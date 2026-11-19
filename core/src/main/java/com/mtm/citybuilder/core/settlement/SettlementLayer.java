@@ -1,32 +1,44 @@
 package com.mtm.citybuilder.core.settlement;
 
 import com.mtm.citybuilder.core.CitySettings;
-import com.mtm.citybuilder.core.cache.RegionCache;
 import com.mtm.citybuilder.core.culture.CultureSample;
 import com.mtm.citybuilder.core.culture.Style;
 import com.mtm.citybuilder.core.noise.Hash;
+import com.mtm.citybuilder.core.plan.PlanStore;
 import com.mtm.citybuilder.core.terrain.Landform;
 import com.mtm.citybuilder.core.terrain.TerrainView;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * L2: settlements and their tiers. Each tier has a grid of its own; in each cell, of a few jittered candidates, the one
- * with the best hinterland (mean suitability around it) is the cell's potential settlement, provided its centre is
- * suitable, away from a culture border and not in a merged-in map, and its hinterland reaches the tier's minimum.
- * A potential settlement stands when
- * <ul>
- *     <li>no settlement of a higher tier lies within the sum of the two radii, and</li>
- *     <li>no potential settlement of its own tier, itself clear of higher tiers, lies within the tier's spacing with a
- *     better hinterland.</li>
- * </ul>
- * Every check looks at a bounded number of neighbouring cells, so a settlement stands or not whatever was asked
- * before, and whichever area asks.
+ * L2: settlements and their tiers, planned once a plan block at a time and stored (see the design document, "规划块").
+ * <p>
+ * Each tier has a grid of its own; in each cell, of a few jittered candidates, the one with the best hinterland (mean
+ * suitability around it) is the cell's potential settlement, provided its centre is suitable, away from a culture
+ * border and not in a merged-in map, and its hinterland reaches the tier's minimum. To plan a tier's block:
+ * <ol>
+ *     <li>the blocks of higher tiers around it are obtained, planned first when they are not yet; potentials within
+ *     the sum of the two radii of a higher settlement are dropped;</li>
+ *     <li>the blocks of its own tier around it that are already planned are read, and potentials within the spacing of
+ *     their settlements are dropped; blocks not yet planned are left alone, and will read this one when planned;</li>
+ *     <li>the potentials left are placed from the best hinterland down, each unless one already placed lies within the
+ *     spacing.</li>
+ * </ol>
+ * The result depends on the order neighbouring blocks are planned in, but never contradicts a block planned before.
+ * One block of a tier is planned at a time; planning a block may plan blocks of higher tiers, never of lower ones, so
+ * the per-tier locks are always taken from the lower tier up.
  */
 public final class SettlementLayer {
     /** Samples across the hinterland's square, of which those inside its circle count. */
     private static final int HINTERLAND_SAMPLES = 7;
+    /** Blocks kept decoded in memory; the store keeps all of them. */
+    private static final int MEMORY = 4096;
+    /** Towns and villages within this many radii of a city or metropolis take its style. */
+    private static final double STYLE_REACH = 3.0;
 
     /** Answers about the layers below that L2 reads. */
     public interface Below {
@@ -38,40 +50,72 @@ public final class SettlementLayer {
         CultureSample culture(double x, double z);
     }
 
-    private record PotentialHolder(Potential potential) {
-    }
-
-    private record SettlementHolder(Settlement settlement) {
-    }
-
     /** The best candidate of a cell. */
-    private record Potential(double x, double z, double hinterland, long tieBreak) {
+    private record Potential(int cellX, int cellZ, double x, double z, double hinterland, long tieBreak) {
         boolean beats(Potential other) {
             return hinterland > other.hinterland || (hinterland == other.hinterland && tieBreak > other.tieBreak);
         }
     }
 
     private final long seed;
+    private final int planVersion;
     private final CitySettings.Settlements config;
     private final TerrainView terrain;
     private final Below below;
-    private final List<RegionCache<PotentialHolder>> potentials = new ArrayList<>();
-    private final List<RegionCache<SettlementHolder>> settlements = new ArrayList<>();
+    private final PlanStore store;
+    private final ReentrantLock[] locks = new ReentrantLock[SettlementTier.values().length];
+    private final Map<String, SettlementBlock> memory = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, SettlementBlock> eldest) {
+            return size() > MEMORY;
+        }
+    };
 
-    public SettlementLayer(long seed, CitySettings settings, TerrainView terrain, Below below) {
+    public SettlementLayer(long seed, CitySettings settings, TerrainView terrain, Below below, PlanStore store) {
         this.seed = seed;
+        this.planVersion = settings.planVersion;
         this.config = settings.settlements;
         this.terrain = terrain;
         this.below = below;
-        for (SettlementTier tier : SettlementTier.values()) {
-            potentials.add(new RegionCache<>(4096, (x, z) -> new PotentialHolder(potential(tier, x, z))));
-            settlements.add(new RegionCache<>(4096, (x, z) -> new SettlementHolder(place(tier, x, z))));
+        this.store = store;
+        for (int k = 0; k < locks.length; k++) {
+            locks[k] = new ReentrantLock();
         }
     }
 
-    /** The settlement of a tier's cell, or null when none stands there. */
+    /** A tier's plan block, planned now if it was not yet. */
+    public SettlementBlock block(SettlementTier tier, int blockX, int blockZ) {
+        String key = SettlementBlock.key(tier, blockX, blockZ);
+        SettlementBlock block = remembered(key);
+        if (block != null) {
+            return block;
+        }
+        ReentrantLock lock = locks[tier.ordinal()];
+        lock.lock();
+        try {
+            block = planned(tier, blockX, blockZ);
+            if (block == null) {
+                block = plan(tier, blockX, blockZ);
+                store.save(key, block.encode());
+                remember(key, block);
+            }
+            return block;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /** Whether a tier's plan block has been planned, in this or an earlier session. */
+    public boolean isPlanned(SettlementTier tier, int blockX, int blockZ) {
+        String key = SettlementBlock.key(tier, blockX, blockZ);
+        return remembered(key) != null || store.load(key) != null;
+    }
+
+    /** The settlement of a tier's cell, or null when none stands there. Plans the cell's block if needed. */
     public Settlement settlement(SettlementTier tier, int cellX, int cellZ) {
-        return settlements.get(tier.ordinal()).get(cellX, cellZ).settlement();
+        CitySettings.Tier settings = tier.of(config);
+        int cells = settings.planBlock / settings.cellSize;
+        return block(tier, Math.floorDiv(cellX, cells), Math.floorDiv(cellZ, cells)).inCell(cellX, cellZ);
     }
 
     /** Settlements of every tier whose centres lie within a rectangle, the highest tiers first. */
@@ -86,18 +130,108 @@ public final class SettlementLayer {
             if (tier.ordinal() > lowest.ordinal()) {
                 break;
             }
-            int size = tier.of(config).cellSize;
-            for (int cx = Math.floorDiv((int) Math.floor(minX), size); cx <= Math.floorDiv((int) Math.floor(maxX), size); cx++) {
-                for (int cz = Math.floorDiv((int) Math.floor(minZ), size); cz <= Math.floorDiv((int) Math.floor(maxZ), size); cz++) {
-                    Settlement settlement = settlement(tier, cx, cz);
-                    if (settlement != null && settlement.x() >= minX && settlement.x() <= maxX
-                            && settlement.z() >= minZ && settlement.z() <= maxZ) {
+            found.addAll(ofTier(tier, minX, minZ, maxX, maxZ));
+        }
+        return found;
+    }
+
+    /** Settlements of one tier whose centres lie within a rectangle, planning the blocks it touches. */
+    private List<Settlement> ofTier(SettlementTier tier, double minX, double minZ, double maxX, double maxZ) {
+        int size = tier.of(config).planBlock;
+        List<Settlement> found = new ArrayList<>();
+        for (int bx = Math.floorDiv((int) Math.floor(minX), size); bx <= Math.floorDiv((int) Math.floor(maxX), size); bx++) {
+            for (int bz = Math.floorDiv((int) Math.floor(minZ), size); bz <= Math.floorDiv((int) Math.floor(maxZ), size); bz++) {
+                for (Settlement settlement : block(tier, bx, bz).settlements()) {
+                    if (settlement.x() >= minX && settlement.x() <= maxX && settlement.z() >= minZ && settlement.z() <= maxZ) {
                         found.add(settlement);
                     }
                 }
             }
         }
         return found;
+    }
+
+    private SettlementBlock remembered(String key) {
+        synchronized (memory) {
+            return memory.get(key);
+        }
+    }
+
+    private void remember(String key, SettlementBlock block) {
+        synchronized (memory) {
+            memory.put(key, block);
+        }
+    }
+
+    /** A block already planned, from memory or the store, or null; does not plan. */
+    private SettlementBlock planned(SettlementTier tier, int blockX, int blockZ) {
+        String key = SettlementBlock.key(tier, blockX, blockZ);
+        SettlementBlock block = remembered(key);
+        if (block == null) {
+            byte[] data = store.load(key);
+            if (data != null) {
+                block = SettlementBlock.decode(data);
+                remember(key, block);
+            }
+        }
+        return block;
+    }
+
+    /** Plans a block; the caller holds the tier's lock and has checked it is not planned yet. */
+    private SettlementBlock plan(SettlementTier tier, int blockX, int blockZ) {
+        CitySettings.Tier settings = tier.of(config);
+        int size = settings.planBlock;
+        double minX = (double) blockX * size;
+        double minZ = (double) blockZ * size;
+        double maxX = minX + size;
+        double maxZ = minZ + size;
+
+        // Higher tiers, as far as they keep potentials out or lend towns and villages their style
+        List<List<Settlement>> higher = new ArrayList<>();
+        for (int k = 0; k < tier.ordinal(); k++) {
+            SettlementTier above = SettlementTier.values()[k];
+            double reach = above.of(config).radius + settings.radius;
+            if (!tier.lowlandOnly() && above.lowlandOnly()) {
+                reach = Math.max(reach, STYLE_REACH * above.of(config).radius);
+            }
+            higher.add(ofTier(above, minX - reach, minZ - reach, maxX + reach, maxZ + reach));
+        }
+
+        // Settlements of the tier already planned around the block; spacing is no wider than a block
+        List<Settlement> neighbours = new ArrayList<>();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx != 0 || dz != 0) {
+                    SettlementBlock neighbour = planned(tier, blockX + dx, blockZ + dz);
+                    if (neighbour != null) {
+                        neighbours.addAll(neighbour.settlements());
+                    }
+                }
+            }
+        }
+
+        List<Potential> potentials = new ArrayList<>();
+        int cells = size / settings.cellSize;
+        for (int i = 0; i < cells; i++) {
+            for (int j = 0; j < cells; j++) {
+                Potential potential = potential(tier, blockX * cells + i, blockZ * cells + j);
+                if (potential != null && clearOfHigher(tier, potential, higher)
+                        && nearest(neighbours, potential.x, potential.z, settings.spacing) == null) {
+                    potentials.add(potential);
+                }
+            }
+        }
+        potentials.sort((a, b) -> a.beats(b) ? -1 : b.beats(a) ? 1 : 0);
+
+        List<Settlement> placed = new ArrayList<>();
+        for (Potential potential : potentials) {
+            if (nearest(placed, potential.x, potential.z, settings.spacing) == null) {
+                placed.add(new Settlement(Hash.of(seed, tier.ordinal(), potential.cellX, potential.cellZ), tier,
+                        potential.cellX, potential.cellZ, potential.x, potential.z, style(tier, potential, higher),
+                        potential.hinterland));
+            }
+        }
+        return new SettlementBlock(planVersion, tier, blockX, blockZ, placed);
     }
 
     private Potential potential(SettlementTier tier, int cellX, int cellZ) {
@@ -111,7 +245,7 @@ public final class SettlementLayer {
                     || below.culture(x, z).margin() < config.borderBuffer) {
                 continue;
             }
-            Potential candidate = new Potential(x, z, hinterland(tier, settings, x, z), hash);
+            Potential candidate = new Potential(cellX, cellZ, x, z, hinterland(tier, settings, x, z), hash);
             if (best == null || candidate.beats(best)) {
                 best = candidate;
             }
@@ -162,74 +296,42 @@ public final class SettlementLayer {
         return tier.lowlandOnly() ? below.broadSuitability(x, z) : below.suitability(x, z);
     }
 
-    /** The potential of a cell, if no higher tier keeps it out. */
-    private Potential clear(SettlementTier tier, int cellX, int cellZ) {
-        Potential potential = potentials.get(tier.ordinal()).get(cellX, cellZ).potential();
-        if (potential == null) {
-            return null;
-        }
+    /** Whether no settlement of a higher tier lies within the sum of the two radii. */
+    private boolean clearOfHigher(SettlementTier tier, Potential potential, List<List<Settlement>> higher) {
         double radius = tier.of(config).radius;
-        for (int higher = 0; higher < tier.ordinal(); higher++) {
-            SettlementTier above = SettlementTier.values()[higher];
-            double reach = above.of(config).radius + radius;
-            if (nearest(above, potential.x, potential.z, reach) != null) {
-                return null;
+        for (int k = 0; k < higher.size(); k++) {
+            double reach = SettlementTier.values()[k].of(config).radius + radius;
+            if (nearest(higher.get(k), potential.x, potential.z, reach) != null) {
+                return false;
             }
         }
-        return potential;
+        return true;
     }
 
-    /** The nearest settlement of a tier within {@code reach} of a position, or null. */
-    private Settlement nearest(SettlementTier tier, double x, double z, double reach) {
-        int size = tier.of(config).cellSize;
+    /** The nearest of some settlements closer than {@code reach} to a position, or null. */
+    private static Settlement nearest(List<Settlement> settlements, double x, double z, double reach) {
         Settlement best = null;
         double bestDistance = reach;
-        for (int cx = Math.floorDiv((int) Math.floor(x - reach), size); cx <= Math.floorDiv((int) Math.floor(x + reach), size); cx++) {
-            for (int cz = Math.floorDiv((int) Math.floor(z - reach), size); cz <= Math.floorDiv((int) Math.floor(z + reach), size); cz++) {
-                Settlement settlement = settlement(tier, cx, cz);
-                if (settlement != null) {
-                    double distance = Math.hypot(settlement.x() - x, settlement.z() - z);
-                    if (distance < bestDistance) {
-                        bestDistance = distance;
-                        best = settlement;
-                    }
-                }
+        for (Settlement settlement : settlements) {
+            double distance = Math.hypot(settlement.x() - x, settlement.z() - z);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = settlement;
             }
         }
         return best;
     }
 
-    private Settlement place(SettlementTier tier, int cellX, int cellZ) {
-        Potential potential = clear(tier, cellX, cellZ);
-        if (potential == null) {
-            return null;
-        }
-        CitySettings.Tier settings = tier.of(config);
-        // A better potential of the same tier, clear of higher tiers, within the tier's spacing keeps this one out
-        double spacing = settings.spacing;
-        int reach = (int) Math.ceil(spacing / settings.cellSize);
-        for (int dx = -reach; dx <= reach; dx++) {
-            for (int dz = -reach; dz <= reach; dz++) {
-                if (dx == 0 && dz == 0) {
-                    continue;
-                }
-                Potential other = clear(tier, cellX + dx, cellZ + dz);
-                if (other != null && Math.hypot(other.x - potential.x, other.z - potential.z) < spacing && other.beats(potential)) {
-                    return null;
-                }
-            }
-        }
-        return new Settlement(Hash.of(seed, tier.ordinal(), cellX, cellZ), tier, cellX, cellZ, potential.x, potential.z,
-                style(tier, potential), potential.hinterland);
-    }
-
-    /** Towns and villages take the style of the city or metropolis they lie near; others that of their own place. */
-    private Style style(SettlementTier tier, Potential potential) {
-        if (tier == SettlementTier.TOWN || tier == SettlementTier.VILLAGE) {
-            for (SettlementTier above : new SettlementTier[]{SettlementTier.METROPOLIS, SettlementTier.CITY}) {
-                Settlement parent = nearest(above, potential.x, potential.z, 3.0 * above.of(config).radius);
-                if (parent != null) {
-                    return parent.style();
+    /** Towns and villages take the style of the metropolis or city they lie near; others that of their own place. */
+    private Style style(SettlementTier tier, Potential potential, List<List<Settlement>> higher) {
+        if (!tier.lowlandOnly()) {
+            for (int k = 0; k < higher.size(); k++) {
+                SettlementTier above = SettlementTier.values()[k];
+                if (above.lowlandOnly()) {
+                    Settlement parent = nearest(higher.get(k), potential.x, potential.z, STYLE_REACH * above.of(config).radius);
+                    if (parent != null) {
+                        return parent.style();
+                    }
                 }
             }
         }

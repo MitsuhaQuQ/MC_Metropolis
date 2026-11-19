@@ -101,13 +101,14 @@ public final class CitySettings {
 
     /**
      * L2: where settlements stand and how big they grow. Each tier has its own grid; in each cell the candidate with the
-     * best hinterland may become a settlement, if no higher tier is too near and no better one of its tier.
+     * best hinterland may become a settlement. Each tier is planned a plan block at a time, once, and stored: within a
+     * block the best potential settlements are placed first, away from higher tiers and from those already placed.
      */
     public static final class Settlements {
-        public Tier metropolis = new Tier(16384, 3000.0, 30000.0, 9, 0.50, 2048.0);
-        public Tier city = new Tier(4096, 1000.0, 8000.0, 9, 0.42, 768.0);
-        public Tier town = new Tier(1024, 300.0, 3000.0, 6, 0.35, 256.0);
-        public Tier village = new Tier(256, 100.0, 400.0, 4, 0.30, 96.0);
+        public Tier metropolis = new Tier(16384, 3000.0, 30000.0, 9, 0.50, 2048.0, 65536);
+        public Tier city = new Tier(4096, 1000.0, 8000.0, 9, 0.42, 768.0, 32768);
+        public Tier town = new Tier(1024, 300.0, 3000.0, 6, 0.35, 256.0, 8192);
+        public Tier village = new Tier(256, 100.0, 400.0, 4, 0.30, 96.0, 4096);
         /**
          * Factor on the suitability of plateaus and mountains when sizing metropolises and cities: plateaus hold towns and
          * small cities, not big ones.
@@ -131,13 +132,20 @@ public final class CitySettings {
         public double minHinterland;
         /** Radius over which the hinterland is measured. */
         public double hinterlandRadius;
-        /** Least distance between two settlements of this tier, in blocks: of two closer ones only the better stands. */
+        /** Least distance between two settlements of this tier, in blocks. */
         public double spacing;
+        /**
+         * Edge of the tier's plan blocks, a multiple of {@code cellSize} no smaller than {@code spacing}: the tier is
+         * planned a block at a time. Smaller blocks read less terrain when planned.
+         */
+        public int planBlock;
 
         public Tier() {
         }
 
-        public Tier(int cellSize, double radius, double spacing, int candidates, double minHinterland, double hinterlandRadius) {
+        public Tier(int cellSize, double radius, double spacing, int candidates, double minHinterland, double hinterlandRadius,
+                    int planBlock) {
+            this.planBlock = planBlock;
             this.cellSize = cellSize;
             this.radius = radius;
             this.candidates = candidates;
@@ -172,6 +180,10 @@ public final class CitySettings {
             Tier tier = tiers[k];
             if (tier.cellSize <= 0 || tier.radius <= 0 || tier.spacing <= 0 || tier.candidates < 1 || tier.hinterlandRadius <= 0) {
                 problems.add("settlement tiers need a positive cellSize, radius, spacing, candidates and hinterlandRadius");
+                break;
+            }
+            if (tier.planBlock <= 0 || tier.planBlock % tier.cellSize != 0 || tier.planBlock < tier.spacing) {
+                problems.add("each settlement tier's planBlock must be a positive multiple of its cellSize, no smaller than its spacing");
                 break;
             }
             if (k > 0 && tiers[k - 1].cellSize % tier.cellSize != 0) {

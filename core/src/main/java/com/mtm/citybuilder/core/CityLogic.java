@@ -7,7 +7,10 @@ import com.mtm.citybuilder.core.culture.CultureSample;
 import com.mtm.citybuilder.core.culture.Style;
 import com.mtm.citybuilder.core.layer.SuitabilityLayer;
 import com.mtm.citybuilder.core.layer.SuitabilityRegion;
+import com.mtm.citybuilder.core.plan.MemoryPlanStore;
+import com.mtm.citybuilder.core.plan.PlanStore;
 import com.mtm.citybuilder.core.settlement.Settlement;
+import com.mtm.citybuilder.core.settlement.SettlementBlock;
 import com.mtm.citybuilder.core.settlement.SettlementLayer;
 import com.mtm.citybuilder.core.settlement.SettlementTier;
 import com.mtm.citybuilder.core.terrain.BroadTerrain;
@@ -18,9 +21,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The one entry point of the city logic: every question about the cities of a world goes here. Everything it answers
- * is a pure function of the seed, the settings, the terrain and the coordinates, so answers do not depend on what was
- * asked before or on which thread asks.
+ * The one entry point of the city logic: every question about the cities of a world goes here.
+ * <p>
+ * L1 and L1.5 are pure functions of the seed, the settings, the terrain and the coordinates, so their answers do not
+ * depend on what was asked before or on which thread asks. L2 is planned a block at a time when first asked for and
+ * kept in the world's {@link PlanStore}: what it answers once it answers for good, but which blocks were planned
+ * before can change how a block is planned (see the design document, "规划块").
  */
 public final class CityLogic {
     private static final Map<WorldKey, CityLogic> WORLDS = new ConcurrentHashMap<>();
@@ -39,7 +45,12 @@ public final class CityLogic {
     private final RegionCache<CultureRegion> culture;
     private final SettlementLayer settlements;
 
+    /** City logic whose plans are kept in memory only, as for tests and tools. */
     public CityLogic(long seed, CitySettings settings, TerrainView terrain) {
+        this(seed, settings, terrain, new MemoryPlanStore());
+    }
+
+    public CityLogic(long seed, CitySettings settings, TerrainView terrain, PlanStore store) {
         List<String> problems = settings.validate();
         if (!problems.isEmpty()) {
             throw new IllegalArgumentException("Invalid city settings: " + String.join("; ", problems));
@@ -68,18 +79,24 @@ public final class CityLogic {
             public CultureSample culture(double x, double z) {
                 return CityLogic.this.culture(x, z);
             }
-        });
+        }, store);
     }
 
-    /** Shared instance for a world, identified by its seed, settings and terrain. */
+    /** Shared instance for a world whose plans are kept in memory only, as for tools. */
     public static CityLogic forWorld(long seed, CitySettings settings, TerrainView terrain) {
-        WorldKey key = new WorldKey(seed, settings.toJson(), terrain.worldKey());
+        WorldKey key = new WorldKey(seed, settings.toJson(), terrain.worldKey(), null);
         return WORLDS.computeIfAbsent(key, k -> new CityLogic(seed, settings, terrain));
     }
 
+    /** Shared instance for a world, identified by its seed, settings, terrain and the store its plans are kept in. */
+    public static CityLogic forWorld(long seed, CitySettings settings, TerrainView terrain, PlanStore store) {
+        WorldKey key = new WorldKey(seed, settings.toJson(), terrain.worldKey(), store);
+        return WORLDS.computeIfAbsent(key, k -> new CityLogic(seed, settings, terrain, store));
+    }
+
     /** Drops the shared instance of a world, as when it is unloaded. */
-    public static void forget(long seed, CitySettings settings, TerrainView terrain) {
-        WORLDS.remove(new WorldKey(seed, settings.toJson(), terrain.worldKey()));
+    public static void forget(long seed, CitySettings settings, TerrainView terrain, PlanStore store) {
+        WORLDS.remove(new WorldKey(seed, settings.toJson(), terrain.worldKey(), store));
     }
 
     public long seed() {
@@ -172,11 +189,21 @@ public final class CityLogic {
         return settlements.within(minX, minZ, maxX, maxZ, lowest);
     }
 
-    /** L2: the settlement of a tier's cell, or null when none stands there. */
+    /** L2: a tier's plan block, planned now if it was not yet. */
+    public SettlementBlock settlementBlock(SettlementTier tier, int blockX, int blockZ) {
+        return settlements.block(tier, blockX, blockZ);
+    }
+
+    /** L2: whether a tier's plan block has been planned. */
+    public boolean isPlanned(SettlementTier tier, int blockX, int blockZ) {
+        return settlements.isPlanned(tier, blockX, blockZ);
+    }
+
+    /** L2: the settlement of a tier's cell, or null when none stands there; plans the cell's block if needed. */
     public Settlement settlement(SettlementTier tier, int cellX, int cellZ) {
         return settlements.settlement(tier, cellX, cellZ);
     }
 
-    private record WorldKey(long seed, String settings, Object terrain) {
+    private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {
     }
 }

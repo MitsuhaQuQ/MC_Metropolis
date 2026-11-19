@@ -7,7 +7,11 @@ import com.mtm.citybuilder.core.terrain.Landform;
 import com.mtm.citybuilder.core.terrain.SyntheticTerrain;
 import com.mtm.citybuilder.core.terrain.TerrainView;
 import com.mtm.citybuilder.core.terrain.WithForeign;
+import com.mtm.citybuilder.core.plan.FilePlanStore;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Path;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,14 +39,9 @@ class SettlementLayerTest {
         return (int) settlements.stream().filter(settlement -> settlement.tier() == tier).count();
     }
 
-    @Test
-    void spacingAndClearanceHoldOnPlains() {
-        List<Settlement> settlements = logic(SyntheticTerrain.flatPlains()).settlements(2000, -20000, 42000, 20000);
-        assertTrue(count(settlements, SettlementTier.METROPOLIS) >= 1, "metropolises");
-        assertTrue(count(settlements, SettlementTier.TOWN) >= 1, "towns");
-        assertTrue(count(settlements, SettlementTier.VILLAGE) >= 10, "villages");
+    /** Same-tier spacing and higher-tier clearance, which hold whatever order blocks were planned in. */
+    private static void assertRules(List<Settlement> settlements) {
         for (Settlement a : settlements) {
-            assertTrue(a.x() >= 0, "no settlement at sea: " + a);
             CitySettings.Tier own = a.tier().of(SETTINGS.settlements);
             for (Settlement b : settlements) {
                 if (a == b) {
@@ -60,17 +59,54 @@ class SettlementLayerTest {
     }
 
     @Test
-    void theSameSettlementsStandWhateverIsAskedFirst() {
+    void spacingAndClearanceHoldOnPlains() {
+        List<Settlement> settlements = logic(SyntheticTerrain.flatPlains()).settlements(2000, -20000, 42000, 20000);
+        assertTrue(count(settlements, SettlementTier.METROPOLIS) >= 1, "metropolises");
+        assertTrue(count(settlements, SettlementTier.TOWN) >= 1, "towns");
+        assertTrue(count(settlements, SettlementTier.VILLAGE) >= 10, "villages");
+        for (Settlement settlement : settlements) {
+            assertTrue(settlement.x() >= 0, "no settlement at sea: " + settlement);
+        }
+        assertRules(settlements);
+    }
+
+    @Test
+    void theRulesHoldAcrossBlocksPlannedInEitherOrder() {
         SyntheticTerrain terrain = SyntheticTerrain.flatPlains();
-        CityLogic first = logic(terrain);
-        List<Settlement> eastThenWest = new ArrayList<>(first.settlements(12000, -6000, 20000, 6000));
-        eastThenWest.addAll(first.settlements(4000, -6000, 12000, 6000));
-        CityLogic second = logic(terrain);
-        List<Settlement> westThenEast = new ArrayList<>(second.settlements(4000, -6000, 12000, 6000));
-        westThenEast.addAll(second.settlements(12000, -6000, 20000, 6000));
-        assertEquals(ids(eastThenWest), ids(westThenEast));
-        // And the halves together are the whole
-        assertEquals(ids(eastThenWest), ids(logic(terrain).settlements(4000, -6000, 20000, 6000)));
+        for (boolean eastFirst : new boolean[]{true, false}) {
+            CityLogic logic = logic(terrain);
+            // Village blocks are 4096 wide: these halves meet on a block border and are planned one after the other
+            if (eastFirst) {
+                logic.settlements(8192, -4096, 16384, 4096);
+                logic.settlements(4096, -4096, 8192, 4096);
+            } else {
+                logic.settlements(4096, -4096, 8192, 4096);
+                logic.settlements(8192, -4096, 16384, 4096);
+            }
+            List<Settlement> all = logic.settlements(4096, -4096, 16384, 4096);
+            assertTrue(count(all, SettlementTier.VILLAGE) >= 10, "villages");
+            assertRules(all);
+        }
+    }
+
+    @Test
+    void theSamePlanningOrderGivesTheSamePlan() {
+        SyntheticTerrain terrain = SyntheticTerrain.flatPlains();
+        assertEquals(ids(logic(terrain).settlements(4000, -6000, 20000, 6000)),
+                ids(logic(terrain).settlements(4000, -6000, 20000, 6000)));
+    }
+
+    @Test
+    void aPlannedBlockIsReadBackAndNeverPlannedAgain(@TempDir Path directory) {
+        SyntheticTerrain terrain = SyntheticTerrain.flatPlains();
+        CityLogic first = new CityLogic(3L, SETTINGS, terrain, new FilePlanStore(directory));
+        List<Settlement> planned = first.settlements(4096, -4096, 12288, 4096);
+        assertFalse(planned.isEmpty());
+        // Another seed over the same store: were anything planned again, it would come out elsewhere
+        CityLogic later = new CityLogic(99L, SETTINGS, terrain, new FilePlanStore(directory));
+        assertTrue(later.isPlanned(SettlementTier.VILLAGE, 1, 0));
+        assertEquals(planned, later.settlements(4096, -4096, 12288, 4096));
+        assertFalse(later.isPlanned(SettlementTier.VILLAGE, 40, 40));
     }
 
     @Test

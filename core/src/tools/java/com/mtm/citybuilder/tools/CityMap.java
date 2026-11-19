@@ -209,13 +209,16 @@ public final class CityMap {
                 break;
             }
             start = System.nanoTime();
-            int size = tier.of(logic.settings().settlements).cellSize;
-            for (int cx = Math.floorDiv((int) (centerX - half), size); cx <= Math.floorDiv((int) (centerX + half), size); cx++) {
-                for (int cz = Math.floorDiv((int) (centerZ - half), size); cz <= Math.floorDiv((int) (centerZ + half), size); cz++) {
-                    logic.settlement(tier, cx, cz);
+            int size = tier.of(logic.settings().settlements).planBlock;
+            int blocks = 0;
+            for (int bx = Math.floorDiv((int) (centerX - half), size); bx <= Math.floorDiv((int) (centerX + half), size); bx++) {
+                for (int bz = Math.floorDiv((int) (centerZ - half), size); bz <= Math.floorDiv((int) (centerZ + half), size); bz++) {
+                    logic.settlementBlock(tier, bx, bz);
+                    blocks++;
                 }
             }
-            System.out.printf("L2 %s: %.1f s%n", tier, (System.nanoTime() - start) / 1e9);
+            // Includes planning the higher tiers' blocks around the area that these blocks read
+            System.out.printf("L2 %s: %d plan blocks in %.1f s%n", tier, blocks, (System.nanoTime() - start) / 1e9);
         }
         List<Settlement> settlements = logic.settlements(centerX - half, centerZ - half, centerX + half, centerZ + half, lowest);
         CitySettings.Settlements config = logic.settings().settlements;
@@ -246,9 +249,25 @@ public final class CityMap {
                     spacingSum += nearest;
                 }
             }
+            if (count > 1 && minimum(settlements, tier) < tier.of(config).spacing) {
+                violations++;
+            }
             System.out.printf("  %-10s %5d, %3.0f%% Asian, mean distance to the nearest of the tier %6.0f%n", tier, count,
                     count == 0 ? 0.0 : 100.0 * asia / count, count < 2 ? 0.0 : spacingSum / count);
         }
-        System.out.println("  settlements within a higher tier's clearance: " + violations);
+        System.out.println("  settlements within a higher tier's clearance, and tiers closer than their spacing: " + violations);
+    }
+
+    /** The least distance between two settlements of a tier. */
+    private static double minimum(List<Settlement> settlements, SettlementTier tier) {
+        double least = Double.POSITIVE_INFINITY;
+        for (Settlement a : settlements) {
+            for (Settlement b : settlements) {
+                if (a != b && a.tier() == tier && b.tier() == tier) {
+                    least = Math.min(least, Math.hypot(a.x() - b.x(), a.z() - b.z()));
+                }
+            }
+        }
+        return least;
     }
 }
