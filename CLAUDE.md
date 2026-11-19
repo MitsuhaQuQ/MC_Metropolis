@@ -45,7 +45,7 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 - **L3 的约定**：每座城的范围（`CityExtent`）只由已存的 L2 聚落和地形决定，不存盘；区域（`UrbanRegion`）收集所有可能伸进来的聚落，按等级取各自的最大伸展范围和农田范围，重叠处取强度高的。L3 读完整 L1 和精细地形（`surfaceHeight`），只用于玩家附近
 - **L4 的约定**：路图和路线只由已存的 L2 和地形决定，不存盘。寻路先用不含河湖的 L1，再只在路线两侧的走廊里查河湖重新寻路，避免在整个窗口里触发水系计算
 - **规划阶段不读精细地形**：worldgen 的 `surfaceHeight`/`waterLevel`/`grade` 要算侵蚀，每点约 2 ms（平滑高度约 18 µs），所以选址偏好、城市范围、道路纵断面都只读平滑高度，水面用湖面和河流查询；精细地形留给区块层。大都市和城市在 256 格的粗网格上判断（`settlements.broadGrid`）。所有层经 `GridCachedTerrain` 读 64 格网格点上的平滑高度、地貌和湖面，避免 worldgen 反复重算
-- **worldgen 的区域缓存只有 64 个区域**（`general.regionCacheSize`，基础区域、水系、湖泊、河流各一份），规划一次要碰几千个区域：这时我们这边并行预取反而更慢（实测：预取完整 L1 使冷启动超过 10 分钟，几十个线程在等水系），不要再加。把它调到 8192 后同样的代码从 93 秒降到约 46 秒，是目前最大的杠杆，但那是 MTM_worldgen 的配置，要向用户说明
+- **worldgen 的区域缓存**：`general.regionCacheSize` 默认 64；MTM_worldgen `75500c6`（2026-11-20，用户让本会话改并推送的）起地形区域是它的 16 倍（1024）、水系湖泊河道 4 倍（256），侵蚀仍 64。规划一次要碰约 3000 个区域，仍装不下：这时我们这边并行预取反而更慢（实测：预取完整 L1 使冷启动超过 10 分钟，几十个线程在等水系），不要再加。`-PworldgenCache=<N>` 可做对照
 - **远处的判断不要触发 worldgen 的水系计算**：完整 L1 要查河流、湖泊，会让 worldgen 计算水系路由（每片第一次 1 秒以上）。大尺度的判断（大都市、城市，以后的城际路线这类看几十公里外的东西）读 `CityLogic.broadSuitability`（基于 `BroadTerrain`，去掉河湖）；只有局部的判断才读完整 L1。`CityLogic.culture` 在交界带以外直接由风格场回答，不读洪泛结果，原因相同。性能问题先用 `cityMap` 的分步计时和 `jstack` 抓线程栈定位，不要猜（曾猜缓存太小，实测无效）
 - `common/`：Minecraft 侧代码。入口 `CityBuilder.init()`（由两个加载器入口调用）；`platform.Platform` 是加载器服务接口，各加载器经 `META-INF/services` 注册实现。common 里不能用 Fabric API 类
 - `fabric/`、`forge/`：只做注册与平台适配，不写逻辑。`shadowJar` 打包 common，`remapJar` 产出正式 jar
