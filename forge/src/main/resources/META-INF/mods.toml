@@ -1,0 +1,39 @@
+modLoader = "javafml"
+loaderVersion = "[47,)"
+license = "MIT"
+
+[[mods]]
+modId = "citybuilder"
+version = "${version}"
+displayName = "City Builder"
+description = '''
+Grows cities across large-scale terrain, alongside Realistic Landforms and MTR.
+'''
+
+[[dependencies.citybuilder]]
+modId = "forge"
+mandatory = true
+versionRange = "[47,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.citybuilder]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.20.1,1.21)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.citybuilder]]
+modId = "mtm_worldgen"
+mandatory = false
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.citybuilder]]
+modId = "mtr"
+mandatory = false
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"

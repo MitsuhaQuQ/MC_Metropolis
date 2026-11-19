@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "citybuilder",
+  "version": "${version}",
+  "name": "City Builder",
+  "description": "Grows cities across large-scale terrain, alongside Realistic Landforms and MTR.",
+  "authors": [],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.mtm.citybuilder.fabric.CityBuilderFabric"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "fabric-api": "*",
+    "minecraft": "~1.20.1",
+    "java": ">=17"
+  },
+  "suggests": {
+    "mtm_worldgen": "*",
+    "mtr": "*"
+  }
+}

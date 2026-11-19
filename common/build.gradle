@@ -1,0 +1,14 @@
+architectury {
+    common(["fabric", "forge"])
+}
+
+// The city logic is compiled into common
+sourceSets.main {
+    java.srcDir rootProject.file("core/src/main/java")
+    resources.srcDir rootProject.file("core/src/main/resources")
+}
+
+dependencies {
+    // Only for the Mixin annotations; no Fabric API classes may be used in common
+    modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
+}
