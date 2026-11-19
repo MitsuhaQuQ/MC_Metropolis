@@ -4,8 +4,12 @@ import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.CitySettings;
 import com.mtm.citybuilder.core.culture.CultureRegion;
 import com.mtm.citybuilder.core.debug.CultureMap;
+import com.mtm.citybuilder.core.debug.SettlementMap;
 import com.mtm.citybuilder.core.debug.SuitabilityMap;
 import com.mtm.citybuilder.core.layer.SuitabilityRegion;
+import com.mtm.citybuilder.core.culture.Style;
+import com.mtm.citybuilder.core.settlement.Settlement;
+import com.mtm.citybuilder.core.settlement.SettlementTier;
 import com.mtm.citybuilder.core.terrain.Landform;
 import com.mtm.citybuilder.core.terrain.WorldgenTerrainView;
 import com.mtm.worldgen.logic.TerrainLogic;
@@ -16,6 +20,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -23,7 +28,7 @@ import java.util.Map;
  * both mods, and prints timings and statistics of that layer over the area of the map.
  * <p>
  * Arguments: seed, centre x, centre z, blocks per pixel, output file, and optionally the image size in pixels and the
- * layer: {@code suitability} (L1, the default) or {@code culture} (L1.5).
+ * layer: {@code suitability} (L1, the default), {@code culture} (L1.5) or {@code settlements} (L2).
  */
 public final class CityMap {
     private CityMap() {
@@ -31,7 +36,7 @@ public final class CityMap {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 5) {
-            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture]");
+            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements]");
             System.exit(2);
         }
         long seed = Long.parseLong(args[0]);
@@ -59,7 +64,12 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = CultureMap.render(logic, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability or culture");
+            case "settlements" -> {
+                settlementStats(logic, centerX, centerZ, half, SettlementMap.lowestTier(scale));
+                start = System.nanoTime();
+                image = SettlementMap.render(logic, centerX, centerZ, scale, size);
+            }
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture or settlements");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();
@@ -170,5 +180,75 @@ public final class CityMap {
         int borderTotal = Math.max(1, borderNodes);
         System.out.printf("  border nodes the floods did not reach (decided by the field): %.0f%%%n", 100.0 * borderUnreached / borderTotal);
         border.forEach((landform, count) -> System.out.printf("  border on %-9s %5.1f%%%n", landform, 100.0 * count / borderTotal));
+    }
+
+    /**
+     * Times placing the settlements of the map's area, and reports how many of each tier stand, how their styles split,
+     * how far each lies from its nearest neighbour of the same tier, and whether any breaks the clearance rules.
+     */
+    private static void settlementStats(CityLogic logic, double centerX, double centerZ, double half, SettlementTier lowest) {
+        // Time the layers below first, then each tier on its own, the highest first as the lower ones read them
+        long start = System.nanoTime();
+        int regionSize = logic.settings().general.regionSize;
+        for (double x = centerX - half; x <= centerX + half; x += regionSize) {
+            for (double z = centerZ - half; z <= centerZ + half; z += regionSize) {
+                logic.suitability(x, z);
+            }
+        }
+        System.out.printf("L1 of the area: %.1f s%n", (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        int cellSize = logic.settings().culture.cellSize;
+        for (double x = centerX - half; x <= centerX + half; x += cellSize) {
+            for (double z = centerZ - half; z <= centerZ + half; z += cellSize) {
+                logic.culture(x, z);
+            }
+        }
+        System.out.printf("L1.5 of the area: %.1f s%n", (System.nanoTime() - start) / 1e9);
+        for (SettlementTier tier : SettlementTier.values()) {
+            if (tier.ordinal() > lowest.ordinal()) {
+                break;
+            }
+            start = System.nanoTime();
+            int size = tier.of(logic.settings().settlements).cellSize;
+            for (int cx = Math.floorDiv((int) (centerX - half), size); cx <= Math.floorDiv((int) (centerX + half), size); cx++) {
+                for (int cz = Math.floorDiv((int) (centerZ - half), size); cz <= Math.floorDiv((int) (centerZ + half), size); cz++) {
+                    logic.settlement(tier, cx, cz);
+                }
+            }
+            System.out.printf("L2 %s: %.1f s%n", tier, (System.nanoTime() - start) / 1e9);
+        }
+        List<Settlement> settlements = logic.settlements(centerX - half, centerZ - half, centerX + half, centerZ + half, lowest);
+        CitySettings.Settlements config = logic.settings().settlements;
+        int violations = 0;
+        for (SettlementTier tier : SettlementTier.values()) {
+            int count = 0;
+            int asia = 0;
+            double spacingSum = 0;
+            for (Settlement a : settlements) {
+                if (a.tier() != tier) {
+                    continue;
+                }
+                count++;
+                if (a.style() == Style.ASIA) {
+                    asia++;
+                }
+                double nearest = Double.POSITIVE_INFINITY;
+                for (Settlement b : settlements) {
+                    double distance = Math.hypot(a.x() - b.x(), a.z() - b.z());
+                    if (b != a && b.tier() == tier) {
+                        nearest = Math.min(nearest, distance);
+                    }
+                    if (b.tier().ordinal() < tier.ordinal() && distance < b.tier().of(config).radius + tier.of(config).radius) {
+                        violations++;
+                    }
+                }
+                if (nearest < Double.POSITIVE_INFINITY) {
+                    spacingSum += nearest;
+                }
+            }
+            System.out.printf("  %-10s %5d, %3.0f%% Asian, mean distance to the nearest of the tier %6.0f%n", tier, count,
+                    count == 0 ? 0.0 : 100.0 * asia / count, count < 2 ? 0.0 : spacingSum / count);
+        }
+        System.out.println("  settlements within a higher tier's clearance: " + violations);
     }
 }

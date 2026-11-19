@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 本项目是 **MTM_worldgen**（`F:\MC\MTM_worldgen`，真实地貌地形生成）与 **MTR Advanced**（`P:\Minecraft-Transit-Railway-391ce5d1800fbc70b7f565571c692287828867fa`，MTR 3.2.2 的运营模拟分支）的共同配套 mod：在大地形尺度上自然地生成城市，并让城市按规则逐步扩展。建筑模型素材取自网络上 MIT、CC 等开放协议授权的作品。
 
-> 当前状态（2026-11-20）：实现顺序的第 1、2 步已完成：`CityLogic`、`CitySettings`、L1 适宜度场、L1.5 文化区、外来区域的排除，以及它们的调试图（`cityMap`）。还没有接进游戏。下文标 **【待决定】** 的是尚未确定的事项，括号内为建议默认值；确定后删除标记。
+> 当前状态（2026-11-20）：实现顺序的第 1–3 步已完成：`CityLogic`、`CitySettings`、L1 适宜度场、L1.5 文化区、外来区域的排除、L2 聚落选址与分级，以及它们的调试图（`cityMap`）。还没有接进游戏。下文标 **【待决定】** 的是尚未确定的事项，括号内为建议默认值；确定后删除标记。
 
 ## 常用命令
 
@@ -18,6 +18,7 @@ gradlew :core:test                              # 单元测试
 gradlew :core:test --tests '*SuitabilityLayerTest.regionBordersMeet'   # 单个测试
 gradlew :core:cityMap -Pseed=12345 -Px=0 -Pz=0 -Pscale=32   # 在 MTM 地形上渲染 L1 适宜度调试图（默认配置），输出到 core/build/debug/
 gradlew :core:cityMap -Players=culture -Pseed=12345 -Px=0 -Pz=0 -Pscale=128   # L1.5 文化区，约 1–2 分钟
+gradlew :core:cityMap -Players=settlements -Pseed=12345 -Px=-10600 -Pz=-10000 -Pscale=16   # L2 聚落叠在 L1 上，冷启动约 40 秒；32 格/像素以上只画大都市和城市
 gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验证）
 ```
 
@@ -31,12 +32,14 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 单一 Minecraft 版本（1.20.1）的 Architectury 布局，Gradle 9.6.0、Architectury Loom 1.17（`loom-remap`，Mojang 映射）、Architectury 插件 3.5、Shadow 9.6.1，加载器版本与 MTM_worldgen 的 1.20.1 相同（`gradle.properties`）。JDK 17。
 
 - `core/`：城市逻辑，纯 Java，**不得引用 Minecraft 类**；不单独出 jar，作为源码目录编进 `common`，单元测试只在这里跑。三个源码集：
-  - `src/main`：入口 `CityLogic.forWorld(seed, CitySettings, TerrainView)`（每个世界一份）；`CitySettings`（JSON，带 `planVersion`，Gson 只在内部类 `Json` 里用）；`cache.RegionCache`（按区域的 LRU，同一区域只算一次）；`noise.Hash`（splitmix64，所有随机选择的来源）；`noise.ValueNoise`（平滑噪声，文化区的风格场）；`layer.SuitabilityLayer`/`SuitabilityRegion`（L1）；`culture.CultureLayer`/`CultureRegion`/`CultureSample`/`Style`（L1.5）；`terrain.ForeignMask`（外来区域的范围）；`debug.SuitabilityMap`、`debug.CultureMap`（调试图渲染）
+  - `src/main`：入口 `CityLogic.forWorld(seed, CitySettings, TerrainView)`（每个世界一份）；`CitySettings`（JSON，带 `planVersion`，Gson 只在内部类 `Json` 里用）；`cache.RegionCache`（按区域的 LRU，同一区域只算一次）；`noise.Hash`（splitmix64，所有随机选择的来源）；`noise.ValueNoise`（平滑噪声，文化区的风格场）；`layer.SuitabilityLayer`/`SuitabilityRegion`（L1）；`culture.CultureLayer`/`CultureRegion`/`CultureSample`/`Style`（L1.5）；`settlement.SettlementLayer`/`Settlement`/`SettlementTier`（L2）；`terrain.BroadTerrain`（去掉河湖的地形，见下）；`terrain.ForeignMask`（外来区域的范围）；`debug.SuitabilityMap`、`debug.CultureMap`、`debug.SettlementMap`（调试图渲染）
   - `src/worldgen`：`core.terrain.WorldgenTerrainView`，把 MTM_worldgen 的 `TerrainLogic` 包成 `TerrainView`。纯 Java，但引用 worldgen，所以不在 `src/main`；common 也编译它（`common/build.gradle` 的 `srcDir`），测试和工具在 core 里直接用
   - `src/tools`：`tools.CityMap`，`cityMap` 任务的入口，不进 jar
 - **L1 的约定**：每个网格节点的值只取决于节点及周围有限范围（`waterReach`、`landformBlend`）的地形，所以任何区域算出的同一节点相同、区域边界两侧连续（`SuitabilityLayerTest.regionBordersMeet`）。水面节点不存值（NaN），插值时不参与，河岸不会被拉低成台阶。离散的地貌类型分数在周围平均后再用，避免硬边。只用 `TerrainView` 的便宜查询
 - **L1.5 的约定**：风格由低频风格场决定（大片区域、各一半），只在场值 0.5 等值线两侧各 `borderHalfWidth` 格的交界带里由地形决定：两种风格从交界带外侧按代价洪泛，交界带里的点归代价低的一方，边界因此落在山脊和海峡上。代价上限 `maxCost` 必须足以穿过整条交界带（哪怕全是山），否则边界会落在某一方能到达的最远处，形成直线（实测踩过）。区域无关性的论证：代价有上限、每格代价至少 1，所以路径不离开窗口；一方到不了时到达的一方获胜，两方都到不了时由风格场决定，都只取决于节点自己。不要回到"文化核心"的做法（为什么见设计文档 L1.5）
 - **外来区域不参与计算**：`TerrainView.foreign(x, z)` 为真的地方（从其他世界拼进来的地图及其缝合带）在每一层都被排除：L1 不存值、不计入邻居；L1.5 洪泛不能穿过。以后各层同样如此。worldgen 不公开缝合带的实际范围，`WorldgenTerrainView` 用 `ForeignMask` 按最大缝合宽度保守排除
+- **L2 的约定**：每级一套网格，每格最多一个聚落；候选点、腹地都由种子和位置决定；成立条件只看有限个相邻格子（上级在两者半径之和以内则不成立；同级最小间距内有更好的、本身不被上级排除的潜在聚落则不成立），所以结果与查询顺序、区域无关。依赖只指向更高的等级和更低的层，不会成环
+- **远处的判断不要触发 worldgen 的水系计算**：完整 L1 要查河流、湖泊，会让 worldgen 计算水系路由（每片第一次 1 秒以上）。大尺度的判断（大都市、城市，以后的城际路线这类看几十公里外的东西）读 `CityLogic.broadSuitability`（基于 `BroadTerrain`，去掉河湖）；只有局部的判断才读完整 L1。`CityLogic.culture` 在交界带以外直接由风格场回答，不读洪泛结果，原因相同。性能问题先用 `cityMap` 的分步计时和 `jstack` 抓线程栈定位，不要猜（曾猜缓存太小，实测无效）
 - `common/`：Minecraft 侧代码。入口 `CityBuilder.init()`（由两个加载器入口调用）；`platform.Platform` 是加载器服务接口，各加载器经 `META-INF/services` 注册实现。common 里不能用 Fabric API 类
 - `fabric/`、`forge/`：只做注册与平台适配，不写逻辑。`shadowJar` 打包 common，`remapJar` 产出正式 jar
 - 对两个兄弟 mod 是软依赖（`fabric.mod.json` 的 `suggests`、`mods.toml` 的 `mandatory = false`），用 `Platform.isModLoaded(CityBuilder.WORLDGEN_MOD_ID / MTR_MOD_ID)` 判断是否存在

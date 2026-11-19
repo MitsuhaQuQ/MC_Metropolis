@@ -21,6 +21,7 @@ public final class CitySettings {
     public General general = new General();
     public Suitability suitability = new Suitability();
     public Culture culture = new Culture();
+    public Settlements settlements = new Settlements();
 
     public static final class General {
         /** Edge of a logic region in blocks: the unit results are cached in, never a boundary of any rule. */
@@ -98,6 +99,54 @@ public final class CitySettings {
         public double climbCost = 0.3;
     }
 
+    /**
+     * L2: where settlements stand and how big they grow. Each tier has its own grid; in each cell the candidate with the
+     * best hinterland may become a settlement, if no higher tier is too near and no better one of its tier.
+     */
+    public static final class Settlements {
+        public Tier metropolis = new Tier(16384, 3000.0, 30000.0, 9, 0.50, 2048.0);
+        public Tier city = new Tier(4096, 1000.0, 8000.0, 9, 0.42, 768.0);
+        public Tier town = new Tier(1024, 300.0, 3000.0, 6, 0.35, 256.0);
+        public Tier village = new Tier(256, 100.0, 400.0, 4, 0.30, 96.0);
+        /**
+         * Factor on the suitability of plateaus and mountains when sizing metropolises and cities: plateaus hold towns and
+         * small cities, not big ones.
+         */
+        public double highlandFactor = 0.3;
+        /** Least suitability at a settlement's centre. */
+        public double minCentre = 0.35;
+        /** Least culture margin at a settlement's centre: no settlement right on a border, which the farmland belt keeps. */
+        public double borderBuffer = 1500.0;
+    }
+
+    /** One tier of settlements. */
+    public static final class Tier {
+        /** Edge of a cell of this tier's grid, in blocks: at most one settlement of the tier per cell. */
+        public int cellSize;
+        /** Radius of a grown settlement of this tier, in blocks; lower tiers keep out of it. */
+        public double radius;
+        /** Jittered candidates per cell. */
+        public int candidates;
+        /** Least hinterland, the mean suitability around a candidate, for a settlement of this tier. */
+        public double minHinterland;
+        /** Radius over which the hinterland is measured. */
+        public double hinterlandRadius;
+        /** Least distance between two settlements of this tier, in blocks: of two closer ones only the better stands. */
+        public double spacing;
+
+        public Tier() {
+        }
+
+        public Tier(int cellSize, double radius, double spacing, int candidates, double minHinterland, double hinterlandRadius) {
+            this.cellSize = cellSize;
+            this.radius = radius;
+            this.candidates = candidates;
+            this.minHinterland = minHinterland;
+            this.hinterlandRadius = hinterlandRadius;
+            this.spacing = spacing;
+        }
+    }
+
     /** Problems with the settings, empty when they are usable. */
     public List<String> validate() {
         List<String> problems = new ArrayList<>();
@@ -117,6 +166,18 @@ public final class CitySettings {
         if (Math.min(Math.min(culture.plainsCost, culture.hillsCost), Math.min(culture.plateauCost,
                 Math.min(culture.mountainsCost, culture.oceanCost))) < 1.0) {
             problems.add("culture costs must be at least 1: maxCost bounds the window by the cheapest cost");
+        }
+        Tier[] tiers = {settlements.metropolis, settlements.city, settlements.town, settlements.village};
+        for (int k = 0; k < tiers.length; k++) {
+            Tier tier = tiers[k];
+            if (tier.cellSize <= 0 || tier.radius <= 0 || tier.spacing <= 0 || tier.candidates < 1 || tier.hinterlandRadius <= 0) {
+                problems.add("settlement tiers need a positive cellSize, radius, spacing, candidates and hinterlandRadius");
+                break;
+            }
+            if (k > 0 && tiers[k - 1].cellSize % tier.cellSize != 0) {
+                problems.add("each settlement tier's cellSize must divide the cellSize of the tier above");
+                break;
+            }
         }
         if (suitability.waterReach < 0 || suitability.highLandFade <= 0) {
             problems.add("suitability.waterReach must not be negative, suitability.highLandFade must be positive");

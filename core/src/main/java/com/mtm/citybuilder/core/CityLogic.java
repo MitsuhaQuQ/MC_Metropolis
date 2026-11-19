@@ -4,8 +4,13 @@ import com.mtm.citybuilder.core.cache.RegionCache;
 import com.mtm.citybuilder.core.culture.CultureLayer;
 import com.mtm.citybuilder.core.culture.CultureRegion;
 import com.mtm.citybuilder.core.culture.CultureSample;
+import com.mtm.citybuilder.core.culture.Style;
 import com.mtm.citybuilder.core.layer.SuitabilityLayer;
 import com.mtm.citybuilder.core.layer.SuitabilityRegion;
+import com.mtm.citybuilder.core.settlement.Settlement;
+import com.mtm.citybuilder.core.settlement.SettlementLayer;
+import com.mtm.citybuilder.core.settlement.SettlementTier;
+import com.mtm.citybuilder.core.terrain.BroadTerrain;
 import com.mtm.citybuilder.core.terrain.TerrainView;
 
 import java.util.List;
@@ -19,17 +24,20 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class CityLogic {
     private static final Map<WorldKey, CityLogic> WORLDS = new ConcurrentHashMap<>();
-    /** Regions kept in memory per layer. */
-    private static final int REGION_CACHE = 64;
+    /** L1 regions kept in memory: about 17 KB each. L2 reads far around each settlement, so keep plenty. */
+    private static final int REGION_CACHE = 1024;
     /** Culture cells kept in memory: each covers 16 logic regions by default. */
-    private static final int CULTURE_CACHE = 16;
+    private static final int CULTURE_CACHE = 64;
 
     private final long seed;
     private final CitySettings settings;
     private final TerrainView terrain;
     private final RegionCache<SuitabilityRegion> suitability;
+    /** L1 without rivers and lakes, for judging places from far away: see {@link #broadSuitability}. */
+    private final RegionCache<SuitabilityRegion> broadSuitability;
     private final CultureLayer cultureLayer;
     private final RegionCache<CultureRegion> culture;
+    private final SettlementLayer settlements;
 
     public CityLogic(long seed, CitySettings settings, TerrainView terrain) {
         List<String> problems = settings.validate();
@@ -41,8 +49,26 @@ public final class CityLogic {
         this.terrain = terrain;
         SuitabilityLayer suitabilityLayer = new SuitabilityLayer(settings, terrain);
         this.suitability = new RegionCache<>(REGION_CACHE, suitabilityLayer::compute);
+        SuitabilityLayer broadLayer = new SuitabilityLayer(settings, new BroadTerrain(terrain));
+        this.broadSuitability = new RegionCache<>(REGION_CACHE, broadLayer::compute);
         this.cultureLayer = new CultureLayer(seed, settings, terrain);
         this.culture = new RegionCache<>(CULTURE_CACHE, cultureLayer::compute);
+        this.settlements = new SettlementLayer(seed, settings, terrain, new SettlementLayer.Below() {
+            @Override
+            public double suitability(double x, double z) {
+                return CityLogic.this.suitability(x, z);
+            }
+
+            @Override
+            public double broadSuitability(double x, double z) {
+                return CityLogic.this.broadSuitability(x, z);
+            }
+
+            @Override
+            public CultureSample culture(double x, double z) {
+                return CityLogic.this.culture(x, z);
+            }
+        });
     }
 
     /** Shared instance for a world, identified by its seed, settings and terrain. */
@@ -84,8 +110,38 @@ public final class CityLogic {
         return suitability.get(regionX, regionZ);
     }
 
-    /** L1.5: the culture a position belongs to, and how deep inside it. */
+    /**
+     * L1 as if the land had no rivers or lakes: the shape of the land, its height and the sea only. Rivers and lakes make
+     * MTM_worldgen compute its drainage, over a second for each new stretch of land, and the big settlement tiers judge
+     * places tens of kilometres apart, so they read this instead.
+     */
+    public double broadSuitability(double x, double z) {
+        int size = settings.general.regionSize;
+        int regionX = Math.floorDiv((int) Math.floor(x), size);
+        int regionZ = Math.floorDiv((int) Math.floor(z), size);
+        int grid = settings.general.gridSize;
+        return broadSuitability.get(regionX, regionZ).interpolate((x - (double) regionX * size) / grid,
+                (z - (double) regionZ * size) / grid);
+    }
+
+    /**
+     * L1.5: the culture a position belongs to, and how deep inside it. The margin is exact within the border band and
+     * a little beyond; further out it is reported as infinite.
+     * <p>
+     * Beyond the band (by two flood cells, so that every flood node around the position is settled too) the style
+     * field alone decides, without the floods: a settled node costs nothing to its own style and at least the band's
+     * width to the other, so the floods would give the same style there, with a margin far above anything that cares.
+     * This keeps the floods, which read terrain far around, to the places near a border.
+     */
     public CultureSample culture(double x, double z) {
+        double distance = cultureLayer.borderDistance(x, z);
+        double settled = settings.culture.borderHalfWidth + 2.0 * settings.culture.floodGrid;
+        if (distance < -settled) {
+            return new CultureSample(Style.ASIA, Double.POSITIVE_INFINITY);
+        }
+        if (distance > settled) {
+            return new CultureSample(Style.EUROPE, Double.POSITIVE_INFINITY);
+        }
         int size = settings.culture.cellSize;
         int cellX = Math.floorDiv((int) Math.floor(x), size);
         int cellZ = Math.floorDiv((int) Math.floor(z), size);
@@ -104,6 +160,21 @@ public final class CityLogic {
      */
     public double styleBorderDistance(double x, double z) {
         return cultureLayer.borderDistance(x, z);
+    }
+
+    /** L2: settlements of every tier whose centres lie within a rectangle, the highest tiers first. */
+    public List<Settlement> settlements(double minX, double minZ, double maxX, double maxZ) {
+        return settlements.within(minX, minZ, maxX, maxZ);
+    }
+
+    /** L2: settlements of the tiers down to {@code lowest} whose centres lie within a rectangle, the highest first. */
+    public List<Settlement> settlements(double minX, double minZ, double maxX, double maxZ, SettlementTier lowest) {
+        return settlements.within(minX, minZ, maxX, maxZ, lowest);
+    }
+
+    /** L2: the settlement of a tier's cell, or null when none stands there. */
+    public Settlement settlement(SettlementTier tier, int cellX, int cellZ) {
+        return settlements.settlement(tier, cellX, cellZ);
     }
 
     private record WorldKey(long seed, String settings, Object terrain) {
