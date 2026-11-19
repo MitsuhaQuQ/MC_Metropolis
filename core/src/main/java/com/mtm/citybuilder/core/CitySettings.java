@@ -108,8 +108,8 @@ public final class CitySettings {
      * block the best potential settlements are placed first, away from higher tiers and from those already placed.
      */
     public static final class Settlements {
-        public Tier metropolis = new Tier(16384, 6000.0, 30000.0, 9, 0.50, 4000.0, 65536);
-        public Tier city = new Tier(4096, 2500.0, 12000.0, 9, 0.42, 1500.0, 32768);
+        public Tier metropolis = new Tier(16384, 6000.0, 30000.0, 9, 0.50, 4000.0, 32768);
+        public Tier city = new Tier(4096, 2500.0, 12000.0, 9, 0.42, 1500.0, 16384);
         public Tier town = new Tier(1024, 500.0, 6000.0, 6, 0.35, 400.0, 8192);
         public Tier village = new Tier(256, 100.0, 700.0, 6, 0.30, 96.0, 4096);
         /**
@@ -117,6 +117,11 @@ public final class CitySettings {
          * small cities, not big ones.
          */
         public double highlandFactor = 0.3;
+        /**
+         * Grid the big tiers judge land on, without rivers and lakes: they compare places tens of kilometres apart,
+         * and every point the terrain is asked for costs, so a coarser grid than the general one.
+         */
+        public int broadGrid = 256;
         /** Least suitability at a settlement's centre. */
         public double minCentre = 0.35;
         /** Least culture margin at a settlement's centre: no settlement right on a border, which the farmland belt keeps. */
@@ -203,7 +208,7 @@ public final class CitySettings {
      */
     public static final class Roads {
         /** Longest trunk and local road, straight from end to end. */
-        public double trunkMaxLength = 30000.0;
+        public double trunkMaxLength = 24000.0;
         public double localMaxLength = 10000.0;
         /** The routing window reaches this far around the two ends, plus {@code windowFactor} of their distance. */
         public double windowMargin = 2000.0;
@@ -304,6 +309,9 @@ public final class CitySettings {
                 problems.add("each settlement tier's cellSize must divide the cellSize of the tier above");
                 break;
             }
+        }
+        if (settlements.broadGrid <= 0 || general.regionSize % settlements.broadGrid != 0) {
+            problems.add("settlements.broadGrid must divide general.regionSize");
         }
         if (extent.sizeMin <= 0 || extent.sizeMax < extent.sizeMin || extent.reach < 1 || extent.suburbTail < 1 || extent.floorRadius <= 0
                 || extent.riseFade <= 0 || extent.steepGrade <= extent.flatGrade) {

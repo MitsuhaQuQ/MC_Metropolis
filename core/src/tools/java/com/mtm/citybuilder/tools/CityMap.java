@@ -59,7 +59,14 @@ public final class CityMap {
         int size = args.length > 5 ? Integer.parseInt(args[5]) : 1024;
         String layer = args.length > 6 ? args[6] : "suitability";
 
-        WorldgenTerrainView terrain = new WorldgenTerrainView(TerrainLogic.forWorld(seed, WorldgenSettings.DEFAULT));
+        WorldgenSettings worldgen = WorldgenSettings.DEFAULT;
+        String cache = System.getProperty("worldgenCache");
+        if (cache != null) {
+            // An experiment: MTM_worldgen's region cache sized differently from its default
+            worldgen = WorldgenSettings.fromJson(WorldgenSettings.DEFAULT.toJson());
+            worldgen.general.regionCacheSize = Integer.parseInt(cache);
+        }
+        WorldgenTerrainView terrain = new WorldgenTerrainView(TerrainLogic.forWorld(seed, worldgen));
         CityLogic logic = CityLogic.forWorld(seed, CitySettings.DEFAULT, terrain);
         double half = size * scale / 2.0;
 
@@ -87,7 +94,8 @@ public final class CityMap {
                 image = ExtentMap.render(logic, centerX, centerZ, scale, size);
             }
             case "spawn" -> {
-                spawn(logic, centerX, centerZ);
+                CountingTerrain counting = new CountingTerrain(terrain, logic.settings().general.regionSize);
+                spawn(new CityLogic(seed, CitySettings.DEFAULT, counting), centerX, centerZ, counting);
                 return;
             }
             case "roads" -> {
@@ -294,21 +302,25 @@ public final class CityMap {
      * as far as it reaches) and the roads passing (L4: the graph, then the routes). Each step reuses what the steps
      * before computed. No map is drawn.
      */
-    private static void spawn(CityLogic logic, double x, double z) {
+    private static void spawn(CityLogic logic, double x, double z, CountingTerrain counting) {
         long all = System.nanoTime();
         long start = System.nanoTime();
         logic.suitability(x, z);
         System.out.printf("spawn L1 at the chunk: %.1f s%n", (System.nanoTime() - start) / 1e9);
+        System.out.println("      " + counting.report());
         start = System.nanoTime();
         logic.culture(x, z);
         System.out.printf("spawn L1.5 at the chunk: %.1f s%n", (System.nanoTime() - start) / 1e9);
+        System.out.println("      " + counting.report());
         start = System.nanoTime();
         UrbanSample sample = logic.urban(x, z);
         System.out.printf("spawn L2 + L3 + L3.5 for the chunk's region: %.1f s (%s)%n", (System.nanoTime() - start) / 1e9,
                 sample.use());
+        System.out.println("      " + counting.report());
         start = System.nanoTime();
         List<RoadEdge> edges = logic.roads(x - 8, z - 8, x + 8, z + 8);
         System.out.printf("spawn L4 graph for the chunk: %d roads in %.1f s%n", edges.size(), (System.nanoTime() - start) / 1e9);
+        System.out.println("      " + counting.report());
         start = System.nanoTime();
         int passing = 0;
         for (RoadEdge edge : edges) {
@@ -321,6 +333,7 @@ public final class CityMap {
             }
         }
         System.out.printf("spawn L4 routes: %.1f s, %d through the chunk%n", (System.nanoTime() - start) / 1e9, passing);
+        System.out.println("      " + counting.report());
         System.out.printf("spawn total: %.1f s%n", (System.nanoTime() - all) / 1e9);
     }
 

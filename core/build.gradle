@@ -54,9 +54,27 @@ tasks.register("cityMap", JavaExec) {
     def out = providers.gradleProperty("out").getOrElse(
             layout.buildDirectory.file("debug/${layer}-${seed}_${x}_${z}_${scale}.png").get().asFile.path)
     args seed, x, z, scale, out, size, layer
+    def threads = providers.gradleProperty("threads")
+    if (threads.isPresent()) {
+        systemProperty "java.util.concurrent.ForkJoinPool.common.parallelism", threads.get()
+    }
+    def worldgenCache = providers.gradleProperty("worldgenCache")
+    if (worldgenCache.isPresent()) {
+        systemProperty "worldgenCache", worldgenCache.get()
+    }
     // -Pjfr=<file.jfr> records where the time goes, for `jfr print --events jdk.ExecutionSample`
     def jfr = providers.gradleProperty("jfr")
     if (jfr.isPresent()) {
-        jvmArgs "-XX:StartFlightRecording=filename=${file(jfr.get()).absolutePath},settings=profile"
+        jvmArgs "-XX:FlightRecorderOptions:stackdepth=512", "-XX:StartFlightRecording=filename=${file(jfr.get()).absolutePath},settings=profile"
     }
+}
+
+// gradlew :core:terrainCost [-Pseed=12345]: what MTM_worldgen's queries cost the first time in a region and after
+tasks.register("terrainCost", JavaExec) {
+    group = "citybuilder"
+    description = "Times MTM_worldgen's terrain queries as the city logic uses them"
+    classpath = sourceSets.tools.runtimeClasspath
+    mainClass = "com.mtm.citybuilder.tools.TerrainCost"
+    maxHeapSize = "6g"
+    args providers.gradleProperty("seed").getOrElse("12345")
 }

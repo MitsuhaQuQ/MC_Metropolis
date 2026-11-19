@@ -3,6 +3,7 @@ package com.mtm.citybuilder.core.road;
 import com.mtm.citybuilder.core.CitySettings;
 import com.mtm.citybuilder.core.settlement.Settlement;
 import com.mtm.citybuilder.core.settlement.SettlementTier;
+import com.mtm.citybuilder.core.terrain.RiverSample;
 import com.mtm.citybuilder.core.terrain.TerrainView;
 
 import java.util.ArrayList;
@@ -29,7 +30,8 @@ import java.util.PriorityQueue;
  * drainage across the whole window; then rivers and lakes are looked up in a corridor around it and the road routed
  * again, crossing them on bridges where it must.
  * <p>
- * <b>Profile</b>: the line is smoothed, sampled every {@code sampleSpacing} blocks, and given a height no steeper than
+ * <b>Profile</b>: the line is smoothed, sampled every {@code sampleSpacing} blocks on the smooth ground (the detailed
+ * ground costs erosion, milliseconds a point: the block layer refines), and given a height no steeper than
  * {@code maxGrade}: halfway between the highest such line under the ground and the lowest one over it, which is the
  * ground itself where the ground is gentle, cuts under ridges and bridges over valleys where it is not. Switchback
  * stretches count their developed length. Where the ground stands far above the road the road is in a tunnel, where
@@ -167,7 +169,8 @@ public final class RoadLayer {
             kind = new byte[width * height];
             suit = new float[width * height];
             ground = new float[width * height];
-            for (int i = 0; i < width; i++) {
+            // Columns read the terrain independently: in parallel
+            java.util.stream.IntStream.range(0, width).parallel().forEach(i -> {
                 for (int j = 0; j < height; j++) {
                     int k = i * height + j;
                     double value = below.broadSuitabilityNode(originX + i, originZ + j);
@@ -175,7 +178,7 @@ public final class RoadLayer {
                     suit[k] = Double.isNaN(value) ? 0f : (float) value;
                     ground[k] = (float) terrain.smoothHeight((double) (originX + i) * grid, (double) (originZ + j) * grid);
                 }
-            }
+            });
         }
 
         int index(int i, int j) {
@@ -451,9 +454,13 @@ public final class RoadLayer {
         for (int i = 0; i < n; i++) {
             xs[i] = samples.get(i)[0];
             zs[i] = samples.get(i)[1];
-            double level = terrain.waterLevel(xs[i], zs[i]);
-            water[i] = !Double.isNaN(level);
-            ground[i] = water[i] ? level : terrain.surfaceHeight((int) Math.floor(xs[i]), (int) Math.floor(zs[i]));
+            // Smooth ground: the detailed ground costs erosion, milliseconds a point; the block layer refines
+            double smoothGround = terrain.smoothHeight(xs[i], zs[i]);
+            double lake = terrain.lakeLevel(xs[i], zs[i]);
+            RiverSample river = terrain.nearestRiver(xs[i], zs[i]);
+            boolean inLake = !Double.isNaN(lake) && lake > smoothGround;
+            water[i] = inLake || (river != null && river.inWater());
+            ground[i] = inLake ? lake : smoothGround;
         }
         // Switchbacks where the ground, smoothed over a few samples, is steeper than the road may be
         double[] smooth = new double[n];

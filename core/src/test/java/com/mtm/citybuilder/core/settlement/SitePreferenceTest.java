@@ -48,7 +48,12 @@ class SitePreferenceTest {
 
         @Override
         public double smoothHeight(double x, double z) {
-            return surfaceHeight((int) x, (int) z);
+            // As MTM_worldgen's: the broad shape of the land, without the river's channel
+            double d = Math.abs(x - 5000.0);
+            if (d < 400) {
+                return 70.5;
+            }
+            return x > 7000 ? 75.0 + 0.1 * (x - 7000) : 75.0;
         }
 
         @Override

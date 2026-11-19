@@ -24,6 +24,7 @@ gradlew :core:cityMap -Players=roads -Pseed=12345 -Px=-10600 -Pz=-10000 -Pscale=
 gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验证）
 ```
 
+- 性能测量（2026-11-20 第一轮优化用的）：`gradlew :core:cityMap -Players=spawn -Px=-10232 -Pz=-10272` 冷启动计时新世界第一个区块要的全部规划（逐层计时、统计碰到的 worldgen 区域数），`-Pjfr=<文件>` 记录 Flight Recorder 采样（`jfr print --events jdk.ExecutionSample`），`-PworldgenCache=<N>` 改 worldgen 的区域缓存大小做对照、`-Pthreads=<N>` 限制公共线程池；`gradlew :core:terrainCost` 计时 worldgen 各查询第一次进入一个区域和之后每点的开销
 - `cityMap` 还接受 `-Psize=<像素>`、`-Pout=<文件>`；它会打印统计：L1 是每个逻辑区域的耗时、各地貌的平均适宜度和海拔；L1.5 是每个文化单元的耗时、亚洲风格的面积比例、边界落在各地貌上的比例、洪泛未到达的边界节点比例。调参后先出图看效果，再看测试
 - 只要统计、不要大图时，用小尺寸覆盖同样的范围，比如 `-Pscale=2048 -Psize=64`
 - 地图很大时注意 worldgen 的区域缓存：调试图按 `debug.PixelBlocks` 分块并行渲染，每块约一个 worldgen 区域；按整行并行会让各线程同时扫过几十个区域，把缓存挤爆（文化区图曾因此从 26 秒变成 400 秒）
@@ -43,6 +44,8 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 - **L2 的约定：一次规划、存入存档（用户 2026-11-20 选定）**：城市不要求由种子完全复现。L2（以后 L3、L4 同样）按每级的规划块（`Tier.planBlock`）第一次被需要时规划，存进 `core.plan.PlanStore`，以后只读不改。规划一个块前先取得（必要时规划）影响它的上级块；同级相邻块只读已存在的，不触发规划；块内按腹地贪心放置。每级一把锁，锁的顺序只从下级到上级。结果与相邻块的规划顺序有关，但后规划的总看得见先规划的，所以不会对不上；给定已存的相邻块，块内结果仍由种子决定。存档里的规划块不能删。L1、L1.5、L5–L8 仍是纯函数、与顺序无关
 - **L3 的约定**：每座城的范围（`CityExtent`）只由已存的 L2 聚落和地形决定，不存盘；区域（`UrbanRegion`）收集所有可能伸进来的聚落，按等级取各自的最大伸展范围和农田范围，重叠处取强度高的。L3 读完整 L1 和精细地形（`surfaceHeight`），只用于玩家附近
 - **L4 的约定**：路图和路线只由已存的 L2 和地形决定，不存盘。寻路先用不含河湖的 L1，再只在路线两侧的走廊里查河湖重新寻路，避免在整个窗口里触发水系计算
+- **规划阶段不读精细地形**：worldgen 的 `surfaceHeight`/`waterLevel`/`grade` 要算侵蚀，每点约 2 ms（平滑高度约 18 µs），所以选址偏好、城市范围、道路纵断面都只读平滑高度，水面用湖面和河流查询；精细地形留给区块层。大都市和城市在 256 格的粗网格上判断（`settlements.broadGrid`）。所有层经 `GridCachedTerrain` 读 64 格网格点上的平滑高度、地貌和湖面，避免 worldgen 反复重算
+- **worldgen 的区域缓存只有 64 个区域**（`general.regionCacheSize`，基础区域、水系、湖泊、河流各一份），规划一次要碰几千个区域：这时我们这边并行预取反而更慢（实测：预取完整 L1 使冷启动超过 10 分钟，几十个线程在等水系），不要再加。把它调到 8192 后同样的代码从 93 秒降到约 46 秒，是目前最大的杠杆，但那是 MTM_worldgen 的配置，要向用户说明
 - **远处的判断不要触发 worldgen 的水系计算**：完整 L1 要查河流、湖泊，会让 worldgen 计算水系路由（每片第一次 1 秒以上）。大尺度的判断（大都市、城市，以后的城际路线这类看几十公里外的东西）读 `CityLogic.broadSuitability`（基于 `BroadTerrain`，去掉河湖）；只有局部的判断才读完整 L1。`CityLogic.culture` 在交界带以外直接由风格场回答，不读洪泛结果，原因相同。性能问题先用 `cityMap` 的分步计时和 `jstack` 抓线程栈定位，不要猜（曾猜缓存太小，实测无效）
 - `common/`：Minecraft 侧代码。入口 `CityBuilder.init()`（由两个加载器入口调用）；`platform.Platform` 是加载器服务接口，各加载器经 `META-INF/services` 注册实现。common 里不能用 Fabric API 类
 - `fabric/`、`forge/`：只做注册与平台适配，不写逻辑。`shadowJar` 打包 common，`remapJar` 产出正式 jar

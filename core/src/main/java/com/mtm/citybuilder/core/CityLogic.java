@@ -22,6 +22,7 @@ import com.mtm.citybuilder.core.settlement.SettlementBlock;
 import com.mtm.citybuilder.core.settlement.SettlementLayer;
 import com.mtm.citybuilder.core.settlement.SettlementTier;
 import com.mtm.citybuilder.core.terrain.BroadTerrain;
+import com.mtm.citybuilder.core.terrain.GridCachedTerrain;
 import com.mtm.citybuilder.core.terrain.TerrainView;
 
 import java.util.ArrayList;
@@ -41,6 +42,8 @@ public final class CityLogic {
     private static final Map<WorldKey, CityLogic> WORLDS = new ConcurrentHashMap<>();
     /** L1 regions kept in memory: about 17 KB each. L2 reads far around each settlement, so keep plenty. */
     private static final int REGION_CACHE = 1024;
+    /** Regions of terrain samples kept in memory: about 36 KB each. */
+    private static final int TERRAIN_CACHE = 2048;
     /** Settlement extents kept in memory per tier. */
     private static final int EXTENT_CACHE = 2048;
     /** Culture cells kept in memory: each covers 16 logic regions by default. */
@@ -52,6 +55,9 @@ public final class CityLogic {
     private final RegionCache<SuitabilityRegion> suitability;
     /** L1 without rivers and lakes, for judging places from far away: see {@link #broadSuitability}. */
     private final RegionCache<SuitabilityRegion> broadSuitability;
+    /** The same on the coarser grid the big settlement tiers judge land on: see {@link #coarseSuitability}. */
+    private final RegionCache<SuitabilityRegion> coarseSuitability;
+    private final int coarseGrid;
     private final CultureLayer cultureLayer;
     private final RegionCache<CultureRegion> culture;
     private final SettlementLayer settlements;
@@ -73,11 +79,18 @@ public final class CityLogic {
         }
         this.seed = seed;
         this.settings = settings;
+        // Every layer reads the terrain through one cache of the coarse grid's nodes: see GridCachedTerrain
+        terrain = new GridCachedTerrain(terrain, settings.general.gridSize, settings.general.regionSize, TERRAIN_CACHE);
         this.terrain = terrain;
         SuitabilityLayer suitabilityLayer = new SuitabilityLayer(settings, terrain);
         this.suitability = new RegionCache<>(REGION_CACHE, suitabilityLayer::compute);
         SuitabilityLayer broadLayer = new SuitabilityLayer(settings, new BroadTerrain(terrain));
         this.broadSuitability = new RegionCache<>(REGION_CACHE, broadLayer::compute);
+        CitySettings coarse = CitySettings.fromJson(settings.toJson());
+        coarse.general.gridSize = settings.settlements.broadGrid;
+        this.coarseGrid = coarse.general.gridSize;
+        SuitabilityLayer coarseLayer = new SuitabilityLayer(coarse, new BroadTerrain(terrain));
+        this.coarseSuitability = new RegionCache<>(REGION_CACHE, coarseLayer::compute);
         this.cultureLayer = new CultureLayer(seed, settings, terrain);
         this.culture = new RegionCache<>(CULTURE_CACHE, cultureLayer::compute);
         this.settlements = new SettlementLayer(seed, settings, terrain, new SettlementLayer.Below() {
@@ -88,13 +101,14 @@ public final class CityLogic {
 
             @Override
             public double broadSuitability(double x, double z) {
-                return CityLogic.this.broadSuitability(x, z);
+                return CityLogic.this.coarseSuitability(x, z);
             }
 
             @Override
             public CultureSample culture(double x, double z) {
                 return CityLogic.this.culture(x, z);
             }
+
         }, store);
         this.extentLayer = new ExtentLayer(settings, terrain, new ExtentLayer.Below() {
             @Override
@@ -137,6 +151,7 @@ public final class CityLogic {
             public List<Settlement> settlements(double minX, double minZ, double maxX, double maxZ, SettlementTier lowest) {
                 return CityLogic.this.settlements(minX, minZ, maxX, maxZ, lowest);
             }
+
         });
     }
 
@@ -189,6 +204,18 @@ public final class CityLogic {
         int i = nodeX - regionX * cells;
         int j = nodeZ - regionZ * cells;
         return region.empty(i, j) ? Double.NaN : region.node(i, j);
+    }
+
+    /**
+     * {@link #broadSuitability} on the coarser grid of {@code settlements.broadGrid}: what metropolises and cities
+     * are judged by, across tens of kilometres, where each point asked of the terrain costs.
+     */
+    public double coarseSuitability(double x, double z) {
+        int size = settings.general.regionSize;
+        int regionX = Math.floorDiv((int) Math.floor(x), size);
+        int regionZ = Math.floorDiv((int) Math.floor(z), size);
+        return coarseSuitability.get(regionX, regionZ).interpolate((x - (double) regionX * size) / coarseGrid,
+                (z - (double) regionZ * size) / coarseGrid);
     }
 
     /** L1 without rivers and lakes at a coarse grid node; NaN at sea and in merged-in maps. */

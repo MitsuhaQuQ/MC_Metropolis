@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.IntStream;
 
 /**
  * L2: settlements and their tiers, planned once a plan block at a time and stored (see the design document, "规划块").
@@ -50,6 +51,7 @@ public final class SettlementLayer {
         double broadSuitability(double x, double z);
 
         CultureSample culture(double x, double z);
+
     }
 
     /** The best candidate of a cell. */
@@ -216,17 +218,13 @@ public final class SettlementLayer {
             }
         }
 
-        List<Potential> potentials = new ArrayList<>();
+        // Each cell's potential is independent of the others: computed in parallel, collected in cell order
         int cells = size / settings.cellSize;
-        for (int i = 0; i < cells; i++) {
-            for (int j = 0; j < cells; j++) {
-                Potential potential = potential(tier, blockX * cells + i, blockZ * cells + j);
-                if (potential != null && clearOfHigher(tier, potential, higher)
-                        && nearest(neighbours, potential.x, potential.z, settings.spacing) == null) {
-                    potentials.add(potential);
-                }
-            }
-        }
+        List<Potential> potentials = new ArrayList<>(IntStream.range(0, cells * cells).parallel()
+                .mapToObj(c -> potential(tier, blockX * cells + c / cells, blockZ * cells + c % cells))
+                .filter(potential -> potential != null && clearOfHigher(tier, potential, higher)
+                        && nearest(neighbours, potential.x, potential.z, settings.spacing) == null)
+                .toList());
         potentials.sort((a, b) -> a.beats(b) ? -1 : b.beats(a) ? 1 : 0);
 
         List<Settlement> placed = new ArrayList<>();

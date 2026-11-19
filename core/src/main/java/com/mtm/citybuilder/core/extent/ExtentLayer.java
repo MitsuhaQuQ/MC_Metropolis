@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.stream.IntStream;
 
 /**
  * L3, the built-up extent of each settlement, and L3.5, the use of the land around.
@@ -96,7 +97,8 @@ public final class ExtentLayer {
         byte[] kind = new byte[size * size];
         float[] suit = new float[size * size];
         float[] height = new float[size * size];
-        for (int i = 0; i < size; i++) {
+        // Rows read the terrain independently: in parallel
+        IntStream.range(0, size).parallel().forEach(i -> {
             for (int j = 0; j < size; j++) {
                 int k = i * size + j;
                 int nodeX = originX + i;
@@ -107,16 +109,16 @@ public final class ExtentLayer {
                 if (!Double.isNaN(s)) {
                     kind[k] = LAND;
                     suit[k] = (float) s;
-                    height[k] = (float) terrain.surfaceHeight(nodeX * grid, nodeZ * grid);
+                    height[k] = (float) terrain.smoothHeight(x, z);
                 } else if (terrain.foreign(x, z) || terrain.landform(x, z) == Landform.OCEAN) {
                     kind[k] = BLOCKED;
                 } else {
                     kind[k] = WATER;
-                    double level = terrain.waterLevel(x, z);
-                    height[k] = (float) (Double.isNaN(level) ? terrain.surfaceHeight(nodeX * grid, nodeZ * grid) : level);
+                    double level = terrain.lakeLevel(x, z);
+                    height[k] = (float) (Double.isNaN(level) ? terrain.smoothHeight(x, z) : level);
                 }
             }
-        }
+        });
 
         float[] cost = new float[size * size];
         Arrays.fill(cost, Float.POSITIVE_INFINITY);
@@ -288,8 +290,10 @@ public final class ExtentLayer {
         Arrays.fill(owner, -1);
         int baseX = regionX * cells;
         int baseZ = regionZ * cells;
+        // Extents are independent of each other: compute those not cached yet in parallel
+        List<CityExtent> extents = around.parallelStream().map(below::extent).toList();
         for (int s = 0; s < around.size(); s++) {
-            CityExtent extent = below.extent(around.get(s));
+            CityExtent extent = extents.get(s);
             int fromI = Math.max(0, extent.originX() - baseX);
             int toI = Math.min(cells, extent.originX() + extent.size() - 1 - baseX);
             int fromJ = Math.max(0, extent.originZ() - baseZ);

@@ -6,8 +6,8 @@ import com.mtm.citybuilder.core.terrain.TerrainView;
 
 /**
  * Where within good land a town or village prefers to stand, as real ones do: by a river but raised above it (a natural
- * levee, a terrace or fan edge), or at the foot of hills; not down on a flood plain. Reads the detailed ground, which
- * the planning of towns and villages near the player can afford.
+ * levee, a terrace or fan edge), or at the foot of hills; not down on a flood plain. Reads the smooth ground and lakes
+ * only: the detailed ground costs MTM_worldgen's erosion, milliseconds a point, far too much for planning.
  */
 public final class SitePreference {
     private static final int RING = 8;
@@ -61,13 +61,11 @@ public final class SitePreference {
         return new Site(bank, rise, climb, Math.max(-1.0, Math.min(1.0, value)));
     }
 
-    /** The ground at a position, or the water surface where there is water: what floods. */
+    /** The smooth ground at a position, or the surface of a lake over it: what floods. */
     private double ground(double x, double z) {
-        double water = terrain.waterLevel(x, z);
-        if (!Double.isNaN(water)) {
-            return water;
-        }
-        return Math.max(terrain.surfaceHeight((int) Math.floor(x), (int) Math.floor(z)), terrain.seaLevel());
+        double ground = Math.max(terrain.smoothHeight(x, z), terrain.seaLevel());
+        double lake = terrain.lakeLevel(x, z);
+        return Double.isNaN(lake) ? ground : Math.max(ground, lake);
     }
 
     private static double clamp(double value) {
