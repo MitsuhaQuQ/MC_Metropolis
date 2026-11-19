@@ -12,3 +12,8 @@ dependencies {
     // Only for the Mixin annotations; no Fabric API classes may be used in common
     modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
 }
+
+dependencies {
+    // MTM_worldgen, compiled against but not bundled: only code behind Platform.isModLoaded may touch it
+    modCompileOnly files(rootProject.worldgenJar("fabric"))
+}

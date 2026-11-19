@@ -3,6 +3,10 @@
 dependencies {
     testImplementation "org.junit.jupiter:junit-jupiter:${rootProject.junit_version}"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
+    // Tests may run the city logic on real MTM terrain: MTM_worldgen's terrain logic is plain Java as well
+    testImplementation files(rootProject.worldgenJar("fabric"))
+    testImplementation "com.google.code.gson:gson:${rootProject.gson_version}"
 }
 
 test {

@@ -15,6 +15,21 @@ allprojects {
 
 def javaVersion = rootProject.java_version as int
 
+// MTM_worldgen's mod jar for a loader, whatever its version: the one its own build last left in
+// versions/<Minecraft version>/<loader>/build/libs (named mtm_worldgen-<loader>-<version>-<Minecraft version>.jar)
+ext.worldgenJar = { String loader ->
+    def mc = rootProject.minecraft_version
+    def dir = file("${rootProject.mtm_worldgen_dir}/versions/${mc}/${loader}/build/libs")
+    def prefix = "mtm_worldgen-${loader}-"
+    def suffix = "-${mc}.jar"
+    def jars = (dir.listFiles() ?: []).findAll { it.name.startsWith(prefix) && it.name.endsWith(suffix) }
+    if (jars.isEmpty()) {
+        throw new GradleException("No MTM_worldgen ${loader} jar for ${mc} in ${dir}. Build it in ${rootProject.mtm_worldgen_dir} " +
+                "(gradlew :${mc}:${loader}:build), or set mtm_worldgen_dir")
+    }
+    return jars.max { it.lastModified() }
+}
+
 // Every module: plain Java with the same toolchain
 subprojects {
     apply plugin: "java"

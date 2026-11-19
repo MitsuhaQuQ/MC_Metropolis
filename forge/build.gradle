@@ -41,3 +41,8 @@ shadowJar {
 remapJar {
     inputFile.set shadowJar.archiveFile
 }
+
+dependencies {
+    // MTM_worldgen in the dev client and server, so its terrain is there to build on
+    modLocalRuntime files(rootProject.worldgenJar("forge"))
+}

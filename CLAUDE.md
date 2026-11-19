@@ -27,6 +27,10 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 - `common/`：Minecraft 侧代码。入口 `CityBuilder.init()`（由两个加载器入口调用）；`platform.Platform` 是加载器服务接口，各加载器经 `META-INF/services` 注册实现。common 里不能用 Fabric API 类
 - `fabric/`、`forge/`：只做注册与平台适配，不写逻辑。`shadowJar` 打包 common，`remapJar` 产出正式 jar
 - 对两个兄弟 mod 是软依赖（`fabric.mod.json` 的 `suggests`、`mods.toml` 的 `mandatory = false`），用 `Platform.isModLoaded(CityBuilder.WORLDGEN_MOD_ID / MTR_MOD_ID)` 判断是否存在
+- **地形接入（直接依赖 jar，用户 2026-11-19 选定）**：编译时直接引用 MTM_worldgen 构建好的 jar（`build.gradle` 的 `worldgenJar(loader)`，从 `gradle.properties` 的 `mtm_worldgen_dir` 下 `versions/1.20.1/<加载器>/build/libs` 取最新修改的 `mtm_worldgen-<加载器>-*-1.20.1.jar`，不绑定版本号；运行时也接受任何版本；找不到 jar 时构建报错，先在 MTM_worldgen 里 `gradlew :1.20.1:fabric:build :1.20.1:forge:build`）。common 用 `modCompileOnly`（不打进 jar），fabric/forge 用 `modLocalRuntime`（开发运行时带上），core 的测试用 `testImplementation`
+  - 城市逻辑只通过 core 的 `core.terrain.TerrainView` 读地形（地表高度、河湖水面、坡度、地貌、群系），不直接用 `TerrainLogic`，这样没装 MTM_worldgen 时也能加载；core 的**测试**可以直接用 `TerrainLogic.forWorld(seed, WorldgenSettings.DEFAULT)` 在真实地形上跑
+  - 唯一引用 MTM_worldgen 类的是 `compat.worldgen.WorldgenTerrain`（包装 `TerrainLogic`，经 `MtmGenerators.terrainLogic(level)` 取得某个世界的实例），只能经 `terrain.Terrains.of(level)` 在 `isModLoaded` 判断之后加载；它返回 null 表示没装 MTM_worldgen 或该维度不是 MTM 地形
+  - 不看版本号，真正的约束是用到的方法签名：`TerrainLogic`（`surfaceHeight`、`sampleWaterLevel`、`sampleGrade`、`sampleLandformKind`、`sampleBiome`、`forWorld`）、`TerrainLogic.Landform` 的取值、`MtmGenerators.terrainLogic(ServerLevel)`、`WorldgenSettings.DEFAULT`。它们改名或改签名时这里编译失败；已发布的 citybuilder 遇到这样的 MTM_worldgen 会在运行时报 `NoSuchMethodError`
 - 还没有 Mixin 和 access widener。加 Mixin 时注意 MTM_worldgen CLAUDE.md "开发约定"里关于 1.20.1 refmap 的坑（Fabric jar 的 mixin 配置要由 `shadowJar` 补上 `refmap`，否则开发环境正常、正式游戏启动即崩），可照搬它的 `remapJar` 检查
 
 ## 语言
@@ -54,7 +58,8 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 
 - 已采用（2026-11-19 搭骨架时按默认值）：Minecraft 1.20.1（MTR 只构建 1.20.1，以后随 MTM_worldgen 的版本链扩展）；Fabric + Forge；对兄弟 mod 软依赖；mod id `citybuilder`、包 `com.mtm.citybuilder`、显示名 City Builder
 - 【待决定】许可证（元数据暂写 MIT，与 MTM_worldgen 一致；仓库里还没有 LICENSE 文件）
-- 【待决定】接入兄弟 mod 的方式（编译期依赖它们的 jar，还是反射/接口；MTM_worldgen 的 Amidst 是靠反射调用 `TerrainLogic`）
+- 地形接入：直接依赖 MTM_worldgen 的 jar（见"代码结构"）
+- 【待决定】MTR 的接入方式（建议同样直接依赖其 1.20.1 jar）
 
 ## 建筑素材的授权
 
