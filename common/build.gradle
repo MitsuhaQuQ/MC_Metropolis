@@ -16,4 +16,6 @@ dependencies {
 dependencies {
     // MTM_worldgen, compiled against but not bundled: only code behind Platform.isModLoaded may touch it
     modCompileOnly files(rootProject.worldgenJar("fabric"))
+    // MTR Advanced, the same way
+    modCompileOnly files(rootProject.mtrJar("fabric", "MTM_Logic"))
 }

@@ -30,7 +30,12 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 - **地形接入（直接依赖 jar，用户 2026-11-19 选定）**：编译时直接引用 MTM_worldgen 构建好的 jar（`build.gradle` 的 `worldgenJar(loader)`，从 `gradle.properties` 的 `mtm_worldgen_dir` 下 `versions/1.20.1/<加载器>/build/libs` 取最新修改的 `mtm_worldgen-<加载器>-*-1.20.1.jar`，不绑定版本号；运行时也接受任何版本；找不到 jar 时构建报错，先在 MTM_worldgen 里 `gradlew :1.20.1:fabric:build :1.20.1:forge:build`）。common 用 `modCompileOnly`（不打进 jar），fabric/forge 用 `modLocalRuntime`（开发运行时带上），core 的测试用 `testImplementation`
   - 城市逻辑只通过 core 的 `core.terrain.TerrainView` 读地形（地表高度、河湖水面、坡度、地貌、群系），不直接用 `TerrainLogic`，这样没装 MTM_worldgen 时也能加载；core 的**测试**可以直接用 `TerrainLogic.forWorld(seed, WorldgenSettings.DEFAULT)` 在真实地形上跑
   - 唯一引用 MTM_worldgen 类的是 `compat.worldgen.WorldgenTerrain`（包装 `TerrainLogic`，经 `MtmGenerators.terrainLogic(level)` 取得某个世界的实例），只能经 `terrain.Terrains.of(level)` 在 `isModLoaded` 判断之后加载；它返回 null 表示没装 MTM_worldgen 或该维度不是 MTM 地形
-  - 不看版本号，真正的约束是用到的方法签名：`TerrainLogic`（`surfaceHeight`、`sampleWaterLevel`、`sampleGrade`、`sampleLandformKind`、`sampleBiome`、`forWorld`）、`TerrainLogic.Landform` 的取值、`MtmGenerators.terrainLogic(ServerLevel)`、`WorldgenSettings.DEFAULT`。它们改名或改签名时这里编译失败；已发布的 citybuilder 遇到这样的 MTM_worldgen 会在运行时报 `NoSuchMethodError`
+  - 不看版本号，真正的约束是用到的方法签名（MTR 同理，见下条）：`TerrainLogic`（`surfaceHeight`、`sampleWaterLevel`、`sampleGrade`、`sampleLandformKind`、`sampleBiome`、`forWorld`）、`TerrainLogic.Landform` 的取值、`MtmGenerators.terrainLogic(ServerLevel)`、`WorldgenSettings.DEFAULT`。它们改名或改签名时这里编译失败；已发布的 citybuilder 遇到这样的 MTM_worldgen 会在运行时报 `NoSuchMethodError`
+- **MTR 接入（直接依赖 jar，用户 2026-11-19 选定）**：取 `gradle.properties` 的 `mtr_jar_dir`（默认 `P:/mtr-ante/test-jars/merged`，MTR 构建流程 `round.sh` 把 jar 复制到这里）里最新修改的 `MTR-merged-<加载器>-1.20.1-MTM_Logic-*.jar`（不含 `-server`），不绑定版本。common `modCompileOnly` 逻辑 jar；fabric/forge 的开发运行带上逻辑 jar、`MTM_Assets` jar 和 MTR 需要的 Architectury API（`architectury_api_version`，与 MTR 构建所用相同）
+  - 城市逻辑通过 core 的 `core.transit.TransitView` 读线网，目前只有车站（`StationInfo`：id、名称、颜色、各矩形区域及高度范围；区域与高度取自 MTR 分支的 `Station.getRectangles()`/`getHeight(rect)`）。返回的是快照，可在任意线程使用
+  - 唯一引用 MTR 类的是 `compat.mtr.MtrTransit`（经 `RailwayData.getInstance(level)`），只能经 `transit.Transits.of(level)` 加载；MTR 的数据由服务端线程修改，`stations()` 要在服务端线程调用
+  - 依赖的 MTR 签名：`RailwayData.getInstance(Level)`、`RailwayData.stations`、`Station.getRectangles()`、`Station.getHeight(int[])`、`NameColorDataBase` 的 `id`/`name`/`color` 字段
+- 开发运行（`runClient`/`runServer`）带上两个兄弟 mod 和 Architectury API 的配置能解析，但还没实际启动验证过
 - 还没有 Mixin 和 access widener。加 Mixin 时注意 MTM_worldgen CLAUDE.md "开发约定"里关于 1.20.1 refmap 的坑（Fabric jar 的 mixin 配置要由 `shadowJar` 补上 `refmap`，否则开发环境正常、正式游戏启动即崩），可照搬它的 `remapJar` 检查
 
 ## 语言
@@ -49,8 +54,8 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 - 多版本：1.20.1 为主版本（Fabric、Forge），另有 1.20.4/1.21.1/1.21.4（Fabric、NeoForge）和 26.3；按版本分模块 `versions/<版本>/{common,fabric,...}`，Architectury Loom 1.17
 - 村庄已被限制在平坦地形（`villageRadius`/`villageMaxRelief`，`ChunkGeneratorMixin`）；原版村庄与本 mod 城市的关系需考虑
 
-**MTR Advanced**（Architectury，Fabric + Forge，JDK 17）
-- **只构建 Minecraft 1.20.1**
+**MTR Advanced**（mod id `mtr`，Architectury，Fabric + Forge，JDK 17）
+- **只构建 Minecraft 1.20.1**；运行时需要 Architectury API
 - 服务端核心数据在 `common/src/main/java/mtr/data/`（每维度一个 `RailwayData`：车站、线路、车厂等）；新运营规则放在纯 Java 8 的 `transit-sim/`
 - 其数据类以 msgpack 存档、`FriendlyByteBuf` 包、`update(key, packet)` 三种方式读写；本 mod 若创建车站/线路，应走 MTR 现有的数据与同步路径，而不是直接改存档
 
@@ -58,8 +63,7 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 
 - 已采用（2026-11-19 搭骨架时按默认值）：Minecraft 1.20.1（MTR 只构建 1.20.1，以后随 MTM_worldgen 的版本链扩展）；Fabric + Forge；对兄弟 mod 软依赖；mod id `citybuilder`、包 `com.mtm.citybuilder`、显示名 City Builder
 - 【待决定】许可证（元数据暂写 MIT，与 MTM_worldgen 一致；仓库里还没有 LICENSE 文件）
-- 地形接入：直接依赖 MTM_worldgen 的 jar（见"代码结构"）
-- 【待决定】MTR 的接入方式（建议同样直接依赖其 1.20.1 jar）
+- 地形与 MTR 接入：都直接依赖对方构建好的 jar，不绑定版本（见"代码结构"）
 
 ## 建筑素材的授权
 

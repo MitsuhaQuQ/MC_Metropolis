@@ -30,6 +30,18 @@ ext.worldgenJar = { String loader ->
     return jars.max { it.lastModified() }
 }
 
+// An MTR Advanced jar for a loader, whatever its version: the newest MTR-merged-<loader>-<Minecraft version>-<mod>-*.jar
+// in mtr_jar_dir, where <mod> is MTM_Logic (the mod's code) or MTM_Assets; server jars are left out
+ext.mtrJar = { String loader, String mod ->
+    def dir = file(rootProject.mtr_jar_dir)
+    def prefix = "MTR-merged-${loader}-${rootProject.minecraft_version}-${mod}-"
+    def jars = (dir.listFiles() ?: []).findAll { it.name.startsWith(prefix) && it.name.endsWith(".jar") && !it.name.endsWith("-server.jar") }
+    if (jars.isEmpty()) {
+        throw new GradleException("No MTR ${mod} jar (${prefix}*.jar) in ${dir}. Build MTR Advanced, or set mtr_jar_dir")
+    }
+    return jars.max { it.lastModified() }
+}
+
 // Every module: plain Java with the same toolchain
 subprojects {
     apply plugin: "java"
@@ -60,6 +72,8 @@ configure(subprojects.findAll { it.name != "core" }) {
 
     repositories {
         maven { url = "https://maven.minecraftforge.net/" }
+        // Architectury API, which MTR needs in dev runs
+        maven { url = "https://maven.architectury.dev/" }
     }
 
     base {

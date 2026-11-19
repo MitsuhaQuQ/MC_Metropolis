@@ -51,4 +51,7 @@ remapJar {
 dependencies {
     // MTM_worldgen in the dev client and server, so its terrain is there to build on
     modLocalRuntime files(rootProject.worldgenJar("fabric"))
+    // MTR Advanced (logic and assets) with the Architectury API it needs
+    modLocalRuntime files(rootProject.mtrJar("fabric", "MTM_Logic"), rootProject.mtrJar("fabric", "MTM_Assets"))
+    modLocalRuntime "dev.architectury:architectury-fabric:${rootProject.architectury_api_version}"
 }
