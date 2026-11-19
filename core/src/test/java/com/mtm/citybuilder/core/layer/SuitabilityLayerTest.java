@@ -2,8 +2,10 @@ package com.mtm.citybuilder.core.layer;
 
 import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.CitySettings;
+import com.mtm.citybuilder.core.terrain.ForeignMask;
 import com.mtm.citybuilder.core.terrain.Landform;
 import com.mtm.citybuilder.core.terrain.SyntheticTerrain;
+import com.mtm.citybuilder.core.terrain.WithForeign;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -20,6 +22,28 @@ class SuitabilityLayerTest {
 
     private static CityLogic logic(SyntheticTerrain terrain) {
         return new CityLogic(1L, SETTINGS, terrain);
+    }
+
+    @Test
+    void mergedInMapsAreLeftOutAndDoNotTouchTheirNeighbours() {
+        // A merged-in map over chunks 100..139 (blocks 1600 to 2240) with a 500 block band: left out from 1100 to 2740.
+        // Inside it the land reads as high mountains, which would lower anything that still read it
+        List<Long> keys = new ArrayList<>();
+        for (int x = 100; x < 140; x++) {
+            for (int z = 100; z < 140; z++) {
+                keys.add(ForeignMask.key(x, z));
+            }
+        }
+        SyntheticTerrain plains = SyntheticTerrain.flatPlains();
+        CityLogic with = new CityLogic(1L, SETTINGS, new WithForeign(plains, new ForeignMask(keys, 500)));
+        CityLogic without = new CityLogic(1L, SETTINGS, plains);
+        int grid = SETTINGS.general.gridSize;
+        SuitabilityRegion region = with.suitabilityRegion(0, 0);
+        assertTrue(region.empty(1920 / grid, 1920 / grid), "inside the map");
+        assertTrue(region.empty(2688 / grid, 1920 / grid), "in the band");
+        // The first node outside, whose west neighbour and landform average reach into the band, reads only outside
+        assertEquals(without.suitabilityRegion(0, 0).node(2752 / grid, 1920 / grid), region.node(2752 / grid, 1920 / grid));
+        assertEquals(without.suitability(2760, 1925), with.suitability(2760, 1925), 1e-9);
     }
 
     @Test
@@ -59,7 +83,7 @@ class SuitabilityLayerTest {
         // Node at x = 3008 lies in the channel, the next one at 3072 on the bank
         SuitabilityRegion region = logic.suitabilityRegion(0, 0);
         int channel = 3008 / grid;
-        assertTrue(region.water(channel, 10));
+        assertTrue(region.empty(channel, 10));
         assertEquals(0.0, region.node(channel, 10));
         assertEquals(region.node(channel + 1, 10), logic.suitability(3008 + 60, 10 * grid), 1e-6);
     }

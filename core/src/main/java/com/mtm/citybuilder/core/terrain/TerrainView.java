@@ -38,6 +38,15 @@ public interface TerrainView {
     double lakeLevel(double x, double z);
 
     /**
+     * Whether a position lies in a map merged in from elsewhere (MTM_worldgen's foreign chunks), or close enough to one
+     * that the terrain blends toward it. The city logic leaves such places out entirely: no value, no settlement, and
+     * nothing passes through them. Cheap.
+     */
+    default boolean foreign(double x, double z) {
+        return false;
+    }
+
+    /**
      * What identifies the world this terrain belongs to, for sharing one city logic per world: two views of the same
      * world return equal keys.
      */

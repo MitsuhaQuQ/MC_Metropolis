@@ -19,6 +19,8 @@ public final class SuitabilityLayer {
     private static final byte LAND = 0;
     private static final byte SEA = 1;
     private static final byte LAKE = 2;
+    /** In a merged-in map or the band around it: left out of everything, neighbours included. */
+    private static final byte FOREIGN = 3;
 
     private final CitySettings.Suitability config;
     private final TerrainView terrain;
@@ -60,7 +62,9 @@ public final class SuitabilityLayer {
                 Landform landform = terrain.landform(x, z);
                 heights[index] = height;
                 landforms[index] = landform;
-                if (landform == Landform.OCEAN) {
+                if (terrain.foreign(x, z)) {
+                    water[index] = FOREIGN;
+                } else if (landform == Landform.OCEAN) {
                     water[index] = SEA;
                 } else {
                     double lake = terrain.lakeLevel(x, z);
@@ -92,15 +96,16 @@ public final class SuitabilityLayer {
             return Double.NaN;
         }
 
-        double gradeX = (heights[index + width] - heights[index - width]) / (2.0 * grid);
-        double gradeZ = (heights[index + 1] - heights[index - 1]) / (2.0 * grid);
+        // Heights in a merged-in map are not read: on that side the node's own height stands in
+        double gradeX = (own(heights, water, index, index + width) - own(heights, water, index, index - width)) / (2.0 * grid);
+        double gradeZ = (own(heights, water, index, index + 1) - own(heights, water, index, index - 1)) / (2.0 * grid);
         double flatness = 1.0 - smoothstep(config.flatGrade, config.steepGrade, Math.hypot(gradeX, gradeZ));
 
         double above = heights[index] - sea;
         double altitude = above <= config.highLand ? 1.0
                 : 1.0 - (1.0 - config.highLandFloor) * Math.min(1.0, (above - config.highLand) / config.highLandFade);
 
-        double base = flatness * blendedLandformScore(landforms, width, wi, wj) * altitude;
+        double base = flatness * blendedLandformScore(landforms, water, width, wi, wj) * altitude;
 
         double nearWater = 0.0;
         if (config.waterReach > 0) {
@@ -123,7 +128,8 @@ public final class SuitabilityLayer {
         double best = Double.POSITIVE_INFINITY;
         for (int di = -reachCells; di <= reachCells; di++) {
             for (int dj = -reachCells; dj <= reachCells; dj++) {
-                if (water[(wi + di) * width + wj + dj] != LAND) {
+                byte kind = water[(wi + di) * width + wj + dj];
+                if (kind == SEA || kind == LAKE) {
                     best = Math.min(best, Math.max(0.0, Math.hypot(di, dj) - 0.5) * grid);
                 }
             }
@@ -131,19 +137,28 @@ public final class SuitabilityLayer {
         return best;
     }
 
-    /** Mean score of the kinds of land within {@link CitySettings.Suitability#landformBlend} of a node. */
-    private double blendedLandformScore(Landform[] landforms, int width, int wi, int wj) {
+    /** Height of {@code other}, or of {@code index} itself when {@code other} lies in a merged-in map. */
+    private static double own(double[] heights, byte[] water, int index, int other) {
+        return water[other] == FOREIGN ? heights[index] : heights[other];
+    }
+
+    /**
+     * Mean score of the kinds of land within {@link CitySettings.Suitability#landformBlend} of a node, leaving out
+     * merged-in maps.
+     */
+    private double blendedLandformScore(Landform[] landforms, byte[] water, int width, int wi, int wj) {
         double sum = 0.0;
         int count = 0;
         for (int di = -blendCells; di <= blendCells; di++) {
             for (int dj = -blendCells; dj <= blendCells; dj++) {
-                if (di * di + dj * dj <= blendCells * blendCells) {
-                    sum += landformScore(landforms[(wi + di) * width + wj + dj]);
+                int at = (wi + di) * width + wj + dj;
+                if (di * di + dj * dj <= blendCells * blendCells && water[at] != FOREIGN) {
+                    sum += landformScore(landforms[at]);
                     count++;
                 }
             }
         }
-        return sum / count;
+        return count == 0 ? 0.0 : sum / count;
     }
 
     private double landformScore(Landform landform) {

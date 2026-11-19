@@ -1,6 +1,9 @@
 package com.mtm.citybuilder.core;
 
 import com.mtm.citybuilder.core.cache.RegionCache;
+import com.mtm.citybuilder.core.culture.CultureLayer;
+import com.mtm.citybuilder.core.culture.CultureRegion;
+import com.mtm.citybuilder.core.culture.CultureSample;
 import com.mtm.citybuilder.core.layer.SuitabilityLayer;
 import com.mtm.citybuilder.core.layer.SuitabilityRegion;
 import com.mtm.citybuilder.core.terrain.TerrainView;
@@ -18,11 +21,15 @@ public final class CityLogic {
     private static final Map<WorldKey, CityLogic> WORLDS = new ConcurrentHashMap<>();
     /** Regions kept in memory per layer. */
     private static final int REGION_CACHE = 64;
+    /** Culture cells kept in memory: each covers 16 logic regions by default. */
+    private static final int CULTURE_CACHE = 16;
 
     private final long seed;
     private final CitySettings settings;
     private final TerrainView terrain;
     private final RegionCache<SuitabilityRegion> suitability;
+    private final CultureLayer cultureLayer;
+    private final RegionCache<CultureRegion> culture;
 
     public CityLogic(long seed, CitySettings settings, TerrainView terrain) {
         List<String> problems = settings.validate();
@@ -34,6 +41,8 @@ public final class CityLogic {
         this.terrain = terrain;
         SuitabilityLayer suitabilityLayer = new SuitabilityLayer(settings, terrain);
         this.suitability = new RegionCache<>(REGION_CACHE, suitabilityLayer::compute);
+        this.cultureLayer = new CultureLayer(seed, settings, terrain);
+        this.culture = new RegionCache<>(CULTURE_CACHE, cultureLayer::compute);
     }
 
     /** Shared instance for a world, identified by its seed, settings and terrain. */
@@ -73,6 +82,28 @@ public final class CityLogic {
     /** L1 of a whole logic region, on the coarse grid. */
     public SuitabilityRegion suitabilityRegion(int regionX, int regionZ) {
         return suitability.get(regionX, regionZ);
+    }
+
+    /** L1.5: the culture a position belongs to, and how deep inside it. */
+    public CultureSample culture(double x, double z) {
+        int size = settings.culture.cellSize;
+        int cellX = Math.floorDiv((int) Math.floor(x), size);
+        int cellZ = Math.floorDiv((int) Math.floor(z), size);
+        int grid = settings.culture.floodGrid;
+        return culture.get(cellX, cellZ).sample((x - (double) cellX * size) / grid, (z - (double) cellZ * size) / grid);
+    }
+
+    /** L1.5 of a whole culture cell, on the flood grid. */
+    public CultureRegion cultureRegion(int cellX, int cellZ) {
+        return culture.get(cellX, cellZ);
+    }
+
+    /**
+     * Signed distance from a position to where the style field changes style, before the terrain moves the border:
+     * negative on the Asian side. Within {@code culture.borderHalfWidth} of 0 lies the border band.
+     */
+    public double styleBorderDistance(double x, double z) {
+        return cultureLayer.borderDistance(x, z);
     }
 
     private record WorldKey(long seed, String settings, Object terrain) {

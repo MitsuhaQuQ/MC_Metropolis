@@ -38,19 +38,20 @@ test {
     maxHeapSize = "4g"
 }
 
-// gradlew :core:cityMap -Pseed=12345 -Px=0 -Pz=0 -Pscale=16 [-Psize=1024] [-Pout=file.png]
+// gradlew :core:cityMap -Pseed=12345 -Px=0 -Pz=0 -Pscale=16 [-Players=suitability|culture] [-Psize=1024] [-Pout=file.png]
 tasks.register("cityMap", JavaExec) {
     group = "citybuilder"
-    description = "Renders the city logic of an MTM_worldgen world to a PNG under build/debug"
+    description = "Renders a layer of the city logic of an MTM_worldgen world to a PNG under build/debug"
     classpath = sourceSets.tools.runtimeClasspath
     mainClass = "com.mtm.citybuilder.tools.CityMap"
-    maxHeapSize = "4g"
+    maxHeapSize = "6g"
     def seed = providers.gradleProperty("seed").getOrElse("12345")
     def x = providers.gradleProperty("x").getOrElse("0")
     def z = providers.gradleProperty("z").getOrElse("0")
     def scale = providers.gradleProperty("scale").getOrElse("16")
     def size = providers.gradleProperty("size").getOrElse("1024")
+    def layer = providers.gradleProperty("layers").getOrElse("suitability")
     def out = providers.gradleProperty("out").getOrElse(
-            layout.buildDirectory.file("debug/city-${seed}_${x}_${z}_${scale}.png").get().asFile.path)
-    args seed, x, z, scale, out, size
+            layout.buildDirectory.file("debug/${layer}-${seed}_${x}_${z}_${scale}.png").get().asFile.path)
+    args seed, x, z, scale, out, size, layer
 }

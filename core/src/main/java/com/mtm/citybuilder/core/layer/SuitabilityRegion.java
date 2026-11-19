@@ -5,14 +5,15 @@ package com.mtm.citybuilder.core.layer;
  * edge. The far edge nodes are the near edge nodes of the next regions and hold the same values there, so values
  * interpolated across a region border meet.
  * <p>
- * Nodes on water (sea, lakes, river channels) hold no value. Interpolation leaves them out, so land beside a river keeps
- * the value of the land around it instead of being dragged towards 0 in steps along the coarse grid.
+ * Nodes on water (sea, lakes, river channels) and nodes left out (merged-in maps and the band around them) hold no
+ * value. Interpolation leaves them out, so land beside a river keeps the value of the land around it instead of being
+ * dragged towards 0 in steps along the coarse grid.
  */
 public final class SuitabilityRegion {
     private final int regionX;
     private final int regionZ;
     private final int cells;
-    /** Suitability per node, NaN on water. */
+    /** Suitability per node, NaN where there is none. */
     private final float[] values;
 
     SuitabilityRegion(int regionX, int regionZ, int cells, float[] values) {
@@ -35,20 +36,20 @@ public final class SuitabilityRegion {
         return cells;
     }
 
-    /** Suitability at node (i, j), counted from the region's corner, each from 0 to {@link #cells()}; 0 on water. */
+    /** Suitability at node (i, j), counted from the region's corner, each from 0 to {@link #cells()}; 0 if it has none. */
     public double node(int i, int j) {
         float value = values[i * (cells + 1) + j];
         return Float.isNaN(value) ? 0.0 : value;
     }
 
-    /** Whether node (i, j) lies on water. */
-    public boolean water(int i, int j) {
+    /** Whether node (i, j) holds no value: on water, or left out as part of a merged-in map. */
+    public boolean empty(int i, int j) {
         return Float.isNaN(values[i * (cells + 1) + j]);
     }
 
     /**
      * Suitability at a position given in cells from the region's corner, interpolated between the land nodes around
-     * it; 0 where all four nodes are water.
+     * it; 0 where none of the four holds a value.
      */
     public double interpolate(double u, double v) {
         int i = Math.min(cells - 1, Math.max(0, (int) Math.floor(u)));

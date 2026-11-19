@@ -1,7 +1,9 @@
 package com.mtm.citybuilder.core.terrain;
 
+import com.mtm.worldgen.logic.ForeignMap;
 import com.mtm.worldgen.logic.RiverRegion;
 import com.mtm.worldgen.logic.TerrainLogic;
+import com.mtm.worldgen.logic.WorldgenSettings;
 
 /**
  * Terrain read from MTM_worldgen's terrain logic. Plain Java like the logic itself, so the game (through
@@ -10,6 +12,7 @@ import com.mtm.worldgen.logic.TerrainLogic;
 public final class WorldgenTerrainView implements TerrainView {
     private final TerrainLogic logic;
     private final int regionSize;
+    private volatile MaskFor mask;
 
     public WorldgenTerrainView(TerrainLogic logic) {
         this.logic = logic;
@@ -68,6 +71,38 @@ public final class WorldgenTerrainView implements TerrainView {
     @Override
     public double lakeLevel(double x, double z) {
         return logic.sampleLakeLevel(x, z);
+    }
+
+    @Override
+    public boolean foreign(double x, double z) {
+        ForeignMap map = logic.foreign();
+        if (map.isEmpty()) {
+            return false;
+        }
+        return mask(map).covers(x, z);
+    }
+
+    /**
+     * The mask for the current foreign map, built when first needed and again if the map is replaced. The band is as
+     * wide as MTM_worldgen's widest blend: its blend itself is not public, so the mask errs on the wide side.
+     */
+    private ForeignMask mask(ForeignMap map) {
+        MaskFor current = mask;
+        if (current == null || current.map != map) {
+            synchronized (this) {
+                current = mask;
+                if (current == null || current.map != map) {
+                    WorldgenSettings.Foreign config = logic.settings().foreign;
+                    double reach = Math.max(config.maxWidth, config.upgradeMaxWidth);
+                    current = new MaskFor(map, new ForeignMask(map.chunks().keySet(), reach));
+                    mask = current;
+                }
+            }
+        }
+        return current.mask;
+    }
+
+    private record MaskFor(ForeignMap map, ForeignMask mask) {
     }
 
     @Override

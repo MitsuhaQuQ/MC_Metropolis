@@ -11,7 +11,6 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.util.stream.IntStream;
 
 /**
  * Renders L1 suitability as a map: land coloured from grey (unsuited) through tan and yellow-green to green (best),
@@ -38,21 +37,22 @@ public final class SuitabilityMap {
         double top = centerZ - size * scale / 2.0;
 
         // One extra row and column for the shading's differences
+        int regionSize = logic.settings().general.regionSize;
         double[] heights = new double[(size + 1) * (size + 1)];
-        IntStream.rangeClosed(0, size).parallel().forEach(py -> {
-            for (int px = 0; px <= size; px++) {
-                heights[py * (size + 1) + px] = terrain.smoothHeight(left + px * scale, top + py * scale);
-            }
-        });
+        PixelBlocks.forEach(size + 1, size + 1, regionSize, scale,
+                (px, py) -> heights[py * (size + 1) + px] = terrain.smoothHeight(left + px * scale, top + py * scale));
 
         int[] pixels = new int[size * size];
-        IntStream.range(0, size).parallel().forEach(py -> {
-            for (int px = 0; px < size; px++) {
+        PixelBlocks.forEach(size, size, regionSize, scale, (px, py) -> {
+            {
                 double x = left + px * scale;
                 double z = top + py * scale;
                 double height = heights[py * (size + 1) + px];
                 int color;
-                if (terrain.landform(x, z) == Landform.OCEAN) {
+                if (terrain.foreign(x, z)) {
+                    // Merged-in maps and the band around them are left out: grey hatching
+                    color = ((px + py) / 4) % 2 == 0 ? 0x8C8C8C : 0x6E6E6E;
+                } else if (terrain.landform(x, z) == Landform.OCEAN) {
                     color = SEA;
                 } else {
                     double lake = terrain.lakeLevel(x, z);
