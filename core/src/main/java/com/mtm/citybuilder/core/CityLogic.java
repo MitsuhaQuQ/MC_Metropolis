@@ -5,6 +5,11 @@ import com.mtm.citybuilder.core.culture.CultureLayer;
 import com.mtm.citybuilder.core.culture.CultureRegion;
 import com.mtm.citybuilder.core.culture.CultureSample;
 import com.mtm.citybuilder.core.culture.Style;
+import com.mtm.citybuilder.core.extent.CityExtent;
+import com.mtm.citybuilder.core.extent.ExtentLayer;
+import com.mtm.citybuilder.core.extent.LandUse;
+import com.mtm.citybuilder.core.extent.UrbanRegion;
+import com.mtm.citybuilder.core.extent.UrbanSample;
 import com.mtm.citybuilder.core.layer.SuitabilityLayer;
 import com.mtm.citybuilder.core.layer.SuitabilityRegion;
 import com.mtm.citybuilder.core.plan.MemoryPlanStore;
@@ -16,6 +21,7 @@ import com.mtm.citybuilder.core.settlement.SettlementTier;
 import com.mtm.citybuilder.core.terrain.BroadTerrain;
 import com.mtm.citybuilder.core.terrain.TerrainView;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,6 +38,8 @@ public final class CityLogic {
     private static final Map<WorldKey, CityLogic> WORLDS = new ConcurrentHashMap<>();
     /** L1 regions kept in memory: about 17 KB each. L2 reads far around each settlement, so keep plenty. */
     private static final int REGION_CACHE = 1024;
+    /** Settlement extents kept in memory per tier. */
+    private static final int EXTENT_CACHE = 2048;
     /** Culture cells kept in memory: each covers 16 logic regions by default. */
     private static final int CULTURE_CACHE = 64;
 
@@ -44,6 +52,10 @@ public final class CityLogic {
     private final CultureLayer cultureLayer;
     private final RegionCache<CultureRegion> culture;
     private final SettlementLayer settlements;
+    private final ExtentLayer extentLayer;
+    /** Extents per tier, keyed by the settlement's cell. */
+    private final List<RegionCache<CityExtent>> extents = new ArrayList<>();
+    private final RegionCache<UrbanRegion> urban;
 
     /** City logic whose plans are kept in memory only, as for tests and tools. */
     public CityLogic(long seed, CitySettings settings, TerrainView terrain) {
@@ -80,6 +92,32 @@ public final class CityLogic {
                 return CityLogic.this.culture(x, z);
             }
         }, store);
+        this.extentLayer = new ExtentLayer(settings, terrain, new ExtentLayer.Below() {
+            @Override
+            public double suitabilityNode(int nodeX, int nodeZ) {
+                return CityLogic.this.suitabilityNode(nodeX, nodeZ);
+            }
+
+            @Override
+            public CultureSample culture(double x, double z) {
+                return CityLogic.this.culture(x, z);
+            }
+
+            @Override
+            public List<Settlement> settlements(double minX, double minZ, double maxX, double maxZ, SettlementTier lowest) {
+                return CityLogic.this.settlements(minX, minZ, maxX, maxZ, lowest);
+            }
+
+            @Override
+            public CityExtent extent(Settlement settlement) {
+                return CityLogic.this.extent(settlement);
+            }
+        });
+        for (SettlementTier tier : SettlementTier.values()) {
+            extents.add(new RegionCache<>(EXTENT_CACHE,
+                    (cellX, cellZ) -> extentLayer.extent(settlements.settlement(tier, cellX, cellZ))));
+        }
+        this.urban = new RegionCache<>(REGION_CACHE, extentLayer::region);
     }
 
     /** Shared instance for a world whose plans are kept in memory only, as for tools. */
@@ -120,6 +158,17 @@ public final class CityLogic {
         double u = (x - (double) regionX * size) / grid;
         double v = (z - (double) regionZ * size) / grid;
         return suitability.get(regionX, regionZ).interpolate(u, v);
+    }
+
+    /** L1 at a node of the coarse grid, counted in nodes from the world's origin; NaN on water and in merged-in maps. */
+    public double suitabilityNode(int nodeX, int nodeZ) {
+        int cells = settings.general.regionSize / settings.general.gridSize;
+        int regionX = Math.floorDiv(nodeX, cells);
+        int regionZ = Math.floorDiv(nodeZ, cells);
+        SuitabilityRegion region = suitability.get(regionX, regionZ);
+        int i = nodeX - regionX * cells;
+        int j = nodeZ - regionZ * cells;
+        return region.empty(i, j) ? Double.NaN : region.node(i, j);
     }
 
     /** L1 of a whole logic region, on the coarse grid. */
@@ -202,6 +251,31 @@ public final class CityLogic {
     /** L2: the settlement of a tier's cell, or null when none stands there; plans the cell's block if needed. */
     public Settlement settlement(SettlementTier tier, int cellX, int cellZ) {
         return settlements.settlement(tier, cellX, cellZ);
+    }
+
+    /** L3: the built-up extent of a settlement. */
+    public CityExtent extent(Settlement settlement) {
+        return extents.get(settlement.tier().ordinal()).get(settlement.cellX(), settlement.cellZ());
+    }
+
+    /** L3's target radius of a settlement, from its tier and hinterland. */
+    public double targetRadius(Settlement settlement) {
+        return extentLayer.targetRadius(settlement);
+    }
+
+    /** L3 and L3.5 at a position: which settlement's built-up land it is, how intensely, and the land's use. */
+    public UrbanSample urban(double x, double z) {
+        if (terrain.foreign(x, z)) {
+            // Exact where the grid is coarse: merged-in maps are left out to the block
+            return new UrbanSample(null, 0.0, LandUse.FOREIGN);
+        }
+        int size = settings.general.regionSize;
+        return urban.get(Math.floorDiv((int) Math.floor(x), size), Math.floorDiv((int) Math.floor(z), size)).sample(x, z);
+    }
+
+    /** L3 and L3.5 of a whole logic region, on the coarse grid. */
+    public UrbanRegion urbanRegion(int regionX, int regionZ) {
+        return urban.get(regionX, regionZ);
     }
 
     private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {

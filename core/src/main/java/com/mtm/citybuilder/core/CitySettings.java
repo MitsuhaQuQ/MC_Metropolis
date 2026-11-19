@@ -22,6 +22,8 @@ public final class CitySettings {
     public Suitability suitability = new Suitability();
     public Culture culture = new Culture();
     public Settlements settlements = new Settlements();
+    public Extent extent = new Extent();
+    public Rural rural = new Rural();
 
     public static final class General {
         /** Edge of a logic region in blocks: the unit results are cached in, never a boundary of any rule. */
@@ -147,6 +149,46 @@ public final class CitySettings {
         public double footRise = 25.0;
     }
 
+    /**
+     * L3: how far each settlement's built-up land reaches. A cost flood from its centre on the coarse grid takes the
+     * cheapest land first until it covers the settlement's target area, or reaches {@code reach} times its radius.
+     * Urban intensity falls from 1 at the centre to 0 at the edge of the flood, and fades on slopes and with the
+     * height above the basin floor.
+     */
+    public static final class Extent {
+        /** Target radius as a factor of the tier's radius, from the poorest hinterland to the best. */
+        public double sizeMin = 0.7;
+        public double sizeMax = 1.3;
+        /** The flood reaches at most this many target radii, as when sea or mountains hem it in. */
+        public double reach = 1.5;
+        /** Extra cost per block of land of no suitability, falling to none at suitability 1. */
+        public double unsuitCost = 3.0;
+        /** Cost per metre climbed or descended between neighbouring nodes, in blocks. */
+        public double climbCost = 8.0;
+        /** Extra cost per block crossing rivers and lakes, which never count as built-up land. */
+        public double bridgeCost = 3.0;
+        /** Radius over which the basin floor, the lowest land around, is taken. */
+        public double floorRadius = 1000.0;
+        /** Height above the basin floor at which urban intensity has faded out. */
+        public double riseFade = 80.0;
+        /** Grades from which urban intensity starts fading, and at which it is gone. */
+        public double flatGrade = 0.05;
+        public double steepGrade = 0.35;
+    }
+
+    /** L3.5: the use of land outside the built-up areas. */
+    public static final class Rural {
+        /** Least suitability of farmland. */
+        public double farmMin = 0.4;
+        /** Farmland lies within this distance of some settlement's centre. */
+        public double farmReach = 2500.0;
+        /**
+         * Within this culture margin of a style border, land is the border's farmland belt: no buildings, and no city
+         * reaches into it.
+         */
+        public double beltHalfWidth = 1000.0;
+    }
+
     /** One tier of settlements. */
     public static final class Tier {
         /** Edge of a cell of this tier's grid, in blocks: at most one settlement of the tier per cell. */
@@ -217,6 +259,13 @@ public final class CitySettings {
                 problems.add("each settlement tier's cellSize must divide the cellSize of the tier above");
                 break;
             }
+        }
+        if (extent.sizeMin <= 0 || extent.sizeMax < extent.sizeMin || extent.reach < 1 || extent.floorRadius <= 0
+                || extent.riseFade <= 0 || extent.steepGrade <= extent.flatGrade) {
+            problems.add("extent needs 0 < sizeMin <= sizeMax, reach >= 1, positive floorRadius and riseFade, steepGrade above flatGrade");
+        }
+        if (rural.beltHalfWidth > settlements.borderBuffer) {
+            problems.add("rural.beltHalfWidth must not exceed settlements.borderBuffer: no settlement centre in the belt");
         }
         Site site = settlements.site;
         if (!(0 < site.riverNear && site.riverNear < site.riverFar && site.riverFar < site.riverFade)

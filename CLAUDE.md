@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 本项目是 **MTM_worldgen**（`F:\MC\MTM_worldgen`，真实地貌地形生成）与 **MTR Advanced**（`P:\Minecraft-Transit-Railway-391ce5d1800fbc70b7f565571c692287828867fa`，MTR 3.2.2 的运营模拟分支）的共同配套 mod：在大地形尺度上自然地生成城市，并让城市按规则逐步扩展。建筑模型素材取自网络上 MIT、CC 等开放协议授权的作品。
 
-> 当前状态（2026-11-20）：实现顺序的第 1–3 步已完成（L2 已改为按规划块规划、存盘）：`CityLogic`、`CitySettings`、L1 适宜度场、L1.5 文化区、外来区域的排除、L2 聚落选址与分级，以及它们的调试图（`cityMap`）。还没有接进游戏。下文标 **【待决定】** 的是尚未确定的事项，括号内为建议默认值；确定后删除标记。
+> 当前状态（2026-11-20）：实现顺序的第 1–4 步已完成（L2 已改为按规划块规划、存盘）：`CityLogic`、`CitySettings`、L1 适宜度场、L1.5 文化区、外来区域的排除、L2 聚落选址与分级、L3 城市范围和强度、L3.5 土地用途，以及它们的调试图（`cityMap`）。还没有接进游戏。下文标 **【待决定】** 的是尚未确定的事项，括号内为建议默认值；确定后删除标记。
 
 ## 常用命令
 
@@ -19,6 +19,7 @@ gradlew :core:test --tests '*SuitabilityLayerTest.regionBordersMeet'   # 单个�
 gradlew :core:cityMap -Pseed=12345 -Px=0 -Pz=0 -Pscale=32   # 在 MTM 地形上渲染 L1 适宜度调试图（默认配置），输出到 core/build/debug/
 gradlew :core:cityMap -Players=culture -Pseed=12345 -Px=0 -Pz=0 -Pscale=128   # L1.5 文化区，约 1–2 分钟
 gradlew :core:cityMap -Players=settlements -Pseed=12345 -Px=-10600 -Pz=-10000 -Pscale=16   # L2 聚落叠在 L1 上，冷启动约 40 秒；32 格/像素以上只画大都市和城市
+gradlew :core:cityMap -Players=extent -Pseed=12345 -Px=-10232 -Pz=-10272 -Pscale=4   # L3 城市强度和 L3.5 用地，冷启动数分钟（主要是周围的 L2）
 gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验证）
 ```
 
@@ -32,13 +33,14 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 单一 Minecraft 版本（1.20.1）的 Architectury 布局，Gradle 9.6.0、Architectury Loom 1.17（`loom-remap`，Mojang 映射）、Architectury 插件 3.5、Shadow 9.6.1，加载器版本与 MTM_worldgen 的 1.20.1 相同（`gradle.properties`）。JDK 17。
 
 - `core/`：城市逻辑，纯 Java，**不得引用 Minecraft 类**；不单独出 jar，作为源码目录编进 `common`，单元测试只在这里跑。三个源码集：
-  - `src/main`：入口 `CityLogic.forWorld(seed, CitySettings, TerrainView)`（每个世界一份）；`CitySettings`（JSON，带 `planVersion`，Gson 只在内部类 `Json` 里用）；`cache.RegionCache`（按区域的 LRU，同一区域只算一次）；`noise.Hash`（splitmix64，所有随机选择的来源）；`noise.ValueNoise`（平滑噪声，文化区的风格场）；`layer.SuitabilityLayer`/`SuitabilityRegion`（L1）；`culture.CultureLayer`/`CultureRegion`/`CultureSample`/`Style`（L1.5）；`settlement.SettlementLayer`/`Settlement`/`SettlementTier`/`SettlementBlock`（L2，`SettlementBlock` 是一个规划块的结果和它的存储编码）；`plan.PlanStore`/`MemoryPlanStore`/`FilePlanStore`（规划块的存储）；`terrain.BroadTerrain`（去掉河湖的地形，见下）；`terrain.ForeignMask`（外来区域的范围）；`debug.SuitabilityMap`、`debug.CultureMap`、`debug.SettlementMap`（调试图渲染）
+  - `src/main`：入口 `CityLogic.forWorld(seed, CitySettings, TerrainView)`（每个世界一份）；`CitySettings`（JSON，带 `planVersion`，Gson 只在内部类 `Json` 里用）；`cache.RegionCache`（按区域的 LRU，同一区域只算一次）；`noise.Hash`（splitmix64，所有随机选择的来源）；`noise.ValueNoise`（平滑噪声，文化区的风格场）；`layer.SuitabilityLayer`/`SuitabilityRegion`（L1）；`culture.CultureLayer`/`CultureRegion`/`CultureSample`/`Style`（L1.5）；`settlement.SettlementLayer`/`Settlement`/`SettlementTier`/`SettlementBlock`（L2，`SettlementBlock` 是一个规划块的结果和它的存储编码）；`plan.PlanStore`/`MemoryPlanStore`/`FilePlanStore`（规划块的存储）；`settlement.SitePreference`（镇和村的选址偏好）；`extent.ExtentLayer`/`CityExtent`/`UrbanRegion`/`UrbanSample`/`LandUse`（L3、L3.5）；`terrain.BroadTerrain`（去掉河湖的地形，见下）；`terrain.ForeignMask`（外来区域的范围）；`debug.SuitabilityMap`、`debug.CultureMap`、`debug.SettlementMap`、`debug.ExtentMap`（调试图渲染）
   - `src/worldgen`：`core.terrain.WorldgenTerrainView`，把 MTM_worldgen 的 `TerrainLogic` 包成 `TerrainView`。纯 Java，但引用 worldgen，所以不在 `src/main`；common 也编译它（`common/build.gradle` 的 `srcDir`），测试和工具在 core 里直接用
   - `src/tools`：`tools.CityMap`，`cityMap` 任务的入口，不进 jar
 - **L1 的约定**：每个网格节点的值只取决于节点及周围有限范围（`waterReach`、`landformBlend`）的地形，所以任何区域算出的同一节点相同、区域边界两侧连续（`SuitabilityLayerTest.regionBordersMeet`）。水面节点不存值（NaN），插值时不参与，河岸不会被拉低成台阶。离散的地貌类型分数在周围平均后再用，避免硬边。只用 `TerrainView` 的便宜查询
 - **L1.5 的约定**：风格由低频风格场决定（大片区域、各一半），只在场值 0.5 等值线两侧各 `borderHalfWidth` 格的交界带里由地形决定：两种风格从交界带外侧按代价洪泛，交界带里的点归代价低的一方，边界因此落在山脊和海峡上。代价上限 `maxCost` 必须足以穿过整条交界带（哪怕全是山），否则边界会落在某一方能到达的最远处，形成直线（实测踩过）。区域无关性的论证：代价有上限、每格代价至少 1，所以路径不离开窗口；一方到不了时到达的一方获胜，两方都到不了时由风格场决定，都只取决于节点自己。不要回到"文化核心"的做法（为什么见设计文档 L1.5）
 - **外来区域不参与计算**：`TerrainView.foreign(x, z)` 为真的地方（从其他世界拼进来的地图及其缝合带）在每一层都被排除：L1 不存值、不计入邻居；L1.5 洪泛不能穿过。以后各层同样如此。worldgen 不公开缝合带的实际范围，`WorldgenTerrainView` 用 `ForeignMask` 按最大缝合宽度保守排除
 - **L2 的约定：一次规划、存入存档（用户 2026-11-20 选定）**：城市不要求由种子完全复现。L2（以后 L3、L4 同样）按每级的规划块（`Tier.planBlock`）第一次被需要时规划，存进 `core.plan.PlanStore`，以后只读不改。规划一个块前先取得（必要时规划）影响它的上级块；同级相邻块只读已存在的，不触发规划；块内按腹地贪心放置。每级一把锁，锁的顺序只从下级到上级。结果与相邻块的规划顺序有关，但后规划的总看得见先规划的，所以不会对不上；给定已存的相邻块，块内结果仍由种子决定。存档里的规划块不能删。L1、L1.5、L5–L8 仍是纯函数、与顺序无关
+- **L3 的约定**：每座城的范围（`CityExtent`）只由已存的 L2 聚落和地形决定，不存盘；区域（`UrbanRegion`）收集所有可能伸进来的聚落，按等级取各自的最大伸展范围和农田范围，重叠处取强度高的。L3 读完整 L1 和精细地形（`surfaceHeight`），只用于玩家附近
 - **远处的判断不要触发 worldgen 的水系计算**：完整 L1 要查河流、湖泊，会让 worldgen 计算水系路由（每片第一次 1 秒以上）。大尺度的判断（大都市、城市，以后的城际路线这类看几十公里外的东西）读 `CityLogic.broadSuitability`（基于 `BroadTerrain`，去掉河湖）；只有局部的判断才读完整 L1。`CityLogic.culture` 在交界带以外直接由风格场回答，不读洪泛结果，原因相同。性能问题先用 `cityMap` 的分步计时和 `jstack` 抓线程栈定位，不要猜（曾猜缓存太小，实测无效）
 - `common/`：Minecraft 侧代码。入口 `CityBuilder.init()`（由两个加载器入口调用）；`platform.Platform` 是加载器服务接口，各加载器经 `META-INF/services` 注册实现。common 里不能用 Fabric API 类
 - `fabric/`、`forge/`：只做注册与平台适配，不写逻辑。`shadowJar` 打包 common，`remapJar` 产出正式 jar

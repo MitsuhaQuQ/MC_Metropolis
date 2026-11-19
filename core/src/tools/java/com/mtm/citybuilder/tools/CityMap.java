@@ -4,6 +4,10 @@ import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.CitySettings;
 import com.mtm.citybuilder.core.culture.CultureRegion;
 import com.mtm.citybuilder.core.debug.CultureMap;
+import com.mtm.citybuilder.core.debug.ExtentMap;
+import com.mtm.citybuilder.core.extent.CityExtent;
+import com.mtm.citybuilder.core.extent.LandUse;
+import com.mtm.citybuilder.core.extent.UrbanRegion;
 import com.mtm.citybuilder.core.debug.SettlementMap;
 import com.mtm.citybuilder.core.debug.SuitabilityMap;
 import com.mtm.citybuilder.core.layer.SuitabilityRegion;
@@ -38,7 +42,7 @@ public final class CityMap {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 5) {
-            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements]");
+            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements|extent]");
             System.exit(2);
         }
         long seed = Long.parseLong(args[0]);
@@ -71,7 +75,12 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = SettlementMap.render(logic, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture or settlements");
+            case "extent" -> {
+                extentStats(logic, centerX, centerZ, half, SettlementMap.lowestTier(scale));
+                start = System.nanoTime();
+                image = ExtentMap.render(logic, centerX, centerZ, scale, size);
+            }
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements or extent");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();
@@ -259,6 +268,57 @@ public final class CityMap {
         }
         System.out.println("  settlements within a higher tier's clearance, and tiers closer than their spacing: " + violations);
         siteStats(logic, settlements, centerX, centerZ, half);
+    }
+
+    /**
+     * Times L3 for the settlements of the area and its regions, and reports how big the built-up land of each tier comes
+     * out against its target, and how the land of the area is used.
+     */
+    private static void extentStats(CityLogic logic, double centerX, double centerZ, double half, SettlementTier lowest) {
+        long start = System.nanoTime();
+        List<Settlement> settlements = logic.settlements(centerX - half, centerZ - half, centerX + half, centerZ + half, lowest);
+        System.out.printf("L2 of the area: %d settlements in %.1f s%n", settlements.size(), (System.nanoTime() - start) / 1e9);
+        int grid = logic.settings().general.gridSize;
+        for (SettlementTier tier : SettlementTier.values()) {
+            start = System.nanoTime();
+            int count = 0;
+            double area = 0;
+            double target = 0;
+            double reach = 0;
+            for (Settlement settlement : settlements) {
+                if (settlement.tier() != tier) {
+                    continue;
+                }
+                CityExtent extent = logic.extent(settlement);
+                count++;
+                area += extent.nodes() * (double) grid * grid;
+                double radius = logic.targetRadius(settlement);
+                target += Math.PI * radius * radius;
+                reach += extent.radius() / radius;
+            }
+            if (count > 0) {
+                System.out.printf("L3 %-10s %4d in %.1f s: built-up %.2f km2 on average (target %.2f), flood stopped at %.2f target radii%n",
+                        tier, count, (System.nanoTime() - start) / 1e9, area / count / 1e6, target / count / 1e6, reach / count);
+            }
+        }
+        start = System.nanoTime();
+        int regionSize = logic.settings().general.regionSize;
+        Map<LandUse, Integer> uses = new EnumMap<>(LandUse.class);
+        int nodes = 0;
+        for (int rx = Math.floorDiv((int) (centerX - half), regionSize); rx <= Math.floorDiv((int) (centerX + half), regionSize); rx++) {
+            for (int rz = Math.floorDiv((int) (centerZ - half), regionSize); rz <= Math.floorDiv((int) (centerZ + half), regionSize); rz++) {
+                UrbanRegion region = logic.urbanRegion(rx, rz);
+                for (int i = 0; i < region.cells(); i++) {
+                    for (int j = 0; j < region.cells(); j++) {
+                        uses.merge(region.use(i, j), 1, Integer::sum);
+                        nodes++;
+                    }
+                }
+            }
+        }
+        System.out.printf("L3.5 regions of the area: %.1f s%n", (System.nanoTime() - start) / 1e9);
+        int all = Math.max(1, nodes);
+        uses.forEach((use, count) -> System.out.printf("  %-11s %5.1f%%%n", use, 100.0 * count / all));
     }
 
     /**

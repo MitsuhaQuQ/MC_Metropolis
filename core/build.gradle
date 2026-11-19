@@ -38,7 +38,7 @@ test {
     maxHeapSize = "4g"
 }
 
-// gradlew :core:cityMap -Pseed=12345 -Px=0 -Pz=0 -Pscale=16 [-Players=suitability|culture] [-Psize=1024] [-Pout=file.png]
+// gradlew :core:cityMap -Pseed=12345 -Px=0 -Pz=0 -Pscale=16 [-Players=suitability|culture|settlements|extent] [-Psize=1024] [-Pout=file.png]
 tasks.register("cityMap", JavaExec) {
     group = "citybuilder"
     description = "Renders a layer of the city logic of an MTM_worldgen world to a PNG under build/debug"
