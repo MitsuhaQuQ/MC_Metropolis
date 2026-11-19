@@ -24,6 +24,7 @@ public final class CitySettings {
     public Settlements settlements = new Settlements();
     public Extent extent = new Extent();
     public Rural rural = new Rural();
+    public Roads roads = new Roads();
 
     public static final class General {
         /** Edge of a logic region in blocks: the unit results are cached in, never a boundary of any rule. */
@@ -195,6 +196,44 @@ public final class CitySettings {
         public double beltHalfWidth = 1000.0;
     }
 
+    /**
+     * L4: intercity roads. Trunk roads join metropolises and cities, local roads join towns to the towns and cities near
+     * them, each set as a relative neighbourhood graph. Each road is routed on the coarse grid by cost, choosing between
+     * a pass, switchbacks and a tunnel by what they cost, then given a profile no steeper than {@code maxGrade}.
+     */
+    public static final class Roads {
+        /** Longest trunk and local road, straight from end to end. */
+        public double trunkMaxLength = 30000.0;
+        public double localMaxLength = 10000.0;
+        /** The routing window reaches this far around the two ends, plus {@code windowFactor} of their distance. */
+        public double windowMargin = 2000.0;
+        public double windowFactor = 0.25;
+        /** Steepest grade of the road itself (1 = 100%). */
+        public double maxGrade = 0.07;
+        /** Extra cost per block of land of no suitability. */
+        public double unsuitCost = 1.0;
+        /** Cost per metre climbed or descended, in blocks. */
+        public double climbCost = 10.0;
+        /** Factor on the developed length of switchbacks up a slope steeper than the road may be. */
+        public double switchbackCost = 2.0;
+        /** Cost per block of tunnel, and for each tunnel's two portals. */
+        public double tunnelCost = 6.0;
+        public double portalCost = 400.0;
+        /** Least ground over a tunnel's line, somewhere along it, for a straight cut through a ridge to be one. */
+        public double tunnelMinCover = 20.0;
+        /** Longest tunnel, in blocks. */
+        public double tunnelMaxLength = 3000.0;
+        /** Extra cost per block over water: bridges. */
+        public double bridgeCost = 4.0;
+        /** Around the first route, rivers and lakes are looked up within this distance and the road routed again. */
+        public double corridor = 1500.0;
+        /** Spacing of the profile's samples along a road. */
+        public double sampleSpacing = 16.0;
+        /** Ground this far above the road makes a tunnel; the road this far above the ground, a bridge. */
+        public double tunnelDepth = 15.0;
+        public double bridgeHeight = 8.0;
+    }
+
     /** One tier of settlements. */
     public static final class Tier {
         /** Edge of a cell of this tier's grid, in blocks: at most one settlement of the tier per cell. */
@@ -272,6 +311,10 @@ public final class CitySettings {
         }
         if (rural.beltHalfWidth > settlements.borderBuffer) {
             problems.add("rural.beltHalfWidth must not exceed settlements.borderBuffer: no settlement centre in the belt");
+        }
+        if (roads.maxGrade <= 0 || roads.sampleSpacing <= 0 || roads.trunkMaxLength <= 0 || roads.localMaxLength <= 0
+                || roads.tunnelMaxLength < 0 || roads.windowMargin < 0) {
+            problems.add("roads need a positive maxGrade, sampleSpacing and maximum lengths");
         }
         Site site = settlements.site;
         if (!(0 < site.riverNear && site.riverNear < site.riverFar && site.riverFar < site.riverFade)

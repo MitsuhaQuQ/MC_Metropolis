@@ -38,7 +38,7 @@ test {
     maxHeapSize = "4g"
 }
 
-// gradlew :core:cityMap -Pseed=12345 -Px=0 -Pz=0 -Pscale=16 [-Players=suitability|culture|settlements|extent] [-Psize=1024] [-Pout=file.png]
+// gradlew :core:cityMap -Pseed=12345 -Px=0 -Pz=0 -Pscale=16 [-Players=suitability|culture|settlements|extent|roads|spawn] [-Pjfr=file.jfr] [-Psize=1024] [-Pout=file.png]
 tasks.register("cityMap", JavaExec) {
     group = "citybuilder"
     description = "Renders a layer of the city logic of an MTM_worldgen world to a PNG under build/debug"
@@ -54,4 +54,9 @@ tasks.register("cityMap", JavaExec) {
     def out = providers.gradleProperty("out").getOrElse(
             layout.buildDirectory.file("debug/${layer}-${seed}_${x}_${z}_${scale}.png").get().asFile.path)
     args seed, x, z, scale, out, size, layer
+    // -Pjfr=<file.jfr> records where the time goes, for `jfr print --events jdk.ExecutionSample`
+    def jfr = providers.gradleProperty("jfr")
+    if (jfr.isPresent()) {
+        jvmArgs "-XX:StartFlightRecording=filename=${file(jfr.get()).absolutePath},settings=profile"
+    }
 }

@@ -13,6 +13,9 @@ import com.mtm.citybuilder.core.extent.UrbanSample;
 import com.mtm.citybuilder.core.layer.SuitabilityLayer;
 import com.mtm.citybuilder.core.layer.SuitabilityRegion;
 import com.mtm.citybuilder.core.plan.MemoryPlanStore;
+import com.mtm.citybuilder.core.road.RoadEdge;
+import com.mtm.citybuilder.core.road.RoadLayer;
+import com.mtm.citybuilder.core.road.RoadRoute;
 import com.mtm.citybuilder.core.plan.PlanStore;
 import com.mtm.citybuilder.core.settlement.Settlement;
 import com.mtm.citybuilder.core.settlement.SettlementBlock;
@@ -56,6 +59,7 @@ public final class CityLogic {
     /** Extents per tier, keyed by the settlement's cell. */
     private final List<RegionCache<CityExtent>> extents = new ArrayList<>();
     private final RegionCache<UrbanRegion> urban;
+    private final RoadLayer roads;
 
     /** City logic whose plans are kept in memory only, as for tests and tools. */
     public CityLogic(long seed, CitySettings settings, TerrainView terrain) {
@@ -118,6 +122,22 @@ public final class CityLogic {
                     (cellX, cellZ) -> extentLayer.extent(settlements.settlement(tier, cellX, cellZ))));
         }
         this.urban = new RegionCache<>(REGION_CACHE, extentLayer::region);
+        this.roads = new RoadLayer(settings, terrain, new RoadLayer.Below() {
+            @Override
+            public double broadSuitabilityNode(int nodeX, int nodeZ) {
+                return CityLogic.this.broadSuitabilityNode(nodeX, nodeZ);
+            }
+
+            @Override
+            public double suitabilityNode(int nodeX, int nodeZ) {
+                return CityLogic.this.suitabilityNode(nodeX, nodeZ);
+            }
+
+            @Override
+            public List<Settlement> settlements(double minX, double minZ, double maxX, double maxZ, SettlementTier lowest) {
+                return CityLogic.this.settlements(minX, minZ, maxX, maxZ, lowest);
+            }
+        });
     }
 
     /** Shared instance for a world whose plans are kept in memory only, as for tools. */
@@ -166,6 +186,17 @@ public final class CityLogic {
         int regionX = Math.floorDiv(nodeX, cells);
         int regionZ = Math.floorDiv(nodeZ, cells);
         SuitabilityRegion region = suitability.get(regionX, regionZ);
+        int i = nodeX - regionX * cells;
+        int j = nodeZ - regionZ * cells;
+        return region.empty(i, j) ? Double.NaN : region.node(i, j);
+    }
+
+    /** L1 without rivers and lakes at a coarse grid node; NaN at sea and in merged-in maps. */
+    public double broadSuitabilityNode(int nodeX, int nodeZ) {
+        int cells = settings.general.regionSize / settings.general.gridSize;
+        int regionX = Math.floorDiv(nodeX, cells);
+        int regionZ = Math.floorDiv(nodeZ, cells);
+        SuitabilityRegion region = broadSuitability.get(regionX, regionZ);
         int i = nodeX - regionX * cells;
         int j = nodeZ - regionZ * cells;
         return region.empty(i, j) ? Double.NaN : region.node(i, j);
@@ -276,6 +307,16 @@ public final class CityLogic {
     /** L3 and L3.5 of a whole logic region, on the coarse grid. */
     public UrbanRegion urbanRegion(int regionX, int regionZ) {
         return urban.get(regionX, regionZ);
+    }
+
+    /** L4: the intercity roads whose routing window touches a rectangle. */
+    public List<RoadEdge> roads(double minX, double minZ, double maxX, double maxZ) {
+        return roads.edges(minX, minZ, maxX, maxZ);
+    }
+
+    /** L4: the route of a road. */
+    public RoadRoute route(RoadEdge edge) {
+        return roads.route(edge);
     }
 
     private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {

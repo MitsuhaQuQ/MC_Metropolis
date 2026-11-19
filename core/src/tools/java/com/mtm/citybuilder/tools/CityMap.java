@@ -5,9 +5,15 @@ import com.mtm.citybuilder.core.CitySettings;
 import com.mtm.citybuilder.core.culture.CultureRegion;
 import com.mtm.citybuilder.core.debug.CultureMap;
 import com.mtm.citybuilder.core.debug.ExtentMap;
+import com.mtm.citybuilder.core.debug.RoadMap;
+import com.mtm.citybuilder.core.road.RoadClass;
+import com.mtm.citybuilder.core.road.RoadEdge;
+import com.mtm.citybuilder.core.road.RoadKind;
+import com.mtm.citybuilder.core.road.RoadRoute;
 import com.mtm.citybuilder.core.extent.CityExtent;
 import com.mtm.citybuilder.core.extent.LandUse;
 import com.mtm.citybuilder.core.extent.UrbanRegion;
+import com.mtm.citybuilder.core.extent.UrbanSample;
 import com.mtm.citybuilder.core.debug.SettlementMap;
 import com.mtm.citybuilder.core.debug.SuitabilityMap;
 import com.mtm.citybuilder.core.layer.SuitabilityRegion;
@@ -42,7 +48,7 @@ public final class CityMap {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 5) {
-            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements|extent]");
+            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements|extent|roads]");
             System.exit(2);
         }
         long seed = Long.parseLong(args[0]);
@@ -80,7 +86,16 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = ExtentMap.render(logic, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements or extent");
+            case "spawn" -> {
+                spawn(logic, centerX, centerZ);
+                return;
+            }
+            case "roads" -> {
+                List<RoadEdge> edges = roadStats(logic, centerX, centerZ, half);
+                start = System.nanoTime();
+                image = RoadMap.render(logic, edges, centerX, centerZ, scale, size);
+            }
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent or roads");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();
@@ -271,6 +286,86 @@ public final class CityMap {
             // Sites read the detailed ground, which costs erosion everywhere sampled: only on maps of towns and villages
             siteStats(logic, settlements, centerX, centerZ, half);
         }
+    }
+
+    /**
+     * Times, cold, what generating the first chunk of a world at a position needs from the city logic, layer by layer
+     * as each reads the ones below: the land use there (L3.5, with L3 of the settlements around, and L2 of every tier
+     * as far as it reaches) and the roads passing (L4: the graph, then the routes). Each step reuses what the steps
+     * before computed. No map is drawn.
+     */
+    private static void spawn(CityLogic logic, double x, double z) {
+        long all = System.nanoTime();
+        long start = System.nanoTime();
+        logic.suitability(x, z);
+        System.out.printf("spawn L1 at the chunk: %.1f s%n", (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        logic.culture(x, z);
+        System.out.printf("spawn L1.5 at the chunk: %.1f s%n", (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        UrbanSample sample = logic.urban(x, z);
+        System.out.printf("spawn L2 + L3 + L3.5 for the chunk's region: %.1f s (%s)%n", (System.nanoTime() - start) / 1e9,
+                sample.use());
+        start = System.nanoTime();
+        List<RoadEdge> edges = logic.roads(x - 8, z - 8, x + 8, z + 8);
+        System.out.printf("spawn L4 graph for the chunk: %d roads in %.1f s%n", edges.size(), (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        int passing = 0;
+        for (RoadEdge edge : edges) {
+            RoadRoute route = logic.route(edge);
+            for (int i = 0; i < route.samples(); i++) {
+                if (Math.abs(route.x(i) - x) < 8 && Math.abs(route.z(i) - z) < 8) {
+                    passing++;
+                    break;
+                }
+            }
+        }
+        System.out.printf("spawn L4 routes: %.1f s, %d through the chunk%n", (System.nanoTime() - start) / 1e9, passing);
+        System.out.printf("spawn total: %.1f s%n", (System.nanoTime() - all) / 1e9);
+    }
+
+    /**
+     * Times finding the roads of the area and routing each, and reports how long they are and how much of them runs in
+     * tunnels, on bridges and up switchbacks, and how much longer than the straight line they come out.
+     */
+    private static List<RoadEdge> roadStats(CityLogic logic, double centerX, double centerZ, double half) {
+        long start = System.nanoTime();
+        List<RoadEdge> edges = logic.roads(centerX - half, centerZ - half, centerX + half, centerZ + half);
+        System.out.printf("L4 graph: %d roads in %.1f s (includes L2 of the area around)%n", edges.size(),
+                (System.nanoTime() - start) / 1e9);
+        for (RoadClass roadClass : RoadClass.values()) {
+            int count = 0;
+            int missing = 0;
+            double length = 0;
+            double straight = 0;
+            double slowest = 0;
+            Map<RoadKind, Double> kinds = new EnumMap<>(RoadKind.class);
+            start = System.nanoTime();
+            for (RoadEdge edge : edges) {
+                if (edge.roadClass() != roadClass) {
+                    continue;
+                }
+                long one = System.nanoTime();
+                RoadRoute route = logic.route(edge);
+                slowest = Math.max(slowest, (System.nanoTime() - one) / 1e9);
+                count++;
+                if (!route.exists()) {
+                    missing++;
+                    continue;
+                }
+                length += route.length();
+                straight += edge.length();
+                for (RoadKind kind : RoadKind.values()) {
+                    kinds.merge(kind, route.length(kind), Double::sum);
+                }
+            }
+            System.out.printf("L4 %-5s %3d roads (%d not found) in %.1f s, the slowest %.1f s: %.0f km, %.2f times the straight line%n",
+                    roadClass, count, missing, (System.nanoTime() - start) / 1e9, slowest, length / 1000,
+                    straight == 0 ? 0.0 : length / straight);
+            double all = Math.max(1, length);
+            kinds.forEach((kind, value) -> System.out.printf("  %-10s %5.1f%%%n", kind, 100 * value / all));
+        }
+        return edges;
     }
 
     /**
