@@ -23,7 +23,8 @@ import java.util.concurrent.locks.ReentrantLock;
  * villages weighed by the {@link SitePreference}. To plan a tier's block:
  * <ol>
  *     <li>the blocks of higher tiers around it are obtained, planned first when they are not yet; potentials within
- *     the sum of the two radii of a higher settlement are dropped;</li>
+ *     the sum of the two radii of a higher settlement are dropped, and towns and villages also within the suburbs of a
+ *     metropolis or city ({@link #clearance});</li>
  *     <li>the blocks of its own tier around it that are already planned are read, and potentials within the spacing of
  *     their settlements are dropped; blocks not yet planned are left alone, and will read this one when planned;</li>
  *     <li>the potentials left are placed from the best score down, each unless one already placed lies within the
@@ -61,6 +62,7 @@ public final class SettlementLayer {
     private final long seed;
     private final int planVersion;
     private final CitySettings.Settlements config;
+    private final double suburbTail;
     private final TerrainView terrain;
     private final Below below;
     private final PlanStore store;
@@ -77,6 +79,7 @@ public final class SettlementLayer {
         this.seed = seed;
         this.planVersion = settings.planVersion;
         this.config = settings.settlements;
+        this.suburbTail = settings.extent.suburbTail;
         this.terrain = terrain;
         this.below = below;
         this.store = store;
@@ -193,7 +196,7 @@ public final class SettlementLayer {
         List<List<Settlement>> higher = new ArrayList<>();
         for (int k = 0; k < tier.ordinal(); k++) {
             SettlementTier above = SettlementTier.values()[k];
-            double reach = above.of(config).radius + settings.radius;
+            double reach = clearance(above, tier);
             if (!tier.lowlandOnly() && above.lowlandOnly()) {
                 reach = Math.max(reach, STYLE_REACH * above.of(config).radius);
             }
@@ -227,14 +230,62 @@ public final class SettlementLayer {
         potentials.sort((a, b) -> a.beats(b) ? -1 : b.beats(a) ? 1 : 0);
 
         List<Settlement> placed = new ArrayList<>();
-        for (Potential potential : potentials) {
-            if (nearest(placed, potential.x, potential.z, settings.spacing) == null) {
-                placed.add(new Settlement(Hash.of(seed, tier.ordinal(), potential.cellX, potential.cellZ), tier,
-                        potential.cellX, potential.cellZ, potential.x, potential.z, style(tier, potential, higher),
-                        potential.hinterland));
+        for (Potential candidate : potentials) {
+            if (nearest(placed, candidate.x, candidate.z, settings.spacing) != null) {
+                continue;
             }
+            Potential potential = candidate;
+            if (tier.lowlandOnly()) {
+                // Judged without rivers and lakes; now that it stands, make sure its centre is on dry land
+                potential = landed(tier, candidate);
+                if (potential == null || nearest(placed, potential.x, potential.z, settings.spacing) != null
+                        || nearest(neighbours, potential.x, potential.z, settings.spacing) != null
+                        || !clearOfHigher(tier, potential, higher)) {
+                    continue;
+                }
+            }
+            placed.add(new Settlement(Hash.of(seed, tier.ordinal(), potential.cellX, potential.cellZ), tier,
+                    potential.cellX, potential.cellZ, potential.x, potential.z, style(tier, potential, higher),
+                    potential.hinterland));
         }
         return new SettlementBlock(planVersion, tier, blockX, blockZ, placed);
+    }
+
+    /**
+     * A metropolis or city moved, if need be, onto the nearest coarse grid point within half its radius whose full
+     * suitability, rivers and lakes included, makes a centre; null when there is none. The big tiers choose their places
+     * by the suitability without rivers and lakes, which may put a centre in a lake; this is checked only for those that
+     * stand, so the drainage is computed around few places, which their extents will read anyway.
+     */
+    private Potential landed(SettlementTier tier, Potential potential) {
+        if (below.suitability(potential.x, potential.z) >= config.minCentre) {
+            return potential;
+        }
+        int grid = 64;
+        int reach = (int) (0.5 * tier.of(config).radius / grid);
+        double baseX = Math.round(potential.x / grid) * (double) grid;
+        double baseZ = Math.round(potential.z / grid) * (double) grid;
+        List<int[]> offsets = new ArrayList<>();
+        for (int i = -reach; i <= reach; i++) {
+            for (int j = -reach; j <= reach; j++) {
+                if (i * i + j * j <= reach * reach) {
+                    offsets.add(new int[]{i, j});
+                }
+            }
+        }
+        offsets.sort((a, b) -> a[0] * a[0] + a[1] * a[1] != b[0] * b[0] + b[1] * b[1]
+                ? Integer.compare(a[0] * a[0] + a[1] * a[1], b[0] * b[0] + b[1] * b[1])
+                : a[0] != b[0] ? Integer.compare(a[0], b[0]) : Integer.compare(a[1], b[1]));
+        for (int[] offset : offsets) {
+            double x = baseX + offset[0] * grid;
+            double z = baseZ + offset[1] * grid;
+            if (!terrain.foreign(x, z) && below.suitability(x, z) >= config.minCentre
+                    && below.culture(x, z).margin() >= config.borderBuffer) {
+                return new Potential(potential.cellX, potential.cellZ, x, z, potential.hinterland, potential.score,
+                        potential.tieBreak);
+            }
+        }
+        return null;
     }
 
     private Potential potential(SettlementTier tier, int cellX, int cellZ) {
@@ -305,11 +356,20 @@ public final class SettlementLayer {
         return tier.lowlandOnly() ? below.broadSuitability(x, z) : below.suitability(x, z);
     }
 
-    /** Whether no settlement of a higher tier lies within the sum of the two radii. */
-    private boolean clearOfHigher(SettlementTier tier, Potential potential, List<List<Settlement>> higher) {
+    /**
+     * How far a settlement of a lower tier keeps from one of a higher tier: the sum of the two radii; towns and villages
+     * keep out of the suburbs of metropolises and cities as well, which thin out instead of gathering round them.
+     */
+    public double clearance(SettlementTier above, SettlementTier tier) {
         double radius = tier.of(config).radius;
+        double higher = above.of(config).radius;
+        return above.lowlandOnly() && !tier.lowlandOnly() ? suburbTail * higher + radius : higher + radius;
+    }
+
+    /** Whether no settlement of a higher tier lies within its {@link #clearance}. */
+    private boolean clearOfHigher(SettlementTier tier, Potential potential, List<List<Settlement>> higher) {
         for (int k = 0; k < higher.size(); k++) {
-            double reach = SettlementTier.values()[k].of(config).radius + radius;
+            double reach = clearance(SettlementTier.values()[k], tier);
             if (nearest(higher.get(k), potential.x, potential.z, reach) != null) {
                 return false;
             }

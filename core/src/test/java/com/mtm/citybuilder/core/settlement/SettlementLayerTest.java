@@ -51,8 +51,12 @@ class SettlementLayerTest {
                 if (b.tier() == a.tier()) {
                     assertTrue(distance >= own.spacing, a + " and " + b + " closer than the spacing");
                 } else if (b.tier().ordinal() < a.tier().ordinal()) {
-                    assertTrue(distance >= own.radius + b.tier().of(SETTINGS.settlements).radius,
-                            a + " within the clearance of " + b);
+                    double clearance = own.radius + b.tier().of(SETTINGS.settlements).radius;
+                    if (b.tier().lowlandOnly() && !a.tier().lowlandOnly()) {
+                        // Towns and villages keep out of big cities' suburbs too
+                        clearance = own.radius + SETTINGS.extent.suburbTail * b.tier().of(SETTINGS.settlements).radius;
+                    }
+                    assertTrue(distance >= clearance, a + " within the clearance of " + b);
                 }
             }
         }

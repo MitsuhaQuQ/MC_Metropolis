@@ -267,7 +267,10 @@ public final class CityMap {
                     count == 0 ? 0.0 : 100.0 * asia / count, count < 2 ? 0.0 : spacingSum / count);
         }
         System.out.println("  settlements within a higher tier's clearance, and tiers closer than their spacing: " + violations);
-        siteStats(logic, settlements, centerX, centerZ, half);
+        if (lowest == SettlementTier.VILLAGE) {
+            // Sites read the detailed ground, which costs erosion everywhere sampled: only on maps of towns and villages
+            siteStats(logic, settlements, centerX, centerZ, half);
+        }
     }
 
     /**

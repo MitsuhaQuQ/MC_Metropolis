@@ -107,9 +107,9 @@ public final class CitySettings {
      * block the best potential settlements are placed first, away from higher tiers and from those already placed.
      */
     public static final class Settlements {
-        public Tier metropolis = new Tier(16384, 3000.0, 30000.0, 9, 0.50, 2048.0, 65536);
-        public Tier city = new Tier(4096, 1000.0, 8000.0, 9, 0.42, 768.0, 32768);
-        public Tier town = new Tier(1024, 300.0, 4000.0, 6, 0.35, 256.0, 8192);
+        public Tier metropolis = new Tier(16384, 6000.0, 30000.0, 9, 0.50, 4000.0, 65536);
+        public Tier city = new Tier(4096, 2500.0, 12000.0, 9, 0.42, 1500.0, 32768);
+        public Tier town = new Tier(1024, 500.0, 6000.0, 6, 0.35, 400.0, 8192);
         public Tier village = new Tier(256, 100.0, 700.0, 6, 0.30, 96.0, 4096);
         /**
          * Factor on the suitability of plateaus and mountains when sizing metropolises and cities: plateaus hold towns and
@@ -171,6 +171,12 @@ public final class CitySettings {
         public double floorRadius = 1000.0;
         /** Height above the basin floor at which urban intensity has faded out. */
         public double riseFade = 80.0;
+        /**
+         * Metropolises and cities do not end at their target area: their intensity tails off into suburbs out to this
+         * many times the cost the target area was reached at. Towns and villages end there. Towns and villages keep
+         * out of the suburbs, which grow thinner instead of gathering round town centres.
+         */
+        public double suburbTail = 1.6;
         /** Grades from which urban intensity starts fading, and at which it is gone. */
         public double flatGrade = 0.05;
         public double steepGrade = 0.35;
@@ -260,9 +266,9 @@ public final class CitySettings {
                 break;
             }
         }
-        if (extent.sizeMin <= 0 || extent.sizeMax < extent.sizeMin || extent.reach < 1 || extent.floorRadius <= 0
+        if (extent.sizeMin <= 0 || extent.sizeMax < extent.sizeMin || extent.reach < 1 || extent.suburbTail < 1 || extent.floorRadius <= 0
                 || extent.riseFade <= 0 || extent.steepGrade <= extent.flatGrade) {
-            problems.add("extent needs 0 < sizeMin <= sizeMax, reach >= 1, positive floorRadius and riseFade, steepGrade above flatGrade");
+            problems.add("extent needs 0 < sizeMin <= sizeMax, reach and suburbTail >= 1, positive floorRadius and riseFade, steepGrade above flatGrade");
         }
         if (rural.beltHalfWidth > settlements.borderBuffer) {
             problems.add("rural.beltHalfWidth must not exceed settlements.borderBuffer: no settlement centre in the belt");

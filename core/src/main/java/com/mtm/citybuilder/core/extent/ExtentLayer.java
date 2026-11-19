@@ -67,15 +67,24 @@ public final class ExtentLayer {
         return tier.radius * (config.sizeMin + (config.sizeMax - config.sizeMin) * quality);
     }
 
+    /** How far beyond its target area a tier's intensity tails off, in costs at the target: suburbs or none. */
+    public double tail(SettlementTier tier) {
+        return tier.lowlandOnly() ? settings.extent.suburbTail : 1.0;
+    }
+
     /** The furthest an extent of a tier reaches from its centre. */
     public double maxReach(SettlementTier tier) {
-        return tier.of(settings.settlements).radius * settings.extent.sizeMax * settings.extent.reach + 2.0 * grid;
+        return tier.of(settings.settlements).radius * settings.extent.sizeMax * settings.extent.reach * tail(tier)
+                + 2.0 * grid;
     }
 
     public CityExtent extent(Settlement settlement) {
         CitySettings.Extent config = settings.extent;
         double radius = targetRadius(settlement);
-        double maxDistance = radius * config.reach;
+        double tail = tail(settlement.tier());
+        // The target area is taken within reach target radii; suburbs may reach further by the tail
+        double coreDistance = radius * config.reach;
+        double maxDistance = coreDistance * tail;
         double targetNodes = Math.PI * radius * radius / ((double) grid * grid);
         int half = (int) Math.ceil(maxDistance / grid) + 1;
         int size = 2 * half + 1;
@@ -116,6 +125,7 @@ public final class ExtentLayer {
                 ? Double.compare(a[0], b[0]) : Double.compare(a[1], b[1]));
         int start = half * size + half;
         double stop = 0.0;
+        boolean stopped = false;
         int taken = 0;
         if (kind[start] == LAND) {
             cost[start] = 0f;
@@ -127,12 +137,20 @@ public final class ExtentLayer {
             if (done[k]) {
                 continue;
             }
+            if (stopped && head[0] > tail * stop) {
+                break;
+            }
             done[k] = true;
-            if (kind[k] == LAND) {
+            int ki = k / size;
+            int kj = k % size;
+            if (!stopped && kind[k] == LAND && Math.hypot(ki - half, kj - half) * grid <= coreDistance) {
                 taken++;
                 stop = head[0];
                 if (taken >= targetNodes) {
-                    break;
+                    stopped = true;
+                    if (tail <= 1.0) {
+                        break;
+                    }
                 }
             }
             int i = k / size;
@@ -172,11 +190,12 @@ public final class ExtentLayer {
             for (int i = 0; i < size; i++) {
                 for (int j = 0; j < size; j++) {
                     int k = i * size + j;
-                    if (kind[k] != LAND || !done[k] || cost[k] > stop) {
+                    if (kind[k] != LAND || !done[k] || cost[k] > tail * stop) {
                         continue;
                     }
-                    double t = cost[k] / stop;
-                    double core = 1.0 - t * t;
+                    double t = cost[k] / (tail * stop);
+                    // Towns and villages end at their target; metropolises and cities tail off into suburbs
+                    double core = tail <= 1.0 ? 1.0 - t * t : Math.pow(1.0 - t * t, 2.0);
                     double rise = Math.max(0.0, height[k] - floor[k]);
                     double riseFade = clamp(1.0 - rise / config.riseFade);
                     double grade = grade(kind, height, size, i, j);

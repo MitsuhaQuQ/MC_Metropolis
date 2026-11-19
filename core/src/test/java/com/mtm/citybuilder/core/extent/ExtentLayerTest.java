@@ -30,15 +30,24 @@ class ExtentLayerTest {
     }
 
     @Test
-    void onOpenPlainsACityCoversItsTargetAndFadesOutwards() {
+    void onOpenPlainsACityCoversItsTargetAndTailsOffIntoSuburbs() {
         CityLogic logic = new CityLogic(3L, SETTINGS, SyntheticTerrain.flatPlains());
         Settlement city = first(logic, SettlementTier.METROPOLIS, 6000, -20000, 42000, 20000);
         assertNotNull(city, "a metropolis on the plains");
         CityExtent extent = logic.extent(city);
         double radius = logic.targetRadius(city);
-        double area = extent.nodes() * 64.0 * 64.0;
+        int core = 0;
+        for (int i = 0; i < extent.size(); i++) {
+            for (int j = 0; j < extent.size(); j++) {
+                if (extent.cost(extent.originX() + i, extent.originZ() + j) <= extent.radius()) {
+                    core++;
+                }
+            }
+        }
+        double area = core * 64.0 * 64.0;
         double target = Math.PI * radius * radius;
-        assertTrue(area > 0.8 * target && area < 1.2 * target, "built-up " + area + " against " + target);
+        assertTrue(area > 0.8 * target && area < 1.2 * target, "core " + area + " against " + target);
+        assertTrue(extent.nodes() > 1.5 * core, "suburbs beyond the core: " + extent.nodes() + " against " + core);
         // Intensity falls away from the centre along a line
         int cx = (int) Math.round(city.x() / 64);
         int cz = (int) Math.round(city.z() / 64);
