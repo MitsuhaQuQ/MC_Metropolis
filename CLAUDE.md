@@ -59,6 +59,17 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 - 服务端核心数据在 `common/src/main/java/mtr/data/`（每维度一个 `RailwayData`：车站、线路、车厂等）；新运营规则放在纯 Java 8 的 `transit-sim/`
 - 其数据类以 msgpack 存档、`FriendlyByteBuf` 包、`update(key, packet)` 三种方式读写；本 mod 若创建车站/线路，应走 MTR 现有的数据与同步路径，而不是直接改存档
 
+## 城市逻辑设计
+
+构思稿在 [docs/city-logic-design.md](docs/city-logic-design.md)（尚未实现）。核心原则照搬 MTM_worldgen：城市规划是 seed + 坐标 + 配置 + 地形的纯函数，从大尺度到小尺度分层（适宜度 → 文化区 → 选址 → 范围 → 乡村 → 城际道路 → 骨架 → 街道 → 地块 → 建筑），区域只是缓存单位；随时间变化的只有每座城的发展值和已建地块记录，规划本身不变。改动设计时同步更新这份文档。
+
+已和用户定下的（2026-11-19）：
+- 两种风格，亚洲（东亚现代）和欧洲（苏联/东欧），各占一半面积，**不在同一座城里混用**；风格决定城市形态，L5–L8 每种风格一套模块
+- 文化区按地形划分，边界尽量落在山脊和海峡上；落在平原上时用无建筑的边境农业带隔开
+- 城际道路有纵断面，翻山时按代价自动选山口、盘山或隧道
+- 欧洲风格建筑用 kogtyv-TAV 的部件（MIT/CC0，已拆成部件）；亚洲风格以程序化生成为主
+- 建筑多样性靠拆部件拼装、换材质、加细节，并以"开发项目"为单位安排重复
+
 ## 已定与待定
 
 - 已采用（2026-11-19 搭骨架时按默认值）：Minecraft 1.20.1（MTR 只构建 1.20.1，以后随 MTM_worldgen 的版本链扩展）；Fabric + Forge；对兄弟 mod 软依赖；mod id `citybuilder`、包 `com.mtm.citybuilder`、显示名 City Builder
