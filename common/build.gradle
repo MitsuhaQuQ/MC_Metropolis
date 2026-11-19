@@ -5,6 +5,8 @@ architectury {
 // The city logic is compiled into common
 sourceSets.main {
     java.srcDir rootProject.file("core/src/main/java")
+    // The adapter onto MTM_worldgen's terrain logic, plain Java shared with core's tests and tools
+    java.srcDir rootProject.file("core/src/worldgen/java")
     resources.srcDir rootProject.file("core/src/main/resources")
 }
 

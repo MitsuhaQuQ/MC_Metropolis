@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 本项目是 **MTM_worldgen**（`F:\MC\MTM_worldgen`，真实地貌地形生成）与 **MTR Advanced**（`P:\Minecraft-Transit-Railway-391ce5d1800fbc70b7f565571c692287828867fa`，MTR 3.2.2 的运营模拟分支）的共同配套 mod：在大地形尺度上自然地生成城市，并让城市按规则逐步扩展。建筑模型素材取自网络上 MIT、CC 等开放协议授权的作品。
 
-> 当前状态（2026-11-19）：只有构建骨架（加载器入口、平台服务、一个冒烟测试），还没有城市逻辑；尚未建 git 仓库。下文标 **【待决定】** 的是尚未确定的事项，括号内为建议默认值；确定后删除标记。
+> 当前状态（2026-11-20）：实现顺序的第 1 步已完成：`CityLogic`、`CitySettings` 骨架、L1 适宜度场和它的调试图（`cityMap`）。还没有接进游戏。下文标 **【待决定】** 的是尚未确定的事项，括号内为建议默认值；确定后删除标记。
 
 ## 常用命令
 
@@ -15,22 +15,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 gradlew build                                   # 构建全部并跑 core 单元测试，mod jar 在 fabric/build/libs、forge/build/libs
 gradlew :core:test                              # 单元测试
-gradlew :core:test --tests '*CityBuilderCoreTest.modIdIsAValidNamespace'   # 单个测试
+gradlew :core:test --tests '*SuitabilityLayerTest.regionBordersMeet'   # 单个测试
+gradlew :core:cityMap -Pseed=12345 -Px=0 -Pz=0 -Pscale=32   # 在 MTM 地形上渲染城市逻辑调试图（默认配置），输出到 core/build/debug/
 gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验证）
 ```
+
+- `cityMap` 还接受 `-Psize=<像素>`、`-Pout=<文件>`；它会打印每个逻辑区域的耗时和各地貌的平均适宜度。调参后先出图看效果，再看测试
+- 调参时常用的对照：种子 12345 的 `-10600 -10000`（平原、河口），种子 707121638 的 `0 0`（平原、高原、湖）
 
 ## 代码结构
 
 单一 Minecraft 版本（1.20.1）的 Architectury 布局，Gradle 9.6.0、Architectury Loom 1.17（`loom-remap`，Mojang 映射）、Architectury 插件 3.5、Shadow 9.6.1，加载器版本与 MTM_worldgen 的 1.20.1 相同（`gradle.properties`）。JDK 17。
 
-- `core/`：城市逻辑，纯 Java，**不得引用 Minecraft 类**；不单独出 jar，作为源码目录编进 `common`，单元测试只在这里跑
+- `core/`：城市逻辑，纯 Java，**不得引用 Minecraft 类**；不单独出 jar，作为源码目录编进 `common`，单元测试只在这里跑。三个源码集：
+  - `src/main`：入口 `CityLogic.forWorld(seed, CitySettings, TerrainView)`（每个世界一份）；`CitySettings`（JSON，带 `planVersion`，Gson 只在内部类 `Json` 里用）；`cache.RegionCache`（按区域的 LRU，同一区域只算一次）；`noise.Hash`（splitmix64，所有随机选择的来源）；`layer.SuitabilityLayer`/`SuitabilityRegion`（L1）；`debug.SuitabilityMap`（调试图渲染）
+  - `src/worldgen`：`core.terrain.WorldgenTerrainView`，把 MTM_worldgen 的 `TerrainLogic` 包成 `TerrainView`。纯 Java，但引用 worldgen，所以不在 `src/main`；common 也编译它（`common/build.gradle` 的 `srcDir`），测试和工具在 core 里直接用
+  - `src/tools`：`tools.CityMap`，`cityMap` 任务的入口，不进 jar
+- **L1 的约定**：每个网格节点的值只取决于节点及周围有限范围（`waterReach`、`landformBlend`）的地形，所以任何区域算出的同一节点相同、区域边界两侧连续（`SuitabilityLayerTest.regionBordersMeet`）。水面节点不存值（NaN），插值时不参与，河岸不会被拉低成台阶。离散的地貌类型分数在周围平均后再用，避免硬边。只用 `TerrainView` 的便宜查询
 - `common/`：Minecraft 侧代码。入口 `CityBuilder.init()`（由两个加载器入口调用）；`platform.Platform` 是加载器服务接口，各加载器经 `META-INF/services` 注册实现。common 里不能用 Fabric API 类
 - `fabric/`、`forge/`：只做注册与平台适配，不写逻辑。`shadowJar` 打包 common，`remapJar` 产出正式 jar
 - 对两个兄弟 mod 是软依赖（`fabric.mod.json` 的 `suggests`、`mods.toml` 的 `mandatory = false`），用 `Platform.isModLoaded(CityBuilder.WORLDGEN_MOD_ID / MTR_MOD_ID)` 判断是否存在
 - **地形接入（直接依赖 jar，用户 2026-11-19 选定）**：编译时直接引用 MTM_worldgen 构建好的 jar（`build.gradle` 的 `worldgenJar(loader)`，从 `gradle.properties` 的 `mtm_worldgen_dir` 下 `versions/1.20.1/<加载器>/build/libs` 取最新修改的 `mtm_worldgen-<加载器>-*-1.20.1.jar`，不绑定版本号；运行时也接受任何版本；找不到 jar 时构建报错，先在 MTM_worldgen 里 `gradlew :1.20.1:fabric:build :1.20.1:forge:build`）。common 用 `modCompileOnly`（不打进 jar），fabric/forge 用 `modLocalRuntime`（开发运行时带上），core 的测试用 `testImplementation`
-  - 城市逻辑只通过 core 的 `core.terrain.TerrainView` 读地形（地表高度、河湖水面、坡度、地貌、群系），不直接用 `TerrainLogic`，这样没装 MTM_worldgen 时也能加载；core 的**测试**可以直接用 `TerrainLogic.forWorld(seed, WorldgenSettings.DEFAULT)` 在真实地形上跑
-  - 唯一引用 MTM_worldgen 类的是 `compat.worldgen.WorldgenTerrain`（包装 `TerrainLogic`，经 `MtmGenerators.terrainLogic(level)` 取得某个世界的实例），只能经 `terrain.Terrains.of(level)` 在 `isModLoaded` 判断之后加载；它返回 null 表示没装 MTM_worldgen 或该维度不是 MTM 地形
-  - 不看版本号，真正的约束是用到的方法签名（MTR 同理，见下条）：`TerrainLogic`（`surfaceHeight`、`sampleWaterLevel`、`sampleGrade`、`sampleLandformKind`、`sampleBiome`、`forWorld`）、`TerrainLogic.Landform` 的取值、`MtmGenerators.terrainLogic(ServerLevel)`、`WorldgenSettings.DEFAULT`。它们改名或改签名时这里编译失败；已发布的 citybuilder 遇到这样的 MTM_worldgen 会在运行时报 `NoSuchMethodError`
+  - 城市逻辑只通过 core 的 `core.terrain.TerrainView` 读地形，不直接用 `TerrainLogic`，这样没装 MTM_worldgen 时也能加载；core 的**测试和工具**用 `new WorldgenTerrainView(TerrainLogic.forWorld(seed, WorldgenSettings.DEFAULT))` 在真实地形上跑
+  - **`TerrainView` 的查询分两档**：便宜的（`smoothHeight`、`landform`、`nearestRiver`、`lakeLevel`）不需要侵蚀，适合在粗网格上整片采样；精细的（`surfaceHeight`、`waterLevel`、`grade`）第一次用到时会算整个区域的侵蚀（约 0.5–1.5 秒），只留给放置东西的步骤。worldgen 的 `sampleRiver` 读的是拟合到侵蚀地面的河，所以 `nearestRiver` 改用 `riverRegion(rx, rz).nearest(x, z)`（按水系路由的原始河道，不需要侵蚀）
+  - 游戏里取得地形的入口是 `terrain.Terrains.of(level)`：在 `isModLoaded` 判断之后才加载 `compat.worldgen.WorldgenTerrain`（经 `MtmGenerators.terrainLogic(level)` 取得该世界的 `TerrainLogic`，再包成 `WorldgenTerrainView`）；返回 null 表示没装 MTM_worldgen 或该维度不是 MTM 地形
+  - 不看版本号，真正的约束是用到的方法签名（MTR 同理，见下条）：`TerrainLogic`（`surfaceHeight`、`sampleWaterLevel`、`sampleGrade`、`sampleLandformKind`、`sampleBiome`、`sampleSmoothLand`、`riverRegion`、`sampleLakeLevel`、`settings`、`forWorld`）、`RiverRegion.nearest` 和 `Hit` 的 `distance`/`width`、`TerrainLogic.Landform` 的取值、`MtmGenerators.terrainLogic(ServerLevel)`、`WorldgenSettings.DEFAULT` 和 `general.regionSize`/`general.seaLevel`。它们改名或改签名时这里编译失败；已发布的 citybuilder 遇到这样的 MTM_worldgen 会在运行时报 `NoSuchMethodError`
 - **MTR 接入（直接依赖 jar，用户 2026-11-19 选定）**：取 `gradle.properties` 的 `mtr_jar_dir`（默认 `P:/mtr-ante/test-jars/merged`，MTR 构建流程 `round.sh` 把 jar 复制到这里）里最新修改的 `MTR-merged-<加载器>-1.20.1-MTM_Logic-*.jar`（不含 `-server`），不绑定版本。common `modCompileOnly` 逻辑 jar；fabric/forge 的开发运行带上逻辑 jar、`MTM_Assets` jar 和 MTR 需要的 Architectury API（`architectury_api_version`，与 MTR 构建所用相同）
   - 城市逻辑通过 core 的 `core.transit.TransitView` 读线网，目前只有车站（`StationInfo`：id、名称、颜色、各矩形区域及高度范围；区域与高度取自 MTR 分支的 `Station.getRectangles()`/`getHeight(rect)`）。返回的是快照，可在任意线程使用
   - 唯一引用 MTR 类的是 `compat.mtr.MtrTransit`（经 `RailwayData.getInstance(level)`），只能经 `transit.Transits.of(level)` 加载；MTR 的数据由服务端线程修改，`stations()` 要在服务端线程调用
@@ -76,6 +85,7 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 - 铁路线形**按接近现实的半径**（干线最小 600、支线 300、城市地铁和高架 160，站台直线优先），带缓和曲线；曲线起终点放"曲线标"方块，标出半径和缓和曲线长度，让玩家照着放 MTR 节点
 - **高速线预留**：第一版不建结构，但线位和站区从第一版起就规划并空出（城市里做绿带或空地），以后在空着的走廊里补建
 - **第一版以日本风格（京都原型）为目标**，欧洲风格之后再做。自然化的原则是"有原因的不规则"：三层时代层叠（古道 → 老城与规划方格 → 铁路与现代改造）、暗渠路、楼高跟路宽挂钩（道路斜线）、表通り和裏通り，不在结果上加随机扰动；用 OSM 统计的真实城市指标（街道朝向熵、路口类型比例等）校准（设计文档第 8 节）
+- **高原可以建城但不以大城市为主**：L1 适宜度不压低高原；L2 计算大都市和城市的腹地时对高原打折（建议 ×0.3），镇和村不打折
 - **山麓渐变**：L3 给出连续的城市强度（到中心的代价、坡度、高出盆地底面的高度），城市到山脚逐步变稀、变矮、变绿：盆地市街 → 山裾（寺社、低层住宅）→ 谷口聚落 → 山坡（墓地、梯田）→ 山林；城市沿谷伸进去，山脊保持森林
 - **规划算法要按世界锁定版本**：区块不会重新生成，规划一改，已生成和未生成的区块就对不上；改变规划的修改必须让旧世界继续用旧算法
 - 以后做高架、立交时，**借 MTR 分支的几何算法**（缓和曲线、斜面填缝、桥面铺设）自己生成方块，不写 MTR 数据；移植的代码保留 MTR 的 MIT 声明并注明出处

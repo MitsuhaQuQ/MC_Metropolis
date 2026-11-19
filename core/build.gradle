@@ -1,14 +1,56 @@
 // City logic: plain Java that knows nothing of Minecraft. common compiles these sources along with its own, so they
 // ship inside every mod jar; tests run here, without starting the game
+sourceSets {
+    // The adapter onto MTM_worldgen's terrain logic: common compiles it too, the tests and tools use it here
+    worldgen {
+        java.srcDir "src/worldgen/java"
+    }
+    // Debug tools run from Gradle, never shipped: the city map
+    tools {
+        java.srcDir "src/tools/java"
+    }
+}
+
+def worldgenJar = files(rootProject.worldgenJar("fabric"))
+
 dependencies {
+    // Settings read and write JSON with the Gson that Minecraft brings
+    compileOnly "com.google.code.gson:gson:${rootProject.gson_version}"
+
+    worldgenImplementation sourceSets.main.output
+    worldgenImplementation worldgenJar
+
+    toolsImplementation sourceSets.main.output
+    toolsImplementation sourceSets.worldgen.output
+    toolsImplementation worldgenJar
+    toolsImplementation "com.google.code.gson:gson:${rootProject.gson_version}"
+
     testImplementation "org.junit.jupiter:junit-jupiter:${rootProject.junit_version}"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
-
     // Tests may run the city logic on real MTM terrain: MTM_worldgen's terrain logic is plain Java as well
-    testImplementation files(rootProject.worldgenJar("fabric"))
+    testImplementation sourceSets.worldgen.output
+    testImplementation worldgenJar
     testImplementation "com.google.code.gson:gson:${rootProject.gson_version}"
 }
 
 test {
     useJUnitPlatform()
+    maxHeapSize = "4g"
+}
+
+// gradlew :core:cityMap -Pseed=12345 -Px=0 -Pz=0 -Pscale=16 [-Psize=1024] [-Pout=file.png]
+tasks.register("cityMap", JavaExec) {
+    group = "citybuilder"
+    description = "Renders the city logic of an MTM_worldgen world to a PNG under build/debug"
+    classpath = sourceSets.tools.runtimeClasspath
+    mainClass = "com.mtm.citybuilder.tools.CityMap"
+    maxHeapSize = "4g"
+    def seed = providers.gradleProperty("seed").getOrElse("12345")
+    def x = providers.gradleProperty("x").getOrElse("0")
+    def z = providers.gradleProperty("z").getOrElse("0")
+    def scale = providers.gradleProperty("scale").getOrElse("16")
+    def size = providers.gradleProperty("size").getOrElse("1024")
+    def out = providers.gradleProperty("out").getOrElse(
+            layout.buildDirectory.file("debug/city-${seed}_${x}_${z}_${scale}.png").get().asFile.path)
+    args seed, x, z, scale, out, size
 }
