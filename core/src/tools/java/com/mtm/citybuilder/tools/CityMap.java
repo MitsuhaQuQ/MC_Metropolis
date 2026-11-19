@@ -10,6 +10,7 @@ import com.mtm.citybuilder.core.layer.SuitabilityRegion;
 import com.mtm.citybuilder.core.culture.Style;
 import com.mtm.citybuilder.core.settlement.Settlement;
 import com.mtm.citybuilder.core.settlement.SettlementTier;
+import com.mtm.citybuilder.core.settlement.SitePreference;
 import com.mtm.citybuilder.core.terrain.Landform;
 import com.mtm.citybuilder.core.terrain.WorldgenTerrainView;
 import com.mtm.worldgen.logic.TerrainLogic;
@@ -19,6 +20,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -256,6 +258,64 @@ public final class CityMap {
                     count == 0 ? 0.0 : 100.0 * asia / count, count < 2 ? 0.0 : spacingSum / count);
         }
         System.out.println("  settlements within a higher tier's clearance, and tiers closer than their spacing: " + violations);
+        siteStats(logic, settlements, centerX, centerZ, half);
+    }
+
+    /**
+     * Where towns and villages stand, against suitable land at random: how many by a river, raised, at the foot of
+     * hills or on a flood plain, by the site preference's own measures.
+     */
+    private static void siteStats(CityLogic logic, List<Settlement> settlements, double centerX, double centerZ, double half) {
+        SitePreference sites = new SitePreference(logic.settings(), logic.terrain());
+        CitySettings.Site config = logic.settings().settlements.site;
+        for (SettlementTier tier : new SettlementTier[]{SettlementTier.TOWN, SettlementTier.VILLAGE}) {
+            List<SitePreference.Site> found = new ArrayList<>();
+            for (Settlement settlement : settlements) {
+                if (settlement.tier() == tier) {
+                    found.add(sites.evaluate(settlement.x(), settlement.z()));
+                }
+            }
+            printSites(tier.toString(), found, config);
+        }
+        List<SitePreference.Site> random = new ArrayList<>();
+        java.util.Random rng = new java.util.Random(1);
+        while (random.size() < 400) {
+            double x = centerX - half + rng.nextDouble() * 2 * half;
+            double z = centerZ - half + rng.nextDouble() * 2 * half;
+            if (logic.suitability(x, z) >= logic.settings().settlements.minCentre && !logic.terrain().foreign(x, z)) {
+                random.add(sites.evaluate(x, z));
+            }
+        }
+        printSites("suitable land at random", random, config);
+    }
+
+    private static void printSites(String what, List<SitePreference.Site> sites, CitySettings.Site config) {
+        if (sites.isEmpty()) {
+            return;
+        }
+        int river = 0;
+        int raised = 0;
+        int foot = 0;
+        int flood = 0;
+        double value = 0;
+        for (SitePreference.Site site : sites) {
+            if (site.bank() >= config.riverNear && site.bank() <= config.riverFar) {
+                river++;
+            }
+            if (site.rise() >= config.raisedRise) {
+                raised++;
+            }
+            if (site.climb() >= config.footRise) {
+                foot++;
+            }
+            if (site.bank() < config.riverFade && site.rise() < config.floodRise) {
+                flood++;
+            }
+            value += site.value();
+        }
+        double n = sites.size();
+        System.out.printf("  sites of %s: %.0f%% by a river, %.0f%% raised, %.0f%% at the foot of hills, %.0f%% on a flood plain, mean value %.2f%n",
+                what, 100 * river / n, 100 * raised / n, 100 * foot / n, 100 * flood / n, value / n);
     }
 
     /** The least distance between two settlements of a tier. */

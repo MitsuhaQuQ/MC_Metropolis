@@ -107,8 +107,8 @@ public final class CitySettings {
     public static final class Settlements {
         public Tier metropolis = new Tier(16384, 3000.0, 30000.0, 9, 0.50, 2048.0, 65536);
         public Tier city = new Tier(4096, 1000.0, 8000.0, 9, 0.42, 768.0, 32768);
-        public Tier town = new Tier(1024, 300.0, 3000.0, 6, 0.35, 256.0, 8192);
-        public Tier village = new Tier(256, 100.0, 400.0, 4, 0.30, 96.0, 4096);
+        public Tier town = new Tier(1024, 300.0, 4000.0, 6, 0.35, 256.0, 8192);
+        public Tier village = new Tier(256, 100.0, 700.0, 6, 0.30, 96.0, 4096);
         /**
          * Factor on the suitability of plateaus and mountains when sizing metropolises and cities: plateaus hold towns and
          * small cities, not big ones.
@@ -118,6 +118,33 @@ public final class CitySettings {
         public double minCentre = 0.35;
         /** Least culture margin at a settlement's centre: no settlement right on a border, which the farmland belt keeps. */
         public double borderBuffer = 1500.0;
+        /** Where towns and villages prefer to stand within good land. */
+        public Site site = new Site();
+    }
+
+    /**
+     * The site preference of towns and villages: by a river but raised above it, as on a natural levee or a terrace
+     * edge, or at the foot of hills; not down on a flood plain. A candidate's score is its hinterland times
+     * {@code 1 + weight * site}, with the site value from -1 to 1.
+     */
+    public static final class Site {
+        public double weight = 0.6;
+        /** Bank distances where a river draws settlements fully: close enough to use it, far enough to keep dry. */
+        public double riverNear = 80.0;
+        public double riverFar = 400.0;
+        /** Bank distance beyond which a river neither draws settlements nor floods them. */
+        public double riverFade = 1000.0;
+        /** Radius of the ring the ground is compared with: rise is the height above its lowest ground or water. */
+        public double ringRadius = 300.0;
+        /** Rise that counts as fully raised. */
+        public double raisedRise = 4.0;
+        /** Rise below which ground near a river is flood plain. */
+        public double floodRise = 1.5;
+        /** How much a flood plain takes off the site value. */
+        public double floodPenalty = 0.6;
+        /** Distance at which rising ground makes a site the foot of hills, and how much higher it must be. */
+        public double footReach = 600.0;
+        public double footRise = 25.0;
     }
 
     /** One tier of settlements. */
@@ -190,6 +217,12 @@ public final class CitySettings {
                 problems.add("each settlement tier's cellSize must divide the cellSize of the tier above");
                 break;
             }
+        }
+        Site site = settlements.site;
+        if (!(0 < site.riverNear && site.riverNear < site.riverFar && site.riverFar < site.riverFade)
+                || site.raisedRise <= 0 || site.floodRise <= 0 || site.footRise <= 0 || site.ringRadius <= 0
+                || site.footReach <= 0) {
+            problems.add("settlements.site needs 0 < riverNear < riverFar < riverFade and positive rises and reaches");
         }
         if (suitability.waterReach < 0 || suitability.highLandFade <= 0) {
             problems.add("suitability.waterReach must not be negative, suitability.highLandFade must be positive");

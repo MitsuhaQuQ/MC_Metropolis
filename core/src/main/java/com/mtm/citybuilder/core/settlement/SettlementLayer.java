@@ -17,15 +17,16 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * L2: settlements and their tiers, planned once a plan block at a time and stored (see the design document, "规划块").
  * <p>
- * Each tier has a grid of its own; in each cell, of a few jittered candidates, the one with the best hinterland (mean
- * suitability around it) is the cell's potential settlement, provided its centre is suitable, away from a culture
- * border and not in a merged-in map, and its hinterland reaches the tier's minimum. To plan a tier's block:
+ * Each tier has a grid of its own; in each cell, of a few jittered candidates, the one with the best score is the cell's
+ * potential settlement, provided its centre is suitable, away from a culture border and not in a merged-in map, and its
+ * hinterland (mean suitability around it) reaches the tier's minimum. The score is the hinterland, for towns and
+ * villages weighed by the {@link SitePreference}. To plan a tier's block:
  * <ol>
  *     <li>the blocks of higher tiers around it are obtained, planned first when they are not yet; potentials within
  *     the sum of the two radii of a higher settlement are dropped;</li>
  *     <li>the blocks of its own tier around it that are already planned are read, and potentials within the spacing of
  *     their settlements are dropped; blocks not yet planned are left alone, and will read this one when planned;</li>
- *     <li>the potentials left are placed from the best hinterland down, each unless one already placed lies within the
+ *     <li>the potentials left are placed from the best score down, each unless one already placed lies within the
  *     spacing.</li>
  * </ol>
  * The result depends on the order neighbouring blocks are planned in, but never contradicts a block planned before.
@@ -51,9 +52,9 @@ public final class SettlementLayer {
     }
 
     /** The best candidate of a cell. */
-    private record Potential(int cellX, int cellZ, double x, double z, double hinterland, long tieBreak) {
+    private record Potential(int cellX, int cellZ, double x, double z, double hinterland, double score, long tieBreak) {
         boolean beats(Potential other) {
-            return hinterland > other.hinterland || (hinterland == other.hinterland && tieBreak > other.tieBreak);
+            return score > other.score || (score == other.score && tieBreak > other.tieBreak);
         }
     }
 
@@ -63,6 +64,7 @@ public final class SettlementLayer {
     private final TerrainView terrain;
     private final Below below;
     private final PlanStore store;
+    private final SitePreference sites;
     private final ReentrantLock[] locks = new ReentrantLock[SettlementTier.values().length];
     private final Map<String, SettlementBlock> memory = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
@@ -78,6 +80,7 @@ public final class SettlementLayer {
         this.terrain = terrain;
         this.below = below;
         this.store = store;
+        this.sites = new SitePreference(settings, terrain);
         for (int k = 0; k < locks.length; k++) {
             locks[k] = new ReentrantLock();
         }
@@ -245,12 +248,18 @@ public final class SettlementLayer {
                     || below.culture(x, z).margin() < config.borderBuffer) {
                 continue;
             }
-            Potential candidate = new Potential(cellX, cellZ, x, z, hinterland(tier, settings, x, z), hash);
+            double hinterland = hinterland(tier, settings, x, z);
+            if (hinterland < settings.minHinterland) {
+                continue;
+            }
+            double score = tier.lowlandOnly() ? hinterland
+                    : hinterland * (1.0 + config.site.weight * sites.evaluate(x, z).value());
+            Potential candidate = new Potential(cellX, cellZ, x, z, hinterland, score, hash);
             if (best == null || candidate.beats(best)) {
                 best = candidate;
             }
         }
-        return best != null && best.hinterland >= settings.minHinterland ? best : null;
+        return best;
     }
 
     /**
