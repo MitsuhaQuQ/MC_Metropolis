@@ -335,6 +335,10 @@ public final class CityMap {
         System.out.printf("spawn L4 routes: %.1f s, %d through the chunk%n", (System.nanoTime() - start) / 1e9, passing);
         System.out.println("      " + counting.report());
         System.out.printf("spawn total: %.1f s%n", (System.nanoTime() - all) / 1e9);
+        System.gc();
+        Runtime runtime = Runtime.getRuntime();
+        System.out.printf("spawn heap in use after a collection: %.0f MB (everything cached: MTM_worldgen's and the city logic's)%n",
+                (runtime.totalMemory() - runtime.freeMemory()) / 1048576.0);
     }
 
     /**
