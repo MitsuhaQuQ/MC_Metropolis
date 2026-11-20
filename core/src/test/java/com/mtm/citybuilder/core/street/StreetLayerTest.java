@@ -115,6 +115,19 @@ class StreetLayerTest {
         assertTrue(town.meanBlockHa() >= 0.6 && town.meanBlockHa() <= 3.0, report);
         assertTrue(town.laneDensity() >= 2.0, report);
         assertTrue(StreetMetrics.orientationOrder(nonLanes(castle)) <= 0.4, report);
+        // Few wedges too thin to build on (OpenStreetMap: under 1% of junction corners sharper than 30 degrees), few
+        // roads squeezed beside another, and a hierarchy: main roads a minority of the arterials and collectors
+        double sharp = StreetMetrics.acute(castle.segments(), 30.0);
+        java.util.function.Predicate<StreetSegment> main = s -> s.streetClass() == StreetClass.ARTERIAL
+                || s.streetClass() == StreetClass.COLLECTOR;
+        double squeezed = StreetMetrics.squeezed(castle.segments(), main, 12.0);
+        double arterial = castle.length(StreetClass.ARTERIAL);
+        double collector = castle.length(StreetClass.COLLECTOR);
+        String shape = String.format("sharp corners %.3f, squeezed %.3f, arterial %.0f, collector %.0f", sharp, squeezed,
+                arterial, collector);
+        assertTrue(sharp <= 0.03, shape);
+        assertTrue(squeezed <= 0.06, shape);
+        assertTrue(collector > 0.2 * (arterial + collector) && arterial > 0.3 * (arterial + collector), shape);
 
         StreetPlan capital = logic.streetPlan(city, Formation.JORI);
         // Measured within the planned city, the grid

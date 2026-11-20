@@ -561,6 +561,24 @@ public final class CitySettings {
         public double oldRoadWidth = 8.0;
         public double arterialWidth = 16.0;
         public double stationAvenueWidth = 24.0;
+        /**
+         * The arterials carrying the town's through traffic, the share {@code mainShare} of their length most used by
+         * the shortest ways between points of the network, stay main roads; the rest become collectors this wide
+         * (two lanes and pavements, as Japan's prefectural roads). Kyoto's trunk, primary and secondary roads are
+         * 18% of its street length, its tertiary roads 16% (OpenStreetMap).
+         */
+        public double collectorWidth = 11.0;
+        public double mainShare = 0.6;
+        /**
+         * A street meeting another at a sharper angle than this, leaving a wedge of a block too thin to build on, is
+         * bent to meet it squarely (OpenStreetMap: under 1% of junction corners sharper than 30 degrees).
+         */
+        public double sharpJoin = 35.0;
+        /**
+         * A collector or street with less land than this between its edge and a road of its class or higher running
+         * beside it the same way leaves no room to build between them: it is taken out.
+         */
+        public double squeezeGap = 12.0;
         /** A station avenue is laid only where the station is at most this far from the heart it leads to. */
         public double stationAvenueMax = 6000.0;
         /**
@@ -610,8 +628,8 @@ public final class CitySettings {
         public double streetBridgeSpacing = 250.0;
         /**
          * Roads along the banks of water wider than a culvert run this far from its edge, on the embankment, whose
-         * crest stands {@code leveeHeight} above the water; a run at least {@code riversideArterial} long is an
-         * arterial. An arterial ending at the water joins a bank road within {@code bankJoin} instead of ending there.
+         * crest stands {@code leveeHeight} above the water; a run at least {@code riversideArterial} long is a
+         * collector, a shorter one a street. An arterial ending at the water joins a bank road within {@code bankJoin} instead of ending there.
          */
         public double leveeHeight = 3.0;
         public double bankOffset = 24.0;

@@ -92,6 +92,8 @@ public final class StreetMap {
                 case OLD_ROAD -> new Color(140, 80, 30);
                 case ARTERIAL -> segment.era() == com.mtm.citybuilder.core.street.Era.MODERN
                         ? new Color(30, 40, 120) : new Color(15, 15, 15);
+                case COLLECTOR -> segment.era() == com.mtm.citybuilder.core.street.Era.MODERN
+                        ? new Color(80, 100, 190) : new Color(45, 45, 45);
                 default -> new Color(70, 70, 70);
             });
             // Structures over the class colours: bridges orange, culverts cyan, ramps yellow, stairs magenta

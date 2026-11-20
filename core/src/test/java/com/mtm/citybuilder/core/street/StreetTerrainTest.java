@@ -89,7 +89,8 @@ class StreetTerrainTest {
         StreetPlan plan = logic.streetPlan(city(20300, 0), Formation.CASTLE_TOWN);
         java.util.Map<Long, Integer> degree = new java.util.HashMap<>();
         List<StreetSegment> arterials = plan.segments().stream()
-                .filter(s -> s.streetClass() == StreetClass.ARTERIAL || s.streetClass() == StreetClass.OLD_ROAD).toList();
+                .filter(s -> s.streetClass() == StreetClass.ARTERIAL || s.streetClass() == StreetClass.COLLECTOR
+                        || s.streetClass() == StreetClass.OLD_ROAD).toList();
         for (StreetSegment segment : arterials) {
             degree.merge(Math.round(segment.x1() * 10) * 1_000_003L + Math.round(segment.z1() * 10), 1, Integer::sum);
             degree.merge(Math.round(segment.x2() * 10) * 1_000_003L + Math.round(segment.z2() * 10), 1, Integer::sum);

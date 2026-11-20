@@ -254,6 +254,31 @@ public final class OsmStats {
             }
         }
         report.put("lanes (service, footway, path) km per km2", lanes / 1000.0 / area);
+        // As the generated streets are measured (StreetMetrics): roads doubled close beside, sharp junction corners
+        List<com.mtm.citybuilder.core.street.StreetSegment> pieces = new ArrayList<>();
+        for (int w = 0; w < data.streets.size(); w++) {
+            long[] refs = data.streets.get(w);
+            String kind = data.streetClasses.get(w);
+            com.mtm.citybuilder.core.street.StreetClass streetClass = kind.equals("primary") || kind.equals("secondary")
+                    || kind.equals("trunk") || kind.equals("tertiary")
+                    ? com.mtm.citybuilder.core.street.StreetClass.ARTERIAL : com.mtm.citybuilder.core.street.StreetClass.STREET;
+            for (int i = 1; i < refs.length; i++) {
+                double[] a = data.nodes.get(refs[i - 1]);
+                double[] b = data.nodes.get(refs[i]);
+                if (a != null && b != null) {
+                    pieces.add(new com.mtm.citybuilder.core.street.StreetSegment(a[0], a[1], b[0], b[1], streetClass,
+                            com.mtm.citybuilder.core.street.Era.MODERN, 6.0));
+                }
+            }
+        }
+        report.put("doubled within 40: arterials (primary-tertiary)", com.mtm.citybuilder.core.street.StreetMetrics.doubled(pieces,
+                s -> s.streetClass() == com.mtm.citybuilder.core.street.StreetClass.ARTERIAL, 40.0));
+        report.put("doubled within 40: streets", com.mtm.citybuilder.core.street.StreetMetrics.doubled(pieces,
+                s -> s.streetClass() == com.mtm.citybuilder.core.street.StreetClass.STREET, 40.0));
+        report.put("squeezed under 12 of land (widths 6): arterials", com.mtm.citybuilder.core.street.StreetMetrics.squeezed(pieces,
+                s -> s.streetClass() == com.mtm.citybuilder.core.street.StreetClass.ARTERIAL, 12.0));
+        report.put("junction corners under 30 deg", com.mtm.citybuilder.core.street.StreetMetrics.acute(pieces, 30.0));
+        report.put("junction corners under 45 deg", com.mtm.citybuilder.core.street.StreetMetrics.acute(pieces, 45.0));
     }
 
     /** Connected parts of the street graph. */

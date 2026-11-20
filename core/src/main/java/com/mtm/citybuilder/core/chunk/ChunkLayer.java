@@ -94,8 +94,9 @@ public final class ChunkLayer {
     /**
      * How a column is paved, as Japanese streets are: a wide street (an arterial, 14 or more wide) has pavements of 3
      * (4 from 20 wide) either side, a yellow centre line, white edge lines and, on a carriageway of two lanes a way,
-     * dashed white lane lines (5 painted, 5 not); a street or an old road is plain asphalt, as narrow Japanese streets
-     * have no centre line; a lane is paving slabs.
+     * dashed white lane lines (5 painted, 5 not); a collector of 10 to 14 wide has pavements of 2, a white centre line
+     * and white edge lines; a street or an old road is plain asphalt, as narrow Japanese streets have no centre line;
+     * a lane is paving slabs.
      * <p>
      * A line is drawn where its centre crosses the block, at the angle of the {@link #ANGLES} nearest the street's
      * heading and at the position it crosses at, so a line at an angle to the blocks, and round a bend, runs on
@@ -127,6 +128,8 @@ public final class ChunkLayer {
         List<Line> lines = new ArrayList<>();
         if (width >= 14) {
             lines.add(new Line(0.0, Paving.YELLOW_LINE, false));
+        } else if (walk > 0) {
+            lines.add(new Line(0.0, Paving.WHITE_LINE, false));
         }
         if (walk > 0) {
             lines.add(new Line(carriage - 0.5, Paving.WHITE_LINE, false));
@@ -170,7 +173,7 @@ public final class ChunkLayer {
 
     /** The pavement either side of a marked street: 3 from 14 wide, 4 from 20, none narrower. */
     private static double walk(double width) {
-        return width >= 20 ? 4.0 : width >= 14 ? 3.0 : 0.0;
+        return width >= 20 ? 4.0 : width >= 14 ? 3.0 : width >= 10 ? 2.0 : 0.0;
     }
 
     /**

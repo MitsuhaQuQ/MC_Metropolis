@@ -457,7 +457,23 @@ public final class CityMap {
                 100 * network.deadEnds(), 100 * network.threeWay(), 100 * network.fourWay(), network.junctions());
         System.out.printf("  mean block %.2f ha (OSM: Kyoto 1.4, Kanazawa 1.0, Takayama 2.6); lanes %.1f km/km2 (Kyoto 22.6, Kanazawa 7.9)%n",
                 network.meanBlockHa(), network.laneDensity());
-        System.out.printf("  street orientation order %.2f%n", StreetMetrics.orientationOrder(plan.segments().stream()
+        java.util.function.Predicate<StreetSegment> main = s -> s.streetClass() == StreetClass.ARTERIAL
+                || s.streetClass() == StreetClass.COLLECTOR;
+        System.out.printf("  doubled within 40: arterials %.0f%%, streets %.0f%%; junction corners under 30 deg %.1f%%, under 45 deg %.1f%%%n",
+                100 * StreetMetrics.doubled(plan.segments(), main, 40.0),
+                100 * StreetMetrics.doubled(plan.segments(), s -> s.streetClass() == StreetClass.STREET, 40.0),
+                100 * StreetMetrics.acute(plan.segments(), 30.0), 100 * StreetMetrics.acute(plan.segments(), 45.0));
+        double[] widths = new double[2];
+        plan.segments().forEach(s -> {
+            if (main.test(s)) {
+                widths[s.width() >= 16 ? 0 : 1] += s.length();
+            }
+        });
+        System.out.printf("  squeezed (under 12 of land beside a parallel road): main roads %.1f%%, streets %.1f%%%n",
+                100 * StreetMetrics.squeezed(plan.segments(), main, 12.0),
+                100 * StreetMetrics.squeezed(plan.segments(), s -> s.streetClass() == StreetClass.STREET, 12.0));
+        System.out.printf("  main roads 16+ wide %.1f km, narrower %.1f km%n", widths[0] / 1000, widths[1] / 1000);
+        System.out.printf("  street orientation order %.2f%n",StreetMetrics.orientationOrder(plan.segments().stream()
                 .filter(s -> s.streetClass() != StreetClass.LANE).toList()));
         System.out.printf("  arterial orientation order %.2f (OSM: Kyoto 0.81, Kanazawa 0.06, Takayama 0.17)%n",
                 StreetMetrics.orientationOrder(plan.segments().stream()
