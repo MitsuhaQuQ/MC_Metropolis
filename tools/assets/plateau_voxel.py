@@ -101,6 +101,8 @@ CITIES = {
     "kanazawa": ("金沢市", "Kanazawa City", 2024, "plateau-17201-kanazawa-shi-2024"),
     "taito": ("台東区", "Taito City (Tokyo)", 2025, "plateau-13106-taito-ku-2025"),
     "chuo": ("中央区", "Chuo City (Tokyo)", 2025, "plateau-13102-chuo-ku-2025"),
+    "yokohama": ("横浜市", "Yokohama City", 2024, "plateau-14100-yokohama-shi-2024"),
+    "saitama": ("さいたま市", "Saitama City", 2025, "plateau-11100-saitama-shi-2025"),
 }
 
 # (gml id, slug, name, palette, city) from the partial city zips fetched by plateau_fetch.py (no textures there, so
@@ -142,6 +144,10 @@ MORE_LANDMARKS = [
     ("bldg_34f0a69b-920f-4f8f-b834-678329ca789f", "warehouse_kachidoki", "倉庫（切妻、勝どき）", "industrial", "chuo"),
     ("bldg_1aaa241b-98f1-447f-9379-0ccf819bf795", "warehouse_harumi", "大型倉庫（晴海）", "industrial", "chuo"),
     ("bldg_ce9c458f-e370-4f49-80d5-a5863aac02a5", "warehouse_multistorey", "多層倉庫（中央区）", "industrial", "chuo"),
+    # Arenas (the Yokohama Arena's mesh is LOD1 only, so not here).
+    ("bldg_5fc20e0c-e93b-4032-b60d-5f3e29205eb1", "saitama_super_arena", "さいたまスーパーアリーナ", "glass", "saitama"),
+    ("bldg_c2a8fdb7-36bb-4c35-86e6-7afd672dbd66", "yokohama_buntai", "横浜BUNTAI（関内）", "modern", "yokohama"),
+    ("bldg_be0df25a-55be-467a-b406-35fbc0ef631c", "yokohama_budokan", "横浜武道館", "industrial", "yokohama"),
 ]
 ALL_LANDMARKS = [(g, s, n, p, "kyoto") for g, s, n, p in LANDMARKS] + MORE_LANDMARKS
 
@@ -289,6 +295,8 @@ LABELS = {
     "factory_small_tsukuda": ("industry", None, "FACTORY"), "factory_building": ("industry", None, "FACTORY"),
     "warehouse_kachidoki": ("industry", None, "WAREHOUSE"), "warehouse_harumi": ("industry", None, "WAREHOUSE"),
     "warehouse_multistorey": ("industry", None, "WAREHOUSE"),
+    "saitama_super_arena": ("sports", None, "ARENA"), "yokohama_buntai": ("sports", None, "ARENA"),
+    "yokohama_budokan": ("sports", None, "ARENA"),
     "demo_precinct_shrine": ("sacred", SHRINE, "KEIDAI"), "demo_precinct_temple": ("sacred", TEMPLE, "GARAN"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
 }
 DEMO_NAMES = {"demo_precinct_shrine": "神社の境内（稲荷風）", "demo_precinct_temple": "寺院の伽藍", "demo_kasuga": "本殿（春日造）", "demo_hachiman": "本殿（八幡造）", "demo_shinmei": "本殿（神明造）",
@@ -434,13 +442,18 @@ def extract(zpath, rows, out, ids):
                 images |= {im for im, _ in b["tex"].values()}
             print(f"{name}: {len(found)} buildings, "
                   f"{sum(len(b['tex']) for b in found.values())} textured polygons", flush=True)
+    missing = 0
     with zipfile.ZipFile(zpath) as z:  # the atlases (aerial photographs) those polygons use
+        have = set(z.namelist())
         for im in sorted(images):
+            if "udx/bldg/" + im not in have:  # partial zips from plateau_fetch.py have no appearance folders
+                missing += 1
+                continue
             dst = os.path.join(out, "tex", im)
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             with open(dst, "wb") as fh:
                 fh.write(z.read("udx/bldg/" + im))
-    print(f"{len(images)} texture atlases", flush=True)
+    print(f"{len(images) - missing} texture atlases" + (f", {missing} not in the zip" if missing else ""), flush=True)
 
 
 # ---------------------------------------------------------------- voxelize
@@ -608,6 +621,8 @@ def voxelize(rings, tex=None, texdir=None):
         if cls == "ground":
             columns |= fill_columns([(p[0], p[2]) for p in ring], [[(p[0], p[2]) for p in h] for h in holes])
         tm = texture_map(ring, tex[pid]) if tex and pid in tex and cls != "ground" else None
+        if tm and not os.path.exists(os.path.join(texdir, tm[0])):  # an atlas not extracted (not in the zip)
+            tm = None
         if tm:
             pix, W, H = atlas(os.path.join(texdir, tm[0]))
             _, ta, tb, cu, cv = tm
