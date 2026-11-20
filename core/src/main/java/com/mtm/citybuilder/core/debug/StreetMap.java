@@ -2,6 +2,7 @@ package com.mtm.citybuilder.core.debug;
 
 import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.street.Anchor;
+import com.mtm.citybuilder.core.street.Moat;
 import com.mtm.citybuilder.core.street.StreetPlan;
 import com.mtm.citybuilder.core.street.StreetSegment;
 
@@ -16,7 +17,7 @@ import java.awt.image.BufferedImage;
 /**
  * Renders a town's street skeleton over its urban intensity: old roads brown, arterials of the old town black and of
  * the modern town dark blue, as wide as they are at least a pixel; anchors marked, the castle, palace or temple as a
- * red square, stations as white squares, the centre as a white disc.
+ * red square, gates as yellow squares, moats blue (wet) or brown (dry), stations as white squares, the centre as a white disc.
  */
 public final class StreetMap {
     private StreetMap() {
@@ -28,6 +29,23 @@ public final class StreetMap {
         double top = centerZ - size * scale / 2.0;
         Graphics2D g = image.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        // Moats under the streets, so the approaches show as bridges over them
+        for (Moat moat : plan.moats()) {
+            g.setColor(moat.wet() ? new Color(70, 130, 205) : new Color(150, 120, 80));
+            g.setStroke(new BasicStroke((float) Math.max(2.0, moat.width() / scale), BasicStroke.CAP_ROUND,
+                    BasicStroke.JOIN_ROUND));
+            java.awt.geom.Path2D.Double path = new java.awt.geom.Path2D.Double();
+            for (int k = 0; k < moat.ring().size(); k++) {
+                double[] p = moat.ring().get(k);
+                if (k == 0) {
+                    path.moveTo((p[0] - left) / scale, (p[1] - top) / scale);
+                } else {
+                    path.lineTo((p[0] - left) / scale, (p[1] - top) / scale);
+                }
+            }
+            path.closePath();
+            g.draw(path);
+        }
         for (StreetSegment segment : plan.segments()) {
             g.setColor(switch (segment.streetClass()) {
                 case OLD_ROAD -> new Color(140, 80, 30);
@@ -50,6 +68,10 @@ public final class StreetMap {
                     g.fillOval(px - 6, py - 6, 12, 12);
                     g.setColor(Color.BLACK);
                     g.drawOval(px - 6, py - 6, 12, 12);
+                }
+                case GATE -> {
+                    g.setColor(new Color(240, 200, 40));
+                    g.fillRect(px - 3, py - 3, 7, 7);
                 }
                 case STATION -> {
                     g.setColor(Color.WHITE);

@@ -399,6 +399,24 @@ public final class CitySettings {
         public double groundsMetropolis = 450.0;
         public double groundsCity = 300.0;
         public double groundsTown = 120.0;
+        /**
+         * Moats of a castle town: the outer moat at the edge of the castle's grounds, the inner one round the keep at
+         * this share of their radius; widths by tier. A castle whose grounds rise more than {@code dryMoatRelief} is a
+         * hill castle with dry moats.
+         */
+        public double innerMoatShare = 0.55;
+        public double outerMoatMetropolis = 30.0;
+        public double outerMoatCity = 20.0;
+        public double outerMoatTown = 12.0;
+        public double innerMoatMetropolis = 40.0;
+        public double innerMoatCity = 25.0;
+        public double innerMoatTown = 15.0;
+        public double dryMoatRelief = 15.0;
+        /** Most gates of the outer moat, and the least angle between two. */
+        public int gates = 4;
+        public double gateAngle = Math.PI / 2;
+        /** Width of the approach from a gate to the keep. */
+        public double approachWidth = 8.0;
         /** Where a castle or a temple is looked for around the centre: the highest land within. */
         public double castleReach = 1000.0;
         public double templeReach = 1500.0;

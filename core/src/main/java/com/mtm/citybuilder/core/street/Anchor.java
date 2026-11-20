@@ -12,6 +12,8 @@ public record Anchor(Kind kind, double x, double z) {
         /** The palace of a planned capital, at the north of its grid. */
         PALACE,
         /** The temple or shrine of a temple town, up the main street. */
-        TEMPLE
+        TEMPLE,
+        /** A gate of a castle, where a bridge crosses its moat. */
+        GATE
     }
 }
