@@ -143,6 +143,57 @@ class BuildingLayerTest {
     }
 
     @Test
+    void nothingHangsWhereNoWallIs() {
+        CityLogic logic = logic();
+        Settlement city = city(logic);
+        CityExtent extent = logic.extent(city);
+        int cx = (int) Math.floor(extent.coreX() / 16);
+        int cz = (int) Math.floor(extent.coreZ() / 16);
+        BuildingLayer.Column[][] grid = new BuildingLayer.Column[64][64];
+        for (int dx = 0; dx < 4; dx++) {
+            for (int dz = 0; dz < 4; dz++) {
+                BuildingLayer.Column[] columns = logic.buildings().columns(cx + dx, cz + dz);
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        grid[dx * 16 + x][dz * 16 + z] = columns[x * 16 + z];
+                    }
+                }
+            }
+        }
+        // A ring column carrying eaves, a hood, a balcony or a ledge has its building's own wall beside it
+        for (int x = 1; x < 63; x++) {
+            for (int z = 1; z < 63; z++) {
+                BuildingLayer.Column c = grid[x][z];
+                if (c.building() == null || !c.ring()) {
+                    continue;
+                }
+                boolean wall = false;
+                for (int i = -1; i <= 1; i++) {
+                    for (int k = -1; k <= 1; k++) {
+                        BuildingLayer.Column n = grid[x + i][z + k];
+                        wall |= n.building() != null && !n.ring() && n.building().id() == c.building().id();
+                    }
+                }
+                if (wall) {
+                    continue;
+                }
+                Building b = c.building();
+                for (int y = b.base(); y <= BuildingLayer.top(c); y++) {
+                    BuildingLayer.Part p = BuildingLayer.part(c, y);
+                    assertTrue(p != BuildingLayer.Part.ROOF_LOW && p != BuildingLayer.Part.ROOF_HIGH
+                            && p != BuildingLayer.Part.HOOD && p != BuildingLayer.Part.PARAPET || isGarden(b, p),
+                            "hanging " + p + " at " + x + ", " + z);
+                }
+            }
+        }
+    }
+
+    /** Parts of a garden that may stand away from the house: a shed's roof, a coped wall. */
+    private static boolean isGarden(Building b, BuildingLayer.Part p) {
+        return b.type() == Building.Type.HOUSE && (p == BuildingLayer.Part.ROOF_LOW || p == BuildingLayer.Part.HOOD);
+    }
+
+    @Test
     void wallsCloseRoundEachBuilding() {
         CityLogic logic = logic();
         Settlement city = city(logic);

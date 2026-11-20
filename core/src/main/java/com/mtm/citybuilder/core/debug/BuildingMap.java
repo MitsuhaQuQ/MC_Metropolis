@@ -23,6 +23,7 @@ public final class BuildingMap {
             case APARTMENT -> 0x80A8E0;
             case OFFICE -> 0xA080D0;
             case WORKS -> 0xA0A0A0;
+            case KURA -> 0xF4F4F4;
         };
     }
 

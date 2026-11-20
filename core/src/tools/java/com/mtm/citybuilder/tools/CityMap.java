@@ -72,6 +72,11 @@ public final class CityMap {
         File out = new File(args[4]);
         int size = args.length > 5 ? Integer.parseInt(args[5]) : 1024;
         String layer = args.length > 6 ? args[6] : "suitability";
+        String quarter = null;
+        if (layer.contains(":")) {
+            quarter = layer.substring(layer.indexOf(':') + 1);
+            layer = layer.substring(0, layer.indexOf(':'));
+        }
 
         WorldgenSettings worldgen = WorldgenSettings.DEFAULT;
         String cache = System.getProperty("worldgenCache");
@@ -133,6 +138,13 @@ public final class CityMap {
                 image = com.mtm.citybuilder.core.debug.BuildingMap.render(logic.buildings(), plots, centerX, centerZ, scale, size);
             }
             case "preview", "preview1", "preview2", "preview3" -> {
+                // preview:QUARTER shows the old town's lots as that quarter, to see the library's styles; where the
+                // quarters really lie is for the layers that lay out the town to say
+                if (quarter != null) {
+                    com.mtm.citybuilder.core.building.Quarter q = com.mtm.citybuilder.core.building.Quarter.valueOf(quarter);
+                    logic.buildings().quarters(plot -> plot.district() == com.mtm.citybuilder.core.street.District.OLD_TOWN
+                            ? q : com.mtm.citybuilder.core.building.Quarter.ORDINARY);
+                }
                 // Isometric picture of the buildings: size is the area's edge in blocks, scale the pixels per block,
                 // preview1..3 turn it a quarter at a time
                 streetStats(logic, centerX, centerZ);

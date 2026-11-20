@@ -13,7 +13,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CrossCollisionBlock;
 import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.FenceBlock;
+import net.minecraft.world.level.block.LanternBlock;
+import net.minecraft.world.level.block.TrapDoorBlock;
+import net.minecraft.world.level.block.WallBannerBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -90,6 +95,8 @@ public final class CityBuildings {
                 // The door faces the street: out of the lot
                 Direction facing = Direction.getNearest(-b.nx(), 0.0, -b.nz());
                 long position = Hash.of(b.variant(), baseX + x, baseZ + z);
+                double[] out = BuildingLayer.outward(column);
+                Direction outward = Direction.getNearest(out[0], 0.0, out[1]);
                 for (int y = Math.max(min, Math.min(floor + 1, b.base())); y <= top; y++) {
                     BuildingLayer.Part part = BuildingLayer.part(column, y);
                     if (part == BuildingLayer.Part.FOUNDATION && y <= floor) {
@@ -97,7 +104,7 @@ public final class CityBuildings {
                     }
                     String id = palette.id(part, b.variant(), position);
                     if (id != null) {
-                        chunk.setBlockState(pos.set(baseX + x, y, baseZ + z), state(block(id), part, facing), false);
+                        chunk.setBlockState(pos.set(baseX + x, y, baseZ + z), state(block(id), part, facing, outward), false);
                     }
                 }
                 // What stands over the roof from before (a tree's crown, a hill cut through) is cleared a little way up;
@@ -112,9 +119,27 @@ public final class CityBuildings {
         }
     }
 
-    private static BlockState state(Block block, BuildingLayer.Part part, Direction facing) {
+    /**
+     * A block's state for a part: slab halves; door halves, facing the street; panes and bars joined along the wall
+     * (across {@code outward}), fences left as posts; trapdoors standing open against the wall; banners hung facing
+     * out; lanterns hanging; leaves kept from decaying.
+     */
+    private static BlockState state(Block block, BuildingLayer.Part part, Direction facing, Direction outward) {
         BlockState state = block.defaultBlockState();
-        if (block instanceof SlabBlock) {
+        if (block instanceof CrossCollisionBlock && (!(block instanceof FenceBlock) || part == BuildingLayer.Part.KOMAYOSE)) {
+            Direction a = outward.getClockWise();
+            Direction b = outward.getCounterClockWise();
+            for (Direction d : new Direction[]{Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST}) {
+                state = state.setValue(side(d), d == a || d == b);
+            }
+        } else if (block instanceof TrapDoorBlock) {
+            // Open, its panel lies on the side away from its facing: facing out, against the wall
+            state = state.setValue(TrapDoorBlock.FACING, outward).setValue(TrapDoorBlock.OPEN, true);
+        } else if (block instanceof WallBannerBlock) {
+            state = state.setValue(WallBannerBlock.FACING, outward);
+        } else if (block instanceof LanternBlock) {
+            state = state.setValue(LanternBlock.HANGING, true);
+        } else if (block instanceof SlabBlock) {
             boolean high = part == BuildingLayer.Part.ROOF_HIGH || part == BuildingLayer.Part.CARPORT;
             state = state.setValue(SlabBlock.TYPE, high ? SlabType.TOP : SlabType.BOTTOM);
         } else if (block instanceof DoorBlock) {
@@ -124,5 +149,14 @@ public final class CityBuildings {
             state = state.setValue(LeavesBlock.PERSISTENT, true);
         }
         return state;
+    }
+
+    private static net.minecraft.world.level.block.state.properties.BooleanProperty side(Direction d) {
+        return switch (d) {
+            case NORTH -> CrossCollisionBlock.NORTH;
+            case EAST -> CrossCollisionBlock.EAST;
+            case SOUTH -> CrossCollisionBlock.SOUTH;
+            default -> CrossCollisionBlock.WEST;
+        };
     }
 }

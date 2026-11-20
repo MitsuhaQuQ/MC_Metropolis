@@ -97,6 +97,24 @@ public final class BuildingLayer {
         POST,
         /** A carport's roof. */
         CARPORT,
+        /** A small hood over a window (霧除け), a slab against the wall. */
+        HOOD,
+        /** A grille over a ground-floor window to the street (面格子): a trapdoor standing against the wall. */
+        GUARD,
+        /** A balcony's or a roof's railing of bars or glass, joined along the wall. */
+        RAIL,
+        /** A downpipe from the eaves (雨樋). */
+        DOWNPIPE,
+        /** A shop curtain over a doorway (暖簾): a banner hung on the wall. */
+        NOREN,
+        /** A lantern hanging by a door. */
+        LANTERN,
+        /** Bamboo blinds (簾) hung across an upper storey's front: a trapdoor standing against the wall. */
+        SUDARE,
+        /** A low wooden rail along a machiya's front (駒寄せ), joined along the wall. */
+        KOMAYOSE,
+        /** A curtain over a doorway in the reds of a hanamachi. */
+        NOREN_RED,
         /** A light inside, so nothing spawns there. */
         LIGHT
     }
@@ -127,11 +145,19 @@ public final class BuildingLayer {
      * @param wing     whether it lies in the annex behind
      * @param lot      in the ring, on which of the lot's own boundary lines: SIDE at the end of its frontage (the
      *                 neighbour's wall is on its own end), BACK along its back, NONE elsewhere
+     * @param adjacent in the ring, whether a column of the building's own (one of the eight round it) is there: only
+     *                 then does what hangs on a wall (eaves, hoods, balconies, ledges) stand here, as the wall may have
+     *                 been cut away by the lot's lines; true off the ring
      */
     public record Column(Building building, boolean ring, double u, double v, Face face, boolean corner, int eave,
-                         boolean ridge, boolean light, boolean door, Face inner, boolean wing, Face lot) {
+                         boolean ridge, boolean light, boolean door, Face inner, boolean wing, Face lot, boolean adjacent) {
         public static final Column EMPTY = new Column(null, false, 0.0, 0.0, Face.NONE, false, 0, false, false, false,
-                Face.NONE, false, Face.NONE);
+                Face.NONE, false, Face.NONE, false);
+
+        /** The same column, with whether its building's walls are beside it. */
+        Column beside(boolean adjacent) {
+            return new Column(building, ring, u, v, face, corner, eave, ridge, light, door, inner, wing, lot, adjacent);
+        }
 
         public boolean edge() {
             return face != Face.NONE;
@@ -149,9 +175,22 @@ public final class BuildingLayer {
         }
     };
 
+    private volatile QuarterMap quarters = QuarterMap.NONE;
+
     public BuildingLayer(CityLogic logic) {
         this.logic = logic;
         this.config = logic.settings().buildings;
+    }
+
+    /**
+     * Hands the layer the quarters of the towns (where hanamachi, chaya and storehouse quarters lie), decided before
+     * the buildings. Buildings already made keep the quarter they were made with, so set this before any is asked for.
+     */
+    public void quarters(QuarterMap quarters) {
+        this.quarters = quarters == null ? QuarterMap.NONE : quarters;
+        synchronized (cache) {
+            cache.clear();
+        }
     }
 
     /** The building on a lot, null where none stands (a street, a block's interior, a remnant, a vacant lot). */
@@ -252,7 +291,25 @@ public final class BuildingLayer {
         } else {
             type = Hash.unit(Hash.of(h, 2)) < 0.08 ? Building.Type.APARTMENT : Building.Type.HOUSE;
         }
-        if (type == Building.Type.MACHIYA) {
+        Quarter quarter = quarters.at(plot);
+        switch (quarter) {
+            case HANAMACHI, CHAYA -> {
+                // Machiya throughout, two storeys
+                type = Building.Type.MACHIYA;
+                storeys = 2;
+            }
+            case STOREHOUSE -> {
+                type = Hash.unit(Hash.of(h, 35)) < config.kuraInQuarter ? Building.Type.KURA : Building.Type.MACHIYA;
+                storeys = 2;
+            }
+            default -> {
+                if (district == District.OLD_TOWN && type != Building.Type.APARTMENT && type != Building.Type.OFFICE
+                        && Hash.unit(Hash.of(h, 35)) < config.kura) {
+                    type = Building.Type.KURA;
+                }
+            }
+        }
+        if (type == Building.Type.MACHIYA || type == Building.Type.KURA) {
             storeys = Math.min(storeys, 2);
         }
         if (project) {
@@ -299,6 +356,13 @@ public final class BuildingLayer {
                 sideGap = 0.0;
                 backGap = 1.0;
                 depth = 14.0 + 10.0 * Hash.unit(Hash.of(h, 4));
+            }
+            case KURA -> {
+                // Narrower than its lot, standing apart, a strip in front for its ledges
+                front = 1.0;
+                sideGap = Math.max(0.0, 0.5 * (plot.frontage() - 6.0 - 3.0 * u3));
+                backGap = 2.0;
+                depth = 8.0 + 4.0 * Hash.unit(Hash.of(h, 4));
             }
             default -> {
                 front = 3.0;
@@ -391,7 +455,7 @@ public final class BuildingLayer {
         boolean corner = chamferLeft > 0 || chamferRight > 0;
 
         int ground = switch (type) {
-            case SHOP, OFFICE -> config.shopFloor;
+            case SHOP, OFFICE, KURA -> config.shopFloor;
             case WORKS -> config.worksStorey;
             default -> config.storey;
         };
@@ -400,7 +464,10 @@ public final class BuildingLayer {
             case WORKS -> config.worksStorey;
             default -> config.storey;
         };
-        if (type == Building.Type.MACHIYA && Hash.unit(Hash.of(h, 30)) < config.lowUpper) {
+        if (quarter == Quarter.CHAYA) {
+            // A chaya's upper storey, its rooms for guests, stands taller than its ground floor
+            upper = config.storey + 1;
+        } else if (type == Building.Type.MACHIYA && Hash.unit(Hash.of(h, 30)) < config.lowUpper) {
             // The low second storey of an older machiya (厨子二階), under the eaves
             upper = 2;
         }
@@ -435,13 +502,15 @@ public final class BuildingLayer {
 
         double[] roofs = switch (type) {
             case HOUSE -> config.roofsHouse;
-            case MACHIYA -> new double[]{1.0, 0.0, 0.0};
+            case MACHIYA, KURA -> new double[]{1.0, 0.0, 0.0};
             case WORKS -> config.roofsWorks;
             default -> storeys >= 4 ? config.roofsTall : config.roofsShop;
         };
         Building.Roof roof = step < storeys ? Building.Roof.FLAT
                 : Building.Roof.values()[draw(roofs, Hash.unit(Hash.of(project ? group : h, 5)))];
-        boolean ridgeAlong = type == Building.Type.MACHIYA || width >= depth;
+        // Machiya keep their ridge along the street (平入り); storehouses mostly turn their gable to it (妻入り)
+        boolean ridgeAlong = type == Building.Type.MACHIYA
+                || (type == Building.Type.KURA ? Hash.unit(Hash.of(h, 36)) < 0.4 : width >= depth);
         double slope = type == Building.Type.WORKS ? 0.5 : 1.0;
 
         // The base: the ground under the footprint (a 3 × 3 grid over it), its median, and no lower than the ground
@@ -492,7 +561,7 @@ public final class BuildingLayer {
         }
 
         // Palette: lots in a run along the street share one, three in five of them; a development, its own
-        List<Integer> family = Palette.of(type);
+        List<Integer> family = Palette.of(type, quarter);
         long run = Hash.of(logic.seed() ^ 0x9A1E77EL, plot.chain(), (long) Math.floor(plot.start() / config.paletteRun));
         long pick = project ? Hash.of(group, 7) : Hash.unit(Hash.of(h, 7)) < 0.6 ? run : Hash.of(h, 8);
         int palette = family.get((int) Math.floorMod(Hash.mix(pick), family.size()));
@@ -502,7 +571,7 @@ public final class BuildingLayer {
         return new Building(plot.id(), type, storeys, ground, upper, roof, ridgeAlong, slope, from, to, front, back,
                 step, stepBack, wingFrom, wingTo, wingBack, chamferLeft, chamferRight, layout, plot.start() - from,
                 plot.end() - from, plot.maxDepth(), parkFrom, parkTo, parkBack, carport, base, ox, oz, p[2], p[3], nx, nz,
-                door, palette, variant);
+                door, quarter, palette, variant);
     }
 
     /** How far out in front a building's ring reaches: its whole front yard for houses and flats, else a block. */
@@ -567,7 +636,11 @@ public final class BuildingLayer {
                     boolean garden = lot.type() == Building.Type.HOUSE;
                     if (garden || l[0] >= -1 && l[0] < lot.width() + 1 && l[1] >= lot.front() - yard(lot)
                             && l[1] < Math.max(lot.back(), lot.wingBack()) + 1) {
-                        columns[x * 16 + z] = column(lot, wx, wz, false, true, plots[c]);
+                        boolean adjacent = false;
+                        for (int nb : new int[]{c - 19, c - 18, c - 17, c - 1, c + 1, c + 17, c + 18, c + 19}) {
+                            adjacent |= inside[nb] != null && inside[nb].id() == lot.id();
+                        }
+                        columns[x * 16 + z] = column(lot, wx, wz, false, true, plots[c]).beside(adjacent);
                     }
                 } else if (plots[c] == null) {
                     // Off the lots (a street's pavement): the front ring of a building standing on the street's edge,
@@ -599,7 +672,7 @@ public final class BuildingLayer {
             // The annex: walls where the mask says, a light in a grid inside
             boolean light = !edge && Math.floorMod((long) Math.floor(u), 6) == 2 && Math.floorMod((long) Math.floor(v - b.back()), 6) == 1;
             return new Column(b, false, u, v, edge ? Face.SIDE : Face.NONE, false, 0, false, light, false, Face.NONE, true,
-                    Face.NONE);
+                    Face.NONE, true);
         }
         Face face = Face.NONE;
         boolean corner = false;
@@ -654,7 +727,37 @@ public final class BuildingLayer {
                 lot = Face.BACK;
             }
         }
-        return new Column(b, ring, u, v, face, corner, eave, ridge, light, door, inner, false, lot);
+        return new Column(b, ring, u, v, face, corner, eave, ridge, light, door, inner, false, lot, true);
+    }
+
+    /**
+     * The direction, in the world, out of the wall a column is on, just inside, or (in the ring) stands against: what
+     * faces it (a pane joins along the wall, across this; a trapdoor, banner or door faces this way). For a column
+     * against no wall, out of the front.
+     */
+    public static double[] outward(Column c) {
+        Building b = c.building();
+        double w = b.width();
+        double u = c.u();
+        double v = c.v();
+        Face face = c.face() != Face.NONE ? c.face() : c.inner();
+        if (c.ring()) {
+            if (u >= 0 && u < w) {
+                face = v < b.front() ? Face.FRONT : v >= b.back() ? Face.BACK : Face.NONE;
+            } else {
+                face = Face.SIDE;
+            }
+        } else if (c.wing()) {
+            face = b.wingBack() - v < 1.0 ? Face.BACK : Face.SIDE;
+            if (face == Face.SIDE) {
+                return u < 0.5 * (b.wingFrom() + b.wingTo()) ? new double[]{-b.tx(), -b.tz()} : new double[]{b.tx(), b.tz()};
+            }
+        }
+        return switch (face) {
+            case BACK -> new double[]{b.nx(), b.nz()};
+            case SIDE -> u < 0.5 * w ? new double[]{-b.tx(), -b.tz()} : new double[]{b.tx(), b.tz()};
+            default -> new double[]{-b.nx(), -b.nz()};
+        };
     }
 
     /** The height of a pitched roof's surface over a column, in half blocks above the top of the walls. */
@@ -686,6 +789,7 @@ public final class BuildingLayer {
             return false;
         }
         return switch (b.type()) {
+            case KURA -> true;
             case APARTMENT, OFFICE -> storey > 0 && chance(b, 11, 0.7);
             case SHOP -> storey > 0 && chance(b, 11, 0.5);
             default -> false;
@@ -709,16 +813,19 @@ public final class BuildingLayer {
      */
     private static int groundStyle(Building b) {
         return switch (b.type()) {
-            case SHOP, MACHIYA -> choice(b, 20, 4);
+            case MACHIYA -> b.quarter() == Quarter.HANAMACHI ? (chance(b, 20, 0.5) ? 0 : 1)
+                    : b.quarter() == Quarter.CHAYA ? 1 : choice(b, 20, 4);
+            case SHOP -> choice(b, 20, 4);
             case OFFICE -> choice(b, 20, 3);
             case APARTMENT -> chance(b, 20, 0.35) ? 1 : 0;
             case HOUSE -> b.width() >= 7 && chance(b, 20, 0.2) ? 1 : 0;
             case WORKS -> 0;
+            case KURA -> choice(b, 20, 3);
         };
     }
 
     private static int yardStyle(Building b) {
-        return choice(b, 21, 4);
+        return choice(b, 21, 5);
     }
 
     /** Whether a column lies on the terrace in front of set-back upper storeys. */
@@ -761,12 +868,12 @@ public final class BuildingLayer {
         }
         if (c.ring()) {
             int top = -1;
-            for (int dy = 0; dy <= Math.max(b.wallHeight() + 2, 8); dy++) {
+            for (int dy = 0; dy <= Math.max(b.wallHeight() + 2, 11); dy++) {
                 if (ringPart(b, c, dy) != Part.NONE) {
                     top = dy;
                 }
             }
-            if (b.roof() != Building.Roof.FLAT && c.eave() >= -1) {
+            if (b.roof() != Building.Roof.FLAT && c.eave() >= -1 && c.adjacent()) {
                 top = Math.max(top, roofRow(b, c));
             }
             return b.base() + top;
@@ -803,7 +910,7 @@ public final class BuildingLayer {
             return wingPart(b, c, dy);
         }
         if (c.ring()) {
-            if (b.roof() != Building.Roof.FLAT && c.eave() >= -1 && dy == roofRow(b, c)) {
+            if (b.roof() != Building.Roof.FLAT && c.eave() >= -1 && c.adjacent() && dy == roofRow(b, c)) {
                 return c.ridge() ? Part.RIDGE : Math.floorMod(halves(b, c), 2) == 1 ? Part.ROOF_LOW : Part.ROOF_HIGH;
             }
             return ringPart(b, c, dy);
@@ -872,7 +979,10 @@ public final class BuildingLayer {
                 return c.edge() ? Part.PARAPET : Part.FLAT;
             }
             if (above == 1) {
-                return c.edge() ? Part.PARAPET : detail(b, c, 3) < 0.04 ? Part.EQUIPMENT : Part.AIR;
+                if (c.edge()) {
+                    return b.type() == Building.Type.APARTMENT && chance(b, 61, 0.3) ? Part.RAIL : Part.PARAPET;
+                }
+                return detail(b, c, 3) < 0.04 ? Part.EQUIPMENT : Part.AIR;
             }
             return Part.AIR;
         }
@@ -922,7 +1032,10 @@ public final class BuildingLayer {
                 continue;
             }
             boolean big = s[1] > b.back() && chance(b, 52 + k, 0.4);
-            trees.add(new Tree(Math.floor(s[0]) + 0.5, Math.floor(s[1]) + 0.5, 3 + choice(b, 54 + k, 2), big ? 2 : 1));
+            // A tall pine over a garden wall, as old houses keep (in a garden-fronted house, one in three)
+            boolean pine = b.layout() == 3 && chance(b, 70 + k, 0.35);
+            int trunk = pine ? 6 + choice(b, 72 + k, 2) : 3 + choice(b, 54 + k, 2);
+            trees.add(new Tree(Math.floor(s[0]) + 0.5, Math.floor(s[1]) + 0.5, trunk, big || pine ? 2 : 1));
         }
         return trees;
     }
@@ -1147,6 +1260,10 @@ public final class BuildingLayer {
      * cornices, fins and ledges; a shop's sign and awning and an office's canopy over the pavement; outdoor units.
      */
     private static Part ringPart(Building b, Column c, int dy) {
+        Part detail = c.adjacent() ? wallDetail(b, c, dy) : null;
+        if (detail != null) {
+            return detail;
+        }
         double w = b.width();
         double u = c.u();
         double v = c.v();
@@ -1154,7 +1271,7 @@ public final class BuildingLayer {
         boolean toDoor = Math.abs(u - b.door()) < 1.0;
         switch (b.type()) {
             case MACHIYA -> {
-                if (inFront) {
+                if (inFront && c.adjacent()) {
                     // The pent roof (一階庇) over the ground floor's front, and the stone strip under it
                     if (dy == b.ground()) {
                         return Part.ROOF_LOW;
@@ -1162,9 +1279,17 @@ public final class BuildingLayer {
                     if (dy == 0) {
                         return Part.PAVING;
                     }
-                    if (dy == 1 && groundStyle(b) == 0 && !toDoor) {
+                    if (dy == 1 && !toDoor && b.quarter() == Quarter.HANAMACHI) {
+                        return groundStyle(b) == 0 ? Part.BAMBOO : Part.KOMAYOSE;
+                    }
+                    if (dy == 1 && groundStyle(b) == 0 && !toDoor && b.quarter() == Quarter.ORDINARY) {
                         return Part.BAMBOO;
                     }
+                }
+            }
+            case KURA -> {
+                if (inFront && dy == 0) {
+                    return Part.PAVING;
                 }
             }
             case HOUSE, APARTMENT -> {
@@ -1175,7 +1300,7 @@ public final class BuildingLayer {
                     }
                 }
                 if (v < b.front() && u >= -1 && u < w + 1) {
-                    boolean balconyBand = b.type() == Building.Type.APARTMENT && v >= b.front() - 1 && u >= 1 && u < w - 1;
+                    boolean balconyBand = b.type() == Building.Type.APARTMENT && c.adjacent() && v >= b.front() - 1 && u >= 1 && u < w - 1;
                     if (balconyBand) {
                         // Balconies along the front, a storey's floor out from the wall and a solid railing on it
                         for (int k = 1; k < b.step(); k++) {
@@ -1184,7 +1309,7 @@ public final class BuildingLayer {
                                 return Part.ACCENT;
                             }
                             if (dy == f + 1) {
-                                return detail(b, c, 5 + k) < 0.12 ? Part.EQUIPMENT : Part.PARAPET;
+                                return detail(b, c, 5 + k) < 0.12 ? Part.EQUIPMENT : chance(b, 60, 0.5) ? Part.RAIL : Part.PARAPET;
                             }
                         }
                     }
@@ -1211,6 +1336,18 @@ public final class BuildingLayer {
                                     return Part.HEDGE;
                                 }
                             }
+                            case 4 -> {
+                                // A plastered wall on a stone course under a tiled coping (瓦屋根付き塀)
+                                if (dy == 1) {
+                                    return Part.FENCE;
+                                }
+                                if (dy == 2) {
+                                    return Part.WALL;
+                                }
+                                if (dy == 3) {
+                                    return Part.HOOD;
+                                }
+                            }
                             default -> {
                                 if (dy == 0) {
                                     return Part.PAVING;
@@ -1221,7 +1358,7 @@ public final class BuildingLayer {
                     if (dy == 1 && !boundary && !toDoor && v >= b.front() - 1 && detail(b, c, 10) < 0.15) {
                         return Part.PLANT;
                     }
-                    if (b.type() == Building.Type.HOUSE && toDoor && v >= b.front() - 1 && dy == 3) {
+                    if (b.type() == Building.Type.HOUSE && toDoor && c.adjacent() && v >= b.front() - 1 && dy == 3) {
                         // A small hood over the door (霧除け庇)
                         return Part.ROOF_LOW;
                     }
@@ -1245,7 +1382,7 @@ public final class BuildingLayer {
             against = Face.SIDE;
             along = v - b.front();
         }
-        if (against != Face.NONE) {
+        if (against != Face.NONE && c.adjacent()) {
             // A cornice along the top of a flat-roofed block's walls
             if (flatTop && dy == b.wallHeight() && (b.type() == Building.Type.OFFICE || b.type() == Building.Type.SHOP
                     || b.type() == Building.Type.APARTMENT && chance(b, 13, 0.5))) {
@@ -1299,12 +1436,123 @@ public final class BuildingLayer {
         return Part.NONE;
     }
 
+    /**
+     * What stands against the walls, in the ring column a block out from them: window hoods and ground-floor grilles of
+     * houses, downpipes at the ends of side walls, a curtain over a machiya's or shop's door, a lantern beside it.
+     * Null where none of these is.
+     */
+    private static Part wallDetail(Building b, Column c, int dy) {
+        double w = b.width();
+        double u = c.u();
+        double v = c.v();
+        Face against;
+        double along;
+        if (u >= 0 && u < w && v >= b.front() - 1 && v < b.front()) {
+            against = Face.FRONT;
+            along = u;
+        } else if (u >= 0 && u < w && v >= b.back() && v < b.back() + 1 && !b.covers(u, v)) {
+            against = Face.BACK;
+            along = u;
+        } else if ((u >= -1 && u < 0 || u >= w && u < w + 1) && v >= b.front() && v < b.back()) {
+            against = Face.SIDE;
+            along = v - b.front();
+        } else {
+            return null;
+        }
+        long s = (long) Math.floor(along);
+        if (b.type() == Building.Type.KURA) {
+            // A tiled ledge (水切り瓦) along every wall at each floor, and over the ground floor's wainscot
+            for (int k = 1; k < b.storeys(); k++) {
+                if (dy == b.floorOf(k)) {
+                    return Part.HOOD;
+                }
+            }
+            if (groundStyle(b) != 2 && dy == wainscot(b) + 1) {
+                return Part.HOOD;
+            }
+            return null;
+        }
+        boolean houseWindow = Math.floorMod(s, 4) == 1 || Math.floorMod(s, 4) == 2;
+        if (b.type() == Building.Type.HOUSE) {
+            // A hood over each window, at the band above it
+            if (chance(b, 62, 0.5) && houseWindow && !(against == Face.FRONT && Math.abs(along - b.door()) < 1.0)) {
+                for (int k = 1; k < b.storeys(); k++) {
+                    if (dy == b.floorOf(k)) {
+                        return Part.HOOD;
+                    }
+                }
+            }
+            // Grilles over the ground floor's windows to the street
+            if (against == Face.FRONT && chance(b, 63, 0.4) && houseWindow && Math.abs(along - b.door()) >= 1.0
+                    && dy >= 1 && dy <= 2) {
+                return Part.GUARD;
+            }
+        }
+        // A downpipe at one end of each side wall, from the ground to the eaves
+        if (against == Face.SIDE && b.type() != Building.Type.WORKS && b.type() != Building.Type.MACHIYA) {
+            boolean frontEnd = chance(b, 64, 0.5);
+            double end = frontEnd ? along : b.depth() - along;
+            if (end < 1.0 && dy >= 1 && dy < b.wallHeight()) {
+                return Part.DOWNPIPE;
+            }
+        }
+        if (against == Face.FRONT && b.type() == Building.Type.MACHIYA && b.quarter() == Quarter.HANAMACHI
+                && dy > b.ground() && dy < b.wallHeight() && along >= 1.0 && along < b.width() - 1.0 && chance(b, 68, 0.85)) {
+            // Bamboo blinds across the upper storey, all but its posts
+            return Part.SUDARE;
+        }
+        if (against == Face.FRONT && (b.type() == Building.Type.MACHIYA || b.type() == Building.Type.SHOP && groundStyle(b) != 2)) {
+            boolean hanamachi = b.quarter() == Quarter.HANAMACHI;
+            // A curtain over the door, hung from above it
+            if (Math.abs(along - b.door()) < 0.5 && dy == 2 && chance(b, 65, hanamachi ? 0.9 : 0.7)) {
+                return hanamachi ? Part.NOREN_RED : Part.NOREN;
+            }
+            // A lantern beside the door, under the pent roof or the fascia (none where an awning runs)
+            double p = b.type() != Building.Type.MACHIYA ? (chance(b, 16, 0.5) ? 0.0 : 0.2)
+                    : b.quarter() == Quarter.ORDINARY || b.quarter() == Quarter.STOREHOUSE ? 0.3 : 0.6;
+            if (Math.abs(along - b.door() - 1.5) < 0.5 && dy == b.ground() - 1 && chance(b, 66, p)) {
+                return Part.LANTERN;
+            }
+        }
+        return null;
+    }
+
+    /** How high a storehouse's dark lower wall runs: the wooden wainscot two blocks, the namako wall the ground floor's. */
+    private static int wainscot(Building b) {
+        return groundStyle(b) == 1 ? b.ground() - 1 : 2;
+    }
+
     private static Part wall(Building b, Column c, Face face, boolean corner, int storey, int row, int height) {
+        double facadeAt = face == Face.SIDE ? c.v() - b.front() : c.u();
+        if (b.type() == Building.Type.KURA) {
+            int style = groundStyle(b);
+            if (storey == 0 && row >= 1 && row <= wainscot(b) && style != 2 && !(face == Face.FRONT && c.door())) {
+                if (style == 1) {
+                    // The namako wall: dark tiles in a white diagonal grid
+                    return Math.floorMod((long) Math.floor(facadeAt) + row, 2) == 0 ? Part.WALL : Part.ACCENT;
+                }
+                return Part.ACCENT;
+            }
+            if (style == 2 && storey == 0 && row == 1 && !c.door()) {
+                // A stone course at the foot of the plaster
+                return Part.FOUNDATION;
+            }
+            if (corner) {
+                return Part.WALL;
+            }
+        } else if (storey == 0 && row == 1 && !corner && face != Face.FRONT
+                && (b.type() == Building.Type.MACHIYA || b.type() == Building.Type.HOUSE && chance(b, 67, 0.4))) {
+            // A wainscot along the foot of the side and back walls
+            return Part.TRIM;
+        }
         if (corner) {
             return Part.TRIM;
         }
         boolean upper = storey > 0;
         Part wall = upper && b.type() == Building.Type.MACHIYA ? Part.ACCENT : Part.WALL;
+        if (row == 0 && b.type() == Building.Type.KURA) {
+            return Part.WALL;
+        }
         if (row == 0) {
             // The band between storeys
             return b.type() == Building.Type.APARTMENT || b.type() == Building.Type.OFFICE || b.type() == Building.Type.MACHIYA
@@ -1320,6 +1568,10 @@ public final class BuildingLayer {
             return wall;
         }
         long s = (long) Math.floor(facade);
+        if (b.type() == Building.Type.MACHIYA && b.quarter() == Quarter.CHAYA && upper && face == Face.FRONT) {
+            // The upper storey glazed across in wooden frames
+            return Math.floorMod(s, 3) == 0 ? Part.TRIM : Part.WINDOW;
+        }
         boolean window = switch (b.type()) {
             case HOUSE -> Math.floorMod(s, 4) == 1 || Math.floorMod(s, 4) == 2;
             case MACHIYA -> row == 1 && Math.floorMod(s, 4) == 2;
@@ -1327,6 +1579,7 @@ public final class BuildingLayer {
             case APARTMENT -> face == Face.FRONT ? Math.floorMod(s, 4) != 0 : Math.floorMod(s, 4) == 2;
             case OFFICE -> Math.floorMod(s, 5) != 0;
             case WORKS -> row == height - 2 && Math.floorMod(s, 2) == 0;
+            case KURA -> row == 2 && Math.floorMod(s, 5) == 2;
         };
         return window ? Part.WINDOW : wall;
     }

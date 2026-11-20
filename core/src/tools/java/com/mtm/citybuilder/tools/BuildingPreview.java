@@ -55,6 +55,12 @@ final class BuildingPreview {
                 {"spruce_leaves", 0x3D5C3D}, {"oak_leaves", 0x4A7A28}, {"dark_oak_leaves", 0x3E6A22},
                 {"cherry_leaves", 0xE7A9C5}, {"azalea", 0x5E7C30}, {"flowering_azalea", 0x8A6E9E},
                 {"green_terracotta", 0x4C532A}, {"andesite_wall", 0x888888},
+                {"iron_trapdoor", 0xC8C8C8}, {"lantern", 0xE8A040}, {"white_stained_glass", 0xF0F0F0},
+                {"black_wool", 0x141519}, {"light_blue_wool", 0x3AAFD9},
+                {"spruce_fence", 0x725431}, {"mangrove_fence", 0x763631}, {"polished_blackstone", 0x35303A},
+                {"yellow_terracotta", 0xBA8523}, {"mangrove_planks", 0x773634}, {"mangrove_log", 0x6B2C2A},
+                {"mangrove_door", 0x773634}, {"bamboo_trapdoor", 0xC4AA4F}, {"magenta_wool", 0xBD44B3},
+                {"purple_wool", 0x7A2AAD},
                 {"light_gray_concrete", 0x7D7D73},
         };
         for (Object[] row : table) {
@@ -63,6 +69,12 @@ final class BuildingPreview {
     }
 
     private static int colour(String id) {
+        if (id.endsWith("_pane")) {
+            id = id.substring(0, id.length() - 5);
+        }
+        if (id.endsWith("_wall_banner")) {
+            id = id.substring(0, id.length() - 12) + "_wool";
+        }
         String key = id.endsWith("_slab") ? id.substring(0, id.length() - 5) : id;
         Integer c = COLOURS.get(key);
         if (c == null) {
@@ -85,6 +97,7 @@ final class BuildingPreview {
             case ROOF_HIGH -> new Voxel(colour(id), 0.5, 0.5);
             case PLANT, SHRUB -> new Voxel(colour(id), 0.5, 0);
             case CARPORT -> new Voxel(colour(id), 0.5, 0.5);
+            case HOOD, LANTERN -> new Voxel(colour(id), 0.5, 0);
             default -> new Voxel(colour(id), 1, 0);
         };
     }

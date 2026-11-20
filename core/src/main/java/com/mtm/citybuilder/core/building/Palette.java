@@ -26,6 +26,7 @@ public record Palette(String wall, String accent, String trim, String window, St
                       String foundation) {
     private static final List<Palette> ALL = new ArrayList<>();
     private static final List<List<Integer>> BY_TYPE = new ArrayList<>();
+    private static final java.util.Map<Quarter, List<Integer>> MACHIYA_BY_QUARTER = new java.util.EnumMap<>(Quarter.class);
 
     private static String m(String id) {
         return "minecraft:" + id;
@@ -40,6 +41,20 @@ public record Palette(String wall, String accent, String trim, String window, St
     private static Palette block(String wall, String trim, String window, String shopfront, String flat) {
         return new Palette(m(wall), m(wall), m(trim), m(window), m(shopfront), m("iron_bars"), m("iron_door"),
                 m("smooth_stone"), m("smooth_stone_slab"), m("smooth_stone"), m(flat), m(wall), m("polished_andesite"));
+    }
+
+    private static Palette lattice(Palette p, String lattice) {
+        return new Palette(p.wall, p.accent, p.trim, p.window, p.shopfront, m(lattice), p.door, p.floor, p.roofSlab,
+                p.roofBlock, p.flat, p.parapet, p.foundation);
+    }
+
+    private static void quarter(Quarter quarter, Palette... palettes) {
+        List<Integer> list = new ArrayList<>();
+        for (Palette p : palettes) {
+            list.add(ALL.size());
+            ALL.add(p);
+        }
+        MACHIYA_BY_QUARTER.put(quarter, list);
     }
 
     private static void add(Building.Type type, Palette... palettes) {
@@ -68,6 +83,16 @@ public record Palette(String wall, String accent, String trim, String window, St
                 pitched("dark_oak_planks", "calcite", "dark_oak_log", "dark_oak_door", "spruce_planks", "deepslate_tile"),
                 pitched("spruce_planks", "packed_mud", "stripped_dark_oak_log", "spruce_door", "spruce_planks", "deepslate_tile"),
                 pitched("dark_oak_planks", "mud_bricks", "dark_oak_log", "dark_oak_door", "spruce_planks", "polished_blackstone_brick"));
+        // Hanamachi machiya: dark wood below, ochre plaster (聚楽壁) above
+        quarter(Quarter.HANAMACHI,
+                pitched("dark_oak_planks", "yellow_terracotta", "dark_oak_log", "dark_oak_door", "spruce_planks", "deepslate_tile"),
+                pitched("spruce_planks", "yellow_terracotta", "dark_oak_log", "spruce_door", "spruce_planks", "deepslate_tile"),
+                pitched("dark_oak_planks", "smooth_sandstone", "dark_oak_log", "dark_oak_door", "spruce_planks", "deepslate_tile"));
+        // Chaya machiya: a fine lattice in bengara red, red-brown wood, ochre plaster
+        quarter(Quarter.CHAYA,
+                lattice(pitched("mangrove_planks", "yellow_terracotta", "dark_oak_log", "mangrove_door", "spruce_planks", "deepslate_tile"), "mangrove_fence"),
+                lattice(pitched("dark_oak_planks", "yellow_terracotta", "mangrove_log", "dark_oak_door", "spruce_planks", "deepslate_tile"), "mangrove_fence"),
+                lattice(pitched("mangrove_planks", "packed_mud", "dark_oak_log", "mangrove_door", "spruce_planks", "polished_blackstone_brick"), "mangrove_fence"));
         // Low shops: tiled or rendered fronts, glass below
         add(Building.Type.SHOP,
                 block("light_gray_concrete", "gray_concrete", "glass", "glass", "smooth_stone"),
@@ -89,6 +114,17 @@ public record Palette(String wall, String accent, String trim, String window, St
                 block("smooth_quartz", "polished_diorite", "light_gray_stained_glass", "glass", "smooth_stone"),
                 block("white_terracotta", "light_gray_terracotta", "light_gray_stained_glass", "glass", "smooth_stone"),
                 block("smooth_sandstone", "cut_sandstone", "light_blue_stained_glass", "glass", "smooth_stone"));
+        // Storehouses: white plaster over a black wooden wainscot (焼杉), dark namako tiles or stone; bars in the windows
+        add(Building.Type.KURA,
+                new Palette(m("white_concrete"), m("dark_oak_planks"), m("white_concrete"), m("iron_bars"), m("iron_bars"),
+                        m("dark_oak_fence"), m("dark_oak_door"), m("oak_planks"), m("deepslate_tile_slab"), m("deepslate_tiles"),
+                        m("smooth_stone"), m("white_concrete"), m("stone_bricks")),
+                new Palette(m("calcite"), m("polished_blackstone"), m("calcite"), m("iron_bars"), m("iron_bars"),
+                        m("dark_oak_fence"), m("spruce_door"), m("oak_planks"), m("deepslate_tile_slab"), m("deepslate_tiles"),
+                        m("smooth_stone"), m("calcite"), m("stone_bricks")),
+                new Palette(m("white_concrete"), m("deepslate_tiles"), m("white_concrete"), m("iron_bars"), m("iron_bars"),
+                        m("dark_oak_fence"), m("dark_oak_door"), m("oak_planks"), m("polished_blackstone_brick_slab"),
+                        m("polished_blackstone_bricks"), m("smooth_stone"), m("white_concrete"), m("cobblestone")));
         // Works: steel and concrete
         add(Building.Type.WORKS,
                 new Palette(m("light_gray_concrete"), m("light_gray_concrete"), m("gray_concrete"), m("glass"), m("glass"),
@@ -124,6 +160,23 @@ public record Palette(String wall, String accent, String trim, String window, St
     private static final String[] SHRUBS = {m("azalea"), m("flowering_azalea")};
     private static final String[] SHEDS = {m("light_gray_concrete"), m("white_concrete"), m("iron_block"), m("green_terracotta")};
     public static final String POST = m("andesite_wall");
+    private static final String[] RAILS = {m("iron_bars"), m("glass_pane"), m("white_stained_glass_pane"), m("light_gray_stained_glass_pane")};
+    private static final String[] NOREN = {m("blue_wall_banner"), m("white_wall_banner"), m("brown_wall_banner"),
+            m("light_blue_wall_banner"), m("red_wall_banner"), m("black_wall_banner")};
+    public static final String GUARD = m("iron_trapdoor");
+    /** A machiya's lattice: weathered dark, or the red-brown of new wood. */
+    private static final String[] LATTICES = {m("dark_oak_fence"), m("dark_oak_fence"), m("spruce_fence"), m("mangrove_fence")};
+    public static final String DOWNPIPE = m("andesite_wall");
+    public static final String LANTERN = m("lantern");
+    public static final String SUDARE = m("bamboo_trapdoor");
+    public static final String KOMAYOSE = m("spruce_fence");
+    private static final String[] NOREN_RED = {m("red_wall_banner"), m("magenta_wall_banner"), m("red_wall_banner"),
+            m("purple_wall_banner")};
+
+    /** A window's glass as panes, set in the middle of their blocks and joined along the wall; anything else as it is. */
+    private static String pane(String id) {
+        return id.endsWith("glass") ? id + "_pane" : id;
+    }
     public static final String CARPORT = m("smooth_stone_slab");
 
     private static String pick(String[] options, long hash) {
@@ -145,9 +198,9 @@ public record Palette(String wall, String accent, String trim, String window, St
             case WALL -> wall;
             case ACCENT -> accent;
             case TRIM -> trim;
-            case WINDOW -> window;
-            case SHOPFRONT -> shopfront;
-            case LATTICE -> lattice;
+            case WINDOW -> pane(window);
+            case SHOPFRONT -> pane(shopfront);
+            case LATTICE -> lattice.endsWith("dark_oak_fence") ? pick(LATTICES, variant ^ 0x99) : lattice;
             case DOOR_LOWER, DOOR_UPPER -> door;
             case ROOF_LOW, ROOF_HIGH -> roofSlab;
             case RIDGE -> roofBlock;
@@ -168,6 +221,15 @@ public record Palette(String wall, String accent, String trim, String window, St
             case SHED -> pick(SHEDS, variant ^ 0x66);
             case POST -> POST;
             case CARPORT -> CARPORT;
+            case HOOD -> roofSlab;
+            case GUARD -> GUARD;
+            case RAIL -> pick(RAILS, variant ^ 0x77);
+            case DOWNPIPE -> DOWNPIPE;
+            case NOREN -> pick(NOREN, variant ^ 0x88);
+            case LANTERN -> LANTERN;
+            case SUDARE -> SUDARE;
+            case KOMAYOSE -> KOMAYOSE;
+            case NOREN_RED -> pick(NOREN_RED, variant ^ 0xAA);
         };
     }
 
@@ -179,6 +241,12 @@ public record Palette(String wall, String accent, String trim, String window, St
     /** How many palettes there are. */
     public static int count() {
         return ALL.size();
+    }
+
+    /** The palettes a kind of building may use in a quarter, as indexes: a quarter's own machiya where it has them. */
+    public static List<Integer> of(Building.Type type, Quarter quarter) {
+        List<Integer> own = type == Building.Type.MACHIYA ? MACHIYA_BY_QUARTER.get(quarter) : null;
+        return own != null ? own : of(type);
     }
 
     /** The palettes a kind of building may use, as indexes. */

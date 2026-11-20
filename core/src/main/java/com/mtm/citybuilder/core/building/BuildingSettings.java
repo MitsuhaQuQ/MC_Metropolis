@@ -53,6 +53,10 @@ public final class BuildingSettings {
     public int projectRun = 4;
     /** Share of houses of two storeys or more with a one-storey annex behind (下屋), making the plan an L. */
     public double annexes = 0.45;
+    /** Share of old-town lots built as a storehouse (土蔵) rather than a machiya or shop. */
+    public double kura = 0.15;
+    /** Share of the lots of a storehouse quarter built as storehouses, the rest machiya. */
+    public double kuraInQuarter = 0.6;
     /** Share of machiya with the low second storey of the older ones (厨子二階), two blocks high. */
     public double lowUpper = 0.5;
 

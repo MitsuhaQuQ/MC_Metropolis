@@ -47,6 +47,7 @@ package com.mtm.citybuilder.core.building;
  * @param nx         the frame's direction into the lot, x
  * @param nz         z
  * @param door       where across the frontage (u) its door is
+ * @param quarter    the character of the quarter it stands in
  * @param palette    which palette of materials
  * @param variant    a hash for the building's details (rooftop, units, balconies)
  */
@@ -55,7 +56,7 @@ public record Building(long id, Type type, int storeys, int ground, int upper, R
                        double wingFrom, double wingTo, double wingBack, double chamferLeft, double chamferRight,
                        int layout, double lotFrom, double lotTo, double lotDepth, double parkFrom, double parkTo,
                        double parkBack, boolean carport, int base, double ox, double oz, double tx, double tz, double nx, double nz, double door,
-                       int palette, long variant) {
+                       Quarter quarter, int palette, long variant) {
     /** Kinds of buildings of the first version, Japanese. */
     public enum Type {
         /** A detached house, set back with a small garden, gable or hipped. */
@@ -70,7 +71,13 @@ public record Building(long id, Type type, int storeys, int ground, int upper, R
         /** An office or mixed block, four storeys and up, on the street's edge, shops below. */
         OFFICE,
         /** Works or a warehouse: tall single storeys, wide. */
-        WORKS
+        WORKS,
+        /**
+         * A storehouse of the old town (土蔵, as Kurashiki's): white plaster over a black wooden wainscot or a namako
+         * wall (dark tiles in a white diagonal grid), a tiled ledge (水切り瓦) at each floor, small windows deep in the
+         * walls behind bars, often its gable to the street.
+         */
+        KURA
     }
 
     /** Roof shapes. */
