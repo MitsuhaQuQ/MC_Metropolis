@@ -859,9 +859,9 @@ public final class StreetLayer {
         }
         List<StationSite> sites = formation == Formation.VILLAGE ? List.of()
                 : sites(settlement, window, anchors, railways, urban, segments);
-        highSpeedCorridor(window, districts);
+        List<List<double[]>> highSpeed = highSpeedCorridor(settlement, window, districts, anchors);
         return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments, urban,
-                window.capital == null ? null : window.capital.clone(), sites);
+                window.capital == null ? null : window.capital.clone(), sites, highSpeed);
     }
 
     /** Points every {@code spacing} blocks along a line, its two ends included, as {x, z}. */
@@ -2982,14 +2982,40 @@ public final class StreetLayer {
         return heading;
     }
 
-    /** The reserved high-speed corridor over the window's built land, marked in the districts. */
-    private void highSpeedCorridor(Window window, Districts districts) {
+    /**
+     * The high-speed lines through the town, rerouted round it, and their reserved corridor marked in the districts.
+     * The lines are laid out on the continent's scale, knowing nothing of towns: here the stretch over the town's
+     * window is searched again on the town's grid, dear through downtown and the old town and never through grounds,
+     * from where the line enters the window to where it leaves it, leaving in the line's own heading; a line with a
+     * station in this town is led instead to the main station, the two stations side by side.
+     */
+    private List<List<double[]>> highSpeedCorridor(Settlement settlement, Window window, Districts districts,
+                                                   List<Anchor> anchors) {
         CitySettings.HighSpeed hs = logic.settings().highSpeed;
-        double half = 0.5 * hs.width + hs.margin + 0.5 * grid;
+        List<List<double[]>> corridors = new ArrayList<>();
         double x0 = (double) window.originX * grid;
         double z0 = (double) window.originZ * grid;
         double x1 = x0 + (window.size - 1.0) * grid;
         double z1 = z0 + (window.size - 1.0) * grid;
+        Anchor main = null;
+        for (Anchor anchor : anchors) {
+            if (anchor.kind() == Anchor.Kind.STATION) {
+                main = anchor;
+            }
+        }
+        Approach.CellCost cost = (i, j) -> {
+            int k = i * window.size + j;
+            if (window.water[k]) {
+                return 1.0 + hs.seaCost;
+            }
+            return switch (districts.node(i, j)) {
+                case GROUNDS -> Double.POSITIVE_INFINITY;
+                case CENTRAL -> 20.0;
+                case OLD_TOWN, STATION_FRONT -> 10.0;
+                case RESIDENTIAL, PORT -> 3.0;
+                default -> 1.0;
+            };
+        };
         for (com.mtm.citybuilder.core.rail.HighSpeedLine line : logic.highSpeedLines(x0, z0, x1, z1)) {
             // Lines whose ends lie far to the side of the town: not routed (a route keeps near its straight)
             double ax0 = line.a().x();
@@ -3010,29 +3036,90 @@ public final class StreetLayer {
                 continue;
             }
             RailRoute route = logic.highSpeedRoute(line);
-            for (int s = 1; s < route.samples(); s++) {
-                double ax = route.x(s - 1);
-                double az = route.z(s - 1);
-                double bx = route.x(s);
-                double bz = route.z(s);
-                int i0 = (int) Math.floor((Math.min(ax, bx) - half) / grid) - window.originX;
-                int i1 = (int) Math.ceil((Math.max(ax, bx) + half) / grid) - window.originX;
-                int j0 = (int) Math.floor((Math.min(az, bz) - half) / grid) - window.originZ;
-                int j1 = (int) Math.ceil((Math.max(az, bz) + half) / grid) - window.originZ;
-                for (int i = Math.max(0, i0); i <= Math.min(window.size - 1, i1); i++) {
-                    for (int j = Math.max(0, j0); j <= Math.min(window.size - 1, j1); j++) {
-                        District d = districts.node(i, j);
-                        if (d == District.NONE || d == District.GROUNDS) {
-                            continue;
-                        }
-                        double px = (double) (window.originX + i) * grid;
-                        double pz = (double) (window.originZ + j) * grid;
-                        double dx = bx - ax;
-                        double dz = bz - az;
-                        double t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
-                        if (Math.hypot(ax + dx * t - px, az + dz * t - pz) <= half) {
-                            districts.mark(i, j, District.HIGH_SPEED);
-                        }
+            int n = route.samples();
+            // The stretch within the window, a little inside its edge
+            double inset = 4.0 * grid;
+            int first = -1;
+            int last = -1;
+            for (int k = 0; k < n; k++) {
+                double x = route.x(k);
+                double z = route.z(k);
+                if (x > x0 + inset && x < x1 - inset && z > z0 + inset && z < z1 - inset) {
+                    if (first < 0) {
+                        first = k;
+                    }
+                    last = k;
+                }
+            }
+            if (first < 0 || last - first < 2) {
+                continue;
+            }
+            boolean atA = line.stationA() != null && line.stationA().id() == settlement.id();
+            boolean atB = line.stationB() != null && line.stationB().id() == settlement.id();
+            List<double[]> stretch = null;
+            if (main != null && (atA || atB)) {
+                // In from the end of the stretch towards the line's far end, to the main station
+                int from = atB ? first : last;
+                int back = atB ? Math.max(0, from - 1) : Math.min(n - 1, from + 1);
+                stretch = rerouted(window, route.x(from), route.z(from),
+                        Math.atan2(route.z(from) - route.z(back), route.x(from) - route.x(back)), main.x(), main.z(),
+                        Double.NaN, hs, cost);
+            } else if (!atA && !atB) {
+                int after = Math.min(n - 1, last + 1);
+                int before = Math.max(0, first - 1);
+                stretch = rerouted(window, route.x(first), route.z(first),
+                        Math.atan2(route.z(first) - route.z(before), route.x(first) - route.x(before)),
+                        route.x(last), route.z(last),
+                        Math.atan2(route.z(after) - route.z(last), route.x(after) - route.x(last)), hs, cost);
+            }
+            if (stretch == null) {
+                stretch = new ArrayList<>();
+                for (int k = first; k <= last; k++) {
+                    stretch.add(new double[]{route.x(k), route.z(k)});
+                }
+            }
+            markCorridor(window, districts, stretch, 0.5 * hs.width + hs.margin + 0.5 * grid);
+            corridors.add(stretch);
+        }
+        return corridors;
+    }
+
+    /** A high-speed stretch searched on the town's grid, the radius eased where the full one finds no way. */
+    private List<double[]> rerouted(Window window, double fx, double fz, double heading, double tx, double tz,
+                                    double arrival, CitySettings.HighSpeed hs, Approach.CellCost cost) {
+        for (double radius : new double[]{hs.minRadius, 0.6 * hs.minRadius}) {
+            Approach.Route route = Approach.route(window.originX, window.originZ, window.size, window.size, grid, fx, fz,
+                    heading, tx, tz, arrival, !Double.isNaN(arrival), radius, hs.turnCost, hs.maxRadius, cost);
+            if (route != null) {
+                return route.line();
+            }
+        }
+        return null;
+    }
+
+    private void markCorridor(Window window, Districts districts, List<double[]> line, double half) {
+        for (int s = 1; s < line.size(); s++) {
+            double ax = line.get(s - 1)[0];
+            double az = line.get(s - 1)[1];
+            double bx = line.get(s)[0];
+            double bz = line.get(s)[1];
+            int i0 = (int) Math.floor((Math.min(ax, bx) - half) / grid) - window.originX;
+            int i1 = (int) Math.ceil((Math.max(ax, bx) + half) / grid) - window.originX;
+            int j0 = (int) Math.floor((Math.min(az, bz) - half) / grid) - window.originZ;
+            int j1 = (int) Math.ceil((Math.max(az, bz) + half) / grid) - window.originZ;
+            for (int i = Math.max(0, i0); i <= Math.min(window.size - 1, i1); i++) {
+                for (int j = Math.max(0, j0); j <= Math.min(window.size - 1, j1); j++) {
+                    District d = districts.node(i, j);
+                    if (d == District.NONE || d == District.GROUNDS) {
+                        continue;
+                    }
+                    double px = (double) (window.originX + i) * grid;
+                    double pz = (double) (window.originZ + j) * grid;
+                    double dx = bx - ax;
+                    double dz = bz - az;
+                    double t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+                    if (Math.hypot(ax + dx * t - px, az + dz * t - pz) <= half) {
+                        districts.mark(i, j, District.HIGH_SPEED);
                     }
                 }
             }

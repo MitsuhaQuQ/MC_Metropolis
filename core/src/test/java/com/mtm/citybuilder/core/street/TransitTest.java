@@ -166,6 +166,16 @@ class TransitTest {
         }
     }
 
+    @Test
+    void highSpeedLinesKeepOutOfDowntownAndTheOldTown() {
+        for (List<double[]> line : plan.highSpeed()) {
+            for (double[] p : line) {
+                District d = plan.districts().at(p[0], p[1]);
+                assertTrue(d != District.CENTRAL && d != District.GROUNDS, "a high-speed line through " + d);
+            }
+        }
+    }
+
     private static boolean cross(StreetSegment s, double[][] p) {
         double d1 = side(p, s.x1(), s.z1());
         double d2 = side(p, s.x2(), s.z2());

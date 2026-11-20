@@ -175,6 +175,15 @@ public final class StreetMap {
                 g.drawOval(px - 4, py - 4, 8, 8);
             }
         }
+        // The reserved high-speed lines: dashed dark green
+        g.setColor(new Color(20, 110, 40));
+        g.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 1f, new float[]{8f, 5f}, 0f));
+        for (java.util.List<double[]> line : plan.highSpeed()) {
+            for (int k = 1; k < line.size(); k++) {
+                g.draw(new Line2D.Double((line.get(k - 1)[0] - left) / scale, (line.get(k - 1)[1] - top) / scale,
+                        (line.get(k)[0] - left) / scale, (line.get(k)[1] - top) / scale));
+            }
+        }
         // Station land: main white, suburban stops black, town line stations purple, reserved sites dashed grey,
         // bus stops small cyan marks
         for (com.mtm.citybuilder.core.street.StationSite site : plan.sites()) {
