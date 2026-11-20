@@ -693,6 +693,7 @@ public final class StreetLayer {
                     moatSide(ground, window, segments);
                 }
             }
+            List<StreetSegment> banks = riverside(window, segments);
             Field field = new Field(window, formation, settlement, anchors, oldRoad);
             double spacing = spacing(formation);
             Tracer arterials = new Tracer(window, field, StreetClass.ARTERIAL, config.arterialWidth, spacing, false,
@@ -700,7 +701,7 @@ public final class StreetLayer {
             arterials.bridging = true;
             arterials.run(arterialSeeds(anchors, oldRoad, window, spacing), segments);
             linkPatches(window, arterials, segments, spacing);
-            demoteDeadEnds(window, segments, anchors);
+            demoteDeadEnds(window, segments, anchors, banks);
             for (Anchor anchor : anchors) {
                 if (anchor.kind() == Anchor.Kind.STATION) {
                     avenue(anchor, extent, window, segments);
@@ -725,6 +726,9 @@ public final class StreetLayer {
                 // between and halve blocks
                 streets.clearance = formation == Formation.JORI ? 0.95 : 0.7;
                 streets.climbing = true;
+                streets.bridging = true;
+                streets.bridgeMax = config.streetBridge;
+                streets.bridgeKeep = config.streetBridgeSpacing;
                 streets.oneSided = formation != Formation.JORI;
                 streets.teeSeed = Hash.mix(settlement.id() ^ 0x7EEL);
                 streets.run(streetSeeds(segments, field, streetSpacing, formation != Formation.JORI), segments);
@@ -735,12 +739,239 @@ public final class StreetLayer {
     }
 
     /**
+     * Joins an arterial's end to the nearest end of a bank road's piece within {@code bankJoin}, straight over land;
+     * whether it did.
+     */
+    private boolean joinBank(Window window, List<StreetSegment> segments, List<StreetSegment> banks, double x, double z) {
+        double[] best = null;
+        double bestDistance = config.bankJoin;
+        for (StreetSegment bank : banks) {
+            for (double[] p : new double[][]{{bank.x1(), bank.z1()}, {bank.x2(), bank.z2()}}) {
+                double d = Math.hypot(p[0] - x, p[1] - z);
+                if (d < bestDistance) {
+                    bestDistance = d;
+                    best = p;
+                }
+            }
+        }
+        if (best == null) {
+            return false;
+        }
+        if (bestDistance < 0.5) {
+            return true;
+        }
+        int samples = Math.max(1, (int) Math.ceil(bestDistance / 8.0));
+        for (int q = 1; q < samples; q++) {
+            double t = (double) q / samples;
+            if (!window.built(x + (best[0] - x) * t, z + (best[1] - z) * t)) {
+                return false;
+            }
+        }
+        int pieces = Math.max(1, (int) Math.ceil(bestDistance / config.step));
+        for (int q = 0; q < pieces; q++) {
+            double ax = x + (best[0] - x) * q / pieces;
+            double az = z + (best[1] - z) * q / pieces;
+            double bx = x + (best[0] - x) * (q + 1) / pieces;
+            double bz = z + (best[1] - z) * (q + 1) / pieces;
+            Era era = window.intensity(0.5 * (ax + bx), 0.5 * (az + bz)) > config.oldTownIntensity ? Era.TOWN : Era.MODERN;
+            StreetSegment piece = sloped(window, ax, az, bx, bz, StreetClass.ARTERIAL, era, config.arterialWidth);
+            if (piece != null) {
+                segments.add(piece);
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Roads along the banks of wide water through built land: rivers, lakes and the sea, as Kyoto's Kawabata-dori
+     * along the Kamo. Each runs on the line {@code bankOffset} from the water, traced as a contour of the distance to
+     * water on the grid and smoothed, cut where the land is not built; a long run is an arterial, a short one a street.
+     * Returns the pieces laid, which arterials ending at the water later join.
+     */
+    private List<StreetSegment> riverside(Window window, List<StreetSegment> segments) {
+        int size = window.size;
+        double[] d = distances(window.water, size);
+        double level = config.bankOffset;
+        // Marching squares: pieces of the contour in each cell, joined end to end into lines
+        Map<Long, List<double[]>> byEnd = new HashMap<>();
+        List<double[]> pieces = new ArrayList<>();
+        for (int i = 0; i < size - 1; i++) {
+            for (int j = 0; j < size - 1; j++) {
+                int[][] corners = {{i, j}, {i + 1, j}, {i + 1, j + 1}, {i, j + 1}};
+                double[] v = new double[4];
+                boolean finite = true;
+                for (int c = 0; c < 4; c++) {
+                    v[c] = d[corners[c][0] * size + corners[c][1]];
+                    finite &= !Double.isInfinite(v[c]);
+                }
+                if (!finite) {
+                    continue;
+                }
+                List<double[]> crossings = new ArrayList<>();
+                for (int e = 0; e < 4; e++) {
+                    double a = v[e];
+                    double b = v[(e + 1) % 4];
+                    if ((a < level) != (b < level)) {
+                        double t = (level - a) / (b - a);
+                        double x = (window.originX + corners[e][0] + t * (corners[(e + 1) % 4][0] - corners[e][0])) * (double) grid;
+                        double z = (window.originZ + corners[e][1] + t * (corners[(e + 1) % 4][1] - corners[e][1])) * (double) grid;
+                        crossings.add(new double[]{x, z, e});
+                    }
+                }
+                if (crossings.size() == 2) {
+                    addPiece(crossings.get(0), crossings.get(1), pieces, byEnd);
+                } else if (crossings.size() == 4) {
+                    // A saddle: pair the crossings by the cell's middle, keeping water on one side
+                    boolean middleIn = (v[0] + v[1] + v[2] + v[3]) / 4 < level;
+                    boolean firstIn = v[0] < level;
+                    if (middleIn == firstIn) {
+                        addPiece(crossings.get(0), crossings.get(1), pieces, byEnd);
+                        addPiece(crossings.get(2), crossings.get(3), pieces, byEnd);
+                    } else {
+                        addPiece(crossings.get(0), crossings.get(3), pieces, byEnd);
+                        addPiece(crossings.get(1), crossings.get(2), pieces, byEnd);
+                    }
+                }
+            }
+        }
+        boolean[] used = new boolean[pieces.size()];
+        Map<double[], Integer> index = new java.util.IdentityHashMap<>();
+        for (int p = 0; p < pieces.size(); p++) {
+            index.put(pieces.get(p), p);
+        }
+        List<StreetSegment> laid = new ArrayList<>();
+        for (int p = 0; p < pieces.size(); p++) {
+            if (used[p]) {
+                continue;
+            }
+            used[p] = true;
+            java.util.LinkedList<double[]> line = new java.util.LinkedList<>();
+            line.add(new double[]{pieces.get(p)[0], pieces.get(p)[1]});
+            line.add(new double[]{pieces.get(p)[2], pieces.get(p)[3]});
+            // Grow at both ends
+            for (int side = 0; side < 2; side++) {
+                while (true) {
+                    double[] end = side == 0 ? line.getLast() : line.getFirst();
+                    double[] next = null;
+                    for (double[] piece : byEnd.getOrDefault(endKey(end[0], end[1]), List.of())) {
+                        int q = index.get(piece);
+                        if (!used[q]) {
+                            next = piece;
+                            used[q] = true;
+                            break;
+                        }
+                    }
+                    if (next == null) {
+                        break;
+                    }
+                    boolean fromStart = endKey(next[0], next[1]) == endKey(end[0], end[1]);
+                    double[] far = fromStart ? new double[]{next[2], next[3]} : new double[]{next[0], next[1]};
+                    if (side == 0) {
+                        line.addLast(far);
+                    } else {
+                        line.addFirst(far);
+                    }
+                }
+            }
+            List<double[]> smooth = new ArrayList<>(line);
+            for (int round = 0; round < 3; round++) {
+                smooth = chaikin(smooth);
+            }
+            laid.addAll(riversideRuns(window, smooth, segments));
+        }
+        return laid;
+    }
+
+    private static long endKey(double x, double z) {
+        return (Math.round(x * 100.0) << 32) ^ (Math.round(z * 100.0) & 0xFFFFFFFFL);
+    }
+
+    private static void addPiece(double[] a, double[] b, List<double[]> pieces, Map<Long, List<double[]>> byEnd) {
+        double[] piece = {a[0], a[1], b[0], b[1]};
+        pieces.add(piece);
+        byEnd.computeIfAbsent(endKey(a[0], a[1]), k -> new ArrayList<>()).add(piece);
+        byEnd.computeIfAbsent(endKey(b[0], b[1]), k -> new ArrayList<>()).add(piece);
+    }
+
+    /** One round of corner cutting, the ends kept. */
+    private static List<double[]> chaikin(List<double[]> line) {
+        if (line.size() < 3) {
+            return line;
+        }
+        List<double[]> out = new ArrayList<>();
+        out.add(line.get(0));
+        for (int k = 0; k < line.size() - 1; k++) {
+            double[] a = line.get(k);
+            double[] b = line.get(k + 1);
+            out.add(new double[]{0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]});
+            out.add(new double[]{0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]});
+        }
+        out.add(line.get(line.size() - 1));
+        return out;
+    }
+
+    /** A bank line cut into runs over built land, laid as pieces about a step long. */
+    private List<StreetSegment> riversideRuns(Window window, List<double[]> line, List<StreetSegment> segments) {
+        // Resample at the step
+        List<double[]> points = new ArrayList<>();
+        points.add(line.get(0));
+        double carry = 0.0;
+        for (int k = 1; k < line.size(); k++) {
+            double[] a = line.get(k - 1);
+            double[] b = line.get(k);
+            double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+            double at = config.step - carry;
+            while (at <= length) {
+                points.add(new double[]{a[0] + (b[0] - a[0]) * at / length, a[1] + (b[1] - a[1]) * at / length});
+                at += config.step;
+            }
+            carry = length - (at - config.step);
+        }
+        List<StreetSegment> laid = new ArrayList<>();
+        List<double[]> run = new ArrayList<>();
+        for (int k = 0; k <= points.size(); k++) {
+            boolean ok = k < points.size() && window.built(points.get(k)[0], points.get(k)[1]);
+            if (ok) {
+                run.add(points.get(k));
+                continue;
+            }
+            if (run.size() >= 3) {
+                double length = (run.size() - 1) * config.step;
+                boolean arterial = length >= config.riversideArterial;
+                for (int q = 1; q < run.size(); q++) {
+                    double[] a = run.get(q - 1);
+                    double[] b = run.get(q);
+                    double mx = 0.5 * (a[0] + b[0]);
+                    double mz = 0.5 * (a[1] + b[1]);
+                    Era era = window.intensity(mx, mz) > config.oldTownIntensity ? Era.TOWN : Era.MODERN;
+                    StreetSegment piece = sloped(window, a[0], a[1], b[0], b[1],
+                            arterial ? StreetClass.ARTERIAL : StreetClass.STREET, era,
+                            arterial ? config.arterialWidth : config.streetWidth);
+                    if (piece == null) {
+                        continue;
+                    }
+                    if (piece.structure() == StreetStructure.GROUND && overStream(a[0], a[1], b[0], b[1])) {
+                        piece = new StreetSegment(piece.x1(), piece.z1(), piece.x2(), piece.z2(), piece.streetClass(),
+                                piece.era(), piece.width(), StreetStructure.CULVERT);
+                    }
+                    segments.add(piece);
+                    laid.add(piece);
+                }
+            }
+            run.clear();
+        }
+        return laid;
+    }
+
+    /**
      * Arterials that run into water without a bridge and end there, made streets back to where they last meet another
      * line: an arterial leading nowhere is a stub no town would build, but the road itself serves the land along it,
-     * as a street ending at the embankment. A run is taken piece by piece from its water end while the node behind
-     * joins no other line; it stops at a junction, at a piece another line crosses, at a bridge and at an anchor.
+     * as a street ending at the embankment. Where a bank road runs near, the arterial joins it instead and stays. A
+     * run is taken piece by piece from its water end while the node behind joins no other line; it stops at a
+     * junction, at a piece another line crosses, at a bridge and at an anchor.
      */
-    private void demoteDeadEnds(Window window, List<StreetSegment> segments, List<Anchor> anchors) {
+    private void demoteDeadEnds(Window window, List<StreetSegment> segments, List<Anchor> anchors,
+                                List<StreetSegment> banks) {
         int count = segments.size();
         Map<Long, List<Integer>> ends = new HashMap<>();
         for (int s = 0; s < count; s++) {
@@ -792,7 +1023,7 @@ public final class StreetLayer {
             boolean first = nodeKey(segment.x1(), segment.z1()) == entry.getKey();
             double x = first ? segment.x1() : segment.x2();
             double z = first ? segment.z1() : segment.z2();
-            if (!nearWater(window, x, z) || nearAnchor(anchors, x, z)) {
+            if (!nearWater(window, x, z) || nearAnchor(anchors, x, z) || joinBank(window, segments, banks, x, z)) {
                 continue;
             }
             // Walk back from the water end while the run joins nothing
@@ -2043,6 +2274,9 @@ public final class StreetLayer {
         /** Whether lines bridge rivers (arterials do), and the bridges built, {middle x, z, spacing kept}, shared by both families. */
         boolean bridging;
         final List<double[]> bridges = new ArrayList<>();
+        /** The widest water this tracer's lines bridge, and the least spacing of their bridges. */
+        double bridgeMax = config.maxBridge;
+        double bridgeKeep = config.bridgeSpacing;
         /** Whether lines may climb past {@code maxGrade} as ramps and stairs (streets may, arterials not). */
         boolean climbing;
         /** Share of crossings with a street of the other family where a street ends instead, and their hash's seed. */
@@ -2239,7 +2473,7 @@ public final class StreetLayer {
          */
         private List<double[]> bridge(double x, double z, double dx, double dz) {
             List<double[]> span = new ArrayList<>();
-            for (double t = config.step; t <= config.maxBridge + config.step; t += config.step) {
+            for (double t = config.step; t <= bridgeMax + config.step; t += config.step) {
                 double bx = x + dx * t;
                 double bz = z + dz * t;
                 if (!window.inside(bx, bz) || window.inGrounds(bx, bz)) {
@@ -2267,7 +2501,7 @@ public final class StreetLayer {
 
         /** The spacing a bridge of a length keeps from others: wider for a longer, costlier one. */
         private double bridgeSpacing(double length) {
-            return config.bridgeSpacing * Math.max(1.0, length / config.bridgeLength);
+            return bridgeKeep * Math.max(1.0, length / config.bridgeLength);
         }
 
         /** Points of a line from a seed in one sense, until it ends; the seed first. */

@@ -101,12 +101,36 @@ class StreetTerrainTest {
             for (double[] end : new double[][]{{segment.x1(), segment.z1()}, {segment.x2(), segment.z2()}}) {
                 // A dead end, not an end on another line's piece (a T where the stub past a crossing was cut)
                 boolean onAnother = arterials.stream().anyMatch(o -> o != segment && distanceTo(o, end[0], end[1]) < 0.5);
-                if (degree.get(Math.round(end[0] * 10) * 1_000_003L + Math.round(end[1] * 10)) == 1 && !onAnother) {
+                // Heading into the river (across it), not along the bank as a bank road ending at the town's edge
+                boolean across = Math.abs(segment.x2() - segment.x1()) > Math.abs(segment.z2() - segment.z1());
+                if (degree.get(Math.round(end[0] * 10) * 1_000_003L + Math.round(end[1] * 10)) == 1 && !onAnother && across) {
                     // The river's banks are 40 either side of x = 20000; the grid reads water to its nearest node
                     assertTrue(Math.abs(end[0] - 20000) > 40 + 64, "an arterial ends at the river: " + segment);
                 }
             }
         }
+    }
+
+    @Test
+    void roadsRunAlongBothBanks() {
+        CityLogic logic = new CityLogic(3L, SETTINGS, new SyntheticTerrain(0.0, 20000, 80, Landform.PLAINS));
+        StreetPlan plan = logic.streetPlan(city(20300, 0), Formation.CASTLE_TOWN);
+        double west = 0.0;
+        double east = 0.0;
+        for (StreetSegment segment : plan.segments()) {
+            double mx = 0.5 * (segment.x1() + segment.x2());
+            boolean along = Math.abs(segment.z2() - segment.z1()) > 2 * Math.abs(segment.x2() - segment.x1());
+            if (!along || segment.streetClass() == StreetClass.LANE) {
+                continue;
+            }
+            // Banks at 19960 and 20040; the bank road runs about bankOffset from the water as the grid reads it
+            if (mx > 19960 - 120 && mx < 19960) {
+                west += segment.length();
+            } else if (mx > 20040 && mx < 20040 + 120) {
+                east += segment.length();
+            }
+        }
+        assertTrue(west > 1000 && east > 1000, "bank roads: west " + west + ", east " + east);
     }
 
     @Test

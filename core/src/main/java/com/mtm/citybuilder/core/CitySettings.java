@@ -466,11 +466,21 @@ public final class CitySettings {
         /**
          * Arterials bridge water up to {@code maxBridge} wide. A bridge stands no closer to another than
          * {@code bridgeSpacing}, and a long one further, in proportion to its length past {@code bridgeLength}: a big
-         * bridge is costly, so a wide river has few (a 600-block bridge keeps 1800 from the next).
+         * bridge is costly, so a wide river has few (a 600-block bridge keeps 1200 from the next).
          */
         public double maxBridge = 1000.0;
-        public double bridgeSpacing = 600.0;
+        public double bridgeSpacing = 400.0;
         public double bridgeLength = 200.0;
+        /** Streets bridge water up to this wide, keeping this far from another street bridge. */
+        public double streetBridge = 60.0;
+        public double streetBridgeSpacing = 250.0;
+        /**
+         * Roads along the banks of wide water run this far from it; a run at least {@code riversideArterial} long is an
+         * arterial. An arterial ending at the water joins a bank road within {@code bankJoin} instead of ending there.
+         */
+        public double bankOffset = 40.0;
+        public double riversideArterial = 600.0;
+        public double bankJoin = 120.0;
         /** Built land the arterials miss in patches of at least this many grid nodes is linked by a bridge of its own. */
         public int minPatch = 20;
         /** Streets past {@code maxGrade} are ramps up to this grade, stairs up to the next; steeper ends them. */
