@@ -138,6 +138,34 @@ class TransitTest {
         assertTrue(alongside > 200, "roads along the railway at grade: " + alongside);
     }
 
+    @Test
+    void stationLandAndBusStops() {
+        long main = plan.sites().stream().filter(s -> s.kind() == StationSite.Kind.MAIN).count();
+        assertTrue(main >= 1, "the main station's land");
+        List<StationSite> intercity = plan.sites().stream().filter(s -> s.kind() == StationSite.Kind.MAIN
+                || s.kind() == StationSite.Kind.SUBURBAN || s.kind() == StationSite.Kind.RESERVED).toList();
+        for (int a = 0; a < intercity.size(); a++) {
+            for (int b = a + 1; b < intercity.size(); b++) {
+                double d = Math.hypot(intercity.get(a).x() - intercity.get(b).x(), intercity.get(a).z() - intercity.get(b).z());
+                assertTrue(d >= SETTINGS.transit.siteApart - 1, "intercity sites " + d + " apart");
+            }
+        }
+        List<StationSite> bus = plan.sites().stream().filter(s -> s.kind() == StationSite.Kind.BUS).toList();
+        assertTrue(bus.size() > 20, "bus stops: " + bus.size());
+        for (int a = 0; a < bus.size(); a++) {
+            for (int b = a + 1; b < bus.size(); b++) {
+                assertTrue(Math.hypot(bus.get(a).x() - bus.get(b).x(), bus.get(a).z() - bus.get(b).z()) >= SETTINGS.transit.busApart - 1);
+            }
+        }
+        // Every station has a bus stop nearby
+        for (StationSite site : plan.sites()) {
+            if (site.kind() == StationSite.Kind.MAIN) {
+                assertTrue(bus.stream().anyMatch(s -> Math.hypot(s.x() - site.x(), s.z() - site.z()) < 2 * SETTINGS.transit.busApart),
+                        "no bus stop by the main station");
+            }
+        }
+    }
+
     private static boolean cross(StreetSegment s, double[][] p) {
         double d1 = side(p, s.x1(), s.z1());
         double d2 = side(p, s.x2(), s.z2());

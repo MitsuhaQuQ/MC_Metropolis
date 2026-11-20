@@ -39,6 +39,7 @@ public final class StreetMap {
             case INDUSTRIAL -> new Color(150, 90, 190);
             case PORT -> new Color(40, 150, 200);
             case STATION_FRONT -> new Color(250, 130, 30);
+            case HIGH_SPEED -> new Color(120, 200, 120);
             case NONE -> null;
         };
     }
@@ -172,6 +173,51 @@ public final class StreetMap {
                 g.fillOval(px - 4, py - 4, 8, 8);
                 g.setColor(new Color(150, 40, 190));
                 g.drawOval(px - 4, py - 4, 8, 8);
+            }
+        }
+        // Station land: main white, suburban stops black, town line stations purple, reserved sites dashed grey,
+        // bus stops small cyan marks
+        for (com.mtm.citybuilder.core.street.StationSite site : plan.sites()) {
+            double hx = Math.cos(site.heading());
+            double hz = Math.sin(site.heading());
+            double l = 0.5 * Math.max(site.length(), 12.0 * scale) / scale;
+            double w = 0.5 * Math.max(site.width(), 6.0 * scale) / scale;
+            double px = (site.x() - left) / scale;
+            double py = (site.z() - top) / scale;
+            java.awt.geom.Path2D box = new java.awt.geom.Path2D.Double();
+            box.moveTo(px - hx * l - hz * w, py - hz * l + hx * w);
+            box.lineTo(px + hx * l - hz * w, py + hz * l + hx * w);
+            box.lineTo(px + hx * l + hz * w, py + hz * l - hx * w);
+            box.lineTo(px - hx * l + hz * w, py - hz * l - hx * w);
+            box.closePath();
+            switch (site.kind()) {
+                case MAIN -> {
+                    g.setColor(Color.WHITE);
+                    g.fill(box);
+                    g.setColor(Color.BLACK);
+                    g.setStroke(new BasicStroke(1.5f));
+                    g.draw(box);
+                }
+                case SUBURBAN -> {
+                    g.setColor(Color.BLACK);
+                    g.fill(box);
+                }
+                case TOWN_LINE -> {
+                    g.setColor(new Color(150, 40, 190));
+                    g.setStroke(new BasicStroke(1.5f));
+                    g.draw(box);
+                }
+                case RESERVED -> {
+                    g.setColor(new Color(255, 255, 255, 160));
+                    g.fill(box);
+                    g.setColor(new Color(40, 40, 40));
+                    g.setStroke(new BasicStroke(2f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 1f, new float[]{4f, 3f}, 0f));
+                    g.draw(box);
+                }
+                case BUS -> {
+                    g.setColor(new Color(0, 190, 210));
+                    g.fillRect((int) Math.round(px) - 2, (int) Math.round(py) - 2, 4, 4);
+                }
             }
         }
         g.setStroke(new BasicStroke(1.2f));

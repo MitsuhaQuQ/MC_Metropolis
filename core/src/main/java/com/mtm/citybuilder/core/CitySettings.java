@@ -399,6 +399,32 @@ public final class CitySettings {
          * every other line's.
          */
         public double lineOffset = 1200.0;
+        /**
+         * Station land: the main station's platform length, width and square; a town line station's width; a suburban
+         * or reserved site's width; an interchange's square.
+         */
+        public double mainLength = 300.0;
+        public double mainWidth = 40.0;
+        public double mainPlaza = 80.0;
+        public double townLineWidth = 14.0;
+        public double siteWidth = 20.0;
+        public double interchangePlaza = 30.0;
+        /**
+         * The intercity lines stop in the suburbs from {@code suburbanFirst} out from the main station, every
+         * {@code suburbanSpacing}; sites toward towns no railway reaches are kept {@code reserveInset} inside the edge
+         * of the built land toward them, for roads within {@code reserveReach}; no two station sites within
+         * {@code siteApart}.
+         */
+        public double suburbanFirst = 2500.0;
+        public double suburbanSpacing = 2500.0;
+        public double reserveInset = 600.0;
+        public double reserveReach = 20000.0;
+        public double siteApart = 1200.0;
+        /** Bus stops along the arterials about this far apart, none closer than {@code busApart}; a bay's size. */
+        public double busSpacing = 400.0;
+        public double busApart = 250.0;
+        public double busLength = 30.0;
+        public double busWidth = 4.0;
         public double interchangeReach = 150.0;
         public double stationApart = 400.0;
         /**

@@ -17,5 +17,7 @@ public enum District {
     /** Quays, warehouses and the trades of a harbour: flat land along the sea. */
     PORT,
     /** Shops, hotels and offices round the main station, Japanese towns' ekimae. */
-    STATION_FRONT
+    STATION_FRONT,
+    /** Kept clear for a high-speed line to be built later: green strips, car parks, nothing built. */
+    HIGH_SPEED
 }

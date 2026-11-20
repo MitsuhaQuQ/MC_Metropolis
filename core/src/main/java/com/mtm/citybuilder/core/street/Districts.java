@@ -32,6 +32,12 @@ public final class Districts {
         return District.values()[kinds[i * size + j]];
     }
 
+    void mark(int i, int j, District district) {
+        if (i >= 0 && j >= 0 && i < size && j < size) {
+            kinds[i * size + j] = (byte) district.ordinal();
+        }
+    }
+
     public int originX() {
         return originX;
     }

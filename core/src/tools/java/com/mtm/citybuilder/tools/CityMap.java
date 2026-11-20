@@ -423,6 +423,9 @@ public final class CityMap {
                     line.length(com.mtm.citybuilder.core.street.TransitMode.STACKED) / 1000,
                     line.length(com.mtm.citybuilder.core.street.TransitMode.GROUND) / 1000, line.stations().size());
         }
+        java.util.Map<com.mtm.citybuilder.core.street.StationSite.Kind, Long> siteCounts = new java.util.TreeMap<>();
+        plan.sites().forEach(site -> siteCounts.merge(site.kind(), 1L, Long::sum));
+        System.out.println("  station sites " + siteCounts);
         for (StreetClass streetClass : StreetClass.values()) {
             double length = plan.length(streetClass);
             if (length > 0) {

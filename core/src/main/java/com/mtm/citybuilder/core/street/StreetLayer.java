@@ -857,8 +857,11 @@ public final class StreetLayer {
                 }
             }
         }
+        List<StationSite> sites = formation == Formation.VILLAGE ? List.of()
+                : sites(settlement, window, anchors, railways, urban, segments);
+        highSpeedCorridor(window, districts);
         return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments, urban,
-                window.capital == null ? null : window.capital.clone());
+                window.capital == null ? null : window.capital.clone(), sites);
     }
 
     /** Points every {@code spacing} blocks along a line, its two ends included, as {x, z}. */
@@ -2750,6 +2753,290 @@ public final class StreetLayer {
             }
         }
         return laid;
+    }
+
+    /**
+     * The land kept for the town's stations and stops: the main station, the intercity lines' stops in the suburbs
+     * every {@code suburbanSpacing} from {@code suburbanFirst} out, the town lines' stations, sites reserved in the
+     * suburbs toward the towns the roads lead to that no railway yet reaches, and bus stops along the arterials, one by
+     * every station first and then about every {@code busSpacing}.
+     */
+    private List<StationSite> sites(Settlement settlement, Window window, List<Anchor> anchors, List<CityRailway> railways,
+                                    List<UrbanLine> urban, List<StreetSegment> segments) {
+        CitySettings.Transit transit = logic.settings().transit;
+        List<StationSite> sites = new ArrayList<>();
+        // The main station, along the lines arriving at it; a station of a line passing through, along the nearest road
+        for (Anchor anchor : anchors) {
+            if (anchor.kind() != Anchor.Kind.STATION) {
+                continue;
+            }
+            double heading = Double.NaN;
+            for (CityRailway railway : railways) {
+                List<double[]> line = railway.line();
+                double[] last = line.get(line.size() - 1);
+                if (Math.hypot(last[0] - anchor.x(), last[1] - anchor.z()) < 1.0 && line.size() > 1) {
+                    double[] before = line.get(line.size() - 2);
+                    heading = Math.atan2(last[1] - before[1], last[0] - before[0]);
+                    break;
+                }
+            }
+            if (Double.isNaN(heading)) {
+                heading = roadHeading(segments, anchor.x(), anchor.z(), 0.0);
+            }
+            sites.add(new StationSite(StationSite.Kind.MAIN, anchor.x(), anchor.z(), heading, transit.mainLength,
+                    transit.mainWidth, transit.mainPlaza));
+        }
+        // The town lines' stations; an interchange gets a square
+        for (UrbanLine line : urban) {
+            for (double[] st : line.stations()) {
+                boolean interchange = false;
+                for (UrbanLine other : urban) {
+                    if (other == line) {
+                        continue;
+                    }
+                    for (double[] q : other.stations()) {
+                        interchange |= Math.hypot(q[0] - st[0], q[1] - st[1]) < 300;
+                    }
+                }
+                for (StationSite main : sites) {
+                    interchange |= main.kind() == StationSite.Kind.MAIN && Math.hypot(main.x() - st[0], main.z() - st[1]) < 300;
+                }
+                sites.add(new StationSite(StationSite.Kind.TOWN_LINE, st[0], st[1], st.length > 3 ? st[3] : 0.0,
+                        transit.platformLength, transit.townLineWidth, interchange ? transit.interchangePlaza : 0.0));
+            }
+        }
+        // The intercity lines' suburban stops, counted out from the main station
+        for (CityRailway railway : railways) {
+            List<double[]> line = railway.line();
+            double run = 0.0;
+            double next = transit.suburbanFirst;
+            for (int k = line.size() - 2; k >= 1; k--) {
+                double[] p = line.get(k);
+                double[] q = line.get(k + 1);
+                run += Math.hypot(q[0] - p[0], q[1] - p[1]);
+                if (run < next) {
+                    continue;
+                }
+                if (!window.built(p[0], p[1]) || (int) p[2] == TransitMode.UNDERGROUND.ordinal()
+                        || clash(sites, p[0], p[1], transit.siteApart)) {
+                    continue;
+                }
+                double[] a = line.get(k - 1);
+                sites.add(new StationSite(StationSite.Kind.SUBURBAN, p[0], p[1], Math.atan2(q[1] - a[1], q[0] - a[0]),
+                        transit.platformLength, transit.siteWidth, transit.interchangePlaza));
+                next = run + transit.suburbanSpacing;
+            }
+        }
+        // Sites kept toward the towns the roads lead to that no railway reaches yet
+        double cx = window.extent.coreX();
+        double cz = window.extent.coreZ();
+        java.util.Set<Long> railed = new java.util.HashSet<>();
+        // Every line or road with an end here has a window over its end: a query at the centre finds them all
+        for (RailEdge edge : logic.railLines(settlement.x() - 1, settlement.z() - 1, settlement.x() + 1, settlement.z() + 1)) {
+            if (edge.a().id() == settlement.id()) {
+                railed.add(edge.b().id());
+            } else if (edge.b().id() == settlement.id()) {
+                railed.add(edge.a().id());
+            }
+        }
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        for (RoadEdge edge : logic.roads(settlement.x() - 1, settlement.z() - 1, settlement.x() + 1, settlement.z() + 1)) {
+            Settlement other = edge.a().id() == settlement.id() ? edge.b() : edge.b().id() == settlement.id() ? edge.a() : null;
+            if (other == null || other.tier() == SettlementTier.VILLAGE || railed.contains(other.id()) || !seen.add(other.id())) {
+                continue;
+            }
+            double d = Math.atan2(other.z() - cz, other.x() - cx);
+            double ux = Math.cos(d);
+            double uz = Math.sin(d);
+            // Out to the edge of the built land that way (across rivers and parks, not across open country), short of
+            // the other town, then back into the suburbs
+            double toward = Math.hypot(other.x() - cx, other.z() - cz) - 1000.0;
+            double edgeAt = -1;
+            for (double r = config.step; r < toward; r += config.step) {
+                if (window.built(cx + ux * r, cz + uz * r)) {
+                    edgeAt = r;
+                } else if (edgeAt > 0 && r - edgeAt > 1500) {
+                    break;
+                }
+            }
+            if (edgeAt < transit.suburbanFirst) {
+                continue;
+            }
+            // Into the suburbs from that edge; where an intercity station stands there, turned up to 25 degrees aside
+            // or drawn further in, to the nearest place clear of it
+            double x = Double.NaN;
+            double z = Double.NaN;
+            search:
+            for (double r = edgeAt - transit.reserveInset; r >= transit.suburbanFirst; r -= 2 * grid) {
+                for (int turn = 0; turn <= 5; turn++) {
+                    for (int sign : turn == 0 ? new int[]{1} : new int[]{1, -1}) {
+                        double a = d + sign * Math.toRadians(5.0 * turn);
+                        double tx = cx + Math.cos(a) * r;
+                        double tz = cz + Math.sin(a) * r;
+                        if (window.built(tx, tz) && !clash(sites, tx, tz, transit.siteApart)) {
+                            x = tx;
+                            z = tz;
+                            break search;
+                        }
+                    }
+                }
+            }
+            if (Double.isNaN(x)) {
+                continue;
+            }
+            sites.add(new StationSite(StationSite.Kind.RESERVED, x, z, roadHeading(segments, x, z, d),
+                    transit.platformLength, transit.siteWidth, transit.interchangePlaza));
+        }
+        // Bus stops: one beside every station, then along the arterials
+        List<double[]> stops = new ArrayList<>();
+        for (StationSite site : List.copyOf(sites)) {
+            if (site.kind() == StationSite.Kind.RESERVED) {
+                continue;
+            }
+            StreetSegment best = null;
+            double bestDistance = transit.busApart;
+            for (StreetSegment g : segments) {
+                if (!busRoad(g)) {
+                    continue;
+                }
+                double d = Math.hypot(0.5 * (g.x1() + g.x2()) - site.x(), 0.5 * (g.z1() + g.z2()) - site.z());
+                if (d < bestDistance) {
+                    bestDistance = d;
+                    best = g;
+                }
+            }
+            if (best != null) {
+                addStop(sites, stops, best, transit);
+            }
+        }
+        double run = 0.0;
+        double[] end = null;
+        for (StreetSegment g : segments) {
+            if (!busRoad(g)) {
+                end = null;
+                continue;
+            }
+            if (end == null || Math.hypot(g.x1() - end[0], g.z1() - end[1]) > 1.0) {
+                run = 0.0;
+            }
+            end = new double[]{g.x2(), g.z2()};
+            run += g.length();
+            if (run < transit.busSpacing || !window.built(0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2()))) {
+                continue;
+            }
+            if (addStop(sites, stops, g, transit)) {
+                run = 0.0;
+            }
+        }
+        return sites;
+    }
+
+    private static boolean busRoad(StreetSegment g) {
+        return g.streetClass() == StreetClass.ARTERIAL && g.structure() != StreetStructure.BRIDGE
+                && g.structure() != StreetStructure.LEVEL_CROSSING && g.length() > 1.0;
+    }
+
+    /** A bus stop beside a road piece, unless another is within {@code busApart}; whether it was added. */
+    private boolean addStop(List<StationSite> sites, List<double[]> stops, StreetSegment g, CitySettings.Transit transit) {
+        double x = 0.5 * (g.x1() + g.x2());
+        double z = 0.5 * (g.z1() + g.z2());
+        for (double[] s : stops) {
+            if (Math.hypot(s[0] - x, s[1] - z) < transit.busApart) {
+                return false;
+            }
+        }
+        stops.add(new double[]{x, z});
+        sites.add(new StationSite(StationSite.Kind.BUS, x, z, Math.atan2(g.z2() - g.z1(), g.x2() - g.x1()),
+                transit.busLength, transit.busWidth, 0.0));
+        return true;
+    }
+
+    /**
+     * Whether an intercity site (the main station, a suburban stop, a reserved site) lies within a distance: a town
+     * line's station near one is an interchange, not a clash.
+     */
+    private static boolean clash(List<StationSite> sites, double x, double z, double distance) {
+        for (StationSite site : sites) {
+            if (site.kind() != StationSite.Kind.BUS && site.kind() != StationSite.Kind.TOWN_LINE
+                    && Math.hypot(site.x() - x, site.z() - z) < distance) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The direction of the arterial nearest a point within 400 blocks, or the fallback. */
+    private static double roadHeading(List<StreetSegment> segments, double x, double z, double fallback) {
+        double best = 400.0;
+        double heading = fallback;
+        for (StreetSegment g : segments) {
+            if (g.streetClass() != StreetClass.ARTERIAL || g.length() < 1.0) {
+                continue;
+            }
+            double d = Math.hypot(0.5 * (g.x1() + g.x2()) - x, 0.5 * (g.z1() + g.z2()) - z);
+            if (d < best) {
+                best = d;
+                heading = Math.atan2(g.z2() - g.z1(), g.x2() - g.x1());
+            }
+        }
+        return heading;
+    }
+
+    /** The reserved high-speed corridor over the window's built land, marked in the districts. */
+    private void highSpeedCorridor(Window window, Districts districts) {
+        CitySettings.HighSpeed hs = logic.settings().highSpeed;
+        double half = 0.5 * hs.width + hs.margin + 0.5 * grid;
+        double x0 = (double) window.originX * grid;
+        double z0 = (double) window.originZ * grid;
+        double x1 = x0 + (window.size - 1.0) * grid;
+        double z1 = z0 + (window.size - 1.0) * grid;
+        for (com.mtm.citybuilder.core.rail.HighSpeedLine line : logic.highSpeedLines(x0, z0, x1, z1)) {
+            // Lines whose ends lie far to the side of the town: not routed (a route keeps near its straight)
+            double ax0 = line.a().x();
+            double az0 = line.a().z();
+            double dx0 = line.b().x() - ax0;
+            double dz0 = line.b().z() - az0;
+            double length = Math.hypot(dx0, dz0);
+            double mx = Math.max(x0, Math.min(x1, ax0 + 0.5 * dx0));
+            double mz = Math.max(z0, Math.min(z1, az0 + 0.5 * dz0));
+            double near = Double.POSITIVE_INFINITY;
+            for (double[] corner : new double[][]{{x0, z0}, {x1, z0}, {x0, z1}, {x1, z1}, {mx, mz}}) {
+                double t = Math.max(0, Math.min(1, ((corner[0] - ax0) * dx0 + (corner[1] - az0) * dz0) / Math.max(1e-9, length * length)));
+                near = Math.min(near, Math.hypot(ax0 + dx0 * t - corner[0], az0 + dz0 * t - corner[1]));
+            }
+            boolean crosses = x0 <= Math.max(ax0, ax0 + dx0) && x1 >= Math.min(ax0, ax0 + dx0)
+                    && z0 <= Math.max(az0, az0 + dz0) && z1 >= Math.min(az0, az0 + dz0);
+            if (!crosses && near > 0.25 * length) {
+                continue;
+            }
+            RailRoute route = logic.highSpeedRoute(line);
+            for (int s = 1; s < route.samples(); s++) {
+                double ax = route.x(s - 1);
+                double az = route.z(s - 1);
+                double bx = route.x(s);
+                double bz = route.z(s);
+                int i0 = (int) Math.floor((Math.min(ax, bx) - half) / grid) - window.originX;
+                int i1 = (int) Math.ceil((Math.max(ax, bx) + half) / grid) - window.originX;
+                int j0 = (int) Math.floor((Math.min(az, bz) - half) / grid) - window.originZ;
+                int j1 = (int) Math.ceil((Math.max(az, bz) + half) / grid) - window.originZ;
+                for (int i = Math.max(0, i0); i <= Math.min(window.size - 1, i1); i++) {
+                    for (int j = Math.max(0, j0); j <= Math.min(window.size - 1, j1); j++) {
+                        District d = districts.node(i, j);
+                        if (d == District.NONE || d == District.GROUNDS) {
+                            continue;
+                        }
+                        double px = (double) (window.originX + i) * grid;
+                        double pz = (double) (window.originZ + j) * grid;
+                        double dx = bx - ax;
+                        double dz = bz - az;
+                        double t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+                        if (Math.hypot(ax + dx * t - px, az + dz * t - pz) <= half) {
+                            districts.mark(i, j, District.HIGH_SPEED);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /** {sample, x, z, heading} of the best point to leave a line's corridor for a station, or null. */
