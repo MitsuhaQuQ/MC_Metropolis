@@ -57,9 +57,21 @@ public record TemplePalette(String roof, String roofStairs, String roofSlab, Str
             m("mangrove_fence"), m("dark_oak_trapdoor"), m("polished_blackstone_wall"), m("white_concrete"),
             m("gilded_blackstone"), null, m("gold_block"));
 
-    /** By name: NATURAL, VERMILION or COPPER. */
+    /**
+     * Old unpainted wood, weathered brown, boarded walls, no gilding or bells: the Zen temples' gates and halls
+     * (Nanzen-ji's sanmon).
+     */
+    public static final TemplePalette WEATHERED = new TemplePalette(m("deepslate_tiles"), m("deepslate_tile_stairs"),
+            m("deepslate_tile_slab"), m("polished_blackstone_bricks"), m("polished_blackstone_brick_stairs"),
+            m("stripped_spruce_log"), m("dark_oak_planks"), m("dark_oak_stairs"), m("spruce_planks"),
+            m("dark_oak_planks"), m("stone_bricks"), m("stone_brick_stairs"), m("dark_oak_fence"),
+            m("dark_oak_trapdoor"), m("polished_blackstone_wall"), m("stripped_spruce_log"), m("dark_oak_planks"),
+            null, m("dark_oak_planks"));
+
+    /** By name: NATURAL, VERMILION, COPPER or WEATHERED. */
     public static TemplePalette named(String name) {
         return switch (name) {
+            case "WEATHERED" -> WEATHERED;
             case "VERMILION" -> VERMILION;
             case "COPPER" -> COPPER;
             default -> NATURAL;

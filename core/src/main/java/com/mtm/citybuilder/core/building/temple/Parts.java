@@ -107,9 +107,10 @@ final class Parts {
 
     /**
      * Brackets (斗栱) stepping out from the top of the walls under the eaves: {@code steps} rows, each one further out
-     * and one higher, upside-down stairs facing the wall with wood behind them.
+     * and one higher, upside-down stairs facing the wall with wood behind them; kept under {@code roof}'s surface
+     * (a block below its piece), so a deep band of brackets never shows through the eaves.
      */
-    static void brackets(Model m, TemplePalette p, Rect r, int top, int steps) {
+    static void brackets(Model m, TemplePalette p, Rect r, int top, int steps, Roof roof) {
         for (int k = 1; k <= steps; k++) {
             int y = top + k;
             for (int j = 0; j <= k; j++) {
@@ -117,7 +118,7 @@ final class Parts {
                 for (int x = ring.x0(); x < ring.x1(); x++) {
                     for (int z = ring.z0(); z < ring.z1(); z++) {
                         boolean onRing = x == ring.x0() || x == ring.x1() - 1 || z == ring.z0() || z == ring.z1() - 1;
-                        if (!onRing) {
+                        if (!onRing || y >= (int) Math.floor(roof.height(x, z) - 1e-6)) {
                             continue;
                         }
                         if (j < k) {

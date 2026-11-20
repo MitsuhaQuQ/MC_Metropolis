@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mtm.citybuilder.core.building.temple.Belfry;
 import com.mtm.citybuilder.core.building.temple.Gate;
+import com.mtm.citybuilder.core.building.temple.GateStyle;
 import com.mtm.citybuilder.core.building.temple.Hall;
 import com.mtm.citybuilder.core.building.temple.Model;
 import com.mtm.citybuilder.core.building.temple.Pagoda;
@@ -28,7 +29,7 @@ import java.util.List;
  *
  * <p>Input: a JSON array of objects with {@code slug}, {@code kind} ({@code hall}, {@code pagoda}, {@code gate} or {@code belfry}), {@code role} (a
  * {@link SacredBuilding}: temple or shrine and the building's role, written into the output), {@code palette}
- * ({@code NATURAL}, {@code VERMILION} or {@code COPPER}) and the fields of {@link Hall}, {@link Pagoda}, {@link Gate} or {@link Belfry}. Output:
+ * ({@code NATURAL}, {@code VERMILION}, {@code COPPER} or {@code WEATHERED}) and the fields of {@link Hall}, {@link Pagoda}, {@link Gate} or {@link Belfry}. Output:
  * {@code <out>/<slug>.json} with {@code role}, {@code religion}, {@code size} and {@code blocks} ([x, y, z, state], from 0).
  */
 public final class TempleModels {
@@ -69,7 +70,8 @@ public final class TempleModels {
             case "gate" -> new Gate(i(o, "width"), i(o, "depth"), d(o, "eave"), d(o, "ridge"),
                     RoofType.valueOf(str(o, "roof", "IRIMOYA")), d(o, "gableInset", 0), i(o, "overhang", 4),
                     i(o, "bays", 3), i(o, "passages", 1), i(o, "lowerWidth", 0), i(o, "lowerDepth", 0),
-                    d(o, "lowerEave", 0), i(o, "lowerOverhang", 3), i(o, "platform", 1), palette).build();
+                    d(o, "lowerEave", 0), i(o, "lowerOverhang", 3), i(o, "platform", 1),
+                    GateStyle.valueOf(str(o, "style", "PLAIN")), i(o, "sanro", 0), palette).build();
             case "belfry" -> new Belfry(i(o, "width"), i(o, "depth"), d(o, "eave"), d(o, "ridge"),
                     RoofType.valueOf(str(o, "roof", "IRIMOYA")), d(o, "gableInset", 0), i(o, "overhang", 3),
                     o.has("skirt") && o.get("skirt").getAsBoolean(), i(o, "platform", 1), palette).build();

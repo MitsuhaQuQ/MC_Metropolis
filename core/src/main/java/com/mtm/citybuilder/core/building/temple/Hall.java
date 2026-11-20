@@ -71,13 +71,13 @@ public record Hall(int width, int depth, double eave, double ridge, RoofType roo
                     .mask(body::contains).walls(ring.x0(), ring.z0(), ring.x1(), ring.z1()).noRidges();
             int mTop = Math.max(platform + 3, wallTop(mRoof, ring) - mSteps);
             Parts.walls(m, p, ring, platform, mTop, bay);
-            Parts.brackets(m, p, ring, mTop, mSteps);
+            Parts.brackets(m, p, ring, mTop, mSteps, mRoof);
             Parts.walls(m, p, body, platform, top, bay);
             mRoof.build(m);
         } else {
             Parts.walls(m, p, body, platform, top, bay);
         }
-        Parts.brackets(m, p, body, top, steps);
+        Parts.brackets(m, p, body, top, steps, mainRoof);
         mainRoof.build(m);
         Parts.closeToRoof(m, p, body, top + 1, (int) Math.ceil(ridge) + 2);
         return m;

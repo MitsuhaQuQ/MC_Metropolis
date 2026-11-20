@@ -81,6 +81,7 @@ LANDMARKS = [
     ("bldg_34c21757-8a98-4dc8-b7d0-ea85209a07f1", "umekoji_depot", "梅小路の大型倉庫", None),
     ("bldg_ce127903-06cf-494d-aeaa-12a932fcb11f", "higashi_honganji_goeidomon", "東本願寺 御影堂門", "temple"),
     ("bldg_8ff4cd35-4d98-4664-8b70-8265b187f269", "nishi_honganji_goeidomon", "西本願寺 御影堂門", "temple"),
+    ("bldg_088dbe5d-5014-44a6-93f1-993e4701d889", "nanzenji_sanmon", "南禅寺 三門", "temple"),
 ]
 
 # Buildings whose LOD2 shape is too coarse to voxelize (a pagoda is a box with a hip roof, halls lose their eaves
@@ -108,6 +109,13 @@ TEMPLES = {
     # LOD2: 13.9 x 13.6 m, eaves 9.0 m, gable ridge 14.2 m: a single-storey gate (四脚門).
     "nishi_honganji_goeidomon": dict(kind="gate", role="TEMPLE_GATE", width=13, depth=13, eave=9.0, ridge=14.2,
                                      roof="GABLE", overhang=3, bays=3, passages=1, platform=1),
+    # LOD1 only (east of the LOD2 area): 47.3 x 19.2 m with the stair houses (山廊) at both ends, 21.9 m high. A
+    # Zen three-gate, five bays and three ways through; the storey heights and the parts after photographs
+    # (columns on stones, doors opened back, boarded side bays, deep brackets, unpainted weathered wood).
+    "nanzenji_sanmon": dict(kind="gate", role="TEMPLE_GATE", width=29, depth=17, eave=16.0, ridge=21.9,
+                            roof="IRIMOYA", gableInset=3.5, overhang=4, bays=5, passages=3, lowerWidth=31,
+                            lowerDepth=19, lowerEave=10.0, lowerOverhang=3, platform=2, style="ZEN", sanro=8,
+                            palette="WEATHERED"),
     # Not from PLATEAU: the same generators in the painted styles (Senso-ji's vermilion pagoda, a shrine hall
     # under a copper roof), to check the palettes.
     "demo_pagoda_vermilion": dict(kind="pagoda", role="PAGODA", storeys=5, span=19, topSpan=15, body=9, topBody=7, firstEave=10.5,
@@ -141,6 +149,7 @@ LABELS = {
     "aquarium": ("museum",), "railway_museum": ("museum",), "umekoji_depot": ("warehouse",),
     "higashi_honganji_goeidomon": ("sacred", TEMPLE, "TEMPLE_GATE"),
     "nishi_honganji_goeidomon": ("sacred", TEMPLE, "TEMPLE_GATE"),
+    "nanzenji_sanmon": ("sacred", TEMPLE, "TEMPLE_GATE"),
     "demo_gate_vermilion": ("sacred", TEMPLE, "TEMPLE_GATE"), "demo_belfry_open": ("sacred", TEMPLE, "BELFRY"),
     "demo_belfry_hakamagoshi": ("sacred", TEMPLE, "BELFRY"),
     "demo_pagoda_vermilion": ("sacred", TEMPLE, "PAGODA"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
@@ -1070,7 +1079,8 @@ def build_one(args):
 def build(rows, out, chosen, jar=MC_JAR, textured=True):
     bc = block_colours(jar, os.path.join(out, "block_colours.json"))
     jobs = [(out, gid, slug, name, pal, rows.get(gid, {}), bc, textured) for gid, slug, name, pal in chosen
-            if os.path.exists(os.path.join(out, "geom", gid + ".json"))]
+            if os.path.exists(os.path.join(out, "geom", gid + ".json"))
+            or slug in TEMPLES and os.path.exists(os.path.join(out, "models", slug + ".json"))]  # LOD1-only ones too
     if len(chosen) == len(LANDMARKS) or any(c[1].startswith("demo_") for c in chosen):
         jobs += [(out, None, slug, DEMO_NAMES.get(slug, slug), None, {}, bc, textured) for slug in TEMPLES
                  if slug.startswith("demo_") and os.path.exists(os.path.join(out, "models", slug + ".json"))]

@@ -76,7 +76,7 @@ public record Pagoda(int storeys, int span, int topSpan, int body, int topBody, 
                     }
                 }
             }
-            Parts.brackets(m, p, r, top, steps);
+            Parts.brackets(m, p, r, top, steps, roof);
             if (next != null) {
                 roof.mask(next::contains).noRidges();
             }

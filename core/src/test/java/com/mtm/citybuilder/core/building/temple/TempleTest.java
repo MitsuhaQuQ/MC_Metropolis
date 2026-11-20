@@ -101,7 +101,10 @@ class TempleTest {
 
     /** Higashi Hongan-ji's Goeidō-mon as measured on LOD2: a two-storey gate, five bays, three ways through. */
     private static final Gate SANMON = new Gate(31, 23, 21.3, 29.2, RoofType.IRIMOYA, 3.8, 4, 5, 3, 33, 25, 11.8, 3, 2,
-            TemplePalette.NATURAL);
+            GateStyle.PLAIN, 0, TemplePalette.NATURAL);
+    /** Nanzen-ji's sanmon: LOD1 47.3 x 19.2 m with its stair houses, 21.9 m high; storeys after photographs. */
+    private static final Gate NANZENJI = new Gate(29, 17, 16.0, 21.9, RoofType.IRIMOYA, 3.5, 4, 5, 3, 31, 19, 10.0, 3,
+            2, GateStyle.ZEN, 8, TemplePalette.WEATHERED);
 
     @Test
     void gateLetsYouThrough() {
@@ -138,6 +141,31 @@ class TempleTest {
         });
         assertTrue(railLow[0] > 11.8 && railLow[0] < 21.3, "railing at " + railLow[0]);
         assertEquals(29, m.maxY() - 2, 1, "ridge near the measured 29.2 m (plus the ridge tiles)");
+    }
+
+    @Test
+    void zenGateStandsOnStonesWithItsDoorsOpenAndStairHouses() {
+        Model m = NANZENJI.build();
+        assertEquals(31 + 2 * 8, m.maxX() - m.minX() + 1, "the gate's eaves and the stair houses: LOD1's 47 m");
+        int[] stairs = {0}, doors = {0};
+        m.forEach((x, y, z, s) -> {
+            if (s.startsWith("minecraft:dark_oak_stairs[facing=east,half=bottom]")
+                    || s.startsWith("minecraft:dark_oak_stairs[facing=west,half=bottom]")) {
+                stairs[0]++;
+            }
+            if (s.equals(TemplePalette.WEATHERED.door()) && y < 8) {
+                doors[0]++;
+            }
+        });
+        assertTrue(stairs[0] >= 2 * 2 * 5, stairs[0] + " stair blocks in the two stair houses");
+        assertTrue(doors[0] > 0, "doors opened back in the passages");
+        // The way through stays clear in the middle passage.
+        int cx = (m.minX() + m.maxX()) / 2;
+        for (int z = 3 + 1; z < 3 + 13 - 1; z++) {
+            for (int y = 2; y < 5; y++) {
+                assertTrue(!m.has(cx, y, z), "blocked at " + cx + "," + y + "," + z + ": " + m.get(cx, y, z));
+            }
+        }
     }
 
     @Test

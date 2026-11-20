@@ -69,7 +69,7 @@ public record Belfry(int width, int depth, double eave, double ridge, RoofType r
             floor++;
         }
         Parts.columns(m, p, body, floor, top, 3.5);
-        Parts.brackets(m, p, body, top, 1);
+        Parts.brackets(m, p, body, top, 1, r);
         // A beam across under the roof, the bell under it, the striking log on chains beside it.
         int cx = (body.x0() + body.x1() - 1) / 2, cz = (body.z0() + body.z1() - 1) / 2;
         for (int x = body.x0(); x < body.x1(); x++) {
