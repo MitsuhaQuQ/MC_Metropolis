@@ -130,13 +130,15 @@ final class Arena {
     /**
      * Stepped stands round a field: a barrier {@code base} high next to the field, then rows two blocks deep rising
      * one block each (about 27°, real stands are 25–35°) with a seat (a stair, back turned away from the field) on
-     * the front block of each row, an aisle every {@code 16} along, and a parapet at the back. The stand is solid
-     * concrete below; its back is the outer wall.
+     * the front block of each row, an aisle every {@code 16} along, and a parapet at the back; a glass screen on the
+     * barrier. The stand is solid concrete below; its back is the outer wall, white pilasters every 8 blocks and a
+     * gate (iron bars under a lintel) every 24.
      *
      * @param depth the stands' depth from the field's edge
+     * @param seats the seats' stairs from the front rows to the back, in as many tiers as given
      * @return the height of the parapet top
      */
-    static int stands(Model m, Field f, Zone zone, int depth, int base, String seat) {
+    static int stands(Model m, Field f, Zone zone, int depth, int base, String... seats) {
         int rows = (int) ((depth - 1.5) / 2);
         f.around(depth + 0.5, (x, z, dist, nx, nz) -> {
             if (!zone.accept(x, z, nx, nz)) {
@@ -145,8 +147,10 @@ final class Arena {
             m.set(x, 0, z, CONCRETE);
             int top;
             String cap = CONCRETE;
+            String above = null;
             if (dist < 1.5) {
                 top = base;
+                above = "minecraft:glass_pane";
             } else {
                 double s = dist - 1.5;
                 int row = (int) (s / 2);
@@ -157,15 +161,24 @@ final class Arena {
                     top = base + row;
                     boolean aisle = Math.floorMod(nx + nz, 16) == 0;
                     if (s - 2 * row < 1 && !aisle) {
+                        String seat = seats[Math.min(seats.length - 1, row * seats.length / rows)];
                         m.set(x, top + 1, z, seat + "[facing=" + Shapes.away(x - nx, z - nz)
                                 + ",half=bottom,shape=straight,waterlogged=false]");
                     }
                 }
             }
+            boolean outside = dist > depth - 0.5;
+            int along = Math.floorMod(nx + nz, 24);
+            boolean gate = outside && along >= 10 && along <= 12;
+            String wall = outside && Math.floorMod(nx + nz, 8) == 0 ? "minecraft:white_concrete" : CONCRETE;
             for (int y = 1; y < top; y++) {
-                m.set(x, y, z, CONCRETE);
+                m.set(x, y, z, gate && y <= 3 ? "minecraft:iron_bars" : gate && y == 4 ? "minecraft:gray_concrete"
+                        : wall);
             }
             m.set(x, top, z, cap);
+            if (above != null) {
+                m.set(x, top + 1, z, above);
+            }
         });
         return base + rows + 1;
     }
@@ -208,6 +221,26 @@ final class Arena {
             for (int y = 1; y <= h; y++) {
                 m.set(x, y, z, y == h ? GRASS : DIRT);
             }
+        });
+    }
+
+    /**
+     * Cherry trees on a bank's top, {@code dist} from the field's edge, at least {@code spacing} apart, where the
+     * zone allows; standing on y - 1.
+     */
+    static void trees(Model m, Field f, Zone zone, double dist, int y, int spacing) {
+        List<int[]> planted = new ArrayList<>();
+        f.around(dist + 0.5, (x, z, d, nx, nz) -> {
+            if (d < dist - 0.5 || !zone.accept(x, z, nx, nz)) {
+                return;
+            }
+            for (int[] t : planted) {
+                if ((t[0] - x) * (t[0] - x) + (t[1] - z) * (t[1] - z) < spacing * spacing) {
+                    return;
+                }
+            }
+            planted.add(new int[]{x, z});
+            Shapes.tree(m, x, y, z, 3);
         });
     }
 
@@ -269,9 +302,55 @@ final class Arena {
     }
 
     /**
+     * Advertising boards (広告看板) one block high round a rectangle [x0, x1] × [z0, z1], in panels of six of
+     * changing colours, with gaps of {@code gap} either side of the middle of the short sides (behind the goals).
+     */
+    static void boards(Model m, int x0, int z0, int x1, int z1, int gap) {
+        String[] colours = {"minecraft:blue_concrete", "minecraft:white_concrete", "minecraft:red_concrete",
+                "minecraft:yellow_concrete", "minecraft:black_concrete", "minecraft:light_blue_concrete",
+                "minecraft:orange_concrete", "minecraft:lime_concrete"};
+        for (int x = x0; x <= x1; x++) {
+            for (int z : new int[]{z0, z1}) {
+                m.set(x, 1, z, colours[Math.floorMod(x / 6 + (z == z0 ? 0 : 3), colours.length)]);
+            }
+        }
+        for (int z = z0; z <= z1; z++) {
+            if (Math.abs(z - (z0 + z1) / 2) < gap) {
+                continue;
+            }
+            for (int x : new int[]{x0, x1}) {
+                m.set(x, 1, z, colours[Math.floorMod(z / 6 + (x == x0 ? 1 : 5), colours.length)]);
+            }
+        }
+    }
+
+    /**
+     * A team bench (ベンチ) of {@code length} along x from (x, z): a row of seats with their backs to the north, a
+     * glass back and sides, and a glass roof.
+     */
+    static void bench(Model m, int x, int z, int length, String seat) {
+        for (int a = x; a < x + length; a++) {
+            m.set(a, 1, z, seat + "[facing=north,half=bottom,shape=straight,waterlogged=false]");
+            m.set(a, 1, z - 1, "minecraft:glass_pane");
+            m.set(a, 2, z - 1, "minecraft:glass_pane");
+            for (int k = z - 1; k <= z + 1; k++) {
+                m.set(a, 3, k, "minecraft:light_gray_stained_glass");
+            }
+        }
+        for (int a : new int[]{x - 1, x + length}) {
+            for (int k = z - 1; k <= z + 1; k++) {
+                m.set(a, 1, k, "minecraft:glass_pane");
+                m.set(a, 2, k, "minecraft:glass_pane");
+                m.set(a, 3, k, "minecraft:light_gray_stained_glass");
+            }
+        }
+    }
+
+    /**
      * A football pitch (105 × 68) along x centred on column (cx, cz) at y = 0: mown stripes, the lines one block wide
      * (touch and goal lines, halfway line, centre circle, penalty and goal areas, penalty spots and arcs), and the
-     * goals (posts and crossbar, 2.44 m under the bar) just outside the goal lines.
+     * goals (posts and crossbar, 2.44 m under the bar, the net of white glass panes two deep behind) just outside the
+     * goal lines, a yellow corner flag at each corner.
      */
     static void pitch(Model m, int cx, int cz) {
         for (int x = cx - 52; x <= cx + 52; x++) {
@@ -299,6 +378,17 @@ final class Arena {
                     m.set(gx, 2, z, "minecraft:quartz_pillar[axis=y]");
                 }
                 m.set(gx, 3, z, "minecraft:quartz_pillar[axis=z]");
+                for (int y = 1; y <= 2; y++) { // the net: the back and the two sides
+                    m.set(gx + 2 * s, y, z, "minecraft:white_stained_glass_pane");
+                    if (post) {
+                        m.set(gx + s, y, z, "minecraft:white_stained_glass_pane");
+                    }
+                }
+            }
+        }
+        for (int sx : new int[]{-52, 52}) {
+            for (int sz : new int[]{-34, 33}) {
+                m.set(cx + sx, 1, cz + sz, "minecraft:yellow_banner[rotation=0]");
             }
         }
     }

@@ -75,6 +75,24 @@ public record AthleticsGround(int standDepth, int roofLength) {
             }
         }
         Shapes.disk(m, 64, 0, 0, 1, "minecraft:smooth_stone");
+        // The high jump: a fan of track surface and the blue landing mat.
+        for (int x = 56; x <= 70; x++) {
+            for (int z = -22; z <= -12; z++) {
+                if (rho(x, z) < KERB - 1) {
+                    m.set(x, 0, z, SURFACE);
+                }
+            }
+        }
+        for (int x = 61; x <= 65; x++) {
+            for (int z = -20; z <= -18; z++) {
+                m.set(x, 1, z, "minecraft:blue_wool");
+            }
+        }
+        for (int x : new int[]{60, 66}) {
+            for (int y = 1; y <= 3; y++) {
+                m.set(x, y, -18, "minecraft:chain[axis=y,waterlogged=false]"); // the uprights
+            }
+        }
         for (int y = 1; y <= 5; y++) {
             int k = 4;
             for (int x = -k; x <= k; x++) {
@@ -89,11 +107,14 @@ public record AthleticsGround(int standDepth, int roofLength) {
         int half = (int) HALF_STRAIGHT + 8;
         Zone main = (x, z, nx, nz) -> z < 0 && Math.abs(x) <= half && nz < -edge + 2;
         Zone covered = (x, z, nx, nz) -> main.accept(x, z, nx, nz) && Math.abs(x) <= roofLength / 2;
-        int top = Arena.stands(m, f, main, standDepth, 1, SEAT);
+        int top = Arena.stands(m, f, main, standDepth, 1, SEAT, "minecraft:dark_prismarine_stairs");
         Arena.roof(m, f, covered, standDepth, top, standDepth * 0.3, 4);
         Arena.bank(m, f, (x, z, nx, nz) -> !main.accept(x, z, nx, nz), BANK_RUN, BANK_TOP, BANK_FLAT);
         int sx = (int) (HALF_STRAIGHT + edge) + BANK_TOP * BANK_RUN + 1;
         Arena.scoreboard(m, sx, 0, false, 16, 7, BANK_TOP + 1);
+        // Cherry trees along the top of the banks, clear of the scoreboard.
+        Arena.trees(m, f, (x, z, nx, nz) -> !main.accept(x, z, nx, nz) && Math.abs(z) > 10,
+                BANK_TOP * BANK_RUN + BANK_FLAT - 1, BANK_TOP + 1, 12);
         Shapes.connect(m);
         return m;
     }

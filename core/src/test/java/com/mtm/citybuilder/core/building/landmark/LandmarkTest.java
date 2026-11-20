@@ -35,6 +35,23 @@ class LandmarkTest {
     }
 
     @Test
+    void panesAndWallsAreConnected() {
+        // Templates are placed without block updates: every pane, bar and wall carries its connections, and a pane
+        // or bar is joined on at least one side (a lone post would show as a thin stick).
+        for (Model m : List.of(CAPE.build(), HARBOUR.build(), STADIUM.build(), BALLPARK.build(), ATHLETICS.build())) {
+            m.forEach((x, y, z, s) -> {
+                String b = base(s);
+                if (b.endsWith("glass_pane") || b.equals("minecraft:iron_bars") || b.endsWith("_wall")) {
+                    assertTrue(s.contains("north=") && s.contains("west="), s);
+                }
+                if (b.endsWith("glass_pane") || b.equals("minecraft:iron_bars")) {
+                    assertTrue(s.contains("=true"), x + "," + y + "," + z + " " + s);
+                }
+            });
+        }
+    }
+
+    @Test
     void capeLighthouseProportions() {
         Model m = CAPE.build();
         int h = height(m);
@@ -46,8 +63,8 @@ class LandmarkTest {
             assertTrue(String.valueOf(m.get(0, y, 1)).contains("ladder"), "ladder at " + y);
         }
         assertEquals("minecraft:sea_lantern", m.get(0, CAPE.tower() + 2, 0));
-        assertTrue(base(m.get(2, CAPE.tower() + 3, 0)).equals("minecraft:glass")
-                || base(m.get(3, CAPE.tower() + 3, 0)).equals("minecraft:glass"));
+        assertTrue(base(m.get(2, CAPE.tower() + 3, 0)).equals("minecraft:glass_pane")
+                || base(m.get(3, CAPE.tower() + 3, 0)).equals("minecraft:glass_pane"));
         // The door to the gallery: two blocks of headroom out of the lantern room on the south.
         int lr = (int) Math.ceil(Math.max(2.3, CAPE.topRadius() - 0.5));
         for (int z = 1; z <= lr; z++) {
@@ -152,10 +169,11 @@ class LandmarkTest {
         assertTrue(last >= 14 && last <= 22, "main stand " + last + " high");
     }
 
-    /** The highest block in a column at or below y = limit that is not a seat. */
+    /** The highest block in a column at or below y = limit that is not a seat or the glass screen. */
     private static int floorBelow(Model m, int x, int z, int limit) {
         for (int y = limit; y >= 0; y--) {
-            if (m.has(x, y, z) && !m.get(x, y, z).contains("_stairs")) {
+            String b = m.get(x, y, z);
+            if (b != null && !b.contains("_stairs") && !b.contains("glass_pane")) {
                 return y;
             }
         }

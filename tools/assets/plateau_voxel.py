@@ -1021,7 +1021,9 @@ COLOURS = {
     "grass_block": 0x5E9D34, "moss_block": 0x4E7F2C, "coarse_dirt": 0x77553A, "dirt": 0x86603F, "sand": 0xDBCFA3,
     "glass_pane": 0xA8D0D8, "dark_oak_door": 0x4A3220, "spruce_door": 0x6B4F2F, "iron_door": 0xC8C8C8,
     "ladder": 0x7A5E36, "polished_deepslate_wall": 0x48484B, "quartz_pillar": 0xEBE5DE, "sea_lantern": 0xC4DCD2,
-    "shroomlight": 0xF09246, "verdant_froglight": 0xC9E3B0,
+    "shroomlight": 0xF09246, "verdant_froglight": 0xC9E3B0, "blue_wool": 0x35399D, "brick_wall": 0x976253,
+    "cherry_leaves": 0xE5ADC2, "cherry_log": 0x3B2433, "spruce_trapdoor": 0x6B4F2F, "stone_brick_wall": 0x7A7A7A,
+    "white_stained_glass_pane": 0xF0F0F0, "yellow_banner": 0xF8C527,
 }
 
 

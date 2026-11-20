@@ -67,11 +67,19 @@ public record Ballpark(int lines, int centre, int foul, int standDepth, int floo
             m.set(base[0], 0, base[1], "minecraft:quartz_block");
         }
         Shapes.disk(m, 0, 0, (int) Math.round(moundZ), 2.5, "minecraft:packed_mud");
+        // The batter's boxes either side of the plate, the on-deck circles.
+        for (int z = -1; z <= 1; z++) {
+            m.set(-2, 0, z, Arena.LINE);
+            m.set(2, 0, z, Arena.LINE);
+        }
+        for (int s : new int[]{-1, 1}) {
+            Shapes.disk(m, s * 9, 0, 4, 1, "minecraft:white_concrete_powder");
+        }
         m.set(0, 0, (int) Math.round(moundZ), "minecraft:quartz_block");
         // Infield stands from pole to pole round behind home; their roof over the part behind the plate.
         Zone infield = (x, z, nx, nz) -> !outfield(nx, nz);
         Zone behind = (x, z, nx, nz) -> !outfield(nx, nz) && Math.abs(angle(nx, nz)) >= Math.toRadians(115);
-        int top = Arena.stands(m, f, infield, standDepth, 3, SEAT);
+        int top = Arena.stands(m, f, infield, standDepth, 3, SEAT, SEAT, "minecraft:prismarine_stairs");
         Arena.roof(m, f, behind, standDepth, top, standDepth * 0.35, 5);
         // The backstop net over the barrier behind the plate.
         f.around(1.5, (x, z, dist, nx, nz) -> {
@@ -86,8 +94,8 @@ public record Ballpark(int lines, int centre, int foul, int standDepth, int floo
         Arena.bank(m, f, out, BANK_RUN, BANK_TOP, BANK_FLAT);
         f.around(1.5, (x, z, dist, nx, nz) -> {
             if (outfield(nx, nz)) {
-                for (int y = 0; y <= 4; y++) {
-                    m.set(x, y, z, FENCE);
+                for (int y = 0; y <= 4; y++) { // padded fence, the yellow home-run line on top
+                    m.set(x, y, z, y == 4 ? "minecraft:yellow_concrete" : FENCE);
                 }
             }
         });
@@ -97,7 +105,11 @@ public record Ballpark(int lines, int centre, int foul, int standDepth, int floo
                 m.set(s * p, y, -p, "minecraft:yellow_concrete");
             }
         }
-        Arena.scoreboard(m, 0, -centre - BANK_TOP * BANK_RUN - BANK_FLAT / 2 - 1, true, 30, 12, BANK_TOP + 1);
+        int boardZ = -centre - BANK_TOP * BANK_RUN - BANK_FLAT / 2 - 1;
+        Arena.scoreboard(m, 0, boardZ, true, 30, 12, BANK_TOP + 1);
+        // Cherry trees along the top of the bank, clear of the scoreboard.
+        Arena.trees(m, f, (x, z, nx, nz) -> outfield(nx, nz) && Math.abs(x) > 20,
+                BANK_TOP * BANK_RUN + BANK_FLAT - 1, BANK_TOP + 1, 12);
         if (floodlights > 0) {
             for (int deg : new int[]{-125, -75, -25, 25, 75, 125}) {
                 double a = Math.toRadians(deg);

@@ -19,6 +19,7 @@ import com.mtm.citybuilder.core.building.temple.Model;
 public record Stadium(int mainDepth, int backDepth, int endDepth, boolean backRoof, int floodlights) {
     /** The field (pitch and run-off): x in [-X, X], z in [-Z0, Z1]. */
     static final int X = 60, Z0 = 41, Z1 = 40;
+    /** Seats: the main stand dark blue with a lighter upper tier, the rest teal. */
     static final String MAIN_SEAT = "minecraft:dark_prismarine_stairs", SEAT = "minecraft:prismarine_stairs";
 
     public Model build() {
@@ -36,7 +37,11 @@ public record Stadium(int mainDepth, int backDepth, int endDepth, boolean backRo
         Zone north = (x, z, nx, nz) -> nz == -Z0 && Math.abs(x) <= X;
         Zone south = (x, z, nx, nz) -> nz == Z1 && Math.abs(x) <= X;
         Zone ends = (x, z, nx, nz) -> Math.abs(nx) == X && z >= -Z0 && z <= Z1;
-        int mainTop = Arena.stands(m, f, north, mainDepth, 2, MAIN_SEAT);
+        // Boards round the pitch, the benches on the main stand's side.
+        Arena.boards(m, -57, -37, 57, 36, 6);
+        Arena.bench(m, -14, -39, 9, "minecraft:quartz_stairs");
+        Arena.bench(m, 6, -39, 9, "minecraft:quartz_stairs");
+        int mainTop = Arena.stands(m, f, north, mainDepth, 2, MAIN_SEAT, MAIN_SEAT, "minecraft:warped_stairs");
         int backTop = Arena.stands(m, f, south, backDepth, 2, SEAT);
         int endTop = Arena.stands(m, f, ends, endDepth, 2, SEAT);
         Arena.roof(m, f, north, mainDepth, mainTop, mainDepth * 0.25, 5);
