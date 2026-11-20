@@ -10,6 +10,8 @@ import com.mtm.citybuilder.core.debug.StreetMap;
 import com.mtm.citybuilder.core.street.StreetClass;
 import com.mtm.citybuilder.core.street.StreetMetrics;
 import com.mtm.citybuilder.core.street.StreetPlan;
+import com.mtm.citybuilder.core.street.StreetSegment;
+import com.mtm.citybuilder.core.street.StreetStructure;
 import com.mtm.citybuilder.core.debug.RailMap;
 import com.mtm.citybuilder.core.rail.HighSpeedLine;
 import com.mtm.citybuilder.core.debug.RoadMap;
@@ -397,6 +399,14 @@ public final class CityMap {
             if (length > 0) {
                 System.out.printf("  %-9s %6.1f km%n", streetClass, length / 1000);
             }
+        }
+        for (StreetStructure structure : StreetStructure.values()) {
+            if (structure == StreetStructure.GROUND) {
+                continue;
+            }
+            List<StreetSegment> built = plan.segments().stream().filter(s -> s.structure() == structure).toList();
+            System.out.printf("  %-9s %6.2f km in %d pieces%n", structure, built.stream().mapToDouble(StreetSegment::length).sum() / 1000,
+                    built.size());
         }
         StreetMetrics.Network network = StreetMetrics.network(plan.segments(), logic.builtArea(nearest));
         System.out.printf("  built %.1f km2; street density %.1f km/km2 (OSM: Kyoto 16.9, Kanazawa 20.4, Takayama 12.1)%n",

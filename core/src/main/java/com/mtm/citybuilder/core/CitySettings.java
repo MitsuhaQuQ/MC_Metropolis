@@ -461,6 +461,16 @@ public final class CitySettings {
         public double laneDepth = 0.4;
         public double laneStep = 4.0;
         public double laneWidth = 2.5;
+        /** Streams this narrow are culverted: streets cross them, and later run along them. */
+        public double culvertWidth = 12.0;
+        /** Arterials bridge water up to this wide, no closer than this to another bridge. */
+        public double maxBridge = 300.0;
+        public double bridgeSpacing = 600.0;
+        /** Streets past {@code maxGrade} are ramps up to this grade, stairs up to the next; steeper ends them. */
+        public double rampGrade = 0.15;
+        public double stairsGrade = 0.35;
+        /** Width of a temple's approach. */
+        public double sandoWidth = 6.0;
         /** Most streamlines traced for one town. */
         public int maxLines = 20000;
     }

@@ -17,7 +17,7 @@ import java.awt.image.BufferedImage;
 /**
  * Renders a town's street skeleton over its urban intensity: old roads brown, arterials of the old town black and of
  * the modern town dark blue, as wide as they are at least a pixel; anchors marked, the castle, palace or temple as a
- * red square, gates as yellow squares, moats blue (wet) or brown (dry), stations as white squares, the centre as a white disc.
+ * red square, gates as yellow squares, bridges orange, culverts cyan, ramps yellow, stairs magenta, moats blue (wet) or brown (dry), stations as white squares, the centre as a white disc.
  */
 public final class StreetMap {
     private StreetMap() {
@@ -51,6 +51,15 @@ public final class StreetMap {
                         ? new Color(30, 40, 120) : new Color(15, 15, 15);
                 default -> new Color(70, 70, 70);
             });
+            // Structures over the class colours: bridges orange, culverts cyan, ramps yellow, stairs magenta
+            switch (segment.structure()) {
+                case BRIDGE -> g.setColor(new Color(240, 130, 20));
+                case CULVERT -> g.setColor(new Color(0, 200, 220));
+                case RAMP -> g.setColor(new Color(240, 220, 40));
+                case STAIRS -> g.setColor(new Color(220, 40, 200));
+                default -> {
+                }
+            }
             g.setStroke(new BasicStroke((float) Math.max(1.2, segment.width() / scale), BasicStroke.CAP_ROUND,
                     BasicStroke.JOIN_ROUND));
             g.draw(new Line2D.Double((segment.x1() - left) / scale, (segment.z1() - top) / scale,

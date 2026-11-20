@@ -12,6 +12,7 @@ import com.mtm.citybuilder.core.road.RoadRoute;
 import com.mtm.citybuilder.core.settlement.Settlement;
 import com.mtm.citybuilder.core.settlement.SettlementTier;
 import com.mtm.citybuilder.core.terrain.Landform;
+import com.mtm.citybuilder.core.terrain.RiverSample;
 import com.mtm.citybuilder.core.terrain.TerrainView;
 
 import java.util.ArrayDeque;
@@ -313,9 +314,15 @@ public final class StreetLayer {
                 for (int p = 0; p < pieces; p++) {
                     double t0 = (double) p / pieces;
                     double t1 = (double) (p + 1) / pieces;
-                    segments.add(new StreetSegment(a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0,
-                            a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1, StreetClass.ARTERIAL, Era.TOWN,
-                            config.approachWidth));
+                    double x1 = a[0] + (b[0] - a[0]) * t0;
+                    double z1 = a[1] + (b[1] - a[1]) * t0;
+                    double x2 = a[0] + (b[0] - a[0]) * t1;
+                    double z2 = a[1] + (b[1] - a[1]) * t1;
+                    double grade = Math.abs(window.height(x2, z2) - window.height(x1, z1)) / Math.max(1e-6, Math.hypot(x2 - x1, z2 - z1));
+                    StreetStructure structure = grade > config.rampGrade ? StreetStructure.STAIRS
+                            : grade > config.maxGrade ? StreetStructure.RAMP : StreetStructure.GROUND;
+                    segments.add(new StreetSegment(x1, z1, x2, z2, StreetClass.STREET, Era.TOWN, config.approachWidth,
+                            structure));
                 }
             }
         }
@@ -436,7 +443,10 @@ public final class StreetLayer {
             double[] a = rim.get(k);
             double[] b = rim.get((k + 1) % rim.size());
             if (window.built(a[0], a[1]) && window.built(b[0], b[1])) {
-                segments.add(new StreetSegment(a[0], a[1], b[0], b[1], StreetClass.ARTERIAL, Era.TOWN, config.arterialWidth));
+                StreetSegment piece = sloped(window, a[0], a[1], b[0], b[1], StreetClass.ARTERIAL, Era.TOWN, config.arterialWidth);
+                if (piece != null) {
+                    segments.add(piece);
+                }
             }
         }
     }
@@ -565,6 +575,77 @@ public final class StreetLayer {
         };
     }
 
+    /**
+     * A piece laid straight rather than traced (moat-side street, approaches, avenues), built as its grade allows: as
+     * given up to {@code maxGrade}; steeper, a street ramp or stairs; null where steeper than stairs.
+     */
+    private StreetSegment sloped(Window window, double x1, double z1, double x2, double z2, StreetClass streetClass,
+                                 Era era, double width) {
+        double grade = Math.abs(window.height(x2, z2) - window.height(x1, z1)) / Math.max(1e-6, Math.hypot(x2 - x1, z2 - z1));
+        if (grade <= config.maxGrade) {
+            return new StreetSegment(x1, z1, x2, z2, streetClass, era, width);
+        }
+        if (grade > config.stairsGrade) {
+            return null;
+        }
+        StreetStructure structure = grade > config.rampGrade ? StreetStructure.STAIRS : StreetStructure.RAMP;
+        return new StreetSegment(x1, z1, x2, z2, StreetClass.STREET, era, Math.min(width, config.streetWidth), structure);
+    }
+
+    /**
+     * Whether a piece crosses a stream narrow enough to be culverted: asked of the terrain at points 4 blocks apart
+     * along it, as a stream narrower than the grid falls between its nodes.
+     */
+    private boolean overStream(double x1, double z1, double x2, double z2) {
+        double length = Math.hypot(x2 - x1, z2 - z1);
+        int samples = Math.max(1, (int) Math.ceil(length / 4.0));
+        for (int q = 0; q <= samples; q++) {
+            double t = (double) q / samples;
+            RiverSample river = terrain.nearestRiver(x1 + (x2 - x1) * t, z1 + (z2 - z1) * t);
+            if (river != null && river.inWater() && river.width() <= config.culvertWidth) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * A temple's approach, its sando: from the edge of its grounds facing the town's centre, straight up to the temple,
+     * stairs where it is steeper than a ramp.
+     */
+    private void sando(Anchor temple, CityExtent extent, Window window, List<StreetSegment> segments) {
+        double dx = extent.coreX() - temple.x();
+        double dz = extent.coreZ() - temple.z();
+        double length = Math.hypot(dx, dz);
+        if (length < 1.0) {
+            dx = 1.0;
+            dz = 0.0;
+            length = 1.0;
+        }
+        dx /= length;
+        dz /= length;
+        // Out from the temple to where its grounds end
+        double edge = 0.0;
+        while (edge < 2000.0 && window.inGrounds(temple.x() + dx * edge, temple.z() + dz * edge)) {
+            edge += config.step;
+        }
+        double px = temple.x() + dx * edge;
+        double pz = temple.z() + dz * edge;
+        double ph = window.height(px, pz);
+        for (double t = edge - config.step; t >= 0; t -= config.step) {
+            double x = temple.x() + dx * t;
+            double z = temple.z() + dz * t;
+            double h = window.height(x, z);
+            double grade = Math.abs(h - ph) / config.step;
+            StreetStructure structure = grade > config.rampGrade ? StreetStructure.STAIRS
+                    : grade > config.maxGrade ? StreetStructure.RAMP : StreetStructure.GROUND;
+            segments.add(new StreetSegment(px, pz, x, z, StreetClass.STREET, Era.TOWN, config.sandoWidth, structure));
+            px = x;
+            pz = z;
+            ph = h;
+        }
+    }
+
     /** Radius of the grounds kept open round a castle, palace or temple, by tier. */
     private double grounds(SettlementTier tier) {
         return switch (tier) {
@@ -607,8 +688,10 @@ public final class StreetLayer {
             }
             Field field = new Field(window, formation, settlement, anchors, oldRoad);
             double spacing = spacing(formation);
-            new Tracer(window, field, StreetClass.ARTERIAL, config.arterialWidth, spacing, false, null, false)
-                    .run(arterialSeeds(anchors, oldRoad, window, spacing), segments);
+            Tracer arterials = new Tracer(window, field, StreetClass.ARTERIAL, config.arterialWidth, spacing, false,
+                    null, false);
+            arterials.bridging = true;
+            arterials.run(arterialSeeds(anchors, oldRoad, window, spacing), segments);
             for (Anchor anchor : anchors) {
                 if (anchor.kind() == Anchor.Kind.STATION) {
                     avenue(anchor, extent, window, segments);
@@ -617,6 +700,8 @@ public final class StreetLayer {
             for (Anchor anchor : List.copyOf(anchors)) {
                 if (anchor.kind() == Anchor.Kind.CASTLE) {
                     castleGates(settlement, anchor, window, anchors, segments, moats);
+                } else if (anchor.kind() == Anchor.Kind.TEMPLE) {
+                    sando(anchor, extent, window, segments);
                 }
             }
             // Streets between the arterials, ending at them (a capital's grid crosses them), then lanes
@@ -630,6 +715,7 @@ public final class StreetLayer {
                 // A grid keeps its lines a full spacing apart: seeds from lines not on its lattice would squeeze in
                 // between and halve blocks
                 streets.clearance = formation == Formation.JORI ? 0.95 : 0.7;
+                streets.climbing = true;
                 streets.teeSeed = Hash.mix(settlement.id() ^ 0x7EEL);
                 streets.run(streetSeeds(segments, field, streetSpacing, formation != Formation.JORI), segments);
                 lanes(settlement, formation, window, segments);
@@ -736,6 +822,10 @@ public final class StreetLayer {
         final int size;
         final float[] height;
         final boolean[] water;
+        /** Small streams, culverted under the streets that cross them. */
+        final boolean[] culvert;
+        /** The town's own urban intensity at each node, a culverted stream's taken from the land beside it. */
+        final float[] intensity;
         /** Grounds kept clear of streets: the castle's, the palace's or the temple's. */
         final List<Ground> grounds = new ArrayList<>();
 
@@ -746,15 +836,56 @@ public final class StreetLayer {
             this.size = extent.size();
             this.height = new float[size * size];
             this.water = new boolean[size * size];
+            this.culvert = new boolean[size * size];
+            this.intensity = new float[size * size];
             for (int i = 0; i < size; i++) {
                 for (int j = 0; j < size; j++) {
+                    int k = i * size + j;
                     double x = (double) (originX + i) * grid;
                     double z = (double) (originZ + j) * grid;
-                    height[i * size + j] = (float) terrain.smoothHeight(x, z);
-                    water[i * size + j] = extent.intensity(originX + i, originZ + j) <= 0.0
-                            && Double.isNaN(logic.suitabilityNode(originX + i, originZ + j));
+                    height[k] = (float) terrain.smoothHeight(x, z);
+                    intensity[k] = (float) extent.intensity(originX + i, originZ + j);
+                    if (intensity[k] > 0.0 || !Double.isNaN(logic.suitabilityNode(originX + i, originZ + j))) {
+                        continue;
+                    }
+                    // Water: a stream narrow enough is culverted, what is wider stops streets
+                    RiverSample river = terrain.nearestRiver(x, z);
+                    double lake = terrain.lakeLevel(x, z);
+                    boolean small = river != null && river.inWater() && river.width() <= config.culvertWidth
+                            && (Double.isNaN(lake) || lake <= height[k]) && terrain.landform(x, z) != Landform.OCEAN
+                            && !terrain.foreign(x, z);
+                    culvert[k] = small;
+                    water[k] = !small;
                 }
             }
+            for (int i = 0; i < size; i++) {
+                for (int j = 0; j < size; j++) {
+                    if (!culvert[i * size + j]) {
+                        continue;
+                    }
+                    double sum = 0.0;
+                    int count = 0;
+                    for (int di = -1; di <= 1; di++) {
+                        for (int dj = -1; dj <= 1; dj++) {
+                            int ni = i + di;
+                            int nj = j + dj;
+                            if (ni >= 0 && nj >= 0 && ni < size && nj < size && !culvert[ni * size + nj]
+                                    && !water[ni * size + nj]) {
+                                sum += intensity[ni * size + nj];
+                                count++;
+                            }
+                        }
+                    }
+                    intensity[i * size + j] = count == 0 ? 0f : (float) (sum / count);
+                }
+            }
+        }
+
+        /** Whether the node nearest a position is a culverted stream. */
+        boolean culvert(double x, double z) {
+            int i = (int) Math.round(x / grid) - originX;
+            int j = (int) Math.round(z / grid) - originZ;
+            return i >= 0 && j >= 0 && i < size && j < size && culvert[i * size + j];
         }
 
         boolean inside(double x, double z) {
@@ -774,8 +905,11 @@ public final class StreetLayer {
             double value = 0.0;
             for (int di = 0; di <= 1; di++) {
                 for (int dj = 0; dj <= 1; dj++) {
-                    value += (di == 0 ? 1 - fu : fu) * (dj == 0 ? 1 - fv : fv)
-                            * extent.intensity(originX + i + di, originZ + j + dj);
+                    int ni = i + di;
+                    int nj = j + dj;
+                    if (ni >= 0 && nj >= 0 && ni < size && nj < size) {
+                        value += (di == 0 ? 1 - fu : fu) * (dj == 0 ? 1 - fv : fv) * intensity[ni * size + nj];
+                    }
                 }
             }
             return value;
@@ -891,10 +1025,19 @@ public final class StreetLayer {
                 double az = route.z(i - 1);
                 double bx = route.x(i);
                 double bz = route.z(i);
-                if (!window.built(ax, az) || !window.built(bx, bz)) {
+                // On built land, or over water inside the town: an old road's bridge stays a bridge
+                boolean bridge = route.kind(i) == com.mtm.citybuilder.core.road.RoadKind.BRIDGE
+                        || window.water(ax, az) || window.water(bx, bz);
+                boolean onLand = window.built(ax, az) && window.built(bx, bz);
+                boolean overWater = bridge && window.inside(ax, az) && window.inside(bx, bz)
+                        && !window.inGrounds(ax, az) && !window.inGrounds(bx, bz)
+                        && window.intensity(0.5 * (ax + bx), 0.5 * (az + bz)) > 0.0;
+                if (!onLand && !overWater) {
                     continue;
                 }
-                segments.add(new StreetSegment(ax, az, bx, bz, StreetClass.OLD_ROAD, Era.OLD, config.oldRoadWidth));
+                StreetStructure structure = bridge ? StreetStructure.BRIDGE
+                        : overStream(ax, az, bx, bz) ? StreetStructure.CULVERT : StreetStructure.GROUND;
+                segments.add(new StreetSegment(ax, az, bx, bz, StreetClass.OLD_ROAD, Era.OLD, config.oldRoadWidth, structure));
                 points.add(new double[]{bx, bz, Math.atan2(bz - az, bx - ax)});
             }
         }
@@ -915,7 +1058,10 @@ public final class StreetLayer {
             double x = station.x() + (extent.coreX() - station.x()) * t;
             double z = station.z() + (extent.coreZ() - station.z()) * t;
             if (window.inside(x, z) && !window.inGrounds(x, z) && !window.inGrounds(px, pz)) {
-                segments.add(new StreetSegment(px, pz, x, z, StreetClass.ARTERIAL, Era.MODERN, config.stationAvenueWidth));
+                double grade = Math.abs(window.height(x, z) - window.height(px, pz)) / config.step;
+                if (grade <= config.maxGrade) {
+                    segments.add(new StreetSegment(px, pz, x, z, StreetClass.ARTERIAL, Era.MODERN, config.stationAvenueWidth));
+                }
             }
             px = x;
             pz = z;
@@ -1083,6 +1229,11 @@ public final class StreetLayer {
         final double cell;
         /** A seed is taken only this many spacings from every line of its family. */
         double clearance = 0.7;
+        /** Whether lines bridge rivers (arterials do), and the middles of the bridges built, shared by both families. */
+        boolean bridging;
+        final List<double[]> bridges = new ArrayList<>();
+        /** Whether lines may climb past {@code maxGrade} as ramps and stairs (streets may, arterials not). */
+        boolean climbing;
         /** Share of crossings with a street of the other family where a street ends instead, and their hash's seed. */
         double teeChance;
         long teeSeed;
@@ -1163,12 +1314,23 @@ public final class StreetLayer {
                         : follow(seed[0], seed[1], family, 1.0, line);
                 List<double[]> backward = only > 0 ? List.of(new double[]{seed[0], seed[1]})
                         : follow(seed[0], seed[1], family, -1.0, line);
+                // Points carry the structure of the piece reaching them as they were followed: {x, z, structure}
                 List<double[]> polyline = new ArrayList<>();
+                List<StreetStructure> structures = new ArrayList<>();
                 for (int k = backward.size() - 1; k >= 1; k--) {
                     polyline.add(backward.get(k));
+                    if (polyline.size() > 1) {
+                        structures.add(structure(backward.get(k + 1)));
+                    }
                 }
                 polyline.add(new double[]{seed[0], seed[1]});
-                polyline.addAll(forward.subList(1, forward.size()));
+                if (polyline.size() > 1) {
+                    structures.add(structure(backward.get(1)));
+                }
+                for (int k = 1; k < forward.size(); k++) {
+                    polyline.add(forward.get(k));
+                    structures.add(structure(forward.get(k)));
+                }
                 if (polyline.size() < 3) {
                     continue;
                 }
@@ -1180,7 +1342,11 @@ public final class StreetLayer {
                     double mx = 0.5 * (a[0] + b[0]);
                     double mz = 0.5 * (a[1] + b[1]);
                     Era era = window.intensity(mx, mz) > config.oldTownIntensity ? Era.TOWN : Era.MODERN;
-                    segments.add(new StreetSegment(a[0], a[1], b[0], b[1], streetClass, era, width));
+                    StreetStructure structure = structures.get(k - 1);
+                    if (structure == StreetStructure.GROUND && overStream(a[0], a[1], b[0], b[1])) {
+                        structure = StreetStructure.CULVERT;
+                    }
+                    segments.add(new StreetSegment(a[0], a[1], b[0], b[1], streetClass, era, width, structure));
                     points.get(family).computeIfAbsent(bucket(b[0], b[1]), key -> new ArrayList<>())
                             .add(new double[]{b[0], b[1], line});
                     pieces.get(family).add(a[0], a[1], b[0], b[1]);
@@ -1197,6 +1363,58 @@ public final class StreetLayer {
                     }
                 }
             }
+        }
+
+        /**
+         * Whether a straight join from one point to another could be a piece of this line: over built land all the
+         * way, and no steeper than the line may climb.
+         */
+        private boolean passable(double x, double z, double tx, double tz) {
+            double length = Math.hypot(tx - x, tz - z);
+            int samples = Math.max(1, (int) Math.ceil(length / 8.0));
+            for (int q = 1; q < samples; q++) {
+                double t = (double) q / samples;
+                if (!window.built(x + (tx - x) * t, z + (tz - z) * t)) {
+                    return false;
+                }
+            }
+            double grade = Math.abs(window.height(tx, tz) - window.height(x, z)) / Math.max(1e-6, length);
+            return grade <= (climbing ? config.stairsGrade : config.maxGrade);
+        }
+
+        private StreetStructure structure(double[] point) {
+            return point.length > 2 ? StreetStructure.values()[(int) point[2]] : StreetStructure.GROUND;
+        }
+
+        /**
+         * Over the water ahead: the points of a bridge to the far bank, if it is no more than {@code maxBridge} away
+         * and no other bridge stands within {@code bridgeSpacing}; null otherwise.
+         */
+        private List<double[]> bridge(double x, double z, double dx, double dz) {
+            List<double[]> span = new ArrayList<>();
+            for (double t = config.step; t <= config.maxBridge + config.step; t += config.step) {
+                double bx = x + dx * t;
+                double bz = z + dz * t;
+                if (!window.inside(bx, bz) || window.inGrounds(bx, bz)) {
+                    return null;
+                }
+                span.add(new double[]{bx, bz, StreetStructure.BRIDGE.ordinal()});
+                if (!window.water(bx, bz)) {
+                    if (!window.built(bx, bz) || span.size() < 2) {
+                        return null;
+                    }
+                    double mx = x + dx * 0.5 * t;
+                    double mz = z + dz * 0.5 * t;
+                    for (double[] other : bridges) {
+                        if (Math.hypot(other[0] - mx, other[1] - mz) < config.bridgeSpacing) {
+                            return null;
+                        }
+                    }
+                    bridges.add(new double[]{mx, mz});
+                    return span;
+                }
+            }
+            return null;
         }
 
         /** Points of a line from a seed in one sense, until it ends; the seed first. */
@@ -1220,24 +1438,45 @@ public final class StreetLayer {
                 previousAngle = Math.atan2(dz, dx);
                 double nx = x + dx * config.step;
                 double nz = z + dz * config.step;
+                StreetStructure structure = StreetStructure.GROUND;
                 if (!window.built(nx, nz)) {
-                    break;
+                    // Arterials bridge rivers where the far bank is near and no bridge stands close by
+                    List<double[]> span = bridging && window.water(nx, nz) ? bridge(x, z, dx, dz) : null;
+                    if (span == null) {
+                        break;
+                    }
+                    path.addAll(span);
+                    double[] far = span.get(span.size() - 1);
+                    travelled += config.step * (span.size() - 1);
+                    x = far[0];
+                    z = far[1];
+                    h = window.height(x, z);
+                    continue;
                 }
                 double nh = window.height(nx, nz);
-                if (Math.abs(nh - h) > config.maxGrade * config.step) {
-                    break;
+                double grade = Math.abs(nh - h) / config.step;
+                if (grade > config.maxGrade) {
+                    // Arterials stop; streets climb on as ramps, then stairs, up to what stairs can
+                    if (!climbing || grade > config.stairsGrade) {
+                        break;
+                    }
+                    structure = grade > config.rampGrade ? StreetStructure.STAIRS : StreetStructure.RAMP;
                 }
                 double spacing = spacing(nx, nz);
                 double[] joined = near(family, nx, nz, 0.5 * spacing, line);
                 if (joined != null && travelled > 0.5 * spacing) {
-                    path.add(new double[]{joined[0], joined[1]});
+                    if (passable(x, z, joined[0], joined[1])) {
+                        path.add(new double[]{joined[0], joined[1]});
+                    }
                     break;
                 }
                 // A wall: a street meets the line laid before it there, and ends on it unless it crosses
                 if (walls != null && !crossWalls && travelled >= config.step) {
                     double[] wall = walls.pieces.hit(x, z, nx, nz);
                     if (wall != null) {
-                        path.add(wall);
+                        if (passable(x, z, wall[0], wall[1])) {
+                            path.add(wall);
+                        }
                         break;
                     }
                 }
@@ -1246,7 +1485,9 @@ public final class StreetLayer {
                 if (teeChance > 0 && travelled >= config.step) {
                     double[] across = pieces.get(1 - family).hit(x, z, nx, nz);
                     if (across != null && Hash.unit(Hash.of(teeSeed, Math.round(across[0]), Math.round(across[1]))) < teeChance) {
-                        path.add(across);
+                        if (passable(x, z, across[0], across[1])) {
+                            path.add(across);
+                        }
                         break;
                     }
                 }
@@ -1256,7 +1497,9 @@ public final class StreetLayer {
                 for (int k = 0; k < behind; k += 2) {
                     double[] p = path.get(k);
                     if (Math.hypot(p[0] - nx, p[1] - nz) < 0.5 * spacing) {
-                        path.add(new double[]{p[0], p[1]});
+                        if (passable(x, z, p[0], p[1])) {
+                            path.add(new double[]{p[0], p[1]});
+                        }
                         closed = true;
                         break;
                     }
@@ -1267,7 +1510,7 @@ public final class StreetLayer {
                 x = nx;
                 z = nz;
                 h = nh;
-                path.add(new double[]{x, z});
+                path.add(new double[]{x, z, structure.ordinal()});
             }
             return path;
         }
