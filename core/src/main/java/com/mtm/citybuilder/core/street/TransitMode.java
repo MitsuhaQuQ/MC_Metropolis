@@ -7,5 +7,10 @@ public enum TransitMode {
     /** On a viaduct, the streets passing under it, as the JR Sagano line through Kyoto. */
     ELEVATED,
     /** At grade: a barrier the streets cross only at level crossings, with roads running alongside. */
-    GROUND
+    GROUND,
+    /**
+     * On the upper deck of a two-level viaduct, over another line's viaduct where the two share a corridor, rather
+     * than a second viaduct beside the first.
+     */
+    STACKED
 }

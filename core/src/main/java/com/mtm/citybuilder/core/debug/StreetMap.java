@@ -136,21 +136,42 @@ public final class StreetMap {
                     g.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                     g.draw(piece);
                     g.setColor(Color.WHITE);
-                    g.setStroke(mode == com.mtm.citybuilder.core.street.TransitMode.ELEVATED.ordinal()
-                            ? new BasicStroke(1f) : new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 1f, new float[]{3f, 3f}, 0f));
+                    if (mode == com.mtm.citybuilder.core.street.TransitMode.STACKED.ordinal()) {
+                        // Upper deck: drawn wider, in orange, over the viaduct below
+                        g.setColor(new Color(240, 140, 30));
+                        g.setStroke(new BasicStroke(2f));
+                    } else {
+                        g.setStroke(mode == com.mtm.citybuilder.core.street.TransitMode.ELEVATED.ordinal()
+                                ? new BasicStroke(1f) : new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 1f, new float[]{3f, 3f}, 0f));
+                    }
                     g.draw(piece);
                 }
             }
         }
         g.setStroke(new BasicStroke(1.5f));
         for (com.mtm.citybuilder.core.street.UrbanLine line : plan.urbanLines()) {
-            for (double[] station : line.stations()) {
+            for (int q = 0; q < line.stations().size(); q++) {
+                double[] station = line.stations().get(q);
+                // The platform along its road, then a disc at its middle
+                java.awt.geom.Path2D platform = new java.awt.geom.Path2D.Double();
+                java.util.List<double[]> points = line.platforms().get(q);
+                platform.moveTo((points.get(0)[0] - left) / scale, (points.get(0)[1] - top) / scale);
+                for (int p = 1; p < points.size(); p++) {
+                    platform.lineTo((points.get(p)[0] - left) / scale, (points.get(p)[1] - top) / scale);
+                }
+                g.setColor(new Color(150, 40, 190));
+                g.setStroke(new BasicStroke(7f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND));
+                g.draw(platform);
+                g.setColor(Color.WHITE);
+                g.setStroke(new BasicStroke(3f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND));
+                g.draw(platform);
+                g.setStroke(new BasicStroke(1.5f));
                 int px = (int) Math.round((station[0] - left) / scale);
                 int py = (int) Math.round((station[1] - top) / scale);
                 g.setColor(Color.WHITE);
-                g.fillOval(px - 5, py - 5, 10, 10);
+                g.fillOval(px - 4, py - 4, 8, 8);
                 g.setColor(new Color(150, 40, 190));
-                g.drawOval(px - 5, py - 5, 10, 10);
+                g.drawOval(px - 4, py - 4, 8, 8);
             }
         }
         g.setStroke(new BasicStroke(1.2f));

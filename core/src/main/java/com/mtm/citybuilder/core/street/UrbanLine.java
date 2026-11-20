@@ -7,12 +7,15 @@ import java.util.List;
  * of it the chunk layer builds is {@code transit.build}.
  *
  * @param points   along the line every {@code step} blocks, each {x, z, mode ordinal}
- * @param stations each {x, z, mode ordinal}, in order along the line
+ * @param stations  each {x, z, mode ordinal, heading in radians}, in order along the line: the middle of its platform
+ * @param platforms each station's platform, in the same order: points {x, z} along the road it lies on, straight or
+ *                  curved no tighter than {@code transit.platformRadius}
  */
-public record UrbanLine(List<double[]> points, List<double[]> stations) {
+public record UrbanLine(List<double[]> points, List<double[]> stations, List<List<double[]>> platforms) {
     public UrbanLine {
         points = List.copyOf(points);
         stations = List.copyOf(stations);
+        platforms = List.copyOf(platforms);
     }
 
     public double length() {

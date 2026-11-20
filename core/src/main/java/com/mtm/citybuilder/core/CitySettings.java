@@ -391,6 +391,17 @@ public final class CitySettings {
         public double maxRadius = 1200.0;
         /** Stations about this far apart along a line. */
         public double stationSpacing = 1000.0;
+        /**
+         * A station is moved onto a road within {@code stationSnap} of the line running with it and turned along it,
+         * its platform {@code platformLength} straight along the road.
+         */
+        public double stationSnap = 250.0;
+        public double platformLength = 200.0;
+        /**
+         * A platform follows its road where the road bends no tighter than this (MTR's curved platforms: a 25-block car
+         * on a radius of 156 leaves half a block between its doors and the edge); along a tighter road it is straight.
+         */
+        public double platformRadius = 160.0;
         /** Demand is summed over squares this wide; a line's ends are chosen among them, no further than {@code reach} from the centre. */
         public double zoneSize = 1024.0;
         public double reach = 8000.0;
@@ -422,6 +433,12 @@ public final class CitySettings {
         public double minModeRun = 400.0;
         /** Roads along a line at grade run this far from its centre; a street crosses it only this far from any other crossing. */
         public double sideOffset = 14.0;
+        /**
+         * Where a town line's viaduct runs within {@code stackReach} of another line's viaduct, along it, for at least
+         * {@code stackRun}, the two share one two-level viaduct, the later line on the upper deck.
+         */
+        public double stackReach = 24.0;
+        public double stackRun = 100.0;
         public double crossingSpacing = 300.0;
     }
 

@@ -417,9 +417,10 @@ public final class CityMap {
             System.out.printf("    of it at grade %.0f%n", ground);
         }
         for (com.mtm.citybuilder.core.street.UrbanLine line : plan.urbanLines()) {
-            System.out.printf("  town line %.1f km: underground %.1f, elevated %.1f, at grade %.1f; %d stations%n",
+            System.out.printf("  town line %.1f km: underground %.1f, elevated %.1f, upper deck %.1f, at grade %.1f; %d stations%n",
                     line.length() / 1000, line.length(com.mtm.citybuilder.core.street.TransitMode.UNDERGROUND) / 1000,
                     line.length(com.mtm.citybuilder.core.street.TransitMode.ELEVATED) / 1000,
+                    line.length(com.mtm.citybuilder.core.street.TransitMode.STACKED) / 1000,
                     line.length(com.mtm.citybuilder.core.street.TransitMode.GROUND) / 1000, line.stations().size());
         }
         for (StreetClass streetClass : StreetClass.values()) {

@@ -737,7 +737,7 @@ public final class StreetLayer {
                 }
             }
             // The town's own railway along the arterials, and roads along its stretches at grade
-            urban.addAll(urbanLines(settlement, window, anchors, districts, segments));
+            urban.addAll(urbanLines(settlement, window, anchors, districts, segments, railways));
             List<List<double[]>> urbanGround = new ArrayList<>();
             for (UrbanLine line : urban) {
                 urbanGround.add(line.points());
@@ -877,7 +877,7 @@ public final class StreetLayer {
      * town's intensity, summed over squares of {@code zoneSize}.
      */
     private List<UrbanLine> urbanLines(Settlement settlement, Window window, List<Anchor> anchors, Districts districts,
-                                       List<StreetSegment> segments) {
+                                       List<StreetSegment> segments, List<CityRailway> railways) {
         CitySettings.Transit transit = logic.settings().transit;
         List<UrbanLine> lines = new ArrayList<>();
         if (settlement.tier() != SettlementTier.CITY && settlement.tier() != SettlementTier.METROPOLIS) {
@@ -1047,7 +1047,7 @@ public final class StreetLayer {
                         nearest = Math.min(nearest, Math.hypot(p[0] - downtown[0], p[1] - downtown[1]));
                     }
                     if (nearest <= transit.downtownReach) {
-                        addLine(lines, window, districts, whole.line(), used, downtown[0], downtown[1], station, transit);
+                        addLine(lines, window, districts, whole.line(), used, downtown[0], downtown[1], station, transit, segments, railways);
                         continue;
                     }
                 }
@@ -1079,15 +1079,158 @@ public final class StreetLayer {
             if (route.size() < 2) {
                 continue;
             }
-            addLine(lines, window, districts, route, used, downtown[0], downtown[1], station, transit);
+            addLine(lines, window, districts, route, used, downtown[0], downtown[1], station, transit, segments, railways);
         }
         return lines;
     }
 
-    /** A routed line given its ways and stations, its cells marked used. */
+    /**
+     * A routed line made a line of the town: stations chosen along it, each moved onto a road running with the line
+     * near it and turned along that road (a station's box lies under or over a street, though the line between may
+     * cut through blocks), the line reshaped to run straight through each platform, then given its ways, its cells
+     * marked used.
+     */
     private void addLine(List<UrbanLine> lines, Window window, Districts districts, List<double[]> route, boolean[] used,
-                         double cx, double cz, Anchor station, CitySettings.Transit transit) {
-        List<double[]> points = moded(window, districts, route, true);
+                         double cx, double cz, Anchor station, CitySettings.Transit transit, List<StreetSegment> segments,
+                         List<CityRailway> railways) {
+        List<double[]> raw = resampleLine(route, config.step);
+        int n = raw.size();
+        double[] run = new double[n];
+        for (int k = 1; k < n; k++) {
+            run[k] = run[k - 1] + Math.hypot(raw.get(k)[0] - raw.get(k - 1)[0], raw.get(k)[1] - raw.get(k - 1)[1]);
+        }
+        int interchange = -1;
+        java.util.TreeSet<Integer> targets = stationIndices(raw, run, cx, cz, station, transit.stationSpacing);
+        if (station != null) {
+            int at = nearestIndex(raw, station.x(), station.z());
+            if (targets.contains(at)) {
+                interchange = at;
+            }
+        }
+        // Road pieces near the line: {line index, offset, |cos| with the line, x, z, ux, uz}
+        List<double[]> candidates = new ArrayList<>();
+        for (int index = 0; index < segments.size(); index++) {
+            StreetSegment g = segments.get(index);
+            if (g.streetClass() != StreetClass.ARTERIAL && g.streetClass() != StreetClass.OLD_ROAD) {
+                continue;
+            }
+            double length = g.length();
+            if (length < 1.0 || g.structure() == StreetStructure.BRIDGE) {
+                continue;
+            }
+            double mx = 0.5 * (g.x1() + g.x2());
+            double mz = 0.5 * (g.z1() + g.z2());
+            int k = nearestIndex(raw, mx, mz);
+            double offset = Math.hypot(raw.get(k)[0] - mx, raw.get(k)[1] - mz);
+            if (offset > transit.stationSnap) {
+                continue;
+            }
+            double[] t = tangent(raw, k);
+            double ux = (g.x2() - g.x1()) / length;
+            double uz = (g.z2() - g.z1()) / length;
+            candidates.add(new double[]{k, offset, Math.abs(ux * t[0] + uz * t[1]), mx, mz, ux, uz, index});
+        }
+        // Road pieces by their ends, to follow a road along a platform's length
+        Map<Long, List<Integer>> roadEnds = new HashMap<>();
+        for (int q = 0; q < segments.size(); q++) {
+            StreetSegment g = segments.get(q);
+            if (g.streetClass() == StreetClass.ARTERIAL || g.streetClass() == StreetClass.OLD_ROAD) {
+                roadEnds.computeIfAbsent(nodeKey(g.x1(), g.z1()), key -> new ArrayList<>()).add(q);
+                roadEnds.computeIfAbsent(nodeKey(g.x2(), g.z2()), key -> new ArrayList<>()).add(q);
+            }
+        }
+        // Each station: {line index, x, z, hx, hz, offset}
+        List<double[]> placed = new ArrayList<>();
+        for (int target : targets) {
+            double[] t = tangent(raw, target);
+            double[] chosen = null;
+            if (target != interchange) {
+                for (double minCos : new double[]{Math.cos(Math.toRadians(35)), Math.cos(Math.toRadians(70)), 0.0}) {
+                    double best = Double.POSITIVE_INFINITY;
+                    for (double[] c : candidates) {
+                        int k = (int) c[0];
+                        if (c[2] < minCos || Math.abs(run[k] - run[target]) > 0.4 * transit.stationSpacing) {
+                            continue;
+                        }
+                        double score = Math.abs(run[k] - run[target]) + 2.0 * c[1];
+                        if (score < best) {
+                            best = score;
+                            double sign = Math.signum(c[5] * t[0] + c[6] * t[1]);
+                            chosen = new double[]{k, c[3], c[4], c[5] * (sign == 0 ? 1 : sign), c[6] * (sign == 0 ? 1 : sign), c[1], c[7]};
+                        }
+                    }
+                    if (chosen != null) {
+                        break;
+                    }
+                }
+            }
+            if (chosen == null) {
+                chosen = new double[]{target, raw.get(target)[0], raw.get(target)[1], t[0], t[1], 0.0};
+            }
+            // In order along the line and apart; a station that would not be is left where the line put it
+            if (!placed.isEmpty() && run[(int) chosen[0]] - run[(int) placed.get(placed.size() - 1)[0]] < 0.3 * transit.stationSpacing) {
+                chosen = new double[]{target, raw.get(target)[0], raw.get(target)[1], t[0], t[1], 0.0};
+                if (run[target] - run[(int) placed.get(placed.size() - 1)[0]] < 0.3 * transit.stationSpacing) {
+                    continue;
+                }
+            }
+            placed.add(chosen);
+        }
+        // Each platform: along its road, curved with it where the road bends gently enough, else straight
+        double half = 0.5 * transit.platformLength;
+        List<List<double[]>> platforms = new ArrayList<>();
+        for (double[] st : placed) {
+            List<double[]> along = st.length > 6 ? roadPlatform(segments, roadEnds, (int) st[6], st, transit) : null;
+            if (along == null) {
+                along = List.of(new double[]{st[1] - st[3] * half, st[2] - st[4] * half}, new double[]{st[1], st[2]},
+                        new double[]{st[1] + st[3] * half, st[2] + st[4] * half});
+            }
+            platforms.add(along);
+        }
+        // Reshape: through each platform, smooth curves back onto the line between
+        List<double[]> shaped = new ArrayList<>();
+        int resume = 0;
+        for (int s = 0; s < placed.size(); s++) {
+            double[] st = placed.get(s);
+            int k = (int) st[0];
+            List<double[]> platform = platforms.get(s);
+            double previousEdge = s == 0 ? 0.0 : run[(int) placed.get(s - 1)[0]];
+            double nextEdge = s == placed.size() - 1 ? run[n - 1] : run[(int) placed.get(s + 1)[0]];
+            double reach = Math.max(250.0, 4.0 * st[5] + 150.0);
+            double before = Math.min(reach, Math.max(0.0, 0.5 * (run[k] - previousEdge) - half));
+            double after = Math.min(reach, Math.max(0.0, 0.5 * (nextEdge - run[k]) - half));
+            double[] a = platform.get(0);
+            double[] b = platform.get(platform.size() - 1);
+            double[] aDirection = direction(platform.get(0), platform.get(1));
+            double[] bDirection = direction(platform.get(platform.size() - 2), platform.get(platform.size() - 1));
+            int in = indexAt(run, run[k] - half - before);
+            int out = indexAt(run, run[k] + half + after);
+            in = Math.max(in, resume);
+            for (int q = resume; q <= in && k > 0; q++) {
+                shaped.add(new double[]{raw.get(q)[0], raw.get(q)[1]});
+            }
+            if (k > 0 && in < n) {
+                double[] t = tangent(raw, in);
+                shaped.addAll(bezier(raw.get(in), t, a, aDirection));
+            }
+            shaped.addAll(platform);
+            if (k < n - 1) {
+                double[] t = tangent(raw, out);
+                shaped.addAll(bezier(b, bDirection, raw.get(out), t));
+                resume = out + 1;
+            } else {
+                resume = n;
+            }
+        }
+        for (int q = resume; q < n; q++) {
+            shaped.add(new double[]{raw.get(q)[0], raw.get(q)[1]});
+        }
+        List<double[]> points = moded(window, districts, shaped, true);
+        // Viaducts sharing a corridor with another line's viaduct: one two-level viaduct, this line on top
+        List<List<double[]>> others = new ArrayList<>();
+        railways.forEach(r -> others.add(r.line()));
+        lines.forEach(l -> others.add(l.points()));
+        stack(points, others, transit);
         int size = window.size;
         for (double[] p : points) {
             int i = (int) Math.round(p[0] / grid) - window.originX;
@@ -1096,7 +1239,191 @@ public final class StreetLayer {
                 used[i * size + j] = true;
             }
         }
-        lines.add(new UrbanLine(points, stations(points, cx, cz, station, transit.stationSpacing)));
+        List<double[]> stations = new ArrayList<>();
+        for (double[] st : placed) {
+            int at = nearestIndex(points, st[1], st[2]);
+            stations.add(new double[]{st[1], st[2], points.get(at)[2], Math.atan2(st[4], st[3])});
+        }
+        lines.add(new UrbanLine(points, stations, platforms));
+    }
+
+    private static double[] direction(double[] a, double[] b) {
+        double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        return length < 1e-9 ? new double[]{1, 0} : new double[]{(b[0] - a[0]) / length, (b[1] - a[1]) / length};
+    }
+
+    /**
+     * A platform along a road: from the middle of a road piece, the road followed both ways piece by piece (at each
+     * end the piece running on most nearly straight) for half a platform, in the station's direction; null where the
+     * road ends first or bends tighter than {@code platformRadius}.
+     */
+    private List<double[]> roadPlatform(List<StreetSegment> segments, Map<Long, List<Integer>> roadEnds, int piece,
+                                        double[] st, CitySettings.Transit transit) {
+        double half = 0.5 * transit.platformLength;
+        StreetSegment g = segments.get(piece);
+        boolean forward = (g.x2() - g.x1()) * st[3] + (g.z2() - g.z1()) * st[4] >= 0;
+        double[] middle = {0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2())};
+        List<double[]> ahead = followRoad(segments, roadEnds, piece, forward, middle, half);
+        List<double[]> behind = followRoad(segments, roadEnds, piece, !forward, middle, half);
+        if (ahead == null || behind == null) {
+            return null;
+        }
+        List<double[]> platform = new ArrayList<>();
+        for (int q = behind.size() - 1; q >= 1; q--) {
+            platform.add(behind.get(q));
+        }
+        platform.addAll(ahead);
+        List<double[]> even = resampleLine(platform, 8.0);
+        // The tightest bend, from the circle through each point and those a car's length either side
+        int span = 3;
+        for (int q = span; q + span < even.size(); q++) {
+            if (circumradius(even.get(q - span), even.get(q), even.get(q + span)) < transit.platformRadius) {
+                return null;
+            }
+        }
+        return even;
+    }
+
+    /** Points along a road from a point on a piece, towards one of its ends and on, until a length is covered; null if the road ends. */
+    private List<double[]> followRoad(List<StreetSegment> segments, Map<Long, List<Integer>> roadEnds, int piece,
+                                      boolean towardsSecond, double[] start, double length) {
+        List<double[]> path = new ArrayList<>();
+        path.add(start);
+        StreetSegment g = segments.get(piece);
+        double[] end = towardsSecond ? new double[]{g.x2(), g.z2()} : new double[]{g.x1(), g.z1()};
+        double[] heading = direction(start, end);
+        double left = length;
+        double[] at = start;
+        int current = piece;
+        for (int guard = 0; guard < 200; guard++) {
+            double d = Math.hypot(end[0] - at[0], end[1] - at[1]);
+            if (d >= left) {
+                path.add(new double[]{at[0] + (end[0] - at[0]) * left / d, at[1] + (end[1] - at[1]) * left / d});
+                return path;
+            }
+            path.add(end);
+            left -= d;
+            at = end;
+            // The piece running on most nearly straight from this end
+            int next = -1;
+            double best = 0.9;
+            double[] nextEnd = null;
+            for (int q : roadEnds.getOrDefault(nodeKey(end[0], end[1]), List.of())) {
+                if (q == current) {
+                    continue;
+                }
+                StreetSegment o = segments.get(q);
+                boolean fromFirst = nodeKey(o.x1(), o.z1()) == nodeKey(end[0], end[1]);
+                double[] far = fromFirst ? new double[]{o.x2(), o.z2()} : new double[]{o.x1(), o.z1()};
+                double[] u = direction(end, far);
+                double cos = u[0] * heading[0] + u[1] * heading[1];
+                if (cos > best) {
+                    best = cos;
+                    next = q;
+                    nextEnd = far;
+                }
+            }
+            if (next < 0) {
+                return null;
+            }
+            heading = direction(end, nextEnd);
+            current = next;
+            end = nextEnd;
+        }
+        return null;
+    }
+
+    private static double circumradius(double[] a, double[] b, double[] c) {
+        double ab = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        double bc = Math.hypot(c[0] - b[0], c[1] - b[1]);
+        double ca = Math.hypot(a[0] - c[0], a[1] - c[1]);
+        double cross = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+        return cross < 1e-9 ? Double.POSITIVE_INFINITY : ab * bc * ca / (2.0 * cross);
+    }
+
+    /**
+     * Marks the runs of a line's viaduct that lie within {@code stackReach} of another line's viaduct and along it, at
+     * least {@code stackRun} long, as the upper deck of a shared two-level viaduct.
+     */
+    private void stack(List<double[]> points, List<List<double[]>> others, CitySettings.Transit transit) {
+        int n = points.size();
+        boolean[] beside = new boolean[n];
+        double cosine = Math.cos(Math.toRadians(20));
+        for (int k = 0; k < n; k++) {
+            if ((int) points.get(k)[2] != TransitMode.ELEVATED.ordinal()) {
+                continue;
+            }
+            double[] t = tangent(points, k);
+            search:
+            for (List<double[]> other : others) {
+                for (int q = 0; q < other.size(); q++) {
+                    double[] o = other.get(q);
+                    int mode = (int) o[2];
+                    if (mode != TransitMode.ELEVATED.ordinal() && mode != TransitMode.STACKED.ordinal()) {
+                        continue;
+                    }
+                    if (Math.hypot(o[0] - points.get(k)[0], o[1] - points.get(k)[1]) > transit.stackReach) {
+                        continue;
+                    }
+                    double[] u = tangent(other, q);
+                    if (Math.abs(t[0] * u[0] + t[1] * u[1]) >= cosine) {
+                        beside[k] = true;
+                        break search;
+                    }
+                }
+            }
+        }
+        int shortest = (int) Math.ceil(transit.stackRun / config.step);
+        for (int start = 0; start < n; ) {
+            if (!beside[start]) {
+                start++;
+                continue;
+            }
+            int end = start;
+            while (end < n && beside[end]) {
+                end++;
+            }
+            if (end - start >= shortest) {
+                for (int k = start; k < end; k++) {
+                    points.get(k)[2] = TransitMode.STACKED.ordinal();
+                }
+            }
+            start = end;
+        }
+    }
+
+    /** The unit direction of a line at a point, from its neighbours. */
+    private static double[] tangent(List<double[]> line, int k) {
+        double[] a = line.get(Math.max(0, k - 2));
+        double[] b = line.get(Math.min(line.size() - 1, k + 2));
+        double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        return length < 1e-9 ? new double[]{1, 0} : new double[]{(b[0] - a[0]) / length, (b[1] - a[1]) / length};
+    }
+
+    /** The first index whose run reaches a length, clamped to the line. */
+    private static int indexAt(double[] run, double length) {
+        int k = 0;
+        while (k < run.length - 1 && run[k] < length) {
+            k++;
+        }
+        return k;
+    }
+
+    /** Points every 8 blocks along a cubic curve from p leaving along u to q arriving along v, both ends excluded. */
+    private static List<double[]> bezier(double[] p, double[] u, double[] q, double[] v) {
+        double length = Math.hypot(q[0] - p[0], q[1] - p[1]);
+        double reach = length / 3.0;
+        double[] c1 = {p[0] + u[0] * reach, p[1] + u[1] * reach};
+        double[] c2 = {q[0] - v[0] * reach, q[1] - v[1] * reach};
+        int pieces = Math.max(1, (int) Math.ceil(length / 8.0));
+        List<double[]> out = new ArrayList<>();
+        for (int i = 1; i < pieces; i++) {
+            double t = (double) i / pieces;
+            double s = 1 - t;
+            out.add(new double[]{s * s * s * p[0] + 3 * s * s * t * c1[0] + 3 * s * t * t * c2[0] + t * t * t * q[0],
+                    s * s * s * p[1] + 3 * s * s * t * c1[1] + 3 * s * t * t * c2[1] + t * t * t * q[1]});
+        }
+        return out;
     }
 
     /**
@@ -1189,12 +1516,9 @@ public final class StreetLayer {
      * Stations along a line: at both ends, at the point nearest the middle of downtown, at the main station where the line passes
      * within 300 blocks of it, and between these evenly, about {@code spacing} apart.
      */
-    private static List<double[]> stations(List<double[]> points, double cx, double cz, Anchor station, double spacing) {
+    private static java.util.TreeSet<Integer> stationIndices(List<double[]> points, double[] run, double cx, double cz,
+                                                          Anchor station, double spacing) {
         int n = points.size();
-        double[] run = new double[n];
-        for (int k = 1; k < n; k++) {
-            run[k] = run[k - 1] + Math.hypot(points.get(k)[0] - points.get(k - 1)[0], points.get(k)[1] - points.get(k - 1)[1]);
-        }
         java.util.TreeSet<Integer> fixed = new java.util.TreeSet<>(List.of(0, n - 1));
         fixed.add(nearestIndex(points, cx, cz));
         if (station != null) {
@@ -1220,11 +1544,7 @@ public final class StreetLayer {
             }
             previous = at;
         }
-        List<double[]> out = new ArrayList<>();
-        for (int k : chosen) {
-            out.add(points.get(k).clone());
-        }
-        return out;
+        return chosen;
     }
 
     private static int nearestIndex(List<double[]> points, double x, double z) {
