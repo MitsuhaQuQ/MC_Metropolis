@@ -69,4 +69,14 @@ test('the castle town seen from the test client', async ({}, testInfo) => {
   const across = 0.5 * g.width - 4 + 0.5;
   await view('kerb', g.x - 20 * Math.cos(h) - across * Math.sin(h), g.ground, g.z - 20 * Math.sin(h) + across * Math.cos(h),
     yaw - 25, 20, testInfo);
+  // The old town's canal: from above, and from beside it at eye height looking along it
+  const c = await server.canal(TOWN.x, TOWN.z);
+  expect(c.found).toBe(true);
+  await server.generate(Math.round(c.x) - 48, Math.round(c.z) - 48, Math.round(c.x) + 47, Math.round(c.z) + 47);
+  const cg = await server.canal(TOWN.x, TOWN.z);
+  await view('canal-above', Math.round(c.x), Math.round(cg.ground ?? 70) + 40, Math.round(c.z), 0, 90, testInfo);
+  const ch = (c.heading * Math.PI) / 180;
+  const cyaw = (Math.atan2(-Math.cos(ch), Math.sin(ch)) * 180) / Math.PI;
+  await view('canal', c.x - 14 * Math.cos(ch) + 3 * Math.sin(ch), (cg.ground ?? 70) + 1, c.z - 14 * Math.sin(ch) - 3 * Math.cos(ch),
+    cyaw + 15, 25, testInfo);
 });

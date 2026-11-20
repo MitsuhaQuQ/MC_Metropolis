@@ -673,6 +673,26 @@ public final class CitySettings {
         public double bankMinWidth = 40.0;
         public double riversideArterial = 600.0;
         public double bankJoin = 120.0;
+        /**
+         * Irrigation canals (yōsui) in a castle, temple or port town with at least {@code canalMinOld} square blocks of
+         * old town and a bank road within {@code canalReach} of it: {@code canalWidth} wide, from an intake upstream
+         * to an outfall at least {@code canalMinRun} downstream; a metropolis's second {@code canalApart} to one side
+         * of the first. The street along a canal keeps {@code canalBankClear} from its ends, where the bank road is.
+         */
+        public double canalWidth = 3.0;
+        public double canalMinOld = 300000.0;
+        public double canalReach = 3000.0;
+        public double canalMinRun = 1000.0;
+        public double canalApart = 600.0;
+        public double canalBankClear = 40.0;
+        /**
+         * The water's head: the intake stands at least this above the old town's ground, and the canal nowhere runs
+         * over ground higher than the intake (or the old town, if higher) by more than this.
+         */
+        public double canalHead = 1.0;
+        /** How much a canal winds: its route's cost varies by up to this share over a smooth field of this wavelength. */
+        public double canalWind = 1.5;
+        public double canalWindLength = 250.0;
         /** Built land the arterials miss in patches of at least this many grid nodes is linked by a bridge of its own. */
         public int minPatch = 20;
         /** Streets past {@code maxGrade} are ramps up to this grade, stairs up to the next; steeper ends them. */

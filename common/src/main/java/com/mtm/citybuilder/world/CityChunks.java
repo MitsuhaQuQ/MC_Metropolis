@@ -102,6 +102,9 @@ public final class CityChunks {
                 ChunkLayer.Column column = columns[x * 16 + z];
                 BlockState block = paving(column);
                 if (block == null) {
+                    if (column.canal() != 0) {
+                        dig(chunk, column, baseX + x, baseZ + z, x, z, pos, top);
+                    }
                     continue;
                 }
                 int y;
@@ -133,6 +136,35 @@ public final class CityChunks {
                     chunk.setBlockState(pos.set(baseX + x, y + up, baseZ + z), Blocks.AIR.defaultBlockState(), false);
                 }
             }
+        }
+    }
+
+    /**
+     * A canal under a column: its water a block below the ground and two deep on a stone-brick bed, or its wall of
+     * stone bricks from the ground down to the bed; what stood over the ground cleared.
+     */
+    private static void dig(ChunkAccess chunk, ChunkLayer.Column column, int wx, int wz, int x, int z,
+                            BlockPos.MutableBlockPos pos, int top) {
+        int floor = Math.min(top, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
+        BlockState state = chunk.getBlockState(pos.set(wx, floor, wz));
+        while (floor > chunk.getMinBuildHeight() + 4 && !state.blocksMotion()) {
+            if (!state.getFluidState().isEmpty()) {
+                // Water there already: the canal meets the river
+                return;
+            }
+            state = chunk.getBlockState(pos.set(wx, --floor, wz));
+        }
+        if (floor <= chunk.getMinBuildHeight() + 4 || floor + HEADROOM > top) {
+            return;
+        }
+        BlockState stone = Blocks.STONE_BRICKS.defaultBlockState();
+        boolean water = column.canal() == ChunkLayer.CANAL_WATER;
+        chunk.setBlockState(pos.set(wx, floor, wz), water ? Blocks.AIR.defaultBlockState() : stone, false);
+        chunk.setBlockState(pos.set(wx, floor - 1, wz), water ? Blocks.WATER.defaultBlockState() : stone, false);
+        chunk.setBlockState(pos.set(wx, floor - 2, wz), water ? Blocks.WATER.defaultBlockState() : stone, false);
+        chunk.setBlockState(pos.set(wx, floor - 3, wz), stone, false);
+        for (int up = 1; up <= HEADROOM; up++) {
+            chunk.setBlockState(pos.set(wx, floor + up, wz), Blocks.AIR.defaultBlockState(), false);
         }
     }
 

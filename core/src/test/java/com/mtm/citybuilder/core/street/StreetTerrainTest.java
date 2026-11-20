@@ -152,6 +152,30 @@ class StreetTerrainTest {
     }
 
     @Test
+    void aCanalRunsThroughTheOldTownWithAStreetAlongIt() {
+        CityLogic logic = new CityLogic(3L, SETTINGS, new SyntheticTerrain(0.0, 20000, 80, Landform.PLAINS));
+        StreetPlan plan = logic.streetPlan(city(20300, 0), Formation.CASTLE_TOWN);
+        assertTrue(!plan.canals().isEmpty(), "no canal");
+        Canal canal = plan.canals().get(0);
+        // Drawn from the river and returned to it: the river is 80 wide along x = 20000
+        for (double[] end : new double[][]{canal.points().get(0), canal.points().get(canal.points().size() - 1)}) {
+            assertTrue(Math.abs(end[0] - 20000) < 45, "an end away from the water: " + end[0] + " " + end[1]);
+        }
+        assertTrue(canal.length() >= SETTINGS.streets.canalMinRun, "length " + canal.length());
+        // A street along it, beyond its wall, for much of its way
+        double along = plan.segments().stream().filter(g -> g.streetClass() == StreetClass.STREET
+                        && Math.abs(canal.distance(0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2())) - 5.5) < 1.5)
+                .mapToDouble(StreetSegment::length).sum();
+        assertTrue(along > 0.3 * canal.length(), "street along it " + along + " of " + canal.length());
+        // What crosses it passes over at ground level
+        for (StreetSegment g : plan.segments()) {
+            if (canal.crosses(g.x1(), g.z1(), g.x2(), g.z2())) {
+                assertTrue(g.structure() != StreetStructure.GROUND, "crosses on the ground: " + g);
+            }
+        }
+    }
+
+    @Test
     void embankmentsStandAboveTheWater() {
         CityLogic logic = new CityLogic(3L, SETTINGS, new SyntheticTerrain(0.0, 20000, 80, Landform.PLAINS));
         StreetPlan plan = logic.streetPlan(city(20300, 0), Formation.CASTLE_TOWN);

@@ -4,6 +4,7 @@ import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.CitySettings;
 import com.mtm.citybuilder.core.extent.CityExtent;
 import com.mtm.citybuilder.core.noise.Hash;
+import com.mtm.citybuilder.core.noise.ValueNoise;
 import com.mtm.citybuilder.core.rail.Approach;
 import com.mtm.citybuilder.core.rail.RailClass;
 import com.mtm.citybuilder.core.rail.RailEdge;
@@ -1183,6 +1184,7 @@ public final class StreetLayer {
             railways.set(r, new CityRailway(railway.edge(), railway.entry(), moded(window, districts, railway.line(), false)));
         }
         List<UrbanLine> urban = new ArrayList<>();
+        List<Canal> canals = new ArrayList<>();
         List<StreetSegment> segments = new ArrayList<>();
         List<double[]> oldRoad = oldRoads(settlement, window, segments);
         if (formation != Formation.VILLAGE) {
@@ -1193,6 +1195,9 @@ public final class StreetLayer {
             }
             List<StreetSegment> capitalEdges = capitalAvenues(window, segments);
             List<StreetSegment> banks = riverside(window, segments, embankments);
+            // The old town's irrigation canals, and the streets along them, before the arterials
+            canals.addAll(canals(settlement, formation, window, anchors, banks));
+            canalStreets(settlement, window, canals, segments);
             // Roads along the intercity lines at grade, laid before the arterials, which cross the lines at level
             Pieces rails = new Pieces();
             Pieces sides = new Pieces();
@@ -1280,6 +1285,7 @@ public final class StreetLayer {
                 interiorLanes(settlement, window, districts, segments);
                 laneNet(settlement, window, districts, segments, laneFrom);
             }
+            culverts(canals, segments);
             // Whatever was laid before the railway was known (old roads, arterials before the town's own lines) and
             // crosses it at grade crosses at a level crossing
             for (int k = 0; k < segments.size(); k++) {
@@ -1298,7 +1304,7 @@ public final class StreetLayer {
                 : sites(settlement, window, anchors, railways, urban, segments);
         List<List<double[]>> highSpeed = highSpeedCorridor(settlement, window, districts, anchors);
         return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments, urban,
-                window.capital == null ? null : window.capital.clone(), sites, highSpeed);
+                window.capital == null ? null : window.capital.clone(), sites, highSpeed, canals);
     }
 
     /** Points every {@code spacing} blocks along a line, its two ends included, as {x, z}. */
@@ -2466,6 +2472,340 @@ public final class StreetLayer {
         }
         out.add(line.get(line.size() - 1));
         return out;
+    }
+
+    /**
+     * The irrigation canals of a castle, temple or port town with an old town of at least {@code canalMinOld} and a
+     * bank road on wide water (yōsui, as Kanazawa's): water drawn from the bank upstream, where the ground stands
+     * highest, led by gravity (nowhere higher than the intake) through the old town (between the castle and the old
+     * town's middle) and back to the bank downstream, at least {@code canalMinRun} from the intake. Routed on the fine
+     * grid, cheapest through the old town, dear on open land and by the river (so it runs through the town, not along
+     * the bank), never through water or grounds; smoothed. A metropolis has a second, through the old town to one side
+     * of the first. Each is {@code canalWidth} wide and runs on into the water at both ends.
+     */
+    private List<Canal> canals(Settlement settlement, Formation formation, Window window, List<Anchor> anchors,
+                               List<StreetSegment> banks) {
+        List<Canal> canals = new ArrayList<>();
+        if (formation != Formation.CASTLE_TOWN && formation != Formation.TEMPLE_TOWN && formation != Formation.PORT_TOWN
+                || banks.isEmpty()) {
+            return canals;
+        }
+        int fs = window.fineSize;
+        double ox = (double) window.originX * grid;
+        double oz = (double) window.originZ * grid;
+        // The old town's middle and size
+        double sx = 0;
+        double sz = 0;
+        int old = 0;
+        for (int i = 0; i < fs; i++) {
+            for (int j = 0; j < fs; j++) {
+                double x = ox + i * FINE;
+                double z = oz + j * FINE;
+                if (window.old(x, z) && window.built(x, z)) {
+                    sx += x;
+                    sz += z;
+                    old++;
+                }
+            }
+        }
+        if (old * FINE * FINE < config.canalMinOld) {
+            return canals;
+        }
+        double cx = sx / old;
+        double cz = sz / old;
+        Anchor castle = anchors.stream().filter(a -> a.kind() == Anchor.Kind.CASTLE).findFirst().orElse(null);
+        // The bank road's points, where the canals leave and rejoin the water
+        List<double[]> bank = new ArrayList<>();
+        for (StreetSegment g : banks) {
+            double x = 0.5 * (g.x1() + g.x2());
+            double z = 0.5 * (g.z1() + g.z2());
+            if (window.inside(x, z) && window.edge(x, z) > 0 && Math.hypot(x - cx, z - cz) < config.canalReach) {
+                bank.add(new double[]{x, z, window.height(x, z)});
+            }
+        }
+        if (bank.size() < 2) {
+            return canals;
+        }
+        int count = settlement.tier() == SettlementTier.METROPOLIS ? 2 : 1;
+        boolean[] used = new boolean[fs * fs];
+        for (int c = 0; c < count; c++) {
+            double wx = castle != null ? 0.5 * (castle.x() + cx) : cx;
+            double wz = castle != null ? 0.5 * (castle.z() + cz) : cz;
+            if (c > 0) {
+                // To one side of the first, by the town's hash
+                double side = Hash.unit(Hash.of(settlement.id() ^ 0xCA7AL, c)) < 0.5 ? -1 : 1;
+                double dx = wx - cx;
+                double dz = wz - cz;
+                double length = Math.max(1.0, Math.hypot(dx, dz));
+                wx = cx - dz / length * side * config.canalApart;
+                wz = cz + dx / length * side * config.canalApart;
+                if (dx == 0 && dz == 0) {
+                    wx = cx + side * config.canalApart;
+                    wz = cz;
+                }
+                if (!window.old(wx, wz) || !window.built(wx, wz)) {
+                    break;
+                }
+            }
+            double fx = wx;
+            double fz = wz;
+            double wh = window.height(wx, wz);
+            // The intake: the nearest bank points standing above the old town's ground, tried in turn until one is
+            // reached without crossing water (failing those, the highest); the outfall likewise downstream of it
+            double wxf = wx;
+            double wzf = wz;
+            List<double[]> above = new ArrayList<>();
+            for (double[] p : bank) {
+                if (p[2] >= wh + config.canalHead) {
+                    above.add(p);
+                }
+            }
+            if (above.isEmpty()) {
+                above.addAll(bank);
+                above.sort((p, q) -> Double.compare(q[2], p[2]));
+            } else {
+                above.sort((p, q) -> Double.compare(Math.hypot(p[0] - wxf, p[1] - wzf), Math.hypot(q[0] - wxf, q[1] - wzf)));
+            }
+            double[] intake = null;
+            List<double[]> first = null;
+            for (double[] p : spread(above, 8)) {
+                first = canalRoute(window, p[0], p[1], wx, wz, Math.max(p[2], wh) + config.canalHead, used, settlement.id() + c);
+                if (first != null) {
+                    intake = p;
+                    break;
+                }
+            }
+            if (intake == null) {
+                break;
+            }
+            double[] from = intake;
+            double ceiling = Math.max(intake[2], wh) + config.canalHead;
+            List<double[]> below = new ArrayList<>();
+            for (double[] p : bank) {
+                if (p[2] <= intake[2] && Math.hypot(p[0] - from[0], p[1] - from[1]) >= config.canalMinRun) {
+                    below.add(p);
+                }
+            }
+            below.sort((p, q) -> Double.compare(Math.hypot(p[0] - wxf, p[1] - wzf) + 50 * p[2],
+                    Math.hypot(q[0] - wxf, q[1] - wzf) + 50 * q[2]));
+            List<double[]> second = null;
+            for (double[] p : spread(below, 8)) {
+                second = canalRoute(window, wx, wz, p[0], p[1], ceiling, used, settlement.id() + c);
+                if (second != null) {
+                    break;
+                }
+            }
+            if (second == null) {
+                break;
+            }
+            List<double[]> line = new ArrayList<>(first);
+            line.addAll(second.subList(1, second.size()));
+            for (int round = 0; round < 3; round++) {
+                line = chaikin(line);
+            }
+            line = resampleLine(line, 4.0);
+            // On into the water at both ends, down the distance to its edge
+            List<double[]> head = intoWater(window, line.get(0)[0], line.get(0)[1]);
+            List<double[]> tail = intoWater(window, line.get(line.size() - 1)[0], line.get(line.size() - 1)[1]);
+            java.util.Collections.reverse(head);
+            List<double[]> points = new ArrayList<>(head);
+            points.addAll(line);
+            points.addAll(tail);
+            List<double[]> flat = new ArrayList<>();
+            for (double[] p : points) {
+                flat.add(new double[]{p[0], p[1]});
+            }
+            canals.add(new Canal(flat, config.canalWidth));
+            // Later canals keep off this one
+            for (double[] p : line) {
+                int i = (int) Math.round((p[0] - ox) / FINE);
+                int j = (int) Math.round((p[1] - oz) / FINE);
+                for (int di = -3; di <= 3; di++) {
+                    for (int dj = -3; dj <= 3; dj++) {
+                        if (i + di >= 0 && j + dj >= 0 && i + di < fs && j + dj < fs) {
+                            used[(i + di) * fs + j + dj] = true;
+                        }
+                    }
+                }
+            }
+        }
+        return canals;
+    }
+
+    /** A canal's moves on the fine grid: the eight neighbours and the knight's moves, so it runs at more angles than 45. */
+    private static final int[][] CANAL_STEPS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
+            {1, 2}, {2, 1}, {-1, 2}, {-2, 1}, {1, -2}, {2, -1}, {-1, -2}, {-2, -1}};
+
+    /** The first {@code count} points of a list, skipping any within 150 of one taken: candidates spread apart. */
+    private static List<double[]> spread(List<double[]> points, int count) {
+        List<double[]> taken = new ArrayList<>();
+        for (double[] p : points) {
+            if (taken.size() >= count) {
+                break;
+            }
+            if (taken.stream().noneMatch(q -> Math.hypot(q[0] - p[0], q[1] - p[1]) < 150)) {
+                taken.add(p);
+            }
+        }
+        return taken;
+    }
+
+    /** From a point on the bank, down the distance to the water's edge into the water: the points after the first. */
+    private List<double[]> intoWater(Window window, double x, double z) {
+        List<double[]> points = new ArrayList<>();
+        for (int k = 0; k < 30 && window.edge(x, z) > -2.0; k++) {
+            double gx = window.edge(x + 1, z) - window.edge(x - 1, z);
+            double gz = window.edge(x, z + 1) - window.edge(x, z - 1);
+            double g = Math.hypot(gx, gz);
+            if (g < 1e-6) {
+                break;
+            }
+            x -= gx / g * 4.0;
+            z -= gz / g * 4.0;
+            points.add(new double[]{x, z});
+        }
+        return points;
+    }
+
+    /**
+     * The cheapest way for a canal on the fine grid from one point to another, as points {x, z}: never through water
+     * (but by the ends), grounds, or ground higher than {@code ceiling}; cheap in the old town, dear on open land,
+     * within 50 of the water (but by the ends) and over cells {@code used} by another canal. Null if there is none.
+     */
+    private List<double[]> canalRoute(Window window, double x1, double z1, double x2, double z2, double ceiling,
+                                      boolean[] used, long seed) {
+        int fs = window.fineSize;
+        double ox = (double) window.originX * grid;
+        double oz = (double) window.originZ * grid;
+        int si = (int) Math.round((x1 - ox) / FINE);
+        int sj = (int) Math.round((z1 - oz) / FINE);
+        int ti = (int) Math.round((x2 - ox) / FINE);
+        int tj = (int) Math.round((z2 - oz) / FINE);
+        if (si < 0 || sj < 0 || ti < 0 || tj < 0 || si >= fs || sj >= fs || ti >= fs || tj >= fs) {
+            return null;
+        }
+        double[] cost = new double[fs * fs];
+        int[] previous = new int[fs * fs];
+        java.util.Arrays.fill(cost, Double.POSITIVE_INFINITY);
+        java.util.Arrays.fill(previous, -1);
+        int start = si * fs + sj;
+        int goal = ti * fs + tj;
+        cost[start] = 0.0;
+        java.util.PriorityQueue<double[]> queue = new java.util.PriorityQueue<>((p, q) -> Double.compare(p[0], q[0]));
+        queue.add(new double[]{0.0, start});
+        while (!queue.isEmpty()) {
+            double[] top = queue.poll();
+            int k = (int) top[1];
+            if (top[0] > cost[k]) {
+                continue;
+            }
+            if (k == goal) {
+                break;
+            }
+            int i = k / fs;
+            int j = k % fs;
+            for (int[] step : CANAL_STEPS) {
+                int di = step[0];
+                int dj = step[1];
+                {
+                    int ni = i + di;
+                    int nj = j + dj;
+                    if (ni < 0 || nj < 0 || ni >= fs || nj >= fs) {
+                        continue;
+                    }
+                    double x = ox + ni * FINE;
+                    double z = oz + nj * FINE;
+                    boolean byEnd = Math.abs(ni - si) + Math.abs(nj - sj) <= 4 || Math.abs(ni - ti) + Math.abs(nj - tj) <= 4;
+                    double edge = window.edge(x, z);
+                    if (edge < 0 && !byEnd || window.height(x, z) > ceiling || window.inGrounds(x, z)) {
+                        continue;
+                    }
+                    double factor = !window.built(x, z) ? 3.0 : window.old(x, z) ? 0.6 : 1.0;
+                    if (edge < 50 && !byEnd) {
+                        factor *= 3.0;
+                    }
+                    if (used[ni * fs + nj]) {
+                        factor *= 5.0;
+                    }
+                    // Old canals wind: a smooth field of cost, so the cheapest way bends
+                    factor *= 1.0 + config.canalWind * ValueNoise.twoOctaves(seed ^ 0xCA7A1L, x, z, config.canalWindLength);
+                    double c = cost[k] + Math.hypot(di, dj) * FINE * factor;
+                    int n = ni * fs + nj;
+                    if (c < cost[n]) {
+                        cost[n] = c;
+                        previous[n] = k;
+                        queue.add(new double[]{c, n});
+                    }
+                }
+            }
+        }
+        if (Double.isInfinite(cost[goal])) {
+            return null;
+        }
+        List<double[]> points = new ArrayList<>();
+        for (int k = goal; k >= 0; k = previous[k]) {
+            points.add(new double[]{ox + (k / fs) * FINE, oz + (k % fs) * FINE});
+        }
+        java.util.Collections.reverse(points);
+        points.set(0, new double[]{x1, z1});
+        points.set(points.size() - 1, new double[]{x2, z2});
+        return points;
+    }
+
+    /**
+     * The street along one side of each canal (by the town's hash), beyond its wall, as Nagamachi's lanes run along
+     * the Ōnoshō canal: laid before the arterials, so the streets traced later end on it. Not on water, open land or
+     * grounds, nor within {@code canalBankClear} of its ends, where it meets the bank road.
+     */
+    private void canalStreets(Settlement settlement, Window window, List<Canal> canals, List<StreetSegment> segments) {
+        for (int c = 0; c < canals.size(); c++) {
+            Canal canal = canals.get(c);
+            double side = Hash.unit(Hash.of(settlement.id() ^ 0xCA75L, c)) < 0.5 ? -1 : 1;
+            double offset = 0.5 * canal.width() + 1.0 + 0.5 * config.streetWidth + 0.5;
+            List<double[]> line = resampleLine(canal.points(), config.step);
+            double total = canal.length();
+            double at = 0.0;
+            double[] previous = null;
+            for (int k = 0; k < line.size(); k++) {
+                double[] p = line.get(k);
+                if (k > 0) {
+                    at += Math.hypot(p[0] - line.get(k - 1)[0], p[1] - line.get(k - 1)[1]);
+                }
+                double[] t = tangent(line, k);
+                double qx = p[0] - t[1] * side * offset;
+                double qz = p[1] + t[0] * side * offset;
+                double[] q = {qx, qz};
+                boolean keep = at > config.canalBankClear && at < total - config.canalBankClear && window.inside(qx, qz)
+                        && window.built(qx, qz) && !window.inGrounds(qx, qz);
+                if (previous != null && keep) {
+                    double mx = 0.5 * (previous[0] + qx);
+                    double mz = 0.5 * (previous[1] + qz);
+                    StreetSegment piece = window.water(mx, mz) ? null : sloped(window, previous[0], previous[1], qx, qz,
+                            StreetClass.STREET, window.old(mx, mz) ? Era.TOWN : Era.MODERN, config.streetWidth);
+                    if (piece != null) {
+                        segments.add(piece);
+                    }
+                }
+                previous = keep ? q : null;
+            }
+        }
+    }
+
+    /** Pieces crossing a canal pass over it at ground level, as culverts. */
+    private static void culverts(List<Canal> canals, List<StreetSegment> segments) {
+        for (int k = 0; k < segments.size(); k++) {
+            StreetSegment g = segments.get(k);
+            if (g.structure() != StreetStructure.GROUND) {
+                continue;
+            }
+            for (Canal canal : canals) {
+                if (canal.crosses(g.x1(), g.z1(), g.x2(), g.z2())) {
+                    segments.set(k, new StreetSegment(g.x1(), g.z1(), g.x2(), g.z2(), g.streetClass(), g.era(), g.width(),
+                            StreetStructure.CULVERT));
+                    break;
+                }
+            }
+        }
     }
 
     /** A bank line cut into runs over built land, laid as pieces about a step long. */

@@ -19,7 +19,7 @@ import java.awt.image.BufferedImage;
 /**
  * Renders a town's street skeleton over its urban intensity: old roads brown, arterials of the old town black and of
  * the modern town dark blue, as wide as they are at least a pixel; anchors marked, the castle, palace or temple as a
- * red square, gates as yellow squares, bridges orange, culverts cyan, ramps yellow, stairs magenta, moats blue (wet) or brown (dry), stations as white squares, the centre as a white disc.
+ * red square, gates as yellow squares, bridges orange, culverts cyan, ramps yellow, stairs magenta, moats blue (wet) or brown (dry), irrigation canals bright blue, stations as white squares, the centre as a white disc.
  */
 public final class StreetMap {
     private StreetMap() {
@@ -85,6 +85,17 @@ public final class StreetMap {
                         BasicStroke.JOIN_ROUND));
                 g.draw(new Line2D.Double((a[0] - left) / scale, (a[1] - top) / scale, (b[0] - left) / scale,
                         (b[1] - top) / scale));
+            }
+        }
+        // Irrigation canals, bright blue, under the streets crossing them
+        g.setColor(new Color(40, 150, 255));
+        for (com.mtm.citybuilder.core.street.Canal canal : plan.canals()) {
+            g.setStroke(new BasicStroke((float) Math.max(1.5, (canal.width() + 2) / scale), BasicStroke.CAP_ROUND,
+                    BasicStroke.JOIN_ROUND));
+            for (int k = 1; k < canal.points().size(); k++) {
+                double[] a = canal.points().get(k - 1);
+                double[] b = canal.points().get(k);
+                g.draw(new Line2D.Double((a[0] - left) / scale, (a[1] - top) / scale, (b[0] - left) / scale, (b[1] - top) / scale));
             }
         }
         for (StreetSegment segment : plan.segments()) {

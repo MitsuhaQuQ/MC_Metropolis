@@ -479,6 +479,12 @@ public final class CityMap {
         java.util.Map<com.mtm.citybuilder.core.street.StationSite.Kind, Long> siteCounts = new java.util.TreeMap<>();
         plan.sites().forEach(site -> siteCounts.merge(site.kind(), 1L, Long::sum));
         System.out.println("  station sites " + siteCounts);
+        for (com.mtm.citybuilder.core.street.Canal canal : plan.canals()) {
+            double[] a = canal.points().get(0);
+            double[] b = canal.points().get(canal.points().size() - 1);
+            System.out.printf("  canal %.1f km from %.0f %.0f (ground %.1f) to %.0f %.0f (ground %.1f)%n", canal.length() / 1000,
+                    a[0], a[1], logic.terrain().smoothHeight(a[0], a[1]), b[0], b[1], logic.terrain().smoothHeight(b[0], b[1]));
+        }
         for (StreetClass streetClass : StreetClass.values()) {
             double length = plan.length(streetClass);
             if (length > 0) {

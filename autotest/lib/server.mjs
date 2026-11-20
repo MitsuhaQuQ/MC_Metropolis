@@ -28,5 +28,7 @@ export const server = {
   planAround: (x, z) => call('/plan-around', { x, z }),
   /** The nearest piece of a class of street (BOULEVARD, ARTERIAL, ...) in this world's plan: {found, x, z, heading, width}. */
   street: (x, z, streetClass, end = false) => call('/street', { x, z, class: streetClass, end: end ? 1 : 0 }),
+  /** The nearest point of a canal (its middle third) in this world's plan: {found, x, z, heading, ground once loaded}. */
+  canal: (x, z) => call('/canal', { x, z }),
   stop: () => call('/stop'),
 };

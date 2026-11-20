@@ -75,6 +75,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/tick", this::tick);
             route(http, "/plan-around", this::planAround);
             route(http, "/street", this::street);
+            route(http, "/canal", this::canal);
             route(http, "/stop", this::stop);
             http.start();
             // The JDK's HTTP dispatcher thread is not a daemon: stopped with the server, or the process never exits
@@ -350,6 +351,47 @@ public final class TestKit implements DedicatedServerModInitializer {
         // The ground there (the top of the surface, plants aside), once its chunk is loaded
         int bx = (int) Math.floor(mx);
         int bz = (int) Math.floor(mz);
+        if (overworld().hasChunk(bx >> 4, bz >> 4)) {
+            found.put("ground", overworld().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz));
+        }
+        return found;
+    }
+
+    /**
+     * The point of a canal nearest (x, z) in the plan of the town owning that point, as this world planned it, a
+     * third of the way along it at the least from either end: {found, x, z, heading in degrees, ground once loaded}.
+     */
+    private Object canal(Map<String, String> query, String body) {
+        double x = Double.parseDouble(query.get("x"));
+        double z = Double.parseDouble(query.get("z"));
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if (logic == null || logic.urban(x, z).owner() == null) {
+            return Map.of("found", false);
+        }
+        double[] best = null;
+        double nearest = Double.POSITIVE_INFINITY;
+        for (com.mtm.citybuilder.core.street.Canal canal : logic.streetPlan(logic.urban(x, z).owner()).canals()) {
+            java.util.List<double[]> points = canal.points();
+            for (int k = points.size() / 3; k < 2 * points.size() / 3; k++) {
+                double[] p = points.get(k);
+                double[] q = points.get(k + 1);
+                double d = Math.hypot(p[0] - x, p[1] - z);
+                if (d < nearest) {
+                    nearest = d;
+                    best = new double[]{p[0], p[1], Math.toDegrees(Math.atan2(q[1] - p[1], q[0] - p[0]))};
+                }
+            }
+        }
+        if (best == null) {
+            return Map.of("found", false);
+        }
+        Map<String, Object> found = new java.util.LinkedHashMap<>();
+        found.put("found", true);
+        found.put("x", best[0]);
+        found.put("z", best[1]);
+        found.put("heading", best[2]);
+        int bx = (int) Math.floor(best[0]);
+        int bz = (int) Math.floor(best[1]);
         if (overworld().hasChunk(bx >> 4, bz >> 4)) {
             found.put("ground", overworld().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz));
         }

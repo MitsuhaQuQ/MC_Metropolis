@@ -35,6 +35,11 @@ public final class ChunkLayer {
         BOULEVARD
     }
 
+    /** A canal's water: the column is dug out, the water a block below the ground and two deep, on stone. */
+    public static final int CANAL_WATER = 1;
+    /** A canal's wall: stone from the ground down, beside its water. */
+    public static final int CANAL_WALL = 2;
+
     /** Whether a surface is marked with lines: arterials, collectors and boulevards. */
     public static boolean marked(Surface surface) {
         return surface == Surface.ARTERIAL || surface == Surface.BOULEVARD;
@@ -56,10 +61,18 @@ public final class ChunkLayer {
      * @param junction    whether two marked streets (arterials) meet over it, not two pieces of one street: no lines
      *                    run on across a junction
      * @param carriageway whether it lies on the carriageway of any marked street over it, not only on a pavement
+     * @param canal   a canal under an unpaved column: {@link #CANAL_WATER} its water, {@link #CANAL_WALL} its stone
+     *                wall, 0 none (a street crossing a canal passes over it at ground level)
      */
     public record Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
-                         double width, boolean junction, boolean carriageway) {
-        public static final Column EMPTY = new Column(Surface.NONE, false, Double.NaN, 0.0, 0.0, 0.0, 0.0, false, false);
+                         double width, boolean junction, boolean carriageway, int canal) {
+        public static final Column EMPTY = new Column(Surface.NONE, false, Double.NaN, 0.0, 0.0, 0.0, 0.0, false, false, 0);
+
+        /** A column of streets, without a canal. */
+        public Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
+                      double width, boolean junction, boolean carriageway) {
+            this(surface, bridge, deck, across, heading, along, width, junction, carriageway, 0);
+        }
 
         /** A column of one street, not at a junction. */
         public Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
@@ -217,7 +230,8 @@ public final class ChunkLayer {
      * A town's street pieces bucketed by chunk, its bridges' deck heights by piece, and for each piece the pieces that
      * continue it: of its class, sharing an end, within 30 degrees of its line.
      */
-    private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links) {
+    private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links,
+                         Map<Long, List<double[]>> canals) {
         /** Whether two pieces are of one street: the same, continuing each other, or with one piece between. */
         boolean sameStreet(int p, int q) {
             if (p == q) {
@@ -265,8 +279,10 @@ public final class ChunkLayer {
         boolean[][] carriage = new boolean[2][256];
         double minX = chunkX * 16.0;
         double minZ = chunkZ * 16.0;
+        List<double[]> canals = new ArrayList<>();
         for (Settlement town : towns(minX, minZ)) {
             Index index = index(town);
+            canals.addAll(index.canals.getOrDefault(key(chunkX, chunkZ), List.of()));
             List<Integer> pieces = index.byChunk.get(key(chunkX, chunkZ));
             if (pieces == null) {
                 continue;
@@ -328,6 +344,36 @@ public final class ChunkLayer {
             if (marked(column.surface) && junction[level][c]) {
                 columns[c] = new Column(column.surface, column.bridge, column.deck, column.across, column.heading,
                         column.along, column.width, true, carriage[level][c]);
+            }
+        }
+        // Canals under the unpaved columns: water within half its width of its middle line, a wall a block beyond
+        if (!canals.isEmpty()) {
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    int c = x * 16 + z;
+                    if (columns[c].surface != Surface.NONE) {
+                        continue;
+                    }
+                    double cx = minX + x + 0.5;
+                    double cz = minZ + z + 0.5;
+                    int kind = 0;
+                    for (double[] piece : canals) {
+                        double dx = piece[2] - piece[0];
+                        double dz = piece[3] - piece[1];
+                        double t = Math.max(0, Math.min(1, ((cx - piece[0]) * dx + (cz - piece[1]) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+                        double d = Math.hypot(piece[0] + dx * t - cx, piece[1] + dz * t - cz);
+                        if (d <= 0.5 * piece[4]) {
+                            kind = CANAL_WATER;
+                            break;
+                        }
+                        if (d <= 0.5 * piece[4] + 1.0) {
+                            kind = CANAL_WALL;
+                        }
+                    }
+                    if (kind != 0) {
+                        columns[c] = new Column(Surface.NONE, false, Double.NaN, 0.0, 0.0, 0.0, 0.0, false, false, kind);
+                    }
+                }
             }
         }
         return columns;
@@ -479,7 +525,22 @@ public final class ChunkLayer {
             }
             links[p] = linked.stream().mapToInt(Integer::intValue).toArray();
         }
-        return new Index(byChunk, segments, deck, links);
+        // The canals' pieces by chunk: {x1, z1, x2, z2, width}
+        Map<Long, List<double[]>> canals = new HashMap<>();
+        for (com.mtm.citybuilder.core.street.Canal canal : plan.canals()) {
+            double reach = 0.5 * canal.width() + 2.0;
+            for (int k = 1; k < canal.points().size(); k++) {
+                double[] a = canal.points().get(k - 1);
+                double[] b = canal.points().get(k);
+                double[] piece = {a[0], a[1], b[0], b[1], canal.width()};
+                for (int cx = Math.floorDiv((int) Math.floor(Math.min(a[0], b[0]) - reach), 16); cx <= Math.floorDiv((int) Math.floor(Math.max(a[0], b[0]) + reach), 16); cx++) {
+                    for (int cz = Math.floorDiv((int) Math.floor(Math.min(a[1], b[1]) - reach), 16); cz <= Math.floorDiv((int) Math.floor(Math.max(a[1], b[1]) + reach), 16); cz++) {
+                        canals.computeIfAbsent(key(cx, cz), q -> new ArrayList<>()).add(piece);
+                    }
+                }
+            }
+        }
+        return new Index(byChunk, segments, deck, links, canals);
     }
 
     private static Surface surface(StreetSegment g) {

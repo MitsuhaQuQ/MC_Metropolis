@@ -50,6 +50,8 @@ public final class TownPlots {
     /** Per chain and side: each lot's district, the one behind its start, as it was cut by. */
     private final List<District[][]> districts = new ArrayList<>();
     private final Map<Long, List<Integer>> cells = new HashMap<>();
+    /** The canals' pieces by cell: {x1, z1, x2, z2, half width with the walls}. */
+    private final Map<Long, List<double[]>> canalCells = new HashMap<>();
     private final double reach;
     /** Each lot's actual area, by id, counted when first asked for. */
     private final Map<Long, Double> areas = new java.util.concurrent.ConcurrentHashMap<>();
@@ -81,6 +83,19 @@ public final class TownPlots {
         reach = 0.5 * widest + deepest + config.priorityBoulevard + 1.0;
         chain();
         lots();
+        for (com.mtm.citybuilder.core.street.Canal canal : plan.canals()) {
+            double half = 0.5 * canal.width() + 1.0;
+            for (int k = 1; k < canal.points().size(); k++) {
+                double[] a = canal.points().get(k - 1);
+                double[] b = canal.points().get(k);
+                double[] piece = {a[0], a[1], b[0], b[1], half};
+                for (long cx = (long) Math.floor((Math.min(a[0], b[0]) - half) / CELL); cx <= (long) Math.floor((Math.max(a[0], b[0]) + half) / CELL); cx++) {
+                    for (long cz = (long) Math.floor((Math.min(a[1], b[1]) - half) / CELL); cz <= (long) Math.floor((Math.max(a[1], b[1]) + half) / CELL); cz++) {
+                        canalCells.computeIfAbsent((cx << 32) ^ (cz & 0xFFFFFFFFL), q -> new ArrayList<>()).add(piece);
+                    }
+                }
+            }
+        }
         for (int p = 0; p < pieces.size(); p++) {
             StreetSegment g = pieces.get(p);
             for (long cx = (long) Math.floor((Math.min(g.x1(), g.x2()) - reach) / CELL); cx <= (long) Math.floor((Math.max(g.x1(), g.x2()) + reach) / CELL); cx++) {
@@ -497,6 +512,10 @@ public final class TownPlots {
         if (district == District.NONE || district == District.GROUNDS || district == District.HIGH_SPEED) {
             return null;
         }
+        // A canal and its walls belong to no lot
+        if (inCanal(x, z)) {
+            return null;
+        }
         List<Integer> near = cells.get(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL));
         if (near == null) {
             return null;
@@ -557,6 +576,19 @@ public final class TownPlots {
         District lotDistrict = districts.get(c)[side > 0 ? 0 : 1][lo];
         return new Plot(id, c, side, lo, starts[lo], starts[lo + 1], along, bestEdge, maxDepth, lotDistrict, g.streetClass(),
                 g.width(), Math.atan2(uz, ux), bestEdge > maxDepth, false);
+    }
+
+    /** Whether a position lies in one of the town's canals, its walls included. */
+    public boolean inCanal(double x, double z) {
+        for (double[] c : canalCells.getOrDefault(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL), List.of())) {
+            double dx = c[2] - c[0];
+            double dz = c[3] - c[1];
+            double t = Math.max(0, Math.min(1, ((x - c[0]) * dx + (z - c[1]) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+            if (Math.hypot(c[0] + dx * t - x, c[1] + dz * t - z) <= c[4]) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether a position lies on one of the town's streets (lots front), between its edges. */

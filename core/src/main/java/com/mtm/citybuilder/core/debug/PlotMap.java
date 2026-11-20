@@ -25,7 +25,7 @@ public final class PlotMap {
                 Plot plot = plots.at(x, z);
                 int rgb;
                 if (plot == null) {
-                    rgb = plots.onStreet(x, z) ? 0x404040 : 0xFFFFFF;
+                    rgb = plots.onStreet(x, z) ? 0x404040 : plots.inCanal(x, z) ? 0x2896FF : 0xFFFFFF;
                     kinds[py * size + px] = 0;
                 } else if (plot.remnant()) {
                     rgb = 0x8FCB6E;
