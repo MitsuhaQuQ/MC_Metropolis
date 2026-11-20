@@ -33,21 +33,8 @@ public final class BuildingSettings {
     /** Share of lots left unbuilt (car parks, gardens, empty land) outside downtown. */
     public double vacant = 0.04;
 
-    /**
-     * Roofs of houses, as shares {gable, hip, flat}; Kyoto's wooden houses are 73% gable, 5% hip, 8% flat, the rest
-     * gable with wings and lean-tos.
-     */
-    public double[] roofsHouse = {0.78, 0.10, 0.12};
-    /** Roofs of low shops and offices (three storeys or fewer). */
-    public double[] roofsShop = {0.40, 0.08, 0.52};
-    /** Roofs from four storeys up: Kyoto 60% flat at four or five, 80% from six. */
-    public double[] roofsTall = {0.10, 0.05, 0.85};
-    /** Roofs of Hokuriku's houses, {gable, hip, flat, hip-and-gable}: the big houses under 入母屋. */
-    public double[] roofsHokuriku = {0.45, 0.10, 0.05, 0.40};
-    /** Roofs of a merchant town's estates. */
-    public double[] roofsEstate = {0.40, 0.10, 0.0, 0.50};
-    /** Roofs of works and warehouses. */
-    public double[] roofsWorks = {0.55, 0.0, 0.45};
+    // Roofs, annexes, low upper storeys, storehouse shares and every other interchangeable part are drawn from the
+    // styles of the catalogue (citybuilder/buildings/catalog.json), not set here
 
     /**
      * Developments (建売住宅): residential lots along streets and lanes go in runs of {@code projectRun}, this share of
@@ -55,14 +42,8 @@ public final class BuildingSettings {
      */
     public double projects = 0.35;
     public int projectRun = 4;
-    /** Share of houses of two storeys or more with a one-storey annex behind (下屋), making the plan an L. */
-    public double annexes = 0.45;
-    /** Share of old-town lots built as a storehouse (土蔵) rather than a machiya or shop. */
+    /** Share of ordinary old-town lots built as a storehouse (土蔵) rather than a machiya or shop. */
     public double kura = 0.15;
-    /** Share of the lots of a storehouse quarter built as storehouses, the rest machiya. */
-    public double kuraInQuarter = 0.6;
-    /** Share of machiya with the low second storey of the older ones (厨子二階), two blocks high. */
-    public double lowUpper = 0.5;
 
     /** Along a street, lots in runs this long share a palette family (one developer, one era): colour changes by area. */
     public double paletteRun = 60.0;

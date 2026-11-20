@@ -89,8 +89,9 @@ final class BuildingPreview {
     private record Voxel(int rgb, double height, double from) {
     }
 
-    private static Voxel voxel(BuildingLayer.Part part, Palette p, long variant, long position) {
-        String id = p.id(part, variant, position);
+    private static Voxel voxel(BuildingLayer.Part part, Palette p, com.mtm.citybuilder.core.building.Composition composition,
+                               long variant, long position) {
+        String id = p.id(part, composition, variant, position);
         if (id == null || id.endsWith(":air") || id.endsWith(":light")) {
             return null;
         }
@@ -181,7 +182,7 @@ final class BuildingPreview {
                     if (part == BuildingLayer.Part.FOUNDATION && y <= gy) {
                         continue;
                     }
-                    Voxel v = voxel(part, palette, column.building().variant(), (long) i * 7919 + k);
+                    Voxel v = voxel(part, palette, column.building().composition(), column.building().variant(), (long) i * 7919 + k);
                     if (v != null) {
                         cube(g, originX, originY, px, a, b, y - floorY, v.height, v.from, v.rgb);
                     }

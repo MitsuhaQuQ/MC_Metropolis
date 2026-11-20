@@ -1,11 +1,9 @@
 package com.mtm.citybuilder.core.building;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * The materials of a building, by the role a block plays, as block ids (the Minecraft side looks them up; the city
- * logic knows no Minecraft classes). Vanilla blocks only, of 1.20.1.
+ * logic knows no Minecraft classes). Vanilla blocks only, of 1.20.1. The palettes, like the materials of the smaller
+ * parts, are listed in the catalogue ({@link Catalog}).
  *
  * @param wall       the walls
  * @param accent     upper walls where they differ from the ground floor (a machiya's plastered upper storey), bands
@@ -24,196 +22,23 @@ import java.util.List;
 public record Palette(String wall, String accent, String trim, String window, String shopfront, String lattice,
                       String door, String floor, String roofSlab, String roofBlock, String flat, String parapet,
                       String foundation) {
-    private static final List<Palette> ALL = new ArrayList<>();
-    private static final List<List<Integer>> BY_TYPE = new ArrayList<>();
-    private static final java.util.Map<Quarter, List<Integer>> MACHIYA_BY_QUARTER = new java.util.EnumMap<>(Quarter.class);
-    private static final List<Integer> HOKURIKU_HOUSES = new ArrayList<>();
-
-    private static String m(String id) {
-        return "minecraft:" + id;
-    }
-
-    private static Palette pitched(String wall, String accent, String trim, String door, String floor, String roof) {
-        return new Palette(m(wall), m(accent), m(trim), m("glass"), m("glass"), m("dark_oak_fence"), m(door), m(floor),
-                m(roof + "_slab"), m(roof.endsWith("tile") || roof.endsWith("brick") ? roof + "s" : roof), m("smooth_stone"),
-                m(wall), m("stone_bricks"));
-    }
-
-    private static Palette block(String wall, String trim, String window, String shopfront, String flat) {
-        return new Palette(m(wall), m(wall), m(trim), m(window), m(shopfront), m("iron_bars"), m("iron_door"),
-                m("smooth_stone"), m("smooth_stone_slab"), m("smooth_stone"), m(flat), m(wall), m("polished_andesite"));
-    }
-
-    private static Palette lattice(Palette p, String lattice) {
-        return new Palette(p.wall, p.accent, p.trim, p.window, p.shopfront, m(lattice), p.door, p.floor, p.roofSlab,
-                p.roofBlock, p.flat, p.parapet, p.foundation);
-    }
-
-    private static void quarter(Quarter quarter, Palette... palettes) {
-        List<Integer> list = new ArrayList<>();
-        for (Palette p : palettes) {
-            list.add(ALL.size());
-            ALL.add(p);
-        }
-        MACHIYA_BY_QUARTER.put(quarter, list);
-    }
-
-    private static void add(Building.Type type, Palette... palettes) {
-        while (BY_TYPE.size() <= type.ordinal()) {
-            BY_TYPE.add(new ArrayList<>());
-        }
-        for (Palette p : palettes) {
-            BY_TYPE.get(type.ordinal()).add(ALL.size());
-            ALL.add(p);
-        }
-    }
-
-    static {
-        // Houses: sidings in white, cream, grey and brown; grey tile (kawara), black, blue-green steel or brown roofs
-        add(Building.Type.HOUSE,
-                pitched("white_terracotta", "white_terracotta", "dark_oak_planks", "dark_oak_door", "oak_planks", "deepslate_tile"),
-                pitched("calcite", "calcite", "spruce_planks", "spruce_door", "spruce_planks", "deepslate_tile"),
-                pitched("light_gray_concrete", "light_gray_concrete", "gray_concrete", "dark_oak_door", "oak_planks", "polished_blackstone_brick"),
-                pitched("birch_planks", "birch_planks", "stripped_spruce_log", "spruce_door", "spruce_planks", "deepslate_tile"),
-                pitched("smooth_sandstone", "smooth_sandstone", "dark_oak_planks", "dark_oak_door", "oak_planks", "dark_prismarine"),
-                pitched("mud_bricks", "mud_bricks", "dark_oak_planks", "dark_oak_door", "spruce_planks", "deepslate_tile"),
-                pitched("white_concrete", "white_concrete", "light_gray_concrete", "birch_door", "birch_planks", "mud_brick"));
-        // Machiya: dark wooden ground floor with lattice, earthen or white plaster above, grey tile roof
-        add(Building.Type.MACHIYA,
-                pitched("dark_oak_planks", "packed_mud", "dark_oak_log", "dark_oak_door", "spruce_planks", "deepslate_tile"),
-                pitched("dark_oak_planks", "calcite", "dark_oak_log", "dark_oak_door", "spruce_planks", "deepslate_tile"),
-                pitched("spruce_planks", "packed_mud", "stripped_dark_oak_log", "spruce_door", "spruce_planks", "deepslate_tile"),
-                pitched("dark_oak_planks", "mud_bricks", "dark_oak_log", "dark_oak_door", "spruce_planks", "polished_blackstone_brick"));
-        // Hanamachi machiya: dark wood below, ochre plaster (聚楽壁) above
-        quarter(Quarter.HANAMACHI,
-                pitched("dark_oak_planks", "yellow_terracotta", "dark_oak_log", "dark_oak_door", "spruce_planks", "deepslate_tile"),
-                pitched("spruce_planks", "yellow_terracotta", "dark_oak_log", "spruce_door", "spruce_planks", "deepslate_tile"),
-                pitched("dark_oak_planks", "smooth_sandstone", "dark_oak_log", "dark_oak_door", "spruce_planks", "deepslate_tile"));
-        // Chaya machiya: a fine lattice in bengara red, red-brown wood, ochre plaster
-        quarter(Quarter.CHAYA,
-                lattice(pitched("mangrove_planks", "yellow_terracotta", "dark_oak_log", "mangrove_door", "spruce_planks", "deepslate_tile"), "mangrove_fence"),
-                lattice(pitched("dark_oak_planks", "yellow_terracotta", "mangrove_log", "dark_oak_door", "spruce_planks", "deepslate_tile"), "mangrove_fence"),
-                lattice(pitched("mangrove_planks", "packed_mud", "dark_oak_log", "mangrove_door", "spruce_planks", "polished_blackstone_brick"), "mangrove_fence"));
-        // A merchant town's machiya: charred cedar boards below, white plaster above, river stones at the foot
-        quarter(Quarter.JINAIMACHI,
-                new Palette(m("stripped_spruce_log"), m("white_concrete"), m("dark_oak_log"), m("glass"), m("glass"),
-                        m("dark_oak_fence"), m("dark_oak_door"), m("spruce_planks"), m("deepslate_tile_slab"), m("deepslate_tiles"),
-                        m("smooth_stone"), m("white_concrete"), m("cobblestone")),
-                new Palette(m("dark_oak_planks"), m("calcite"), m("dark_oak_log"), m("glass"), m("glass"),
-                        m("dark_oak_fence"), m("dark_oak_door"), m("spruce_planks"), m("deepslate_tile_slab"), m("deepslate_tiles"),
-                        m("smooth_stone"), m("calcite"), m("cobblestone")));
-        // Hokuriku's houses: siding in beige, grey and brown under glazed black tiles
-        for (Palette p : new Palette[]{
-                pitched("smooth_sandstone", "smooth_sandstone", "dark_oak_planks", "dark_oak_door", "oak_planks", "polished_blackstone_brick"),
-                pitched("light_gray_terracotta", "light_gray_terracotta", "dark_oak_planks", "spruce_door", "spruce_planks", "polished_blackstone_brick"),
-                pitched("white_terracotta", "white_terracotta", "dark_oak_planks", "dark_oak_door", "oak_planks", "polished_blackstone_brick"),
-                pitched("brown_terracotta", "brown_terracotta", "dark_oak_planks", "dark_oak_door", "spruce_planks", "deepslate_tile"),
-                pitched("calcite", "calcite", "dark_oak_log", "dark_oak_door", "spruce_planks", "polished_blackstone_brick")}) {
-            HOKURIKU_HOUSES.add(ALL.size());
-            ALL.add(p);
-        }
-        // Low shops: tiled or rendered fronts, glass below
-        add(Building.Type.SHOP,
-                block("light_gray_concrete", "gray_concrete", "glass", "glass", "smooth_stone"),
-                block("white_concrete", "light_gray_concrete", "glass", "glass", "smooth_stone"),
-                block("smooth_sandstone", "cut_sandstone", "glass", "glass", "smooth_stone"),
-                block("bricks", "stone_bricks", "glass", "glass", "smooth_stone"),
-                block("white_terracotta", "light_gray_terracotta", "glass", "glass", "smooth_stone"));
-        // Flats: white, beige, grey or brick-tiled blocks
-        add(Building.Type.APARTMENT,
-                block("white_concrete", "light_gray_concrete", "glass", "glass", "smooth_stone"),
-                block("smooth_quartz", "quartz_pillar", "glass", "glass", "smooth_stone"),
-                block("brown_terracotta", "white_concrete", "glass", "glass", "smooth_stone"),
-                block("light_gray_concrete", "white_concrete", "glass", "glass", "smooth_stone"),
-                block("white_terracotta", "brown_terracotta", "glass", "glass", "smooth_stone"),
-                block("pink_terracotta", "white_terracotta", "glass", "glass", "smooth_stone"),
-                block("light_gray_terracotta", "white_concrete", "glass", "glass", "smooth_stone"));
-        // Offices: curtain walls and stone
-        add(Building.Type.OFFICE,
-                block("light_gray_concrete", "polished_andesite", "light_blue_stained_glass", "glass", "smooth_stone"),
-                block("polished_andesite", "smooth_stone", "gray_stained_glass", "glass", "smooth_stone"),
-                block("smooth_quartz", "polished_diorite", "light_gray_stained_glass", "glass", "smooth_stone"),
-                block("white_terracotta", "light_gray_terracotta", "light_gray_stained_glass", "glass", "smooth_stone"),
-                block("smooth_sandstone", "cut_sandstone", "light_blue_stained_glass", "glass", "smooth_stone"));
-        // Storehouses: white plaster over a black wooden wainscot (焼杉), dark namako tiles or stone; bars in the windows
-        add(Building.Type.KURA,
-                new Palette(m("white_concrete"), m("dark_oak_planks"), m("white_concrete"), m("iron_bars"), m("iron_bars"),
-                        m("dark_oak_fence"), m("dark_oak_door"), m("oak_planks"), m("deepslate_tile_slab"), m("deepslate_tiles"),
-                        m("smooth_stone"), m("white_concrete"), m("stone_bricks")),
-                new Palette(m("calcite"), m("polished_blackstone"), m("calcite"), m("iron_bars"), m("iron_bars"),
-                        m("dark_oak_fence"), m("spruce_door"), m("oak_planks"), m("deepslate_tile_slab"), m("deepslate_tiles"),
-                        m("smooth_stone"), m("calcite"), m("stone_bricks")),
-                new Palette(m("white_concrete"), m("deepslate_tiles"), m("white_concrete"), m("iron_bars"), m("iron_bars"),
-                        m("dark_oak_fence"), m("dark_oak_door"), m("oak_planks"), m("polished_blackstone_brick_slab"),
-                        m("polished_blackstone_bricks"), m("smooth_stone"), m("white_concrete"), m("cobblestone")));
-        // Works: steel and concrete
-        add(Building.Type.WORKS,
-                new Palette(m("light_gray_concrete"), m("light_gray_concrete"), m("gray_concrete"), m("glass"), m("glass"),
-                        m("iron_bars"), m("iron_door"), m("smooth_stone"), m("polished_andesite_slab"), m("polished_andesite"),
-                        m("smooth_stone"), m("light_gray_concrete"), m("polished_andesite")),
-                new Palette(m("white_concrete"), m("white_concrete"), m("light_blue_concrete"), m("glass"), m("glass"),
-                        m("iron_bars"), m("iron_door"), m("smooth_stone"), m("dark_prismarine_slab"), m("dark_prismarine"),
-                        m("smooth_stone"), m("white_concrete"), m("polished_andesite")),
-                new Palette(m("iron_block"), m("iron_block"), m("gray_concrete"), m("glass"), m("glass"),
-                        m("iron_bars"), m("iron_door"), m("smooth_stone"), m("smooth_stone_slab"), m("smooth_stone"),
-                        m("smooth_stone"), m("iron_block"), m("polished_andesite")));
-    }
-
-    /** Outdoor units of air conditioners and water tanks, off-white on any building. */
-    public static final String EQUIPMENT = "minecraft:smooth_quartz";
-
-    private static final String[] AWNINGS = {m("red_wool"), m("green_wool"), m("blue_wool"), m("white_wool"),
-            m("orange_wool"), m("brown_wool"), m("cyan_wool")};
-    private static final String[] SIGNS = {m("white_concrete"), m("yellow_concrete"), m("red_concrete"),
-            m("light_blue_concrete"), m("orange_concrete"), m("lime_concrete"), m("sea_lantern")};
-    private static final String[] VENDING = {m("red_concrete"), m("blue_concrete"), m("white_concrete"), m("light_blue_concrete")};
-    private static final String[] FENCES = {m("stone_bricks"), m("polished_andesite"), m("bricks"), m("smooth_sandstone"),
-            m("light_gray_concrete"), m("mossy_stone_bricks"), m("cobblestone")};
-    private static final String[] PLANTS = {m("potted_azalea_bush"), m("potted_fern"), m("potted_red_tulip"),
-            m("potted_oak_sapling"), m("potted_flowering_azalea_bush"), m("potted_bamboo")};
-    /** A rolling shutter: the grey of galvanised steel. */
-    public static final String SHUTTER = m("smooth_stone");
-    public static final String HEDGE = m("azalea_leaves");
-    public static final String BAMBOO = m("bamboo_fence");
-    private static final String[] LOGS = {m("spruce_log"), m("dark_oak_log"), m("oak_log"), m("birch_log")};
-    private static final String[] CROWNS = {m("spruce_leaves"), m("oak_leaves"), m("azalea_leaves"), m("dark_oak_leaves"),
-            m("cherry_leaves")};
-    private static final String[] SHRUBS = {m("azalea"), m("flowering_azalea")};
-    private static final String[] SHEDS = {m("light_gray_concrete"), m("white_concrete"), m("iron_block"), m("green_terracotta")};
-    public static final String POST = m("andesite_wall");
-    private static final String[] RAILS = {m("iron_bars"), m("glass_pane"), m("white_stained_glass_pane"), m("light_gray_stained_glass_pane")};
-    private static final String[] NOREN = {m("blue_wall_banner"), m("white_wall_banner"), m("brown_wall_banner"),
-            m("light_blue_wall_banner"), m("red_wall_banner"), m("black_wall_banner")};
-    public static final String GUARD = m("iron_trapdoor");
-    /** A machiya's lattice: weathered dark, or the red-brown of new wood. */
-    private static final String[] LATTICES = {m("dark_oak_fence"), m("dark_oak_fence"), m("spruce_fence"), m("mangrove_fence")};
-    public static final String DOWNPIPE = m("andesite_wall");
-    public static final String LANTERN = m("lantern");
-    public static final String SUDARE = m("bamboo_trapdoor");
-    public static final String KOMAYOSE = m("spruce_fence");
-    private static final String[] NOREN_RED = {m("red_wall_banner"), m("magenta_wall_banner"), m("red_wall_banner"),
-            m("purple_wall_banner")};
-
     /** A window's glass as panes, set in the middle of their blocks and joined along the wall; anything else as it is. */
     private static String pane(String id) {
         return id.endsWith("glass") ? id + "_pane" : id;
     }
-    public static final String CARPORT = m("smooth_stone_slab");
-
-    private static String pick(String[] options, long hash) {
-        return options[(int) Math.floorMod(com.mtm.citybuilder.core.noise.Hash.mix(hash), options.length)];
-    }
 
     /**
-     * The block id of a part of a building with this palette; {@code variant} is the building's, {@code position} a
-     * hash of the block's column (for what varies from block to block, as pot plants). Null for a part that leaves the
-     * world as it is. Slabs, doors and leaves come back as their blocks' ids; the caller sets their states.
+     * The block id of a part of a building with this palette and composition; {@code variant} is the building's,
+     * {@code position} a hash of the block's column (for what varies from block to block, as pot plants). Null for a
+     * part that leaves the world as it is. Slabs, doors and leaves come back as their blocks' ids; the caller sets
+     * their states.
      */
-    public String id(com.mtm.citybuilder.core.building.BuildingLayer.Part part, long variant, long position) {
+    public String id(BuildingLayer.Part part, Composition composition, long variant, long position) {
+        Catalog c = Catalog.get();
         return switch (part) {
             case NONE -> null;
-            case AIR -> m("air");
-            case LIGHT -> m("light");
+            case AIR -> "minecraft:air";
+            case LIGHT -> "minecraft:light";
             case FOUNDATION, PAVING -> foundation;
             case FLOOR -> floor;
             case WALL -> wall;
@@ -221,68 +46,52 @@ public record Palette(String wall, String accent, String trim, String window, St
             case TRIM -> trim;
             case WINDOW -> pane(window);
             case SHOPFRONT -> pane(shopfront);
-            case LATTICE -> lattice.endsWith("dark_oak_fence") ? pick(LATTICES, variant ^ 0x99) : lattice;
+            case LATTICE -> switch (composition.get(Slot.LATTICE_WOOD)) {
+                case "spruce" -> c.material("latticeSpruce", variant);
+                case "mangrove" -> c.material("latticeMangrove", variant);
+                default -> lattice;
+            };
             case DOOR_LOWER, DOOR_UPPER -> door;
-            case ROOF_LOW, ROOF_HIGH -> roofSlab;
+            case ROOF_LOW, ROOF_HIGH, HOOD -> roofSlab;
             case RIDGE -> roofBlock;
             case FLAT -> flat;
             case PARAPET -> parapet;
-            case EQUIPMENT -> EQUIPMENT;
-            case AWNING -> pick(AWNINGS, variant ^ 0x11);
-            case SIGN -> pick(SIGNS, variant ^ 0x22);
-            case SHUTTER -> SHUTTER;
-            case VENDING -> pick(VENDING, variant ^ 0x33);
-            case FENCE -> pick(FENCES, variant ^ 0x44);
-            case HEDGE -> HEDGE;
-            case BAMBOO -> BAMBOO;
-            case PLANT -> pick(PLANTS, position);
-            case LOG -> pick(LOGS, variant ^ 0x55);
-            case LEAVES -> pick(CROWNS, variant ^ 0x55);
-            case SHRUB -> pick(SHRUBS, position);
-            case SHED -> pick(SHEDS, variant ^ 0x66);
-            case POST -> POST;
-            case CARPORT -> CARPORT;
-            case HOOD -> roofSlab;
-            case GUARD -> GUARD;
-            case RAIL -> pick(RAILS, variant ^ 0x77);
-            case DOWNPIPE -> DOWNPIPE;
-            case NOREN -> pick(NOREN, variant ^ 0x88);
-            case LANTERN -> LANTERN;
-            case SUDARE -> SUDARE;
-            case KOMAYOSE -> KOMAYOSE;
-            case NOREN_RED -> pick(NOREN_RED, variant ^ 0xAA);
-            case ENGAWA -> m("spruce_slab");
-            case TORO -> m("stone_brick_wall");
-            case TORO_LIGHT -> m("lantern");
-            case TORO_CAP -> m("stone_brick_slab");
-            case GRAVEL -> m("gravel");
-            case BOARD -> m("stripped_spruce_log");
-            case PLASTER -> m("white_concrete");
-            case SPIKE -> m("spruce_fence");
+            case EQUIPMENT -> c.material("equipment", variant);
+            case AWNING -> c.material("awning", variant ^ 0x11);
+            case SIGN -> c.material("sign", variant ^ 0x22);
+            case SHUTTER -> c.material("shutter", variant);
+            case VENDING -> c.material("vending", variant ^ 0x33);
+            case FENCE -> c.material("fence", variant ^ 0x44);
+            case HEDGE -> c.material("hedge", variant);
+            case BAMBOO -> c.material("bamboo", variant);
+            case PLANT -> c.material("plant", position);
+            case LOG -> c.material("log", variant ^ 0x55);
+            case LEAVES -> c.material("leaves", variant ^ 0x55);
+            case SHRUB -> c.material("shrub", position);
+            case SHED -> c.material("shed", variant ^ 0x66);
+            case POST -> c.material("post", variant);
+            case CARPORT -> c.material("carport", variant);
+            case GUARD -> c.material("guard", variant);
+            case RAIL -> c.material("rail", variant ^ 0x77);
+            case DOWNPIPE -> c.material("downpipe", variant);
+            case NOREN -> c.material("curtain", variant ^ 0x88);
+            case NOREN_RED -> c.material("curtainRed", variant ^ 0xAA);
+            case LANTERN -> c.material("lantern", variant);
+            case SUDARE -> c.material("sudare", variant);
+            case KOMAYOSE -> c.material("komayose", variant);
+            case ENGAWA -> c.material("engawa", variant);
+            case TORO -> c.material("toro", variant);
+            case TORO_LIGHT -> c.material("toroLight", variant);
+            case TORO_CAP -> c.material("toroCap", variant);
+            case GRAVEL -> c.material("gravel", variant);
+            case BOARD -> c.material("board", variant);
+            case PLASTER -> c.material("plaster", variant);
+            case SPIKE -> c.material("spike", variant);
         };
     }
 
-    /** A palette by its index. */
+    /** A palette of the catalogue by its index. */
     public static Palette get(int index) {
-        return ALL.get(index);
-    }
-
-    /** How many palettes there are. */
-    public static int count() {
-        return ALL.size();
-    }
-
-    /** The palettes a kind of building may use in a quarter, as indexes: a quarter's own machiya where it has them. */
-    public static List<Integer> of(Building.Type type, Quarter quarter, Region region) {
-        if (type == Building.Type.HOUSE && region == Region.HOKURIKU) {
-            return HOKURIKU_HOUSES;
-        }
-        List<Integer> own = type == Building.Type.MACHIYA ? MACHIYA_BY_QUARTER.get(quarter) : null;
-        return own != null ? own : of(type);
-    }
-
-    /** The palettes a kind of building may use, as indexes. */
-    public static List<Integer> of(Building.Type type) {
-        return BY_TYPE.get(type.ordinal());
+        return Catalog.get().palette(index);
     }
 }
