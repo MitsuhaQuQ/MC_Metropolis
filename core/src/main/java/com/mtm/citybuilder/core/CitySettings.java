@@ -412,6 +412,10 @@ public final class CitySettings {
         public double innerMoatCity = 25.0;
         public double innerMoatTown = 15.0;
         public double dryMoatRelief = 15.0;
+        /** Open bank along the outer moat, beyond three quarters of its width: the castle's grounds end there. */
+        public double moatBank = 12.0;
+        /** Within this distance of a castle's grounds the streets run along the grounds' nearest edge. */
+        public double moatSideReach = 300.0;
         /** Chance a metropolis's castle has a third bailey, with a middle moat. */
         public double thirdBaileyChance = 0.5;
         /** Most gates of the outer moat, and the least angle between two. */

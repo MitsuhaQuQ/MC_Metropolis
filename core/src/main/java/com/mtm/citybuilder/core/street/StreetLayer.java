@@ -151,8 +151,7 @@ public final class StreetLayer {
      * the station first and spread round; each approach bends sideways between two moats, as a masugata gate does,
      * and no other street crosses a moat.
      */
-    private void castle(Settlement settlement, Anchor castle, Field field, Window window, List<Anchor> anchors,
-                        List<StreetSegment> segments, List<Moat> moats) {
+    private void castleMoats(Settlement settlement, Anchor castle, Window window, List<Moat> moats) {
         double radius = grounds(settlement.tier());
         double outerWidth = switch (settlement.tier()) {
             case METROPOLIS -> config.outerMoatMetropolis;
@@ -178,11 +177,11 @@ public final class StreetLayer {
         double relief = highest - lowest;
         boolean wet = relief <= config.dryMoatRelief;
         long seed = Hash.mix(settlement.id() ^ 0xCA571EL);
-        double turn = field.patchAngle(settlement, castle.x(), castle.z());
+        double turn = patchAngle(settlement, castle.x(), castle.z());
         boolean third = settlement.tier() == SettlementTier.METROPOLIS && Hash.unit(Hash.mix(seed + 3)) < config.thirdBaileyChance;
 
         // Rings from the outside in, each within the band its neighbours leave it
-        double outerMax = radius - 0.6 * outerWidth;
+        double outerMax = radius;
         double offsetAngle = 2.0 * Math.PI * Hash.unit(Hash.mix(seed + 7));
         double offset = 0.05 * radius;
         double innerX = castle.x() + offset * Math.cos(offsetAngle);
@@ -199,15 +198,53 @@ public final class StreetLayer {
                     Double.NaN, false), wet, true));
         }
 
-        // Gates where arterials end at the grounds' edge, spread round the castle, the first facing the station
+        // The grounds: the outer moat's shape with a strip of open bank outside it
+        double bank = 0.75 * outerWidth + config.moatBank;
+        List<double[]> shape = new ArrayList<>();
+        for (double[] p : moats.get(0).ring()) {
+            double d = Math.hypot(p[0] - castle.x(), p[1] - castle.z());
+            shape.add(new double[]{castle.x() + (p[0] - castle.x()) * (d + bank) / d,
+                    castle.z() + (p[1] - castle.z()) * (d + bank) / d});
+        }
+        window.grounds.add(new Ground(castle.x(), castle.z(), radius + bank, shape));
+    }
+
+    /**
+     * A castle's gates and approaches, once the streets are traced: gates where arterials end at the edge of its
+     * grounds, spread round, the first facing the station; each approach bends sideways between two moats.
+     */
+    private void castleGates(Settlement settlement, Anchor castle, Window window, List<Anchor> anchors,
+                             List<StreetSegment> segments, List<Moat> moats) {
+        if (moats.isEmpty()) {
+            return;
+        }
+        Ground ground = null;
+        for (Ground candidate : window.grounds) {
+            if (candidate.cx == castle.x() && candidate.cz == castle.z()) {
+                ground = candidate;
+            }
+        }
+        if (ground == null) {
+            return;
+        }
+        long seed = Hash.mix(settlement.id() ^ 0xCA571EL);
+        double turn = patchAngle(settlement, castle.x(), castle.z());
         List<double[]> ends = new ArrayList<>();
         for (StreetSegment segment : segments) {
             if (segment.streetClass() != StreetClass.ARTERIAL) {
                 continue;
             }
+            // Streets coming in towards the castle, not those running along its moat
+            double sx = segment.x2() - segment.x1();
+            double sz = segment.z2() - segment.z1();
+            double mx = 0.5 * (segment.x1() + segment.x2()) - castle.x();
+            double mz = 0.5 * (segment.z1() + segment.z2()) - castle.z();
+            double cosine = Math.abs(sx * mx + sz * mz) / Math.max(1e-9, Math.hypot(sx, sz) * Math.hypot(mx, mz));
+            if (cosine < 0.5) {
+                continue;
+            }
             for (double[] end : new double[][]{{segment.x1(), segment.z1()}, {segment.x2(), segment.z2()}}) {
-                double d = Math.hypot(end[0] - castle.x(), end[1] - castle.z());
-                if (d >= radius && d <= radius + 2.0 * config.step) {
+                if (!ground.contains(end[0], end[1]) && ground.distance(end[0], end[1]) <= 2.0 * config.step) {
                     ends.add(new double[]{end[0], end[1], Math.atan2(end[1] - castle.z(), end[0] - castle.x())});
                 }
             }
@@ -350,6 +387,46 @@ public final class StreetLayer {
         return Math.min(d, 2.0 * Math.PI - d);
     }
 
+    /**
+     * The grid direction of the patch a position lies in: patches are the cells of a jittered grid
+     * {@code patchSize} wide, the nearest site's, each turned its own way by the town's hash.
+     */
+    private double patchAngle(Settlement settlement, double x, double z) {
+        double size = config.patchSize;
+        long cx = (long) Math.floor(x / size);
+        long cz = (long) Math.floor(z / size);
+        double best = Double.POSITIVE_INFINITY;
+        double angle = 0.0;
+        for (long dx = -1; dx <= 1; dx++) {
+            for (long dz = -1; dz <= 1; dz++) {
+                long hash = Hash.of(settlement.id() ^ 0x9A7C4L, cx + dx, cz + dz);
+                double sx = (cx + dx + Hash.unit(hash)) * size;
+                double sz = (cz + dz + Hash.unit(Hash.mix(hash))) * size;
+                double d = Math.hypot(sx - x, sz - z);
+                if (d < best) {
+                    best = d;
+                    angle = Math.PI / 2 * Hash.unit(Hash.mix(Hash.mix(hash)));
+                }
+            }
+        }
+        return angle;
+    }
+
+    /**
+     * The street along a castle's moat, just outside its grounds, following the moat's angled runs: built land only,
+     * so it breaks where a river or the town's edge comes in.
+     */
+    private void moatSide(Ground ground, Window window, List<StreetSegment> segments) {
+        List<double[]> rim = ground.rim(config.step, ground.polygon.size());
+        for (int k = 0; k < rim.size(); k++) {
+            double[] a = rim.get(k);
+            double[] b = rim.get((k + 1) % rim.size());
+            if (window.built(a[0], a[1]) && window.built(b[0], b[1])) {
+                segments.add(new StreetSegment(a[0], a[1], b[0], b[1], StreetClass.ARTERIAL, Era.TOWN, config.arterialWidth));
+            }
+        }
+    }
+
     /** Radius of the grounds kept open round a castle, palace or temple, by tier. */
     private double grounds(SettlementTier tier) {
         return switch (tier) {
@@ -374,16 +451,22 @@ public final class StreetLayer {
         CityExtent extent = logic.extent(settlement);
         Window window = new Window(extent);
         List<Anchor> anchors = anchors(settlement, extent, formation, window);
+        List<Moat> moats = new ArrayList<>();
         for (Anchor anchor : anchors) {
-            if (anchor.kind() == Anchor.Kind.CASTLE || anchor.kind() == Anchor.Kind.PALACE
-                    || anchor.kind() == Anchor.Kind.TEMPLE) {
-                window.grounds.add(new double[]{anchor.x(), anchor.z(), grounds(settlement.tier())});
+            if (anchor.kind() == Anchor.Kind.PALACE || anchor.kind() == Anchor.Kind.TEMPLE) {
+                window.grounds.add(new Ground(anchor.x(), anchor.z(), grounds(settlement.tier()), null));
+            } else if (anchor.kind() == Anchor.Kind.CASTLE) {
+                castleMoats(settlement, anchor, window, moats);
             }
         }
         List<StreetSegment> segments = new ArrayList<>();
-        List<Moat> moats = new ArrayList<>();
         List<double[]> oldRoad = oldRoads(settlement, window, segments);
         if (formation != Formation.VILLAGE) {
+            for (Ground ground : window.grounds) {
+                if (ground.polygon != null) {
+                    moatSide(ground, window, segments);
+                }
+            }
             Field field = new Field(window, formation, settlement, anchors, oldRoad);
             new Tracer(window, field, spacing(formation)).trace(anchors, oldRoad, segments);
             for (Anchor anchor : anchors) {
@@ -391,15 +474,103 @@ public final class StreetLayer {
                     avenue(anchor, extent, window, segments);
                 }
             }
-            if (formation == Formation.CASTLE_TOWN) {
-                for (Anchor anchor : List.copyOf(anchors)) {
-                    if (anchor.kind() == Anchor.Kind.CASTLE) {
-                        castle(settlement, anchor, field, window, anchors, segments, moats);
-                    }
+            for (Anchor anchor : List.copyOf(anchors)) {
+                if (anchor.kind() == Anchor.Kind.CASTLE) {
+                    castleGates(settlement, anchor, window, anchors, segments, moats);
                 }
             }
         }
         return new StreetPlan(settlement, formation, anchors, segments, moats);
+    }
+
+    /**
+     * Grounds no street enters: a circle round a palace or temple, or round a castle the shape of its outer moat with
+     * a strip of open bank along it, so the streets round the castle follow the moat's angled runs.
+     */
+    private static final class Ground {
+        final double cx;
+        final double cz;
+        final double radius;
+        /** Corners of the shape, or null for a circle. */
+        final List<double[]> polygon;
+
+        Ground(double cx, double cz, double radius, List<double[]> polygon) {
+            this.cx = cx;
+            this.cz = cz;
+            this.radius = radius;
+            this.polygon = polygon == null ? null : List.copyOf(polygon);
+        }
+
+        boolean contains(double x, double z) {
+            if (polygon == null) {
+                return Math.hypot(x - cx, z - cz) < radius;
+            }
+            boolean inside = false;
+            for (int k = 0, m = polygon.size() - 1; k < polygon.size(); m = k++) {
+                double[] a = polygon.get(k);
+                double[] b = polygon.get(m);
+                if ((a[1] > z) != (b[1] > z) && x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0]) {
+                    inside = !inside;
+                }
+            }
+            return inside;
+        }
+
+        /** Distance from a point to the edge of the grounds. */
+        double distance(double x, double z) {
+            if (polygon == null) {
+                return Math.abs(Math.hypot(x - cx, z - cz) - radius);
+            }
+            double best = Double.POSITIVE_INFINITY;
+            for (int k = 0; k < polygon.size(); k++) {
+                double[] a = polygon.get(k);
+                double[] b = polygon.get((k + 1) % polygon.size());
+                double dx = b[0] - a[0];
+                double dz = b[1] - a[1];
+                double length = dx * dx + dz * dz;
+                double t = length < 1e-9 ? 0.0 : Math.max(0.0, Math.min(1.0, ((x - a[0]) * dx + (z - a[1]) * dz) / length));
+                best = Math.min(best, Math.hypot(x - a[0] - t * dx, z - a[1] - t * dz));
+            }
+            return best;
+        }
+
+        /** Distance to the nearest edge of the shape and that edge's direction, as {distance, angle}. */
+        double[] nearestEdge(double x, double z) {
+            double best = Double.POSITIVE_INFINITY;
+            double angle = 0.0;
+            for (int k = 0; k < polygon.size(); k++) {
+                double[] a = polygon.get(k);
+                double[] b = polygon.get((k + 1) % polygon.size());
+                double dx = b[0] - a[0];
+                double dz = b[1] - a[1];
+                double length = dx * dx + dz * dz;
+                double t = length < 1e-9 ? 0.0 : Math.max(0.0, Math.min(1.0, ((x - a[0]) * dx + (z - a[1]) * dz) / length));
+                double d = Math.hypot(x - a[0] - t * dx, z - a[1] - t * dz);
+                if (d < best) {
+                    best = d;
+                    angle = Math.atan2(dz, dx);
+                }
+            }
+            return new double[]{best, angle};
+        }
+
+        /** Points just outside the edge, every so far round, where streets may start. */
+        List<double[]> rim(double out, int count) {
+            List<double[]> points = new ArrayList<>();
+            for (int k = 0; k < count; k++) {
+                double[] p;
+                if (polygon == null) {
+                    double angle = 2.0 * Math.PI * k / count;
+                    p = new double[]{cx + (radius + out) * Math.cos(angle), cz + (radius + out) * Math.sin(angle)};
+                } else {
+                    double[] q = polygon.get(k * polygon.size() / count);
+                    double d = Math.hypot(q[0] - cx, q[1] - cz);
+                    p = new double[]{cx + (q[0] - cx) * (d + out) / d, cz + (q[1] - cz) * (d + out) / d};
+                }
+                points.add(p);
+            }
+            return points;
+        }
     }
 
     /** A town's window: its extent's nodes, with heights and water, and whether each is built land. */
@@ -410,8 +581,8 @@ public final class StreetLayer {
         final int size;
         final float[] height;
         final boolean[] water;
-        /** Grounds kept clear of streets: the castle's, the palace's or the temple's, as {x, z, radius}. */
-        final List<double[]> grounds = new ArrayList<>();
+        /** Grounds kept clear of streets: the castle's, the palace's or the temple's. */
+        final List<Ground> grounds = new ArrayList<>();
 
         Window(CityExtent extent) {
             this.extent = extent;
@@ -477,8 +648,8 @@ public final class StreetLayer {
         }
 
         boolean inGrounds(double x, double z) {
-            for (double[] ground : grounds) {
-                if (Math.hypot(x - ground[0], z - ground[1]) < ground[2]) {
+            for (Ground ground : grounds) {
+                if (ground.contains(x, z)) {
                     return true;
                 }
             }
@@ -663,6 +834,17 @@ public final class StreetLayer {
                             s += w * Math.sin(2 * nearest[2]);
                         }
                     }
+                    for (Ground ground : window.grounds) {
+                        if (ground.polygon == null) {
+                            continue;
+                        }
+                        double[] edge = ground.nearestEdge(x, z);
+                        if (edge[0] < config.moatSideReach) {
+                            double w = 2.5 * (1.0 - edge[0] / config.moatSideReach);
+                            c += w * Math.cos(2 * edge[1]);
+                            s += w * Math.sin(2 * edge[1]);
+                        }
+                    }
                     double gx = (window.height(x + grid, z) - window.height(x - grid, z)) / (2.0 * grid);
                     double gz = (window.height(x, z + grid) - window.height(x, z - grid)) / (2.0 * grid);
                     double slope = Math.hypot(gx, gz);
@@ -676,31 +858,6 @@ public final class StreetLayer {
                     sin2[i * n + j] = (float) s;
                 }
             }
-        }
-
-        /**
-         * The grid direction of the patch a position lies in: patches are the cells of a jittered grid
-         * {@code patchSize} wide, the nearest site's, each turned its own way by the town's hash.
-         */
-        private double patchAngle(Settlement settlement, double x, double z) {
-            double size = config.patchSize;
-            long cx = (long) Math.floor(x / size);
-            long cz = (long) Math.floor(z / size);
-            double best = Double.POSITIVE_INFINITY;
-            double angle = 0.0;
-            for (long dx = -1; dx <= 1; dx++) {
-                for (long dz = -1; dz <= 1; dz++) {
-                    long hash = Hash.of(settlement.id() ^ 0x9A7C4L, cx + dx, cz + dz);
-                    double sx = (cx + dx + Hash.unit(hash)) * size;
-                    double sz = (cz + dz + Hash.unit(Hash.mix(hash))) * size;
-                    double d = Math.hypot(sx - x, sz - z);
-                    if (d < best) {
-                        best = d;
-                        angle = Math.PI / 2 * Hash.unit(Hash.mix(Hash.mix(hash)));
-                    }
-                }
-            }
-            return angle;
         }
 
         private long bucket(double x, double z, double size) {
@@ -809,12 +966,10 @@ public final class StreetLayer {
                 seeds.add(new double[]{anchor.x(), anchor.z(), 1});
             }
             // Round the open grounds, where streets meet the castle's or temple's edge
-            for (double[] ground : window.grounds) {
-                for (int k = 0; k < 8; k++) {
-                    double angle = Math.PI / 4 * k;
-                    double r = ground[2] + 2.0 * config.step;
+            for (Ground ground : window.grounds) {
+                for (double[] p : ground.rim(2.0 * config.step, 12)) {
                     for (int family = 0; family < 2; family++) {
-                        seeds.add(new double[]{ground[0] + r * Math.cos(angle), ground[1] + r * Math.sin(angle), family});
+                        seeds.add(new double[]{p[0], p[1], family});
                     }
                 }
             }
