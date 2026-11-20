@@ -930,6 +930,24 @@ public final class StreetLayer {
         }
         double cx = window.extent.coreX();
         double cz = window.extent.coreZ();
+        // The middle of downtown, where lines are drawn through (the actual centre may lie on a shore)
+        double[] downtown = {cx, cz};
+        double downtownWeight = 0.0;
+        double sumX = 0.0;
+        double sumZ = 0.0;
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                if (districts.node(i, j) == District.CENTRAL) {
+                    double w = window.intensity[i * size + j];
+                    sumX += w * (window.originX + i) * (double) grid;
+                    sumZ += w * (window.originZ + j) * (double) grid;
+                    downtownWeight += w;
+                }
+            }
+        }
+        if (downtownWeight > 0) {
+            downtown = new double[]{sumX / downtownWeight, sumZ / downtownWeight};
+        }
         Anchor station = null;
         for (Anchor anchor : anchors) {
             if (anchor.kind() == Anchor.Kind.STATION && (station == null
@@ -1018,6 +1036,22 @@ public final class StreetLayer {
             if (ends[0] == null && ends[1] == null) {
                 continue;
             }
+            // First straight from end to end, as straight as the search allows: kept if it passes through downtown
+            if (ends[0] != null && ends[1] != null) {
+                Approach.Route whole = Approach.route(window.originX, window.originZ, size, size, grid, ends[0][0], ends[0][1],
+                        Math.atan2(ends[1][1] - ends[0][1], ends[1][0] - ends[0][0]), ends[1][0], ends[1][1], Double.NaN,
+                        transit.minRadius, transit.turnCost, transit.maxRadius, cost);
+                if (whole != null) {
+                    double nearest = Double.POSITIVE_INFINITY;
+                    for (double[] p : whole.line()) {
+                        nearest = Math.min(nearest, Math.hypot(p[0] - downtown[0], p[1] - downtown[1]));
+                    }
+                    if (nearest <= transit.downtownReach) {
+                        addLine(lines, window, districts, whole.line(), used, downtown[0], downtown[1], station, transit);
+                        continue;
+                    }
+                }
+            }
             List<double[]> route = new ArrayList<>();
             double arrival = angle;
             if (ends[0] != null) {
@@ -1030,32 +1064,129 @@ public final class StreetLayer {
                 }
             }
             if (ends[1] != null) {
-                double heading = route.isEmpty() ? Math.atan2(ends[1][1] - cz, ends[1][0] - cx) : arrival;
-                Approach.Route leg = Approach.route(window.originX, window.originZ, size, size, grid, cx, cz, heading,
-                        ends[1][0], ends[1][1], Double.NaN, transit.minRadius, transit.turnCost, transit.maxRadius, cost);
+                // The other half is searched from its far end in towards the centre too, each half free, and the two
+                // are joined at the centre by an arc: a line whose ends lie on one side of a centre on a shore turns
+                // there instead of looping round over the water to run straight through
+                Approach.Route leg = Approach.route(window.originX, window.originZ, size, size, grid, ends[1][0], ends[1][1],
+                        Math.atan2(cz - ends[1][1], cx - ends[1][0]), cx, cz, Double.NaN, transit.minRadius,
+                        transit.turnCost, transit.maxRadius, cost);
                 if (leg != null) {
-                    List<double[]> out = leg.line();
-                    route.addAll(route.isEmpty() ? out : out.subList(1, out.size()));
+                    List<double[]> out = new ArrayList<>(leg.line());
+                    java.util.Collections.reverse(out);
+                    route = route.isEmpty() ? out : joinWithArc(route, out, transit.minRadius);
                 }
             }
             if (route.size() < 2) {
                 continue;
             }
-            List<double[]> points = moded(window, districts, route, true);
-            for (double[] p : points) {
-                int i = (int) Math.round(p[0] / grid) - window.originX;
-                int j = (int) Math.round(p[1] / grid) - window.originZ;
-                if (i >= 0 && j >= 0 && i < size && j < size) {
-                    used[i * size + j] = true;
-                }
-            }
-            lines.add(new UrbanLine(points, stations(points, cx, cz, station, transit.stationSpacing)));
+            addLine(lines, window, districts, route, used, downtown[0], downtown[1], station, transit);
         }
         return lines;
     }
 
+    /** A routed line given its ways and stations, its cells marked used. */
+    private void addLine(List<UrbanLine> lines, Window window, Districts districts, List<double[]> route, boolean[] used,
+                         double cx, double cz, Anchor station, CitySettings.Transit transit) {
+        List<double[]> points = moded(window, districts, route, true);
+        int size = window.size;
+        for (double[] p : points) {
+            int i = (int) Math.round(p[0] / grid) - window.originX;
+            int j = (int) Math.round(p[1] / grid) - window.originZ;
+            if (i >= 0 && j >= 0 && i < size && j < size) {
+                used[i * size + j] = true;
+            }
+        }
+        lines.add(new UrbanLine(points, stations(points, cx, cz, station, transit.stationSpacing)));
+    }
+
     /**
-     * Stations along a line: at both ends, at the point nearest the centre, at the main station where the line passes
+     * Two lines meeting end to start at a point, joined round it by an arc of the given radius (less where the lines
+     * are too short for it): each is cut back by the arc's tangent length and the arc put between.
+     */
+    private static List<double[]> joinWithArc(List<double[]> in, List<double[]> out, double radius) {
+        double[] p = in.get(in.size() - 1);
+        double[] a = in.get(in.size() - 2);
+        double[] b = out.get(1);
+        double ux = p[0] - a[0];
+        double uz = p[1] - a[1];
+        double vx = b[0] - p[0];
+        double vz = b[1] - p[1];
+        double ul = Math.hypot(ux, uz);
+        double vl = Math.hypot(vx, vz);
+        List<double[]> joined = new ArrayList<>();
+        if (ul < 1e-9 || vl < 1e-9) {
+            joined.addAll(in);
+            joined.addAll(out.subList(1, out.size()));
+            return joined;
+        }
+        ux /= ul;
+        uz /= ul;
+        vx /= vl;
+        vz /= vl;
+        double turn = Math.acos(Math.max(-1.0, Math.min(1.0, ux * vx + uz * vz)));
+        if (turn < 1e-3) {
+            joined.addAll(in);
+            joined.addAll(out.subList(1, out.size()));
+            return joined;
+        }
+        double inLength = 0.0;
+        for (int k = 1; k < in.size(); k++) {
+            inLength += Math.hypot(in.get(k)[0] - in.get(k - 1)[0], in.get(k)[1] - in.get(k - 1)[1]);
+        }
+        double outLength = 0.0;
+        for (int k = 1; k < out.size(); k++) {
+            outLength += Math.hypot(out.get(k)[0] - out.get(k - 1)[0], out.get(k)[1] - out.get(k - 1)[1]);
+        }
+        // Keep the tangent within half of either line
+        double tangent = Math.min(radius * Math.tan(0.5 * Math.min(turn, Math.PI * 0.95)), 0.5 * Math.min(inLength, outLength));
+        double r = tangent / Math.tan(0.5 * Math.min(turn, Math.PI * 0.95));
+        List<double[]> head = cutEnd(in, tangent);
+        List<double[]> tail = cutStart(out, tangent);
+        double[] t1 = head.get(head.size() - 1);
+        double side = Math.signum(ux * vz - uz * vx);
+        double ccx = t1[0] - side * uz * r;
+        double ccz = t1[1] + side * ux * r;
+        double from = Math.atan2(t1[1] - ccz, t1[0] - ccx);
+        int pieces = Math.max(2, (int) Math.ceil(r * turn / 8.0));
+        joined.addAll(head);
+        for (int q = 1; q < pieces; q++) {
+            double angle = from + side * turn * q / pieces;
+            joined.add(new double[]{ccx + r * Math.cos(angle), ccz + r * Math.sin(angle)});
+        }
+        joined.addAll(tail);
+        return joined;
+    }
+
+    /** A line with a length cut off its end. */
+    private static List<double[]> cutEnd(List<double[]> line, double length) {
+        List<double[]> reversed = new ArrayList<>(line);
+        java.util.Collections.reverse(reversed);
+        List<double[]> cut = cutStart(reversed, length);
+        java.util.Collections.reverse(cut);
+        return cut;
+    }
+
+    /** A line with a length cut off its start. */
+    private static List<double[]> cutStart(List<double[]> line, double length) {
+        double left = length;
+        for (int k = 1; k < line.size(); k++) {
+            double[] a = line.get(k - 1);
+            double[] b = line.get(k);
+            double d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+            if (d >= left) {
+                List<double[]> cut = new ArrayList<>();
+                double t = d < 1e-9 ? 0 : left / d;
+                cut.add(new double[]{a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t});
+                cut.addAll(line.subList(k, line.size()));
+                return cut;
+            }
+            left -= d;
+        }
+        return new ArrayList<>(List.of(line.get(line.size() - 1)));
+    }
+
+    /**
+     * Stations along a line: at both ends, at the point nearest the middle of downtown, at the main station where the line passes
      * within 300 blocks of it, and between these evenly, about {@code spacing} apart.
      */
     private static List<double[]> stations(List<double[]> points, double cx, double cz, Anchor station, double spacing) {

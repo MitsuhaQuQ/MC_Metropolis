@@ -387,20 +387,26 @@ public final class CitySettings {
         public int maxLines = 4;
         /** Least curve radius of a town's lines, the search's turn cost, the widest curve fitted. */
         public double minRadius = 160.0;
-        public double turnCost = 200.0;
+        public double turnCost = 800.0;
         public double maxRadius = 1200.0;
         /** Stations about this far apart along a line. */
         public double stationSpacing = 1000.0;
         /** Demand is summed over squares this wide; a line's ends are chosen among them, no further than {@code reach} from the centre. */
         public double zoneSize = 1024.0;
         public double reach = 8000.0;
-        /** Cost per block of running a line: along an arterial, and elsewhere by district; a cell already used by a line costs this many times more. */
+        /**
+         * Cost per block of running a line: along an arterial, and elsewhere by district; a cell already used by a line
+         * costs {@code reuseFactor} times more. Kept close to one another, so a line runs nearly straight from end to
+         * end, drawn a little through downtown, rather than winding along the streets.
+         */
         public double alongCost = 1.0;
-        public double centralCost = 6.0;
-        public double oldTownCost = 4.0;
-        public double housesCost = 3.0;
-        public double worksCost = 1.5;
-        public double openCost = 2.0;
+        public double centralCost = 1.1;
+        public double oldTownCost = 1.6;
+        public double housesCost = 1.5;
+        public double worksCost = 1.2;
+        public double openCost = 1.4;
+        /** A line run straight from end to end must pass this close to the middle of downtown, else it is routed through the centre. */
+        public double downtownReach = 800.0;
         public double reuseFactor = 3.0;
         /** Cost per block of running a town's line over water: lines go round a lake or along a shore, bridging only short gaps. */
         public double waterCost = 25.0;

@@ -38,8 +38,11 @@ class TransitTest {
         double cx = logic.extent(city).coreX();
         double cz = logic.extent(city).coreZ();
         for (UrbanLine line : plan.urbanLines()) {
-            double nearest = line.points().stream().mapToDouble(p -> Math.hypot(p[0] - cx, p[1] - cz)).min().orElseThrow();
-            assertTrue(nearest < 300, "a line misses the centre by " + nearest);
+            // Through downtown, underground there
+            List<double[]> downtown = line.points().stream()
+                    .filter(p -> plan.districts().at(p[0], p[1]) == District.CENTRAL).toList();
+            assertTrue(!downtown.isEmpty(), "a line misses downtown");
+            assertTrue(downtown.stream().allMatch(p -> (int) p[2] == TransitMode.UNDERGROUND.ordinal()), "a line above ground downtown");
             List<double[]> stations = line.stations();
             assertTrue(stations.size() >= 2);
             for (int k = 1; k < stations.size(); k++) {
@@ -47,9 +50,17 @@ class TransitTest {
                 assertTrue(gap > 0.3 * SETTINGS.transit.stationSpacing && gap < 1.8 * SETTINGS.transit.stationSpacing,
                         "stations " + gap + " apart");
             }
-            // Under the centre the line runs underground
-            double[] middle = line.points().stream().min(java.util.Comparator.comparingDouble(p -> Math.hypot(p[0] - cx, p[1] - cz))).orElseThrow();
-            assertTrue((int) middle[2] == TransitMode.UNDERGROUND.ordinal(), "at the centre the line is " + TransitMode.values()[(int) middle[2]]);
+            // As straight as it can be: no loops, the line never turns back on itself by more than a right angle
+            // over a kilometre
+            List<double[]> p = line.points();
+            int stride = (int) (1000 / SETTINGS.streets.step);
+            for (int k = stride; k + stride < p.size(); k += stride / 4) {
+                double ax = p.get(k)[0] - p.get(k - stride)[0];
+                double az = p.get(k)[1] - p.get(k - stride)[1];
+                double bx = p.get(k + stride)[0] - p.get(k)[0];
+                double bz = p.get(k + stride)[1] - p.get(k)[1];
+                assertTrue(ax * bx + az * bz > 0, "a line doubles back near " + p.get(k)[0] + " " + p.get(k)[1]);
+            }
         }
         Anchor station = plan.anchors().stream().filter(a -> a.kind() == Anchor.Kind.STATION).findFirst().orElse(null);
         if (station != null) {

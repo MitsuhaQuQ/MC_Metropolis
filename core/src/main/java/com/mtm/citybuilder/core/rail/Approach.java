@@ -32,6 +32,17 @@ public final class Approach {
     public static Route route(int originX, int originZ, int width, int height, double grid, double fromX, double fromZ,
                               double heading, double toX, double toZ, double axis, double minRadius, double turnCost,
                               double maxRadius, CellCost cellCost) {
+        return route(originX, originZ, width, height, grid, fromX, fromZ, heading, toX, toZ, axis, false, minRadius,
+                turnCost, maxRadius, cellCost);
+    }
+
+    /**
+     * As {@link #route(int, int, int, int, double, double, double, double, double, double, double, double, double,
+     * double, CellCost)}; with {@code oneWay} the stretch arrives heading along {@code axis} itself, not either way.
+     */
+    public static Route route(int originX, int originZ, int width, int height, double grid, double fromX, double fromZ,
+                              double heading, double toX, double toZ, double axis, boolean oneWay, double minRadius,
+                              double turnCost, double maxRadius, CellCost cellCost) {
         int si = (int) Math.round(fromX / grid) - originX;
         int sj = (int) Math.round(fromZ / grid) - originZ;
         int gi = (int) Math.round(toX / grid) - originX;
@@ -59,7 +70,7 @@ public final class Approach {
         int goal = 0;
         if (!Double.isNaN(axis)) {
             int d = nearestHeading(axis);
-            goal = (1 << d) | (1 << ((d + Alignment.HEADINGS / 2) % Alignment.HEADINGS));
+            goal = oneWay ? 1 << d : (1 << d) | (1 << ((d + Alignment.HEADINGS / 2) % Alignment.HEADINGS));
         }
         List<Integer> cells = Alignment.search(width, height, grid, si * height + sj, gi * height + gj, steps, turnCost,
                 cost, start, goal);
