@@ -21,6 +21,7 @@ gradlew :core:cityMap -Players=culture -Pseed=12345 -Px=0 -Pz=0 -Pscale=128   # 
 gradlew :core:cityMap -Players=settlements -Pseed=12345 -Px=-10600 -Pz=-10000 -Pscale=16   # L2 聚落叠在 L1 上，冷启动约 40 秒；32 格/像素以上只画大都市和城市
 gradlew :core:cityMap -Players=extent -Pseed=12345 -Px=-10232 -Pz=-10272 -Pscale=4   # L3 城市强度和 L3.5 用地，冷启动数分钟（主要是周围的 L2）
 gradlew :core:cityMap -Players=roads -Pseed=12345 -Px=-10600 -Pz=-10000 -Pscale=32   # L4 城际道路，冷启动十几分钟（周围几十公里的 L2）
+gradlew :core:osmStats -Pin=F:/MC/citybuilder/core/build/osm/kyoto.osm -Pbox="34.975 135.735 35.035 135.785"   # OSM 街道统计（路径要绝对路径，相对路径按 core 目录解析；数据从 Overpass 下载要先问用户）
 gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验证）
 ```
 
@@ -37,7 +38,7 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 - `core/`：城市逻辑，纯 Java，**不得引用 Minecraft 类**；不单独出 jar，作为源码目录编进 `common`，单元测试只在这里跑。三个源码集：
   - `src/main`：入口 `CityLogic.forWorld(seed, CitySettings, TerrainView)`（每个世界一份）；`CitySettings`（JSON，带 `planVersion`，Gson 只在内部类 `Json` 里用）；`cache.RegionCache`（按区域的 LRU，同一区域只算一次）；`noise.Hash`（splitmix64，所有随机选择的来源）；`noise.ValueNoise`（平滑噪声，文化区的风格场）；`layer.SuitabilityLayer`/`SuitabilityRegion`（L1）；`culture.CultureLayer`/`CultureRegion`/`CultureSample`/`Style`（L1.5）；`settlement.SettlementLayer`/`Settlement`/`SettlementTier`/`SettlementBlock`（L2，`SettlementBlock` 是一个规划块的结果和它的存储编码）；`plan.PlanStore`/`MemoryPlanStore`/`FilePlanStore`（规划块的存储）；`settlement.SitePreference`（镇和村的选址偏好）；`extent.ExtentLayer`/`CityExtent`/`UrbanRegion`/`UrbanSample`/`LandUse`（L3、L3.5）；`road.RoadLayer`/`RoadEdge`/`RoadRoute`/`RoadKind`/`RoadClass`（L4）；`rail.RailLayer`/`RailEdge`/`RailRoute`/`RailCurve`/`RailStation`/`RailKind`/`RailClass`（L4b）、`rail.HighSpeedLayer`/`HighSpeedLine`/`SpineNode`（高速线预留），两者共用 `rail.Alignment`（带朝向寻路、圆弧拟合、纵断面）；`terrain.BroadTerrain`（去掉河湖的地形，见下）；`terrain.ForeignMask`（外来区域的范围）；`debug.SuitabilityMap`、`debug.CultureMap`、`debug.SettlementMap`、`debug.ExtentMap`、`debug.RoadMap`、`debug.RailMap`、`debug.HighSpeedMap`（调试图渲染）
   - `src/worldgen`：`core.terrain.WorldgenTerrainView`，把 MTM_worldgen 的 `TerrainLogic` 包成 `TerrainView`。纯 Java，但引用 worldgen，所以不在 `src/main`；common 也编译它（`common/build.gradle` 的 `srcDir`），测试和工具在 core 里直接用
-  - `src/tools`：`tools.CityMap`，`cityMap` 任务的入口，不进 jar
+  - `src/tools`：`tools.CityMap`（`cityMap` 任务）、`tools.OsmStats`（`osmStats` 任务，OSM 街道统计，目标值在设计文档第 8 节）、`tools.TerrainCost`（`terrainCost` 任务），都不进 jar
 - **L1 的约定**：每个网格节点的值只取决于节点及周围有限范围（`waterReach`、`landformBlend`）的地形，所以任何区域算出的同一节点相同、区域边界两侧连续（`SuitabilityLayerTest.regionBordersMeet`）。水面节点不存值（NaN），插值时不参与，河岸不会被拉低成台阶。离散的地貌类型分数在周围平均后再用，避免硬边。只用 `TerrainView` 的便宜查询
 - **L1.5 的约定**：风格由低频风格场决定（大片区域、各一半），只在场值 0.5 等值线两侧各 `borderHalfWidth` 格的交界带里由地形决定：两种风格从交界带外侧按代价洪泛，交界带里的点归代价低的一方，边界因此落在山脊和海峡上。代价上限 `maxCost` 必须足以穿过整条交界带（哪怕全是山），否则边界会落在某一方能到达的最远处，形成直线（实测踩过）。区域无关性的论证：代价有上限、每格代价至少 1，所以路径不离开窗口；一方到不了时到达的一方获胜，两方都到不了时由风格场决定，都只取决于节点自己。不要回到"文化核心"的做法（为什么见设计文档 L1.5）
 - **外来区域不参与计算**：`TerrainView.foreign(x, z)` 为真的地方（从其他世界拼进来的地图及其缝合带）在每一层都被排除：L1 不存值、不计入邻居；L1.5 洪泛不能穿过。以后各层同样如此。worldgen 不公开缝合带的实际范围，`WorldgenTerrainView` 用 `ForeignMask` 按最大缝合宽度保守排除

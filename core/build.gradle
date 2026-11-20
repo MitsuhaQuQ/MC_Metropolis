@@ -31,6 +31,8 @@ dependencies {
     testImplementation sourceSets.worldgen.output
     testImplementation worldgenJar
     testImplementation "com.google.code.gson:gson:${rootProject.gson_version}"
+    // The tools are tested too: the OSM statistics
+    testImplementation sourceSets.tools.output
 }
 
 test {
@@ -77,4 +79,19 @@ tasks.register("terrainCost", JavaExec) {
     mainClass = "com.mtm.citybuilder.tools.TerrainCost"
     maxHeapSize = "6g"
     args providers.gradleProperty("seed").getOrElse("12345")
+}
+
+// gradlew :core:osmStats -Pin=<file.osm> [-Pbox="south west north east"]: statistics of a real town from OpenStreetMap,
+// the targets the street layers are tuned against (data from OpenStreetMap, ODbL: statistics only, never shipped)
+tasks.register("osmStats", JavaExec) {
+    group = "citybuilder"
+    description = "Street and settlement statistics of an OpenStreetMap extract"
+    classpath = sourceSets.tools.runtimeClasspath
+    mainClass = "com.mtm.citybuilder.tools.OsmStats"
+    maxHeapSize = "6g"
+    def input = providers.gradleProperty("in")
+    def box = providers.gradleProperty("box")
+    if (input.isPresent()) {
+        args([file(input.get()).absolutePath] + (box.isPresent() ? box.get().tokenize(" ") : []))
+    }
 }
