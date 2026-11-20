@@ -24,9 +24,14 @@ gradlew :core:cityMap -Players=roads -Pseed=12345 -Px=-10600 -Pz=-10000 -Pscale=
 gradlew :core:cityMap -Players=streets -Pseed=12345 -Px=-10232 -Pz=-10272 -Pscale=8   # L5/L6 离该点最近的镇以上聚落的路网，打印各类长度、桥/暗渠/坡道/台阶、分区比例和 OSM 指标，约 50 秒；-Players=districts 同样的图，底色换成功能分区
 gradlew :core:cityMap -Players=plots -Pseed=12345 -Px=-10400 -Pz=-10150 -Pscale=1 -Psize=700   # L7 地块，打印面积比例和各片区面宽进深，约 70 秒
 gradlew :core:osmStats -Pin=F:/MC/citybuilder/core/build/osm/kyoto.osm -Pbox="34.975 135.735 35.035 135.785"   # OSM 街道统计（路径要绝对路径，相对路径按 core 目录解析；数据从 Overpass 下载要先问用户）
+python -I tools/assets/plateau_buildings.py F:/MC/citybuilder/core/build/plateau/26100_kyoto-shi_city_2025_citygml_1_op.zip F:/MC/citybuilder/core/build/plateau/kyoto-buildings.csv   # PLATEAU 建筑属性和 LOD2 屋顶形式 → CSV，全京都约 1 分钟（多进程）
+python -I tools/assets/plateau_stats.py F:/MC/citybuilder/core/build/plateau/kyoto-buildings.csv [--box 34.975,135.735,35.035,135.785 --streets F:/MC/citybuilder/core/build/osm/kyoto.osm]   # 层高、占地、屋顶、圆环、按临街道路等级的层数（设计文档第 6 节"京都实测"）
+python -I tools/assets/osm_buildings.py F:/MC/citybuilder/core/build/osm/kanazawa-bld.json --streets F:/MC/citybuilder/core/build/osm/kanazawa.osm   # OSM 建筑统计（Overpass 的 out geom JSON）
+python -I tools/assets/nbt_survey.py <目录或 .nbt>   # 原版结构模板（如 kogtyv-TAV）的尺寸、DataVersion、1.20.1 没有的方块、拼图池、层高估计
 gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验证）
 ```
 
+- 建筑数据（2026-11-20）：PLATEAU 京都市 2025 年度 CityGML 在 `F:\MC\citybuilder\core\build\plateau\`（2.7 GB，用户同意下载；授权见设计文档"素材来源"），OSM 建筑在 `core/build/osm/*-bld.json`；都不进仓库，只把统计结果写进设计文档。脚本在 `tools/assets/`，纯 Python 标准库，用 `python -I` 运行
 - 性能测量（2026-11-20 第一轮优化用的）：`gradlew :core:cityMap -Players=spawn -Px=-10232 -Pz=-10272` 冷启动计时新世界第一个区块要的全部规划（逐层计时、统计碰到的 worldgen 区域数），`-Pjfr=<文件>` 记录 Flight Recorder 采样（`jfr print --events jdk.ExecutionSample`），`-PworldgenCache=<N>` 改 worldgen 的区域缓存大小做对照、`-Pthreads=<N>` 限制公共线程池；`gradlew :core:terrainCost` 计时 worldgen 各查询第一次进入一个区域和之后每点的开销
 - `cityMap` 还接受 `-Psize=<像素>`、`-Pout=<文件>`；它会打印统计：L1 是每个逻辑区域的耗时、各地貌的平均适宜度和海拔；L1.5 是每个文化单元的耗时、亚洲风格的面积比例、边界落在各地貌上的比例、洪泛未到达的边界节点比例。调参后先出图看效果，再看测试
 - 只要统计、不要大图时，用小尺寸覆盖同样的范围，比如 `-Pscale=2048 -Psize=64`
