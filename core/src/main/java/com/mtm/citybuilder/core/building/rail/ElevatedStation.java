@@ -30,6 +30,7 @@ public final class ElevatedStation {
     private final int floor;
     private final int stairRun;
     private final int stairX;
+    private final int escalatorRun;
     private final Viaduct viaduct;
 
     /**
@@ -56,17 +57,19 @@ public final class ElevatedStation {
             throw new IllegalArgumentException("deck " + level + " too low over the ground at " + floor);
         }
         stairRun = steps + (landing(steps) > 0 ? 2 * ((steps - 1) / landing(steps)) : 0);
-        this.concourseLength = Math.max(stairRun + 8,
+        escalatorRun = steps + 2;
+        // Stairs, then in line beyond their top the escalator well coming up the other way to the same landing
+        this.concourseLength = Math.max(stairRun + escalatorRun + 8,
                 concourseLength > 0 ? concourseLength : Math.max(16, Math.min(40, platformLength / 4)));
         int c0 = centre - this.concourseLength / 2;
         stairX = c0 + 3;
         this.canopyLength = Math.min(platformLength, canopyLength > 0 ? canopyLength : platformLength - 6);
         List<int[]> clear = new ArrayList<>(keepClear);
-        clear.add(new int[] {stairX - 1, stairX + stairRun + 1});
+        clear.add(new int[] {stairX - 1, stairX + stairRun + escalatorRun + 2});
         viaduct = Viaduct.builder(Viaduct.Deck.RAIL, platformLength + 2 * approach, level)
                 .width(2 * section.half() + 1).spans(limits).keepClear(clear).columns(2)
                 .trackCentres(section.tracks()).palette(p).ground(ground).build();
-        if (stairX + stairRun > approach + platformLength) {
+        if (stairX + stairRun + escalatorRun > approach + platformLength) {
             throw new IllegalArgumentException("platform too short for the stairs: " + platformLength);
         }
     }
@@ -110,6 +113,36 @@ public final class ElevatedStation {
         return floor;
     }
 
+    /** The concourse along x, inclusive: the station building under the deck. */
+    public int[] concourseX() {
+        int c0 = approach + platformLength / 2 - concourseLength / 2;
+        return new int[] {c0, c0 + concourseLength - 1};
+    }
+
+    /** The platforms' top block (people stand a block above). */
+    public int platformY() {
+        return level;
+    }
+
+    /**
+     * Each platform's flights: stairs from the concourse up through the deck (climbing +x), and beyond their top an
+     * empty well for MTR's escalator coming up the other way to the same landing.
+     */
+    public List<Flights.Flight> flights() {
+        List<Flights.Flight> out = new ArrayList<>();
+        int roof = level + StationParts.CANOPY_HEIGHT;
+        int arrive = stairX + stairRun;
+        for (CrossSection.Platform pl : section.platforms()) {
+            int[] w = well(pl);
+            out.add(new Flights.Flight(stairX, 1, w[0], w[1], floor + 1, level + 1, landing(level - floor), false,
+                    false, floor + 1, roof - 1, level + 1, null));
+            int[] e = {w[0], w[0] + Flights.ESCALATOR_WIDTH - 1};
+            out.add(new Flights.Flight(arrive + escalatorRun, -1, e[0], e[1], floor + 1, level + 1, 0, false, true,
+                    floor + 1, roof - 1, level + 1, null));
+        }
+        return out;
+    }
+
     /** z of a platform's stair well: the middle of an island (3 wide on wide ones), the back of a side platform. */
     static int[] well(CrossSection.Platform pl) {
         if (pl.island()) {
@@ -120,6 +153,15 @@ public final class ElevatedStation {
     }
 
     public Model build() {
+        Model m = buildWithoutFlights();
+        for (Flights.Flight f : flights()) {
+            Flights.place(m, p, f);
+        }
+        return m;
+    }
+
+    /** Everything but the stairs and escalator wells ({@link #flights()}), for laying on a curve first. */
+    public Model buildWithoutFlights() {
         Model m = new Model();
         viaduct.buildInto(m);
         int x0 = platformStart(), x1 = platformEnd();
@@ -141,24 +183,6 @@ public final class ElevatedStation {
                     level, colZ);
         }
         concourse(m);
-        for (CrossSection.Platform pl : section.platforms()) {
-            int[] w = well(pl);
-            // Cut the well through the deck and the platform, then the stairs and railings round the opening
-            StationParts.clear(m, stairX, stairX + stairRun - 1, floor + 1, roof - 1, w[0], w[1]);
-            StationParts.flight(m, p, stairX, floor + 1, level + 1, 1, w[0], w[1], false, landing(level - floor));
-            for (int x = stairX - 1; x < stairX + stairRun; x++) {
-                for (int z : new int[] {w[0] - 1, w[1] + 1}) {
-                    if (m.has(x, level, z) && !m.has(x, level + 1, z)) {
-                        m.set(x, level + 1, z, RailPalette.bars(p.rail(), true));
-                    }
-                }
-            }
-            for (int z = w[0] - 1; z <= w[1] + 1; z++) {
-                if (m.has(stairX - 1, level, z)) {
-                    m.set(stairX - 1, level + 1, z, RailPalette.bars(p.rail(), false));
-                }
-            }
-        }
         return m;
     }
 

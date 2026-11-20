@@ -8,6 +8,7 @@ import com.google.gson.JsonParser;
 import com.mtm.citybuilder.core.building.rail.BrickViaduct;
 import com.mtm.citybuilder.core.building.rail.CrossSection;
 import com.mtm.citybuilder.core.building.rail.Curve;
+import com.mtm.citybuilder.core.building.rail.CurvedStation;
 import com.mtm.citybuilder.core.building.rail.ElevatedStation;
 import com.mtm.citybuilder.core.building.rail.Footbridge;
 import com.mtm.citybuilder.core.building.rail.FrameViaduct;
@@ -57,11 +58,15 @@ public final class RailModels {
             String slug = o.get("slug").getAsString();
             long t0 = System.nanoTime();
             JsonObject meta = new JsonObject();
-            Model m = build(o, meta);
-            if (o.has("curve")) {  // [start, radius, length]: the straight structure laid on a curve
+            Curve curve = null;
+            if (o.has("curve")) {  // [start, radius, length]: laid on a curve
                 JsonArray c = o.getAsJsonArray("curve");
-                m = new Curve(c.get(0).getAsDouble(), c.get(1).getAsDouble(), c.get(2).getAsDouble()).apply(m);
+                curve = new Curve(c.get(0).getAsDouble(), c.get(1).getAsDouble(), c.get(2).getAsDouble());
                 meta.add("curve", c);
+            }
+            Model m = build(o, meta, curve);
+            if (curve != null && !meta.has("curvedStation")) {
+                m = curve.apply(m);
             }
             write(m, meta, out.resolve(slug + ".json"));
             System.out.printf("%-28s %4d x %3d x %3d  %7d blocks  spans %s  %d ms%n", slug,
@@ -70,7 +75,7 @@ public final class RailModels {
         }
     }
 
-    static Model build(JsonObject o, JsonObject meta) {
+    static Model build(JsonObject o, JsonObject meta, Curve curve) {
         RailPalette p = RailPalette.named(str(o, "palette", "CONCRETE"));
         Ground ground = ground(o);
         String kind = o.get("kind").getAsString();
@@ -105,6 +110,11 @@ public final class RailModels {
                 describe(meta, s.viaduct().spans(), s.trackCentres(), s.viaduct().level());
                 meta.addProperty("platformStart", s.platformStart());
                 meta.addProperty("platformEnd", s.platformEnd());
+                if (curve != null) {
+                    meta.addProperty("curvedStation", true);
+                    return CurvedStation.elevated(s, curve, i(o, "carLength", CurvedStation.CAR_LENGTH),
+                            i(o, "buildingMinRadius", CurvedStation.BUILDING_MIN_RADIUS), p);
+                }
                 return s.build();
             }
             case "ground_station" -> {
@@ -116,6 +126,11 @@ public final class RailModels {
                 describe(meta, List.of(), s.trackCentres(), 1);
                 meta.addProperty("platformStart", s.platformStart());
                 meta.addProperty("platformEnd", s.platformEnd());
+                if (curve != null) {
+                    meta.addProperty("curvedStation", true);
+                    return CurvedStation.ground(s, curve, i(o, "carLength", CurvedStation.CAR_LENGTH),
+                            i(o, "buildingMinRadius", CurvedStation.BUILDING_MIN_RADIUS), p);
+                }
                 return s.build();
             }
             case "brick_viaduct" -> {

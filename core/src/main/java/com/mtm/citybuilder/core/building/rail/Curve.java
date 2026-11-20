@@ -38,6 +38,25 @@ public final class Curve {
         this.length = length;
     }
 
+    public double start() {
+        return start;
+    }
+
+    public double radius() {
+        return radius;
+    }
+
+    public double length() {
+        return length;
+    }
+
+    /** Decides a block of the curved result: gets the block the straight structure has there and the exact point
+     * it maps back to (distance along, offset across, continuous), returns what to set or null for nothing. */
+    @FunctionalInterface
+    public interface Filter {
+        String block(int x, int y, int z, String state, double s, double d);
+    }
+
     /** The centre line's point and heading (radians, clockwise from +x seen from above) at distance s. */
     public double[] at(double s) {
         double sign = Math.signum(radius), r = Math.abs(radius);
@@ -90,6 +109,11 @@ public final class Curve {
 
     /** The straight structure laid on the curve. */
     public Model apply(Model straight) {
+        return apply(straight, null);
+    }
+
+    /** The straight structure laid on the curve, each block passed through {@code filter} (when not null). */
+    public Model apply(Model straight, Filter filter) {
         Model out = new Model();
         if (straight.size() == 0) {
             return out;
@@ -120,7 +144,11 @@ public final class Curve {
                 }
                 int turns = quarterTurns(s + 0.5);
                 for (Map.Entry<Integer, String> e : col.entrySet()) {
-                    out.set(x, e.getKey(), z, rotate(e.getValue(), turns));
+                    String b = filter == null ? e.getValue()
+                            : filter.block(x, e.getKey(), z, e.getValue(), sd[0], sd[1]);
+                    if (b != null) {
+                        out.set(x, e.getKey(), z, rotate(b, turns));
+                    }
                 }
             }
         }

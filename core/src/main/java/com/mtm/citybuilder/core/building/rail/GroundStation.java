@@ -84,7 +84,7 @@ public final class GroundStation {
         int run = platformRun();
         int centre = approach + platformLength / 2;
         bridgeX = house == House.OVER ? centre - houseDepth / 2 : centre + run / 2;
-        if (bridgeX - run - 2 < approach) {
+        if (bridgeX - run - 2 < approach || hasBridge() && bridgeX1() + escalatorRun() + 2 > approach + platformLength) {
             throw new IllegalArgumentException("platform too short for the stairs: " + platformLength);
         }
     }
@@ -141,7 +141,79 @@ public final class GroundStation {
                 areas.stream().mapToInt(CrossSection.Platform::z1).max().orElse(0)};
     }
 
+    /** Whether there is a bridge over the tracks (a building over them, or a footbridge to the far platforms). */
+    public boolean hasBridge() {
+        return house == House.OVER || areas.size() > 1;
+    }
+
+    /** x of the bridge's far side (the building over the tracks, or the footbridge). */
+    public int bridgeX1() {
+        return house == House.OVER ? bridgeX + houseDepth - 1 : bridgeX + 4;
+    }
+
+    /** The building beside the line along x, inclusive. */
+    public int[] houseX() {
+        int hx0 = approach + platformLength / 2 - houseWidth / 2;
+        return new int[] {hx0, hx0 + houseWidth - 1};
+    }
+
+    /** The platforms' top block (people stand a block above). */
+    public int platformY() {
+        return 1;
+    }
+
+    private int escalatorRun() {
+        return bridgeFloor + 1 - 2 + 2;
+    }
+
+    /** z of the building over the tracks, reaching past them on both sides. */
+    private int[] overZ() {
+        int reach = Math.max(5, houseWidth);
+        int[] bz = bridgeZ();
+        return new int[] {Math.min(bz[0], section.zMin()) - reach, Math.max(bz[1], section.zMax()) + reach};
+    }
+
+    /**
+     * The flights: stairs from every platform up to the bridge (climbing +x to its near side), an empty well for MTR's
+     * escalator from every platform up to its far side (climbing -x), and with a building over the tracks, stairs
+     * from the street on both sides.
+     */
+    public List<Flights.Flight> flights() {
+        List<Flights.Flight> out = new ArrayList<>();
+        if (!hasBridge()) {
+            return out;
+        }
+        int top = bridgeFloor + 1;
+        int run = platformRun();
+        for (CrossSection.Platform a : areas) {
+            int[] w = ElevatedStation.well(a);
+            out.add(new Flights.Flight(bridgeX - run, 1, w[0], w[1], 2, top, landing(platformSteps()), true, false, 2,
+                    top + 2, Integer.MIN_VALUE, null));
+            out.add(new Flights.Flight(bridgeX1() + escalatorRun(), -1, w[0], w[0] + Flights.ESCALATOR_WIDTH - 1, 2,
+                    top, 0, false, true, 2, top + 2, Integer.MIN_VALUE, null));
+        }
+        if (house == House.OVER) {
+            int[] oz = overZ();
+            for (int[] w : new int[][] {{oz[0] + 1, oz[0] + 3}, {oz[1] - 3, oz[1] - 1}}) {
+                int foot = ground.at(bridgeX, (w[0] + w[1]) / 2);
+                int steps = top - foot - 1;
+                out.add(new Flights.Flight(bridgeX - run(steps), 1, w[0], w[1], foot + 1, top, landing(steps), true,
+                        false, top + 3, top + 2, Integer.MIN_VALUE, ground));
+            }
+        }
+        return out;
+    }
+
     public Model build() {
+        Model m = buildWithoutFlights();
+        for (Flights.Flight f : flights()) {
+            Flights.place(m, p, f);
+        }
+        return m;
+    }
+
+    /** Everything but the stairs and escalator wells ({@link #flights()}), for laying on a curve first. */
+    public Model buildWithoutFlights() {
         Model m = new Model();
         int x0 = platformStart(), x1 = platformEnd();
         int len = length();
@@ -181,29 +253,6 @@ public final class GroundStation {
             beside(m, bz[0], bz[1]);
         }
         return m;
-    }
-
-    /** Stairs from each area up to the bridge, arriving at x = bridgeX. */
-    private void platformStairs(Model m) {
-        int top = bridgeFloor + 1;
-        int run = platformRun();
-        for (CrossSection.Platform a : areas) {
-            int[] w = ElevatedStation.well(a);
-            StationParts.clear(m, bridgeX - run, bridgeX - 1, 2, top + 2, w[0], w[1]);
-            int end = StationParts.flight(m, p, bridgeX - run, 2, top, 1, w[0], w[1], true, landing(platformSteps()));
-            if (end != bridgeX) {
-                throw new IllegalStateException("stair ends at " + end + ", not " + bridgeX);
-            }
-            opening(m, w[0], w[1]);
-        }
-    }
-
-    private void opening(Model m, int z0, int z1) {
-        for (int z = z0; z <= z1; z++) {
-            for (int y = bridgeFloor + 1; y <= bridgeFloor + 3; y++) {
-                m.remove(bridgeX, y, z);
-            }
-        }
     }
 
     /** The bridge's walls and roof: floor at bridgeFloor over x in [bx0, bx1], z in [z0, z1]; columns to the ground. */
@@ -258,23 +307,14 @@ public final class GroundStation {
 
     /** 橋上駅舎: the building over the tracks, reaching past them on both sides, stairs to the street at both ends. */
     private void over(Model m, int zLo, int zHi) {
-        int reach = Math.max(5, houseWidth);
-        int z0 = Math.min(zLo, section.zMin()) - reach, z1 = Math.max(zHi, section.zMax()) + reach;
-        int bx1 = bridgeX + houseDepth - 1;
+        int[] oz = overZ();
+        int z0 = oz[0], z1 = oz[1];
+        int bx1 = bridgeX1();
         bridgeBox(m, bridgeX, bx1, z0, z1, STOREY);
-        platformStairs(m);
-        // Street stairs at both ends, climbing +x from the terrain to the floor
+        // Pavement at the feet of the street stairs (the stairs are flights)
         for (int[] w : new int[][] {{z0 + 1, z0 + 3}, {z1 - 3, z1 - 1}}) {
             int foot = ground.at(bridgeX, (w[0] + w[1]) / 2);
-            int top = bridgeFloor + 1;
-            int steps = top - foot - 1;
-            int run = run(steps);
-            int end = StationParts.flight(m, p, bridgeX - run, foot + 1, top, 1, w[0], w[1], true, landing(steps),
-                    ground);
-            if (end != bridgeX) {
-                throw new IllegalStateException("street stair ends at " + end);
-            }
-            opening(m, w[0], w[1]);
+            int run = run(bridgeFloor + 1 - foot - 1);
             for (int x = bridgeX - run - 2; x < bridgeX - run; x++) {  // pavement at the foot
                 for (int z = w[0]; z <= w[1]; z++) {
                     m.setIfEmpty(x, ground.at(x, z), z, p.walk());
@@ -291,7 +331,6 @@ public final class GroundStation {
     private void beside(Model m, int zLo, int zHi) {
         if (areas.size() > 1) {
             bridgeBox(m, bridgeX, bridgeX + 4, zLo, zHi, 3);
-            platformStairs(m);
         }
         // The building behind the near platform: its floor level with the platform, a door onto it
         int hz0 = zHi + 2, hz1 = hz0 + houseDepth - 1;

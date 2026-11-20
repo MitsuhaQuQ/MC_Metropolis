@@ -10,6 +10,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Every structure is built over a sweep of sizes, sections and terrain: nothing in them is a fixed size. */
@@ -262,6 +263,129 @@ class RailStructureTest {
                     assertStates(m);
                 }
             }
+        }
+    }
+
+    private static int[] facing(String s) {
+        String f = s.substring(s.indexOf("facing=") + 7);
+        f = f.substring(0, Math.min(f.indexOf(',') < 0 ? f.length() : f.indexOf(','), f.indexOf(']')));
+        return new int[] {f.equals("east") ? 1 : f.equals("west") ? -1 : 0, f.equals("south") ? 1 : f.equals("north") ? -1 : 0};
+    }
+
+    /** Whether a step has another step or a floor straight ahead of it, one up or level. */
+    private static boolean ahead(Model m, int x, int y, int z, int[] d) {
+        String up = m.get(x + d[0], y + 1, z + d[1]), level = m.get(x + d[0], y, z + d[1]);
+        return up != null && base(up).endsWith("_stairs") || level != null && !m.has(x + d[0], y + 1, z + d[1]);
+    }
+
+    /**
+     * Stair blocks in a model, and how many can be climbed: a step or floor straight ahead, or (where a flight shifts
+     * sideways along a curve) a step beside it in its row that has one.
+     */
+    private static int[] steps(Model m) {
+        int[] out = new int[2];
+        m.forEach((x, y, z, s) -> {
+            if (!base(s).endsWith("andesite_stairs")) {
+                return;
+            }
+            out[0]++;
+            int[] d = facing(s);
+            boolean ok = ahead(m, x, y, z, d);
+            for (int k = -1; k <= 1 && !ok; k += 2) {
+                int sx = x + k * d[1], sz = z + k * d[0];  // beside it, across the way it climbs
+                String b = m.get(sx, y, sz);
+                ok = b != null && b.equals(s) && ahead(m, sx, y, sz, d);
+            }
+            if (ok) {
+                out[1]++;
+            }
+        });
+        return out;
+    }
+
+    @Test
+    void curvedStationsLeaveTheirEdgesOpenAndKeepTheirStairs() {
+        for (double radius : new double[] {160, -250, 400, 900}) {
+            ElevatedStation st = new ElevatedStation(new CrossSection("TPT", 11), 200, 9, 6, Spans.Limits.RAIL,
+                    List.of(), 0, 0, P, Ground.FLAT);
+            double start = Math.abs(radius) >= CurvedStation.BUILDING_MIN_RADIUS ? 20 : st.concourseX()[1] + 2;
+            Curve c = new Curve(start, radius, 206 - start);
+            Model m = CurvedStation.elevated(st, c, 20, CurvedStation.BUILDING_MIN_RADIUS, P);
+            double gap = CurvedStation.edgeGap(radius, 20);
+            int[] tracks = st.trackCentres();
+            int[] near = {0};
+            m.forEach((x, y, z, s) -> {
+                if (y != 9 || !(s.equals(P.platform()) || s.equals(P.tactile()) || s.equals(P.edge()))) {
+                    return;
+                }
+                double[] sd = c.project(x + 0.5, z + 0.5);
+                if (sd[0] < start + 10 || sd[0] > c.start() + c.length() - 10) {
+                    return;
+                }
+                for (int t : tracks) {
+                    if (Math.abs(sd[1] - (t + 0.5)) - 0.5 < gap - 1e-9) {
+                        near[0]++;
+                    }
+                }
+            });
+            assertEquals(0, near[0], radius + ": platform blocks inside the open edge");
+            // Every step of every flight is there and climbable: none doubled or dropped by the curve
+            int[] counted = steps(m);
+            int expected = 0;
+            for (Flights.Flight f : st.flights()) {
+                if (!f.escalator()) {
+                    expected += (f.z1() - f.z0() + 1) * (f.top() - f.bottom());
+                }
+            }
+            // As many steps as straight; a row is a block wider where the flight shifts sideways along the curve
+            assertTrue(counted[0] >= expected && counted[0] <= expected + expected / 3, radius + ": steps " + counted[0]);
+            assertEquals(counted[0], counted[1], radius + ": climbable steps");
+            // Trains pass along the arc
+            for (double s = start + 2; s < c.start() + c.length() - 2; s += 0.5) {
+                for (int t : tracks) {
+                    double[] pt = c.place(s, t + 0.5);
+                    for (int y = 9; y <= 13; y++) {
+                        assertFalse(m.has((int) Math.floor(pt[0]), y, (int) Math.floor(pt[1])), radius + ": train");
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void stationBuildingsStandOnlyOnWideCurves() {
+        GroundStation st = new GroundStation(new CrossSection("PTTP", 5), 120, GroundStation.House.OVER, 6, 14, 1, 0,
+                4, 9, P, Ground.FLAT);
+        assertThrows(IllegalArgumentException.class,
+                () -> CurvedStation.ground(st, new Curve(0, 300, 128), 20, CurvedStation.BUILDING_MIN_RADIUS, P));
+        Model m = CurvedStation.ground(st, new Curve(0, 800, 128), 20, CurvedStation.BUILDING_MIN_RADIUS, P);
+        int[] counted = steps(m);
+        assertTrue(counted[0] > 0);
+        assertEquals(counted[0], counted[1], "climbable steps on the wide curve");
+        ElevatedStation es = new ElevatedStation(new CrossSection("PTTP", 6), 160, 10, 6, Spans.Limits.RAIL,
+                List.of(), 0, 0, P, Ground.FLAT);
+        assertThrows(IllegalArgumentException.class,
+                () -> CurvedStation.elevated(es, new Curve(0, 200, 172), 20, CurvedStation.BUILDING_MIN_RADIUS, P));
+    }
+
+    @Test
+    void escalatorWellsAreLeftEmpty() {
+        ElevatedStation st = new ElevatedStation(new CrossSection("TPT", 11), 160, 9, 6, Spans.Limits.RAIL,
+                List.of(), 0, 0, P, Ground.FLAT);
+        Model m = st.build();
+        for (Flights.Flight f : st.flights()) {
+            if (!f.escalator()) {
+                continue;
+            }
+            for (int i = 0; i < f.run(); i++) {
+                int x = f.x() + f.dir() * i;
+                for (int z = f.z0(); z <= f.z1(); z++) {
+                    for (int y = f.bottom(); y <= 9; y++) {
+                        assertFalse(m.has(x, y, z), "escalator well at " + x + "," + y + "," + z);
+                    }
+                }
+            }
+            assertTrue(m.has(f.x(), f.bottom() - 1, f.z0()), "the concourse floor at the escalator's foot");
         }
     }
 
