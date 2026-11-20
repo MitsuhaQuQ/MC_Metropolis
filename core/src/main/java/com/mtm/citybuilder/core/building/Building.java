@@ -50,6 +50,10 @@ package com.mtm.citybuilder.core.building;
  * @param quarter    the character of the quarter it stands in
  * @param region     the regional way of building
  * @param composition the style it was built in and the option it took for each interchangeable part
+ * @param program    a particular use the lot was given (a convenience store, a fast food restaurant, a post office),
+ *                   or null
+ * @param standalone whether the program stands alone, set back behind its parking, rather than in the lot's
+ *                   building's ground floor
  * @param palette    which palette of materials
  * @param variant    a hash for the building's details (rooftop, units, balconies)
  */
@@ -58,7 +62,8 @@ public record Building(long id, Type type, int storeys, int ground, int upper, R
                        double wingFrom, double wingTo, double wingBack, double chamferLeft, double chamferRight,
                        int layout, double lotFrom, double lotTo, double lotDepth, double parkFrom, double parkTo,
                        double parkBack, boolean carport, int base, double ox, double oz, double tx, double tz, double nx, double nz, double door,
-                       Quarter quarter, Region region, Composition composition, int palette, long variant) {
+                       Quarter quarter, Region region, Composition composition, Program program, boolean standalone,
+                       int palette, long variant) {
     /** Kinds of buildings of the first version, Japanese. */
     public enum Type {
         /** A detached house, set back with a small garden, gable or hipped. */

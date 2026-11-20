@@ -135,6 +135,16 @@ public final class BuildingLayer {
         DISPLAY,
         /** What a shop puts out on the pavement: a standing sign, a barrel, a pot. */
         STAND,
+        /** A program's brand colour: a convenience store's band, a post office's red. */
+        BRAND,
+        /** A billboard's face. */
+        AD,
+        /** A white line on a parking lot. */
+        LINE,
+        /** A red post box. */
+        POSTBOX,
+        /** A pole sign's pole. */
+        POLE,
         /** A light inside, so nothing spawns there. */
         LIGHT
     }
@@ -316,6 +326,7 @@ public final class BuildingLayer {
         }
         Quarter quarter = quarters.at(plot);
         Region region = quarters.region(plot);
+        Program program = quarters.program(plot);
         Catalog catalog = Catalog.get();
         // A quarter with styles of its own (a hanamachi, a chaya or storehouse quarter, a merchant town) builds in them;
         // elsewhere the district's kind of building, in the region's style for it (the catalogue)
@@ -331,7 +342,7 @@ public final class BuildingLayer {
             if (project) {
                 type = Building.Type.HOUSE;
             }
-            style = catalog.forType(type, region, Hash.unit(Hash.of(project ? group : h, 36)));
+            style = catalog.forType(type, region, district, Hash.unit(Hash.of(project ? group : h, 36)));
         }
         if (style.storeys() != null) {
             storeys = style.storeys();
@@ -346,6 +357,27 @@ public final class BuildingLayer {
         // The building's interchangeable parts, drawn from its style; a development's houses share them
         long seed = project ? group : h;
         Composition composition = catalog.compose(style, seed);
+        // A program the lot was given: standalone where the lot is open (not downtown or in the old town, wide and deep
+        // enough for parking in front), else the ground floor of a shop, office or block of flats
+        boolean standalone = false;
+        if (program != null) {
+            boolean open = !downtown && district != District.OLD_TOWN && plot.frontage() >= 12.0 && plot.maxDepth() >= 18.0;
+            if (open) {
+                standalone = true;
+                project = false;
+                style = catalog.standalone(program);
+                type = style.type();
+                storeys = style.storeys() == null ? 1 : style.storeys();
+                seed = h;
+                composition = catalog.compose(style, seed);
+            } else if (type != Building.Type.SHOP && type != Building.Type.OFFICE && type != Building.Type.APARTMENT) {
+                type = Building.Type.SHOP;
+                project = false;
+                seed = h;
+                style = catalog.forType(type, region, district, Hash.unit(Hash.of(seed, 36)));
+                composition = catalog.compose(style, seed);
+            }
+        }
 
         // Footprint: setback from the street, gaps at the sides and the back, depth within the kind's range
         double u3 = Hash.unit(Hash.of(h, 3));
@@ -400,6 +432,13 @@ public final class BuildingLayer {
                 backGap = 3.0;
                 depth = plot.maxDepth();
             }
+        }
+        if (standalone) {
+            // A box set back behind its parking, five blocks of bays and a lane
+            front = 7.0;
+            sideGap = 1.0;
+            backGap = 1.0;
+            depth = 9.0 + 4.0 * Hash.unit(Hash.of(h, 4));
         }
         double width = Math.floor(plot.frontage() - 2.0 * sideGap);
         if (width < 5.0) {
@@ -489,6 +528,9 @@ public final class BuildingLayer {
             case WORKS -> config.worksStorey;
             default -> config.storey;
         };
+        if (standalone) {
+            ground = config.shopFloor + 1;
+        }
         int upper = switch (type) {
             case OFFICE -> config.shopFloor;
             case WORKS -> config.worksStorey;
@@ -529,7 +571,7 @@ public final class BuildingLayer {
         if (type == Building.Type.OFFICE && storeys < 4) {
             // Capped by a narrow street: a shop with rooms above, not an office block
             type = Building.Type.SHOP;
-            style = catalog.forType(type, region, Hash.unit(Hash.of(seed, 36)));
+            style = catalog.forType(type, region, district, Hash.unit(Hash.of(seed, 36)));
             composition = catalog.compose(style, seed);
         }
 
@@ -598,12 +640,12 @@ public final class BuildingLayer {
         return new Building(plot.id(), type, storeys, ground, upper, roof, ridgeAlong, slope, from, to, front, back,
                 step, stepBack, wingFrom, wingTo, wingBack, chamferLeft, chamferRight, layout, plot.start() - from,
                 plot.end() - from, plot.maxDepth(), parkFrom, parkTo, parkBack, carport, base, ox, oz, p[2], p[3], nx, nz,
-                door, quarter, region, composition, palette, variant);
+                door, quarter, region, composition, program, standalone, palette, variant);
     }
 
     /** How far out in front a building's ring reaches: its whole front yard for houses and flats, else a block. */
     private static double yard(Building b) {
-        return b.type() == Building.Type.HOUSE || b.type() == Building.Type.APARTMENT ? b.front() : 1.0;
+        return b.type() == Building.Type.HOUSE || b.type() == Building.Type.APARTMENT || b.standalone() ? b.front() : 1.0;
     }
 
     /**
@@ -883,6 +925,60 @@ public final class BuildingLayer {
                 && c.face() == Face.FRONT && c.u() >= 1.0 && c.u() < b.width() - 1.0;
     }
 
+    /** Whether a column carries a downtown block's rooftop billboard: just behind its front parapet, short of the corners. */
+    private static boolean roofAd(Building b, Column c) {
+        String ad = b.composition().get(Slot.AD);
+        double in = c.v() - b.front();
+        return (ad.equals("roof") || ad.equals("both")) && b.roof() == Building.Roof.FLAT && b.step() == b.storeys()
+                && b.storeys() >= 4 && in >= 1.0 && in < 2.0 && c.u() >= 1.0 && c.u() < b.width() - 1.0;
+    }
+
+    /** Whether a side wall's block is in a downtown block's wall billboard: its upper storeys, short of its ends. */
+    private static boolean wallAd(Building b, Column c, int dy) {
+        String ad = b.composition().get(Slot.AD);
+        if (!(ad.equals("wall") || ad.equals("both")) || b.storeys() < 5) {
+            return false;
+        }
+        double in = c.v() - b.front();
+        int bottom = b.floorOf(Math.max(1, b.storeys() - 4));
+        return in >= 2.0 && b.depth() - in >= 2.0 && dy >= bottom && dy <= b.wallHeight() - 2;
+    }
+
+    /**
+     * A standalone program's forecourt and a program's pavement: the parking lot paved and lined, a pole sign by the road
+     * at one end, a post office's post box by its door. Null where none of these is.
+     */
+    private static Part forecourt(Building b, Column c, int dy) {
+        double u = c.u();
+        double v = c.v();
+        if (b.program() == Program.POST_OFFICE && dy == 1 && v < b.front() && Math.abs(u - b.door() - 2.0) < 0.5
+                && v >= b.front() - 1.0) {
+            return Part.POSTBOX;
+        }
+        if (!b.standalone() || v >= b.front()) {
+            return null;
+        }
+        // The pole sign, at the road's edge by one end of the frontage
+        double pole = chance(b, 80, 0.5) ? 0.5 : b.width() - 0.5;
+        if (Math.abs(u - pole) < 0.5 && v < 1.0) {
+            int height = b.program() == Program.FASTFOOD ? 8 : 6;
+            if (dy >= 1 && dy <= height) {
+                return Part.POLE;
+            }
+            if (dy == height + 1 || dy == height + 2) {
+                return Part.BRAND;
+            }
+            return Part.NONE;
+        }
+        if (dy == 0) {
+            // Lined parking bays, three blocks wide, between the road's edge and the door's path
+            boolean bayLine = Math.floorMod((long) Math.floor(u), 3) == 0 && v >= 2.0 && v < b.front() - 1.0
+                    && Math.abs(u - b.door()) >= 1.5;
+            return bayLine ? Part.LINE : Part.PAVING;
+        }
+        return Part.NONE;
+    }
+
     /** Whether a column lies on the terrace in front of set-back upper storeys. */
     private static boolean terrace(Building b, Column c) {
         return b.step() < b.storeys() && c.v() - b.front() < b.stepBack();
@@ -944,6 +1040,9 @@ public final class BuildingLayer {
             }
             if (billboard(b, c)) {
                 return wallTop + 2;
+            }
+            if (roofAd(b, c)) {
+                return wallTop + 6;
             }
             return wallTop + (c.edge() || detail(b, c, 3) < 0.04 ? 1 : 0);
         }
@@ -1024,6 +1123,13 @@ public final class BuildingLayer {
                 }
                 return c.light() && row == height - 1 ? Part.LIGHT : Part.AIR;
             }
+            if (face == Face.SIDE && !corner && wallAd(b, c, dy)) {
+                // A billboard over the upper side wall, framed
+                double in = c.v() - b.front();
+                int bottom = b.floorOf(Math.max(1, b.storeys() - 4));
+                boolean frame = in < 3.0 || b.depth() - in < 3.0 || dy == bottom || dy == b.wallHeight() - 2;
+                return frame ? Part.TRIM : Part.AD;
+            }
             Part part = wall(b, c, face, corner, storey, row, height);
             return part == Part.WINDOW && recessed(b, storey) && !stepped ? Part.AIR : part;
         }
@@ -1038,6 +1144,17 @@ public final class BuildingLayer {
             }
             if ((above == 1 || above == 2) && billboard(b, c)) {
                 return Part.SIGN;
+            }
+            if (b.standalone() && c.face() == Face.FRONT && (above == 0 || above == 1)) {
+                // The brand's colour along the front parapet
+                return Part.BRAND;
+            }
+            if (roofAd(b, c) && above >= 1 && above <= 6) {
+                // A billboard on the roof: legs, then its face
+                if (above <= 2) {
+                    return Math.floorMod((long) Math.floor(c.u()), 4) == 1 ? Part.POLE : Part.AIR;
+                }
+                return Part.AD;
             }
             if (above == 1) {
                 if (c.edge()) {
@@ -1283,6 +1400,23 @@ public final class BuildingLayer {
         double u = c.u();
         double w = b.width();
         boolean top = row == height - 1;
+        if (b.program() != null && face == Face.FRONT) {
+            // A program's front: glass to the street under its brand's band, the door in the middle
+            if (corner) {
+                return Part.TRIM;
+            }
+            if (top) {
+                return Part.BRAND;
+            }
+            if (c.door()) {
+                return row == 1 ? Part.DOOR_LOWER : row == 2 ? Part.DOOR_UPPER : Part.SHOPFRONT;
+            }
+            return Part.SHOPFRONT;
+        }
+        if (b.program() != null && behind && row == 1 && !c.door() && b.composition().is(Slot.DISPLAY, "goods")) {
+            // Shelves behind the glass
+            return Part.DISPLAY;
+        }
         switch (b.type()) {
             case SHOP -> {
                 if (front && !corner) {
@@ -1403,6 +1537,12 @@ public final class BuildingLayer {
         double v = c.v();
         boolean inFront = v < b.front() && u >= 0 && u < w;
         boolean toDoor = Math.abs(u - b.door()) < 1.0;
+        if (b.program() != null) {
+            Part court = forecourt(b, c, dy);
+            if (court != null) {
+                return court;
+            }
+        }
         switch (b.type()) {
             case MACHIYA -> {
                 if (inFront && c.adjacent()) {

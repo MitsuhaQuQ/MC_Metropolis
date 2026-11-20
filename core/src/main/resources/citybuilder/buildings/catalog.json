@@ -185,6 +185,12 @@
   "DISPLAY": [
    "none",
    "goods"
+  ],
+  "AD": [
+   "none",
+   "roof",
+   "wall",
+   "both"
   ]
  },
  "palettes": {
@@ -968,6 +974,96 @@
    "parapet": "minecraft:white_concrete",
    "foundation": "minecraft:cobblestone"
   },
+  "konbini.1": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:gray_concrete"
+  },
+  "konbini.2": {
+   "wall": "minecraft:smooth_quartz",
+   "accent": "minecraft:smooth_quartz",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_quartz",
+   "foundation": "minecraft:gray_concrete"
+  },
+  "fastfood.1": {
+   "wall": "minecraft:bricks",
+   "accent": "minecraft:bricks",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:red_concrete",
+   "foundation": "minecraft:gray_concrete"
+  },
+  "fastfood.2": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:red_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:gray_concrete"
+  },
+  "post.1": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:gray_concrete"
+  },
+  "post.2": {
+   "wall": "minecraft:bricks",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:stone_bricks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:bricks",
+   "foundation": "minecraft:gray_concrete"
+  },
   "works.1": {
    "wall": "minecraft:light_gray_concrete",
    "accent": "minecraft:light_gray_concrete",
@@ -1182,6 +1278,41 @@
    "minecraft:composter",
    "minecraft:potted_bamboo",
    "minecraft:potted_fern"
+  ],
+  "brandKonbini": [
+   "minecraft:lime_concrete",
+   "minecraft:blue_concrete",
+   "minecraft:orange_concrete",
+   "minecraft:green_concrete"
+  ],
+  "brandFastfood": [
+   "minecraft:red_concrete",
+   "minecraft:yellow_concrete",
+   "minecraft:orange_concrete"
+  ],
+  "brandPost": [
+   "minecraft:red_concrete"
+  ],
+  "postbox": [
+   "minecraft:red_concrete"
+  ],
+  "line": [
+   "minecraft:white_concrete"
+  ],
+  "pole": [
+   "minecraft:andesite_wall"
+  ],
+  "ad": [
+   "minecraft:red_concrete",
+   "minecraft:yellow_concrete",
+   "minecraft:blue_concrete",
+   "minecraft:white_concrete",
+   "minecraft:magenta_concrete",
+   "minecraft:lime_concrete",
+   "minecraft:orange_concrete",
+   "minecraft:light_blue_concrete",
+   "minecraft:pink_concrete",
+   "minecraft:black_concrete"
   ]
  },
  "styles": {
@@ -1817,6 +1948,207 @@
      "flat": 0.45
     }
    }
+  },
+  "downtown.shop": {
+   "type": "SHOP",
+   "palettes": {
+    "shop.1": 1.0,
+    "shop.2": 1.0,
+    "shop.3": 1.0,
+    "shop.4": 1.0,
+    "shop.5": 1.0,
+    "shop.6": 1.0,
+    "shop.7": 1.0,
+    "shop.8": 1.0,
+    "shop.9": 1.0,
+    "shop.10": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.25,
+     "lowWall": 0.25,
+     "shutter": 0.25,
+     "recessed": 0.25
+    },
+    "RECESS": {
+     "flush": 0.5,
+     "recessed": 0.5
+    },
+    "SIGN": {
+     "none": 0.2,
+     "side": 0.8
+    },
+    "AWNING": {
+     "none": 0.5,
+     "awning": 0.5
+    },
+    "VENDING": {
+     "none": 0.7,
+     "vending": 0.3
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "FASCIA": {
+     "plain": 0.15,
+     "sign": 0.4,
+     "lit": 0.45
+    },
+    "ROOF_SIGN": {
+     "none": 0.55,
+     "billboard": 0.45
+    },
+    "UPPER_STREET": {
+     "windows": 0.5,
+     "balcony": 0.3,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.5,
+     "stand": 0.5
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
+    },
+    "LANTERN": {
+     "none": 0.8,
+     "lantern": 0.2
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    }
+   }
+  },
+  "downtown.office": {
+   "type": "OFFICE",
+   "palettes": {
+    "office.1": 1.0,
+    "office.2": 1.0,
+    "office.3": 1.0,
+    "office.4": 1.0,
+    "office.5": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.3333333333333333,
+     "colonnade": 0.3333333333333333,
+     "canopy": 0.3333333333333333
+    },
+    "RECESS": {
+     "flush": 0.3,
+     "recessed": 0.7
+    },
+    "ARTICULATION": {
+     "plain": 0.3333333333333333,
+     "fins": 0.3333333333333333,
+     "ledges": 0.3333333333333333
+    },
+    "SIGN": {
+     "none": 0.45,
+     "tall": 0.55
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "AD": {
+     "none": 0.4,
+     "roof": 0.3,
+     "wall": 0.15,
+     "both": 0.15
+    }
+   }
+  },
+  "konbini.standalone": {
+   "type": "SHOP",
+   "storeys": 1,
+   "palettes": {
+    "konbini.1": 1.0,
+    "konbini.2": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "DISPLAY": {
+     "goods": 1.0
+    },
+    "CORNICE": {
+     "none": 1.0
+    }
+   }
+  },
+  "fastfood.standalone": {
+   "type": "SHOP",
+   "storeys": 1,
+   "palettes": {
+    "fastfood.1": 1.0,
+    "fastfood.2": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "DISPLAY": {
+     "none": 1.0
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    }
+   }
+  },
+  "postoffice.standalone": {
+   "type": "SHOP",
+   "storeys": 1,
+   "palettes": {
+    "post.1": 1.0,
+    "post.2": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 0.6,
+     "hip": 0.4
+    },
+    "DISPLAY": {
+     "none": 1.0
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    }
+   }
   }
  },
  "quarters": {
@@ -1834,6 +2166,38 @@
    "jinaimachi.estate": 0.25,
    "kura": 0.25,
    "jinaimachi.machiya": 0.5
+  }
+ },
+ "districts": {
+  "CENTRAL": {
+   "SHOP": {
+    "downtown.shop": 1.0
+   },
+   "OFFICE": {
+    "downtown.office": 1.0
+   }
+  },
+  "STATION_FRONT": {
+   "SHOP": {
+    "downtown.shop": 1.0
+   },
+   "OFFICE": {
+    "downtown.office": 1.0
+   }
+  }
+ },
+ "programs": {
+  "KONBINI": {
+   "standalone": "konbini.standalone",
+   "brand": "brandKonbini"
+  },
+  "FASTFOOD": {
+   "standalone": "fastfood.standalone",
+   "brand": "brandFastfood"
+  },
+  "POST_OFFICE": {
+   "standalone": "postoffice.standalone",
+   "brand": "brandPost"
   }
  },
  "regions": {

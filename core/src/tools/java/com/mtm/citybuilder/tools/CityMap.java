@@ -140,8 +140,24 @@ public final class CityMap {
             case "preview", "preview1", "preview2", "preview3" -> {
                 // preview:QUARTER shows the old town's lots as that quarter, to see the library's styles; where the
                 // quarters really lie is for the layers that lay out the town to say
-                // preview:HOKURIKU shows the whole town built the Hokuriku way
-                if (quarter != null && quarter.equals("HOKURIKU")) {
+                // preview:PROGRAMS gives one lot in ten a program (convenience store, fast food, post office), to see
+                // them; where they really are is for the layers before to say
+                if (quarter != null && quarter.equals("PROGRAMS")) {
+                    logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
+                        @Override
+                        public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Quarter.ORDINARY;
+                        }
+
+                        @Override
+                        public com.mtm.citybuilder.core.building.Program program(com.mtm.citybuilder.core.plot.Plot plot) {
+                            double r = com.mtm.citybuilder.core.noise.Hash.unit(com.mtm.citybuilder.core.noise.Hash.of(plot.id(), 777));
+                            return r < 0.05 ? com.mtm.citybuilder.core.building.Program.KONBINI
+                                    : r < 0.08 ? com.mtm.citybuilder.core.building.Program.FASTFOOD
+                                    : r < 0.10 ? com.mtm.citybuilder.core.building.Program.POST_OFFICE : null;
+                        }
+                    });
+                } else if (quarter != null && quarter.equals("HOKURIKU")) {
                     logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
                         @Override
                         public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {

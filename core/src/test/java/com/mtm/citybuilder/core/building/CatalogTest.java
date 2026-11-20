@@ -19,7 +19,7 @@ class CatalogTest {
         assertTrue(c.paletteCount() > 30);
         for (Building.Type type : Building.Type.values()) {
             for (Region region : Region.values()) {
-                Style s = c.forType(type, region, 0.5);
+                Style s = c.forType(type, region, com.mtm.citybuilder.core.street.District.RESIDENTIAL, 0.5);
                 assertEquals(type, s.type(), type + " in " + region);
                 assertTrue(!s.palettes().isEmpty());
             }
@@ -28,6 +28,11 @@ class CatalogTest {
             assertNotNull(c.forQuarter(q, 0.5), q.toString());
         }
         assertEquals(null, c.forQuarter(Quarter.ORDINARY, 0.5));
+        for (Program p : Program.values()) {
+            assertEquals(Building.Type.SHOP, c.standalone(p).type());
+        }
+        assertEquals("downtown.office", c.forType(Building.Type.OFFICE, Region.KINKI,
+                com.mtm.citybuilder.core.street.District.CENTRAL, 0.5).name());
     }
 
     @Test

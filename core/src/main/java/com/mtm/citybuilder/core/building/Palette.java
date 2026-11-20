@@ -33,8 +33,10 @@ public record Palette(String wall, String accent, String trim, String window, St
      * part that leaves the world as it is. Slabs, doors and leaves come back as their blocks' ids; the caller sets
      * their states.
      */
-    public String id(BuildingLayer.Part part, Composition composition, long variant, long position) {
+    public String id(BuildingLayer.Part part, Building building, long position) {
         Catalog c = Catalog.get();
+        Composition composition = building.composition();
+        long variant = building.variant();
         return switch (part) {
             case NONE -> null;
             case AIR -> "minecraft:air";
@@ -90,6 +92,11 @@ public record Palette(String wall, String accent, String trim, String window, St
             case FASCIA_LIT -> c.material("fasciaLit", variant ^ 0xBB);
             case DISPLAY -> c.material("display", position);
             case STAND -> c.material("stand", position);
+            case BRAND -> building.program() == null ? accent : c.material(c.brand(building.program()), variant ^ 0xCC);
+            case AD -> c.material("ad", variant ^ 0xDD);
+            case LINE -> c.material("line", variant);
+            case POSTBOX -> c.material("postbox", variant);
+            case POLE -> c.material("pole", variant);
         };
     }
 

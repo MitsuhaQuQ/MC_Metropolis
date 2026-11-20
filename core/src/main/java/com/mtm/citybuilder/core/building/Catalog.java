@@ -33,6 +33,9 @@ public final class Catalog {
     private final Map<String, Style> styles = new LinkedHashMap<>();
     private final Map<Quarter, Map<String, Double>> quarters = new EnumMap<>(Quarter.class);
     private final Map<Region, Map<Building.Type, Map<String, Double>>> regions = new EnumMap<>(Region.class);
+    private final Map<com.mtm.citybuilder.core.street.District, Map<Building.Type, Map<String, Double>>> districts =
+            new EnumMap<>(com.mtm.citybuilder.core.street.District.class);
+    private final Map<Program, String[]> programs = new EnumMap<>(Program.class);
 
     /** The catalogue the mod ships, read once. */
     public static Catalog get() {
@@ -91,14 +94,32 @@ public final class Catalog {
         return mix == null ? null : style(draw(mix, u));
     }
 
-    /** The style a region builds a kind of building in, drawn by {@code u}; the Kinki style where a region has none. */
-    public Style forType(Building.Type type, Region region, double u) {
+    /**
+     * The style a kind of building is built in, drawn by {@code u}: its district's where the catalogue gives one (the
+     * busy downtown), else its region's, else the Kinki style.
+     */
+    public Style forType(Building.Type type, Region region, com.mtm.citybuilder.core.street.District district, double u) {
+        Map<Building.Type, Map<String, Double>> byDistrict = districts.get(district);
+        Map<String, Double> mix = byDistrict == null ? null : byDistrict.get(type);
+        if (mix != null) {
+            return style(draw(mix, u));
+        }
         Map<Building.Type, Map<String, Double>> byType = regions.get(region);
-        Map<String, Double> mix = byType == null ? null : byType.get(type);
+        mix = byType == null ? null : byType.get(type);
         if (mix == null) {
             mix = regions.get(Region.KINKI).get(type);
         }
         return style(draw(mix, u));
+    }
+
+    /** The style a program is built in when it stands alone. */
+    public Style standalone(Program program) {
+        return style(programs.get(program)[0]);
+    }
+
+    /** The material key of a program's brand colours. */
+    public String brand(Program program) {
+        return programs.get(program)[1];
     }
 
     /** A building's composition: each slot its style varies drawn from its weights, by the building's hash. */
@@ -145,7 +166,8 @@ public final class Catalog {
     static final List<String> MATERIALS = List.of("awning", "sign", "vending", "fence", "plant", "log", "leaves", "shrub",
             "shed", "rail", "curtain", "curtainRed", "latticeSpruce", "latticeMangrove", "equipment", "shutter", "hedge",
             "bamboo", "post", "carport", "guard", "downpipe", "lantern", "sudare", "komayose", "engawa", "toro", "toroLight",
-            "toroCap", "gravel", "board", "plaster", "spike", "fasciaLit", "display", "stand");
+            "toroCap", "gravel", "board", "plaster", "spike", "fasciaLit", "display", "stand", "brandKonbini",
+            "brandFastfood", "brandPost", "postbox", "line", "pole", "ad");
 
     /** Gson is used here only. */
     private static final class Json {
@@ -230,6 +252,37 @@ public final class Catalog {
                     map.put(Building.Type.valueOf(type), mix);
                 }
                 c.regions.put(Region.valueOf(key), map);
+            }
+            com.google.gson.JsonObject districts = root.getAsJsonObject("districts");
+            if (districts != null) {
+                for (String key : districts.keySet()) {
+                    com.google.gson.JsonObject byType = districts.getAsJsonObject(key);
+                    Map<Building.Type, Map<String, Double>> map = new EnumMap<>(Building.Type.class);
+                    for (String type : byType.keySet()) {
+                        Map<String, Double> mix = weights(byType.getAsJsonObject(type));
+                        for (String s : mix.keySet()) {
+                            if (c.style(s).type() != Building.Type.valueOf(type)) {
+                                throw new IllegalArgumentException("District " + key + " builds " + type + " in " + s);
+                            }
+                        }
+                        map.put(Building.Type.valueOf(type), mix);
+                    }
+                    c.districts.put(com.mtm.citybuilder.core.street.District.valueOf(key), map);
+                }
+            }
+            com.google.gson.JsonObject programs = root.getAsJsonObject("programs");
+            for (Program program : Program.values()) {
+                if (programs == null || !programs.has(program.name())) {
+                    throw new IllegalArgumentException("Missing program " + program);
+                }
+                com.google.gson.JsonObject p = programs.getAsJsonObject(program.name());
+                String style = p.get("standalone").getAsString();
+                String brand = p.get("brand").getAsString();
+                c.style(style);
+                if (!c.materials.containsKey(brand)) {
+                    throw new IllegalArgumentException("Program " + program + " has no brand material " + brand);
+                }
+                c.programs.put(program, new String[]{style, brand});
             }
             Map<Building.Type, Map<String, Double>> kinki = c.regions.get(Region.KINKI);
             for (Building.Type type : Building.Type.values()) {

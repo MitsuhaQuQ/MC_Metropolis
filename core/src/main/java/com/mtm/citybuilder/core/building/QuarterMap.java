@@ -16,4 +16,9 @@ public interface QuarterMap {
     default Region region(Plot plot) {
         return Region.KINKI;
     }
+
+    /** A particular use the lot is given (a convenience store, a fast food restaurant, a post office), or null. */
+    default Program program(Plot plot) {
+        return null;
+    }
 }

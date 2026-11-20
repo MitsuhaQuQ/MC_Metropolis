@@ -65,7 +65,8 @@ final class BuildingPreview {
                 {"stone_brick_wall", 0x7A7A7A}, {"black_concrete", 0x080A0F}, {"orange_terracotta", 0xA05325},
                 {"light_blue_terracotta", 0x716C89}, {"ochre_froglight", 0xF5E9B5}, {"pearlescent_froglight", 0xEBDCE1},
                 {"verdant_froglight", 0xD4EAD0}, {"chiseled_bookshelf", 0x725431}, {"barrel", 0x86643B},
-                {"bookshelf", 0x6B5839}, {"decorated_pot", 0x8C4F3C}, {"oak_sign", 0xA2834F}, {"composter", 0x7D5A33}, {"stone_brick", 0x7A7A7A}, {"pink_terracotta", 0xA14E4E},
+                {"bookshelf", 0x6B5839}, {"magenta_concrete", 0xA9309F}, {"pink_concrete", 0xD5658E},
+                {"green_concrete", 0x495B24}, {"decorated_pot", 0x8C4F3C}, {"oak_sign", 0xA2834F}, {"composter", 0x7D5A33}, {"stone_brick", 0x7A7A7A}, {"pink_terracotta", 0xA14E4E},
                 {"light_gray_concrete", 0x7D7D73},
         };
         for (Object[] row : table) {
@@ -92,9 +93,9 @@ final class BuildingPreview {
     private record Voxel(int rgb, double height, double from) {
     }
 
-    private static Voxel voxel(BuildingLayer.Part part, Palette p, com.mtm.citybuilder.core.building.Composition composition,
-                               long variant, long position) {
-        String id = p.id(part, composition, variant, position);
+    private static Voxel voxel(BuildingLayer.Part part, Palette p, com.mtm.citybuilder.core.building.Building building,
+                               long position) {
+        String id = p.id(part, building, position);
         if (id == null || id.endsWith(":air") || id.endsWith(":light")) {
             return null;
         }
@@ -185,7 +186,7 @@ final class BuildingPreview {
                     if (part == BuildingLayer.Part.FOUNDATION && y <= gy) {
                         continue;
                     }
-                    Voxel v = voxel(part, palette, column.building().composition(), column.building().variant(), (long) i * 7919 + k);
+                    Voxel v = voxel(part, palette, column.building(), (long) i * 7919 + k);
                     if (v != null) {
                         cube(g, originX, originY, px, a, b, y - floorY, v.height, v.from, v.rgb);
                     }

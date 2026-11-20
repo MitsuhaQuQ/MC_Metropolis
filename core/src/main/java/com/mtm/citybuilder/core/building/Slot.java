@@ -79,7 +79,9 @@ public enum Slot {
     /** What a shop puts out on the pavement by its door: a standing sign, barrels, pots. */
     STREET_DISPLAY("none", "stand"),
     /** Goods on show behind a shop's glass. */
-    DISPLAY("none", "goods");
+    DISPLAY("none", "goods"),
+    /** Billboards of a busy downtown block: on its roof, on a side wall, both. */
+    AD("none", "roof", "wall", "both");
 
     private final List<String> options;
 

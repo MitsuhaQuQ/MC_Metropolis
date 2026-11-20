@@ -188,6 +188,51 @@ class BuildingLayerTest {
         }
     }
 
+    @Test
+    void programsStandAloneOnOpenLotsAndInGroundFloorsElsewhere() {
+        CityLogic logic = logic();
+        Settlement city = city(logic);
+        CityExtent extent = logic.extent(city);
+        BuildingLayer layer = new BuildingLayer(logic);
+        layer.quarters(new QuarterMap() {
+            @Override
+            public Quarter at(Plot plot) {
+                return Quarter.ORDINARY;
+            }
+
+            @Override
+            public Program program(Plot plot) {
+                return Program.KONBINI;
+            }
+        });
+        TownPlots plots = logic.plots().town(city);
+        int standalone = 0;
+        int tenant = 0;
+        Set<Long> seen = new HashSet<>();
+        // Out from downtown and the old town, where lots are open enough
+        for (double x = extent.coreX() + 600; x < extent.coreX() + 4000; x += 5) {
+            for (double z = extent.coreZ() - 200; z < extent.coreZ() + 200; z += 5) {
+                Plot plot = plots.at(x, z);
+                Building b = layer.building(plots, plot);
+                if (b == null || !seen.add(b.id())) {
+                    continue;
+                }
+                assertEquals(Program.KONBINI, b.program());
+                if (b.standalone()) {
+                    standalone++;
+                    assertEquals(1, b.storeys());
+                    assertTrue(b.front() >= 7.0, "parking in front " + b);
+                } else {
+                    tenant++;
+                    assertTrue(b.type() == Building.Type.SHOP || b.type() == Building.Type.OFFICE
+                            || b.type() == Building.Type.APARTMENT, "tenant in " + b.type());
+                }
+            }
+        }
+        assertTrue(standalone > 0, "no standalone store");
+        assertTrue(tenant > 0, "no store in a ground floor");
+    }
+
     /** Parts of a garden that may stand away from the house: a shed's roof, a coped wall. */
     private static boolean isGarden(Building b, BuildingLayer.Part p) {
         return b.type() == Building.Type.HOUSE && (p == BuildingLayer.Part.ROOF_LOW || p == BuildingLayer.Part.HOOD);
