@@ -50,21 +50,28 @@ class StreetTerrainTest {
                 assertTrue(segment.streetClass() != StreetClass.STREET && segment.streetClass() != StreetClass.LANE,
                         "a street bridges the river: " + segment);
             }
+            // Each bridge as {start x, z, end x, z}, its pieces joined end to end
             if (segment.streetClass() == StreetClass.ARTERIAL && segment.structure() == StreetStructure.BRIDGE) {
-                if (current == null || Math.hypot(segment.x1() - current[0], segment.z1() - current[1]) > SETTINGS.streets.step + 1) {
-                    current = new double[]{segment.x2(), segment.z2()};
+                if (current == null || Math.hypot(segment.x1() - current[2], segment.z1() - current[3]) > 1.0) {
+                    current = new double[]{segment.x1(), segment.z1(), segment.x2(), segment.z2()};
                     bridges.add(current);
                 } else {
-                    current[0] = segment.x2();
-                    current[1] = segment.z2();
+                    current[2] = segment.x2();
+                    current[3] = segment.z2();
                 }
             }
         }
         assertTrue(!bridges.isEmpty(), "at least one bridge");
+        // Bridges keep their spacing, the longer one's; measured between middles, less a step either side for where
+        // the bridge's own run starts and ends against the pieces either side
         for (int a = 0; a < bridges.size(); a++) {
             for (int b = a + 1; b < bridges.size(); b++) {
-                assertTrue(Math.abs(bridges.get(a)[1] - bridges.get(b)[1]) >= SETTINGS.streets.bridgeSpacing - 2 * SETTINGS.streets.maxBridge,
-                        "bridges too close: " + bridges.get(a)[1] + " and " + bridges.get(b)[1]);
+                double[] p = bridges.get(a);
+                double[] q = bridges.get(b);
+                double longer = Math.max(Math.hypot(p[2] - p[0], p[3] - p[1]), Math.hypot(q[2] - q[0], q[3] - q[1]));
+                double keep = SETTINGS.streets.bridgeSpacing * Math.max(1.0, longer / SETTINGS.streets.bridgeLength);
+                double apart = Math.hypot(0.5 * (p[0] + p[2] - q[0] - q[2]), 0.5 * (p[1] + p[3] - q[1] - q[3]));
+                assertTrue(apart >= keep - 2 * SETTINGS.streets.step, "bridges too close: " + apart + " < " + keep);
             }
         }
     }

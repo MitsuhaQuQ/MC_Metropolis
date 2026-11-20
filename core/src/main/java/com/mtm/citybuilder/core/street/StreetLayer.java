@@ -699,6 +699,7 @@ public final class StreetLayer {
                     null, false);
             arterials.bridging = true;
             arterials.run(arterialSeeds(anchors, oldRoad, window, spacing), segments);
+            linkPatches(window, arterials, segments, spacing);
             for (Anchor anchor : anchors) {
                 if (anchor.kind() == Anchor.Kind.STATION) {
                     avenue(anchor, extent, window, segments);
@@ -730,6 +731,218 @@ public final class StreetLayer {
             }
         }
         return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways);
+    }
+
+    /**
+     * Built land the arterials never reached, as across a river too wide for the bridges they met it at: each patch of
+     * it big enough to be a quarter is linked to land they did reach by a bridge at its narrowest crossing (up to
+     * {@code maxBridge}, kept clear of no other bridge, as a town always has one), and arterials are traced from the
+     * bridge's foot into it. A patch with no such crossing gets arterials from its heart alone. Land joined to the
+     * arterials' but further than an arterial spacing from any of them, as behind a river that bends round, gets
+     * arterials from its deepest point, which bridge to the rest where they meet water as any arterial does. Repeated
+     * while anything is seeded, as one patch may be reached only through another.
+     */
+    private void linkPatches(Window window, Tracer arterials, List<StreetSegment> segments, double spacing) {
+        int size = window.size;
+        int n = size * size;
+        boolean[] land = new boolean[n];
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                int k = i * size + j;
+                land[k] = !window.water[k] && window.intensity[k] > config.builtIntensity
+                        && !window.inGrounds((double) (window.originX + i) * grid, (double) (window.originZ + j) * grid);
+            }
+        }
+        boolean[] tried = new boolean[n];
+        boolean[] bridged = new boolean[n];
+        for (int round = 0; round < 8; round++) {
+            // Land the arterials and old roads reach
+            boolean[] reached = new boolean[n];
+            for (StreetSegment segment : segments) {
+                if (segment.streetClass() != StreetClass.ARTERIAL && segment.streetClass() != StreetClass.OLD_ROAD) {
+                    continue;
+                }
+                for (double[] p : new double[][]{{segment.x1(), segment.z1()}, {segment.x2(), segment.z2()}}) {
+                    int i = (int) Math.round(p[0] / grid) - window.originX;
+                    int j = (int) Math.round(p[1] / grid) - window.originZ;
+                    if (i >= 0 && j >= 0 && i < size && j < size) {
+                        reached[i * size + j] = true;
+                    }
+                }
+            }
+            // Patches of land, and whether any of their nodes is reached
+            int[] patch = new int[n];
+            java.util.Arrays.fill(patch, -1);
+            List<List<Integer>> patches = new ArrayList<>();
+            List<Boolean> linked = new ArrayList<>();
+            for (int start = 0; start < n; start++) {
+                if (!land[start] || patch[start] >= 0) {
+                    continue;
+                }
+                int id = patches.size();
+                List<Integer> nodes = new ArrayList<>();
+                boolean any = false;
+                ArrayDeque<Integer> queue = new ArrayDeque<>();
+                queue.add(start);
+                patch[start] = id;
+                while (!queue.isEmpty()) {
+                    int k = queue.poll();
+                    nodes.add(k);
+                    any |= reached[k];
+                    int i = k / size;
+                    int j = k % size;
+                    for (int[] d : NEIGHBOURS) {
+                        int ni = i + d[0];
+                        int nj = j + d[1];
+                        int nk = ni * size + nj;
+                        if (ni >= 0 && nj >= 0 && ni < size && nj < size && land[nk] && patch[nk] < 0) {
+                            patch[nk] = id;
+                            queue.add(nk);
+                        }
+                    }
+                }
+                patches.add(nodes);
+                linked.add(any);
+            }
+            boolean changed = false;
+            // Land far from every arterial, in patches joined to reached land: arterials from its deepest point
+            boolean[] marked = new boolean[n];
+            for (int k = 0; k < n; k++) {
+                marked[k] = reached[k];
+            }
+            double[] away = distances(marked, size);
+            boolean[] far = new boolean[n];
+            for (int k = 0; k < n; k++) {
+                far[k] = land[k] && patch[k] >= 0 && linked.get(patch[k]) && away[k] > spacing && !tried[k];
+            }
+            boolean[] seenFar = new boolean[n];
+            for (int start = 0; start < n; start++) {
+                if (!far[start] || seenFar[start]) {
+                    continue;
+                }
+                List<Integer> region = new ArrayList<>();
+                ArrayDeque<Integer> queue = new ArrayDeque<>();
+                queue.add(start);
+                seenFar[start] = true;
+                while (!queue.isEmpty()) {
+                    int k = queue.poll();
+                    region.add(k);
+                    int i = k / size;
+                    int j = k % size;
+                    for (int[] d : NEIGHBOURS) {
+                        int ni = i + d[0];
+                        int nj = j + d[1];
+                        int nk = ni * size + nj;
+                        if (ni >= 0 && nj >= 0 && ni < size && nj < size && far[nk] && !seenFar[nk]) {
+                            seenFar[nk] = true;
+                            queue.add(nk);
+                        }
+                    }
+                }
+                if (region.size() < config.minPatch) {
+                    continue;
+                }
+                int deepest = region.get(0);
+                for (int k : region) {
+                    tried[k] = true;
+                    if (away[k] > away[deepest]) {
+                        deepest = k;
+                    }
+                }
+                double x = (double) (window.originX + deepest / size) * grid;
+                double z = (double) (window.originZ + deepest % size) * grid;
+                ArrayDeque<double[]> seeds = new ArrayDeque<>();
+                seeds.add(new double[]{x, z, 0});
+                seeds.add(new double[]{x, z, 1});
+                arterials.run(seeds, segments);
+                changed = true;
+            }
+            for (int id = 0; id < patches.size(); id++) {
+                List<Integer> nodes = patches.get(id);
+                if (linked.get(id) || nodes.size() < config.minPatch || bridged[nodes.get(0)]) {
+                    continue;
+                }
+                for (int k : nodes) {
+                    bridged[k] = true;
+                }
+                // The shortest straight crossing from a node of the patch to land of a reached patch
+                double[] best = null;
+                double bestLength = config.maxBridge;
+                for (int k : nodes) {
+                    double x = (double) (window.originX + k / size) * grid;
+                    double z = (double) (window.originZ + k % size) * grid;
+                    for (int a = 0; a < 32; a++) {
+                        double angle = 2.0 * Math.PI * a / 32;
+                        double dx = Math.cos(angle);
+                        double dz = Math.sin(angle);
+                        boolean wet = false;
+                        for (double t = config.step; t <= bestLength + grid; t += 8.0) {
+                            double bx = x + dx * t;
+                            double bz = z + dz * t;
+                            if (!window.inside(bx, bz) || window.inGrounds(bx, bz)) {
+                                break;
+                            }
+                            if (window.water(bx, bz)) {
+                                wet = true;
+                                continue;
+                            }
+                            int bi = (int) Math.round(bx / grid) - window.originX;
+                            int bj = (int) Math.round(bz / grid) - window.originZ;
+                            int bk = bi * size + bj;
+                            if (!wet) {
+                                if (patch[bk] != id && patch[bk] >= 0) {
+                                    break;
+                                }
+                                continue;
+                            }
+                            // Across the water: land of a reached patch ends the crossing; anything else stops it
+                            if (land[bk] && patch[bk] >= 0 && linked.get(patch[bk]) && window.built(bx, bz) && t < bestLength) {
+                                bestLength = t;
+                                best = new double[]{x, z, bx, bz};
+                            }
+                            break;
+                        }
+                    }
+                }
+                double seedX;
+                double seedZ;
+                if (best != null) {
+                    double length = Math.hypot(best[2] - best[0], best[3] - best[1]);
+                    int pieces = Math.max(1, (int) Math.ceil(length / config.step));
+                    for (int q = 0; q < pieces; q++) {
+                        double ax = best[0] + (best[2] - best[0]) * q / pieces;
+                        double az = best[1] + (best[3] - best[1]) * q / pieces;
+                        double bx = best[0] + (best[2] - best[0]) * (q + 1) / pieces;
+                        double bz = best[1] + (best[3] - best[1]) * (q + 1) / pieces;
+                        boolean over = window.water(ax, az) || window.water(bx, bz) || window.water(0.5 * (ax + bx), 0.5 * (az + bz));
+                        segments.add(new StreetSegment(ax, az, bx, bz, StreetClass.ARTERIAL, Era.MODERN, config.arterialWidth,
+                                over ? StreetStructure.BRIDGE : StreetStructure.GROUND));
+                    }
+                    arterials.bridges.add(new double[]{0.5 * (best[0] + best[2]), 0.5 * (best[1] + best[3]),
+                            arterials.bridgeSpacing(length)});
+                    seedX = best[0];
+                    seedZ = best[1];
+                } else {
+                    // No crossing: arterials from the most intense node of the patch
+                    int heart = nodes.get(0);
+                    for (int k : nodes) {
+                        if (window.intensity[k] > window.intensity[heart]) {
+                            heart = k;
+                        }
+                    }
+                    seedX = (double) (window.originX + heart / size) * grid;
+                    seedZ = (double) (window.originZ + heart % size) * grid;
+                }
+                ArrayDeque<double[]> seeds = new ArrayDeque<>();
+                seeds.add(new double[]{seedX, seedZ, 0});
+                seeds.add(new double[]{seedX, seedZ, 1});
+                arterials.run(seeds, segments);
+                changed = true;
+            }
+            if (!changed) {
+                return;
+            }
+        }
     }
 
     /**
@@ -1591,7 +1804,7 @@ public final class StreetLayer {
         final double cell;
         /** A seed is taken only this many spacings from every line of its family. */
         double clearance = 0.7;
-        /** Whether lines bridge rivers (arterials do), and the middles of the bridges built, shared by both families. */
+        /** Whether lines bridge rivers (arterials do), and the bridges built, {middle x, z, spacing kept}, shared by both families. */
         boolean bridging;
         final List<double[]> bridges = new ArrayList<>();
         /** Whether lines may climb past {@code maxGrade} as ramps and stairs (streets may, arterials not). */
@@ -1786,7 +1999,7 @@ public final class StreetLayer {
 
         /**
          * Over the water ahead: the points of a bridge to the far bank, if it is no more than {@code maxBridge} away
-         * and no other bridge stands within {@code bridgeSpacing}; null otherwise.
+         * and no other bridge stands within the spacing either keeps, longer for a longer bridge; null otherwise.
          */
         private List<double[]> bridge(double x, double z, double dx, double dz) {
             List<double[]> span = new ArrayList<>();
@@ -1803,16 +2016,22 @@ public final class StreetLayer {
                     }
                     double mx = x + dx * 0.5 * t;
                     double mz = z + dz * 0.5 * t;
+                    double keep = bridgeSpacing(t);
                     for (double[] other : bridges) {
-                        if (Math.hypot(other[0] - mx, other[1] - mz) < config.bridgeSpacing) {
+                        if (Math.hypot(other[0] - mx, other[1] - mz) < Math.max(keep, other[2])) {
                             return null;
                         }
                     }
-                    bridges.add(new double[]{mx, mz});
+                    bridges.add(new double[]{mx, mz, keep});
                     return span;
                 }
             }
             return null;
+        }
+
+        /** The spacing a bridge of a length keeps from others: wider for a longer, costlier one. */
+        private double bridgeSpacing(double length) {
+            return config.bridgeSpacing * Math.max(1.0, length / config.bridgeLength);
         }
 
         /** Points of a line from a seed in one sense, until it ends; the seed first. */

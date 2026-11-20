@@ -463,9 +463,16 @@ public final class CitySettings {
         public double laneWidth = 2.5;
         /** Streams this narrow are culverted: streets cross them, and later run along them. */
         public double culvertWidth = 12.0;
-        /** Arterials bridge water up to this wide, no closer than this to another bridge. */
-        public double maxBridge = 300.0;
+        /**
+         * Arterials bridge water up to {@code maxBridge} wide. A bridge stands no closer to another than
+         * {@code bridgeSpacing}, and a long one further, in proportion to its length past {@code bridgeLength}: a big
+         * bridge is costly, so a wide river has few (a 600-block bridge keeps 1800 from the next).
+         */
+        public double maxBridge = 1000.0;
         public double bridgeSpacing = 600.0;
+        public double bridgeLength = 200.0;
+        /** Built land the arterials miss in patches of at least this many grid nodes is linked by a bridge of its own. */
+        public int minPatch = 20;
         /** Streets past {@code maxGrade} are ramps up to this grade, stairs up to the next; steeper ends them. */
         public double rampGrade = 0.15;
         public double stairsGrade = 0.35;
