@@ -1661,34 +1661,57 @@ def kyoto_tower(blocks):
 
 
 def kyoto_station(blocks):
-    """Kyoto Station's front, the north side facing the city, after a photograph of its main entrance: above 12 m
-    every north wall is a curtain wall of blue reflecting glass on a grid of fine light grey mullions (every 3 blocks
-    both ways), a grey band every 12. In the middle stretch of the tall front (the central concourse, x 240-335 in
-    the model, where the front stands back at z 27 and rises to 51 m) the bottom 24 m is the great gate: grey stone
-    piers at its ends, a band of white steel truss (chords and crossing diagonals) from 18 to 23 m, the atrium open
-    and dark under it, glass doors at the street. Elsewhere below 12 m the colours stay as read off the photographs."""
-    gx0, gx1, gate_top, truss0 = 240, 336, 24, 18
+    """Kyoto Station's front, the north side facing the city, after photographs of its main entrance.
+
+    Above 12 m every north wall is a curtain wall of blue reflecting glass on a grid of fine light grey mullions
+    (every 3 blocks both ways), a grey band every 12. In the middle stretch of the tall front (the central concourse,
+    x 240-335 in the model) the bottom 24 m is the great gate: grey tiled stone piers at its ends; between them a
+    white steel truss whose top chord runs straight at 23 m and whose bottom chord rises in two arches from the
+    piers and from an X-braced white post in the middle; the truss's web crossing diagonals in a row of X; under the
+    arches the atrium, open and dark; glass doors at the street. Elsewhere below 12 m the colours stay as read off
+    the photographs."""
+    import math
+    gx0, gx1, top = 240, 336, 23
+    ix0, ix1 = gx0 + 8, gx1 - 8  # inside the piers
+    xc = (ix0 + ix1) // 2  # the middle post: xc - 2 .. xc + 1
+    foot, crown = 13, 19  # the arches' bottom chord: at the supports, at mid-span
     frame, band = ("light_gray_concrete", None), ("gray_concrete", None)
-    stone, white = ("polished_andesite", None), ("white_concrete", None)
+    stone, joint, white = ("polished_andesite", None), ("andesite", None), ("white_concrete", None)
     ew = {"east": "true", "west": "true"}
+    dark = ("black_stained_glass_pane", dict(ew))
+
+    def arch(x):
+        """The bottom chord's height over x, in the half-span it is in."""
+        a0, a1 = (ix0, xc - 2) if x < xc else (xc + 2, ix1)
+        t = (x - a0 + 0.5) / max(1, a1 - a0)
+        return foot + (crown - foot) * math.sin(math.pi * max(0.0, min(1.0, t)))
+
+    def diagonal(x, y, period=6):
+        k, j = (x - ix0) % period, (y - foot) % period
+        return k == j or k == (period - j) % period
+
     for (x, y, z), b in list(blocks.items()):
         if y < 1 or (x, y, z - 1) in blocks:
             continue  # not facing north
         if (b[1] is not None and not b[0].endswith("_pane")) or (x, y + 1, z) not in blocks:
             continue  # stairs, slabs, roofs
-        if gx0 <= x < gx1 and y < gate_top:
-            if x < gx0 + 8 or x >= gx1 - 8:
-                blocks[(x, y, z)] = stone  # the piers
-            elif y in (truss0, gate_top - 1):
-                blocks[(x, y, z)] = white  # the truss's chords
-            elif y > truss0:
-                k = (x - gx0 - 8) % 10
-                diag = k == (y - truss0) * 2 - 1 or k == 10 - (y - truss0) * 2 + 1 or k == 0
-                blocks[(x, y, z)] = white if diag else ("iron_bars", None)
+        if gx0 <= x < gx1 and y <= top:
+            if x < ix0 or x >= ix1:  # the piers, tiled
+                blocks[(x, y, z)] = joint if y % 3 == 0 or (x - gx0) % 4 == 0 else stone
+            elif xc - 2 <= x < xc + 2 and y < arch(xc - 3):  # the middle post, X-braced
+                edge = x in (xc - 2, xc + 1)
+                blocks[(x, y, z)] = white if edge or diagonal(x, y, 4) else dark
+            elif y == top:
+                blocks[(x, y, z)] = white  # the top chord
+            elif y >= round(arch(x)):
+                if y == round(arch(x)) or y == round(arch(x)) + 1:
+                    blocks[(x, y, z)] = white  # the bottom chord, arched
+                else:
+                    blocks[(x, y, z)] = white if diagonal(x, y) else dark  # the web
             elif y < 4:
                 blocks[(x, y, z)] = frame if x % 4 == 0 else ("light_gray_stained_glass_pane", dict(ew))
             else:
-                blocks[(x, y, z)] = ("black_stained_glass_pane", dict(ew))  # the atrium, open and in shade
+                blocks[(x, y, z)] = dark  # the atrium under the arches
         elif y >= 12:
             if y % 12 == 0:
                 blocks[(x, y, z)] = band
