@@ -5,7 +5,13 @@ import com.mtm.citybuilder.core.CitySettings;
 import com.mtm.citybuilder.core.culture.CultureRegion;
 import com.mtm.citybuilder.core.debug.CultureMap;
 import com.mtm.citybuilder.core.debug.ExtentMap;
+import com.mtm.citybuilder.core.debug.RailMap;
 import com.mtm.citybuilder.core.debug.RoadMap;
+import com.mtm.citybuilder.core.rail.RailClass;
+import com.mtm.citybuilder.core.rail.RailCurve;
+import com.mtm.citybuilder.core.rail.RailEdge;
+import com.mtm.citybuilder.core.rail.RailKind;
+import com.mtm.citybuilder.core.rail.RailRoute;
 import com.mtm.citybuilder.core.road.RoadClass;
 import com.mtm.citybuilder.core.road.RoadEdge;
 import com.mtm.citybuilder.core.road.RoadKind;
@@ -48,7 +54,7 @@ public final class CityMap {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 5) {
-            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements|extent|roads]");
+            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements|extent|roads|rail]");
             System.exit(2);
         }
         long seed = Long.parseLong(args[0]);
@@ -98,12 +104,17 @@ public final class CityMap {
                 spawn(new CityLogic(seed, CitySettings.DEFAULT, counting), centerX, centerZ, counting);
                 return;
             }
+            case "rail" -> {
+                List<RailEdge> lines = railStats(logic, centerX, centerZ, half);
+                start = System.nanoTime();
+                image = RailMap.render(logic, lines, centerX, centerZ, scale, size);
+            }
             case "roads" -> {
                 List<RoadEdge> edges = roadStats(logic, centerX, centerZ, half);
                 start = System.nanoTime();
                 image = RoadMap.render(logic, edges, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent or roads");
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads or rail");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();
@@ -339,6 +350,58 @@ public final class CityMap {
         Runtime runtime = Runtime.getRuntime();
         System.out.printf("spawn heap in use after a collection: %.0f MB (everything cached: MTM_worldgen's and the city logic's)%n",
                 (runtime.totalMemory() - runtime.freeMemory()) / 1048576.0);
+    }
+
+    /**
+     * Times finding the rail corridors of the area and routing each, and reports their length, how much of it runs on
+     * each kind of structure, their curves and their stations.
+     */
+    private static List<RailEdge> railStats(CityLogic logic, double centerX, double centerZ, double half) {
+        long start = System.nanoTime();
+        List<RailEdge> lines = logic.railLines(centerX - half, centerZ - half, centerX + half, centerZ + half);
+        System.out.printf("L4b graph: %d lines in %.1f s (includes L2 of the area around)%n", lines.size(),
+                (System.nanoTime() - start) / 1e9);
+        for (RailClass railClass : RailClass.values()) {
+            int count = 0;
+            int missing = 0;
+            int curves = 0;
+            int stations = 0;
+            double tightest = Double.POSITIVE_INFINITY;
+            double length = 0;
+            double straight = 0;
+            double slowest = 0;
+            Map<RailKind, Double> kinds = new EnumMap<>(RailKind.class);
+            start = System.nanoTime();
+            for (RailEdge edge : lines) {
+                if (edge.railClass() != railClass) {
+                    continue;
+                }
+                long one = System.nanoTime();
+                RailRoute route = logic.railRoute(edge);
+                slowest = Math.max(slowest, (System.nanoTime() - one) / 1e9);
+                count++;
+                if (!route.exists()) {
+                    missing++;
+                    continue;
+                }
+                length += route.length();
+                straight += edge.length();
+                curves += route.curves().size();
+                stations += route.stations().size();
+                for (RailCurve curve : route.curves()) {
+                    tightest = Math.min(tightest, curve.radius());
+                }
+                for (RailKind kind : RailKind.values()) {
+                    kinds.merge(kind, route.length(kind), Double::sum);
+                }
+            }
+            System.out.printf("L4b %-6s %3d lines (%d not found) in %.1f s, the slowest %.1f s: %.0f km, %.2f times the straight line, %d curves (tightest %.0f), %d stations%n",
+                    railClass, count, missing, (System.nanoTime() - start) / 1e9, slowest, length / 1000,
+                    straight == 0 ? 0.0 : length / straight, curves, tightest, stations);
+            double all = Math.max(1, length);
+            kinds.forEach((kind, value) -> System.out.printf("  %-10s %5.1f%%%n", kind, 100 * value / all));
+        }
+        return lines;
     }
 
     /**

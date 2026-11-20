@@ -13,6 +13,9 @@ import com.mtm.citybuilder.core.extent.UrbanSample;
 import com.mtm.citybuilder.core.layer.SuitabilityLayer;
 import com.mtm.citybuilder.core.layer.SuitabilityRegion;
 import com.mtm.citybuilder.core.plan.MemoryPlanStore;
+import com.mtm.citybuilder.core.rail.RailEdge;
+import com.mtm.citybuilder.core.rail.RailLayer;
+import com.mtm.citybuilder.core.rail.RailRoute;
 import com.mtm.citybuilder.core.road.RoadEdge;
 import com.mtm.citybuilder.core.road.RoadLayer;
 import com.mtm.citybuilder.core.road.RoadRoute;
@@ -72,6 +75,7 @@ public final class CityLogic {
     };
     private final RegionCache<UrbanRegion> urban;
     private final RoadLayer roads;
+    private final RailLayer rail;
 
     /** City logic whose plans are kept in memory only, as for tests and tools. */
     public CityLogic(long seed, CitySettings settings, TerrainView terrain) {
@@ -138,6 +142,22 @@ public final class CityLogic {
             }
         });
         this.urban = new RegionCache<>(REGION_CACHE, extentLayer::region);
+        this.rail = new RailLayer(settings, terrain, new RailLayer.Below() {
+            @Override
+            public double broadSuitabilityNode(int nodeX, int nodeZ) {
+                return CityLogic.this.broadSuitabilityNode(nodeX, nodeZ);
+            }
+
+            @Override
+            public double suitabilityNode(int nodeX, int nodeZ) {
+                return CityLogic.this.suitabilityNode(nodeX, nodeZ);
+            }
+
+            @Override
+            public List<Settlement> settlements(double minX, double minZ, double maxX, double maxZ, SettlementTier lowest) {
+                return CityLogic.this.settlements(minX, minZ, maxX, maxZ, lowest);
+            }
+        });
         this.roads = new RoadLayer(settings, terrain, new RoadLayer.Below() {
             @Override
             public double broadSuitabilityNode(int nodeX, int nodeZ) {
@@ -356,6 +376,16 @@ public final class CityLogic {
     /** L4: the route of a road. */
     public RoadRoute route(RoadEdge edge) {
         return roads.route(edge);
+    }
+
+    /** L4b: the rail corridors whose routing window touches a rectangle. */
+    public List<RailEdge> railLines(double minX, double minZ, double maxX, double maxZ) {
+        return rail.edges(minX, minZ, maxX, maxZ);
+    }
+
+    /** L4b: the route of a rail corridor. */
+    public RailRoute railRoute(RailEdge edge) {
+        return rail.route(edge);
     }
 
     private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {

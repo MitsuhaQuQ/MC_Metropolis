@@ -25,6 +25,7 @@ public final class CitySettings {
     public Extent extent = new Extent();
     public Rural rural = new Rural();
     public Roads roads = new Roads();
+    public Rail rail = new Rail();
 
     public static final class General {
         /** Edge of a logic region in blocks: the unit results are cached in, never a boundary of any rule. */
@@ -249,6 +250,66 @@ public final class CitySettings {
         public double bridgeHeight = 8.0;
     }
 
+    /**
+     * L4b: intercity rail corridors, built as structures for players to lay MTR track in. A Gabriel graph joins
+     * metropolises and cities; lines with a metropolis at an end are trunk lines, the others branch lines. Each is
+     * routed with its heading, turning no tighter than its least radius, fitted into straights and arcs, and given a
+     * profile no steeper than its grade; where the ground stands far above or below it, tunnels and bridges.
+     */
+    public static final class Rail {
+        /** Longest line, straight from end to end. */
+        public double maxLength = 30000.0;
+        /** The routing window reaches this far around the two ends, plus {@code windowFactor} of their distance. */
+        public double windowMargin = 2500.0;
+        public double windowFactor = 0.25;
+        /** Least and preferred radius of curves, in blocks, by class. */
+        public double trunkMinRadius = 600.0;
+        public double trunkRadius = 1200.0;
+        public double branchMinRadius = 300.0;
+        public double branchRadius = 600.0;
+        /** Largest radius a curve is fitted with, where the line allows. */
+        public double maxRadius = 4000.0;
+        /** Steepest grade, by class (0.015 = 15 per mille). */
+        public double trunkGrade = 0.015;
+        public double branchGrade = 0.025;
+        /** Transition curve lengths at the least radius and at the preferred radius and above, by class. */
+        public double trunkTransitionMax = 120.0;
+        public double trunkTransitionMin = 60.0;
+        public double branchTransitionMax = 60.0;
+        public double branchTransitionMin = 30.0;
+        /** Extra cost per block of land of no suitability. */
+        public double unsuitCost = 1.0;
+        /** Cost per metre climbed or descended, in blocks: rail keeps to valleys, and tunnels or bridges the rest. */
+        public double climbCost = 20.0;
+        /** Extra cost per block over water. */
+        public double bridgeCost = 3.0;
+        /**
+         * Cost of each change of heading, in blocks: without it the search zigzags between neighbouring headings to
+         * run between them, and the line gets a curve every few hundred blocks.
+         */
+        public double turnCost = 400.0;
+        /** Around the first route, rivers and lakes are looked up within this distance and the line routed again. */
+        public double corridor = 1500.0;
+        /** Spacing of the profile's samples along a line. */
+        public double sampleSpacing = 16.0;
+        /** Ground this far above the rail makes a tunnel; the rail this far above the ground, a bridge. */
+        public double tunnelDepth = 12.0;
+        public double bridgeHeight = 6.0;
+        /** Within this height of the ground the line runs on it; above on an embankment, below in a cutting. */
+        public double groundBand = 1.5;
+        /** Bridges up to this long are plate girders; spans over water this wide, or this high, steel trusses. */
+        public double girderMaxLength = 40.0;
+        public double trussSpan = 50.0;
+        public double trussHeight = 30.0;
+        /** Bridges longer than this are viaducts whatever they cross: long crossings are many spans, not one truss. */
+        public double trussMaxLength = 400.0;
+        /** Towns within this distance of a line get a station on it. */
+        public double stationReach = 1500.0;
+        /** Width of the corridor kept for the track, by class: double track for trunk lines, single for branches. */
+        public double trunkWidth = 12.0;
+        public double branchWidth = 8.0;
+    }
+
     /** One tier of settlements. */
     public static final class Tier {
         /** Edge of a cell of this tier's grid, in blocks: at most one settlement of the tier per cell. */
@@ -333,6 +394,10 @@ public final class CitySettings {
         if (roads.maxGrade <= 0 || roads.sampleSpacing <= 0 || roads.trunkMaxLength <= 0 || roads.localMaxLength <= 0
                 || roads.tunnelMaxLength < 0 || roads.windowMargin < 0) {
             problems.add("roads need a positive maxGrade, sampleSpacing and maximum lengths");
+        }
+        if (rail.maxLength <= 0 || rail.trunkMinRadius <= 0 || rail.branchMinRadius <= 0 || rail.trunkGrade <= 0
+                || rail.branchGrade <= 0 || rail.sampleSpacing <= 0 || rail.maxRadius < rail.trunkRadius) {
+            problems.add("rail needs positive lengths, radii and grades, and maxRadius no smaller than trunkRadius");
         }
         Site site = settlements.site;
         if (!(0 < site.riverNear && site.riverNear < site.riverFar && site.riverFar < site.riverFade)
