@@ -206,6 +206,24 @@ class ChunkLayerTest {
     }
 
     @Test
+    void boulevardsHaveAMedianAndLanesEachWay() {
+        // 30 wide: pavements of 4, a median of 4, three lanes of 3 each way
+        assertEquals(ChunkLayer.Paving.MEDIAN, paving(ChunkLayer.Surface.BOULEVARD, 0.5, 2.0, 30.0));
+        assertEquals(ChunkLayer.Paving.MEDIAN, paving(ChunkLayer.Surface.BOULEVARD, -1.5, 2.0, 30.0));
+        assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.BOULEVARD, 2.5, 2.0, 30.0));
+        assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.BOULEVARD, 3.5, 2.0, 30.0));
+        assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.BOULEVARD, 5.0, 2.0, 30.0));
+        assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.BOULEVARD, 5.0, 7.0, 30.0));
+        assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.BOULEVARD, -10.5, 7.0, 30.0));
+        assertEquals(ChunkLayer.Paving.SIDEWALK, paving(ChunkLayer.Surface.BOULEVARD, 12.0, 7.0, 30.0));
+        // On a bridge the median is paved; at a junction it is broken off
+        assertEquals(ChunkLayer.Paving.SIDEWALK, ChunkLayer.paving(new ChunkLayer.Column(ChunkLayer.Surface.BOULEVARD, true,
+                70.0, 0.5, 0.0, 2.0, 30.0)));
+        assertEquals(ChunkLayer.Paving.ASPHALT, ChunkLayer.paving(new ChunkLayer.Column(ChunkLayer.Surface.BOULEVARD, false,
+                Double.NaN, 0.5, 0.0, 2.0, 30.0, true, true)));
+    }
+
+    @Test
     void anglesStepEvery180OverTheirCount() {
         assertEquals(0, ChunkLayer.angle(0.0));
         assertEquals(0, ChunkLayer.angle(Math.PI));

@@ -837,7 +837,7 @@ public final class StreetLayer {
                 urbanGround.add(line.points());
             }
             railSides(window, urbanGround, segments, rails, sides);
-            demote(settlement, segments);
+            boulevards(settlement, extent, anchors, segments, demote(settlement, segments));
             // Streets between the arterials, ending at them (a capital's grid crosses them), then lanes
             double streetSpacing = streetSpacing(formation);
             if (streetSpacing > 0) {
@@ -2295,6 +2295,7 @@ public final class StreetLayer {
     /** How much a class of street outranks another where they meet: the lesser one gives way. */
     private static int rank(StreetClass streetClass) {
         return switch (streetClass) {
+            case BOULEVARD -> 5;
             case OLD_ROAD -> 4;
             case ARTERIAL -> 3;
             case COLLECTOR -> 2;
@@ -2668,7 +2669,8 @@ public final class StreetLayer {
      * collectors and old roads) between nodes of that network picked by the town's hash use each piece; the most used
      * arterial pieces, {@code mainShare} of the arterials' length, stay arterials.
      */
-    private void demote(Settlement settlement, List<StreetSegment> segments) {
+    private double[] demote(Settlement settlement, List<StreetSegment> segments) {
+        double[] used = new double[segments.size()];
         Map<Long, Integer> index = new HashMap<>();
         List<double[]> nodes = new ArrayList<>();
         List<int[]> edges = new ArrayList<>();
@@ -2695,7 +2697,7 @@ public final class StreetLayer {
         }
         int n = nodes.size();
         if (n < 2 || arterialLength <= 0) {
-            return;
+            return used;
         }
         List<List<Integer>> adjacent = new ArrayList<>();
         for (int v = 0; v < n; v++) {
@@ -2766,15 +2768,148 @@ public final class StreetLayer {
         }
         arterials.sort((p, q) -> use[q] != use[p] ? Double.compare(use[q], use[p]) : Integer.compare(p, q));
         double kept = 0.0;
+        for (int e = 0; e < edges.size(); e++) {
+            used[edgePiece.get(e)] = use[e];
+        }
         for (int e : arterials) {
             int k = edgePiece.get(e);
             StreetSegment g = segments.get(k);
-            if (kept < config.mainShare * arterialLength) {
+            // The main share stays; so does the station avenue, wider than an arterial
+            if (kept < config.mainShare * arterialLength || g.width() > config.arterialWidth) {
                 kept += g.length();
                 continue;
             }
             segments.set(k, new StreetSegment(g.x1(), g.z1(), g.x2(), g.z2(), StreetClass.COLLECTOR, g.era(),
                     Math.min(g.width(), config.collectorWidth), g.structure()));
+        }
+        return used;
+    }
+
+    /**
+     * A town's one or two boulevards: the station avenue for its first {@code boulevardLength} from the station, and
+     * in a city or metropolis the most used arterial piece within {@code boulevardReach} of the heart (by
+     * {@code used}, each piece's through traffic) and the arterials running on straight from it either way, up to
+     * {@code downtownBoulevard} in all.
+     */
+    private void boulevards(Settlement settlement, CityExtent extent, List<Anchor> anchors, List<StreetSegment> segments,
+                            double[] used) {
+        Map<Long, List<Integer>> byNode = new HashMap<>();
+        for (int k = 0; k < segments.size(); k++) {
+            StreetSegment g = segments.get(k);
+            if (g.streetClass() == StreetClass.ARTERIAL && g.length() > 1e-6) {
+                byNode.computeIfAbsent(nodeKey(g.x1(), g.z1()), q -> new ArrayList<>()).add(k);
+                byNode.computeIfAbsent(nodeKey(g.x2(), g.z2()), q -> new ArrayList<>()).add(k);
+            }
+        }
+        java.util.Set<Integer> chosen = new java.util.TreeSet<>();
+        // The station avenue, out from the station
+        for (Anchor anchor : anchors) {
+            if (anchor.kind() != Anchor.Kind.STATION) {
+                continue;
+            }
+            int start = -1;
+            double nearest = config.boulevardLength;
+            for (int k = 0; k < segments.size(); k++) {
+                StreetSegment g = segments.get(k);
+                if (g.streetClass() == StreetClass.ARTERIAL && g.width() >= config.stationAvenueWidth - 1e-6) {
+                    double d = Math.min(Math.hypot(g.x1() - anchor.x(), g.z1() - anchor.z()), Math.hypot(g.x2() - anchor.x(), g.z2() - anchor.z()));
+                    if (d < nearest) {
+                        nearest = d;
+                        start = k;
+                    }
+                }
+            }
+            if (start < 0) {
+                continue;
+            }
+            // Along the avenue's pieces, as far from the station as the boulevard runs
+            Map<Integer, Double> reached = new HashMap<>();
+            ArrayDeque<Integer> queue = new ArrayDeque<>();
+            reached.put(start, nearest);
+            queue.add(start);
+            while (!queue.isEmpty()) {
+                int k = queue.poll();
+                StreetSegment g = segments.get(k);
+                double at = reached.get(k);
+                if (at >= config.boulevardLength) {
+                    continue;
+                }
+                chosen.add(k);
+                for (long end : new long[]{nodeKey(g.x1(), g.z1()), nodeKey(g.x2(), g.z2())}) {
+                    for (int q : byNode.getOrDefault(end, List.of())) {
+                        if (!reached.containsKey(q) && segments.get(q).width() >= config.stationAvenueWidth - 1e-6) {
+                            reached.put(q, at + g.length());
+                            queue.add(q);
+                        }
+                    }
+                }
+            }
+        }
+        // Downtown: the busiest arterial near the heart, and straight on from it
+        if (settlement.tier() == SettlementTier.CITY || settlement.tier() == SettlementTier.METROPOLIS) {
+            int best = -1;
+            for (int k = 0; k < segments.size(); k++) {
+                StreetSegment g = segments.get(k);
+                if (g.streetClass() != StreetClass.ARTERIAL || g.structure() != StreetStructure.GROUND || chosen.contains(k)
+                        || Math.hypot(0.5 * (g.x1() + g.x2()) - extent.coreX(), 0.5 * (g.z1() + g.z2()) - extent.coreZ()) > config.boulevardReach) {
+                    continue;
+                }
+                if (best < 0 || used[k] > used[best]) {
+                    best = k;
+                }
+            }
+            if (best >= 0) {
+                StreetSegment b = segments.get(best);
+                java.util.Set<Integer> run = new java.util.TreeSet<>();
+                run.add(best);
+                double length = b.length();
+                for (boolean forward : new boolean[]{true, false}) {
+                    int piece = best;
+                    long node = forward ? nodeKey(b.x2(), b.z2()) : nodeKey(b.x1(), b.z1());
+                    double side = 0.0;
+                    while (side < 0.5 * (config.downtownBoulevard - b.length())) {
+                        StreetSegment g = segments.get(piece);
+                        boolean out = nodeKey(g.x1(), g.z1()) == node;
+                        // The piece's direction into the node
+                        double ux = out ? g.x1() - g.x2() : g.x2() - g.x1();
+                        double uz = out ? g.z1() - g.z2() : g.z2() - g.z1();
+                        int next = -1;
+                        double straightest = Math.cos(Math.toRadians(30));
+                        for (int q : byNode.getOrDefault(node, List.of())) {
+                            StreetSegment o = segments.get(q);
+                            if (q == piece || run.contains(q) || chosen.contains(q)) {
+                                continue;
+                            }
+                            boolean from = nodeKey(o.x1(), o.z1()) == node;
+                            double ox = from ? o.x2() - o.x1() : o.x1() - o.x2();
+                            double oz = from ? o.z2() - o.z1() : o.z1() - o.z2();
+                            double cos = (ux * ox + uz * oz) / (Math.hypot(ux, uz) * Math.hypot(ox, oz));
+                            if (cos > straightest) {
+                                straightest = cos;
+                                next = q;
+                            }
+                        }
+                        if (next < 0) {
+                            break;
+                        }
+                        StreetSegment o = segments.get(next);
+                        node = nodeKey(o.x1(), o.z1()) == node ? nodeKey(o.x2(), o.z2()) : nodeKey(o.x1(), o.z1());
+                        run.add(next);
+                        side += o.length();
+                        length += o.length();
+                        piece = next;
+                    }
+                }
+                // A short run is no boulevard
+                if (length >= 0.5 * config.downtownBoulevard) {
+                    chosen.addAll(run);
+                }
+            }
+        }
+        for (int k : chosen) {
+            StreetSegment g = segments.get(k);
+            segments.set(k, new StreetSegment(g.x1(), g.z1(), g.x2(), g.z2(), StreetClass.BOULEVARD, g.era(),
+                    config.boulevardWidth, g.structure()));
         }
     }
 
@@ -3670,7 +3805,8 @@ public final class StreetLayer {
 
     /** Whether a class is of the main roads, arterial or collector, as the town's network counts them. */
     private static boolean major(StreetClass streetClass) {
-        return streetClass == StreetClass.ARTERIAL || streetClass == StreetClass.COLLECTOR;
+        return streetClass == StreetClass.ARTERIAL || streetClass == StreetClass.COLLECTOR
+                || streetClass == StreetClass.BOULEVARD;
     }
 
     private static boolean busRoad(StreetSegment g) {

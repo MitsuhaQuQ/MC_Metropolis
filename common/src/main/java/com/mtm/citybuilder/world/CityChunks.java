@@ -37,6 +37,7 @@ public final class CityChunks {
             case WHITE_LINE -> line(CityBlocks.ASPHALT_LINE_WHITE.get(), mark);
             case YELLOW_LINE -> line(CityBlocks.ASPHALT_LINE_YELLOW.get(), mark);
             case SIDEWALK -> CityBlocks.SIDEWALK.get().defaultBlockState();
+            case MEDIAN -> net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState();
             case NONE -> null;
         };
     }

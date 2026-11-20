@@ -458,7 +458,7 @@ public final class CityMap {
         System.out.printf("  mean block %.2f ha (OSM: Kyoto 1.4, Kanazawa 1.0, Takayama 2.6); lanes %.1f km/km2 (Kyoto 22.6, Kanazawa 7.9)%n",
                 network.meanBlockHa(), network.laneDensity());
         java.util.function.Predicate<StreetSegment> main = s -> s.streetClass() == StreetClass.ARTERIAL
-                || s.streetClass() == StreetClass.COLLECTOR;
+                || s.streetClass() == StreetClass.COLLECTOR || s.streetClass() == StreetClass.BOULEVARD;
         System.out.printf("  doubled within 40: arterials %.0f%%, streets %.0f%%; junction corners under 30 deg %.1f%%, under 45 deg %.1f%%%n",
                 100 * StreetMetrics.doubled(plan.segments(), main, 40.0),
                 100 * StreetMetrics.doubled(plan.segments(), s -> s.streetClass() == StreetClass.STREET, 40.0),
@@ -469,6 +469,12 @@ public final class CityMap {
                 widths[s.width() >= 16 ? 0 : 1] += s.length();
             }
         });
+        List<StreetSegment> boulevards = plan.segments().stream().filter(b -> b.streetClass() == StreetClass.BOULEVARD).toList();
+        for (int k = 0; k < boulevards.size(); k += 10) {
+            StreetSegment b = boulevards.get(k);
+            System.out.printf("  boulevard at %.0f %.0f heading %.0f deg%n", 0.5 * (b.x1() + b.x2()), 0.5 * (b.z1() + b.z2()),
+                    Math.toDegrees(Math.atan2(b.z2() - b.z1(), b.x2() - b.x1())));
+        }
         System.out.printf("  squeezed (under 12 of land beside a parallel road): main roads %.1f%%, streets %.1f%%%n",
                 100 * StreetMetrics.squeezed(plan.segments(), main, 12.0),
                 100 * StreetMetrics.squeezed(plan.segments(), s -> s.streetClass() == StreetClass.STREET, 12.0));

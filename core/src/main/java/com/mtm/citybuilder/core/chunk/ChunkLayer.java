@@ -30,8 +30,18 @@ public final class ChunkLayer {
         LANE,
         STREET,
         OLD_ROAD,
-        ARTERIAL
+        ARTERIAL,
+        /** A boulevard, divided by a planted median. */
+        BOULEVARD
     }
+
+    /** Whether a surface is marked with lines: arterials, collectors and boulevards. */
+    public static boolean marked(Surface surface) {
+        return surface == Surface.ARTERIAL || surface == Surface.BOULEVARD;
+    }
+
+    /** The planted median of a boulevard, its whole width (the street layer's {@code boulevardMedian}). */
+    public static final double MEDIAN = 4.0;
 
     /**
      * One column of a chunk.
@@ -67,7 +77,9 @@ public final class ChunkLayer {
         /** The yellow centre line of a wide street. */
         YELLOW_LINE,
         /** Paving slabs: a pavement beside a wide street, or a lane. */
-        SIDEWALK
+        SIDEWALK,
+        /** The planted median of a boulevard: grass. */
+        MEDIAN
     }
 
     /** Directions a line may cross its block at: every 180 / ANGLES degrees, from along +x towards +z. */
@@ -95,8 +107,10 @@ public final class ChunkLayer {
      * How a column is paved, as Japanese streets are: a wide street (an arterial, 14 or more wide) has pavements of 3
      * (4 from 20 wide) either side, a yellow centre line, white edge lines and, on a carriageway of two lanes a way,
      * dashed white lane lines (5 painted, 5 not); a collector of 10 to 14 wide has pavements of 2, a white centre line
-     * and white edge lines; a street or an old road is plain asphalt, as narrow Japanese streets have no centre line;
-     * a lane is paving slabs.
+     * and white edge lines; a boulevard has pavements of 4, a planted median of {@link #MEDIAN} (paving slabs on a
+     * bridge) with a white line along either side, white edge lines and dashed white lines between lanes of about 3;
+     * a street or an old road is plain asphalt, as narrow Japanese streets have no centre line; a lane is paving
+     * slabs. Where marked streets meet, the junction is plain asphalt, the median and the lines broken off.
      * <p>
      * A line is drawn where its centre crosses the block, at the angle of the {@link #ANGLES} nearest the street's
      * heading and at the position it crosses at, so a line at an angle to the blocks, and round a bend, runs on
@@ -126,16 +140,30 @@ public final class ChunkLayer {
             return new Mark(Paving.SIDEWALK, 0, 0);
         }
         List<Line> lines = new ArrayList<>();
-        if (width >= 14) {
+        if (column.surface == Surface.BOULEVARD) {
+            double median = 0.5 * MEDIAN;
+            if (Math.abs(column.across) < median) {
+                return new Mark(column.bridge ? Paving.SIDEWALK : Paving.MEDIAN, 0, 0);
+            }
+            double side = carriage - median;
+            int lanes = Math.max(1, (int) Math.floor(side / 3.0));
+            for (int sign : new int[]{1, -1}) {
+                lines.add(new Line(sign * (median + 0.5), Paving.WHITE_LINE, false));
+                lines.add(new Line(sign * (carriage - 0.5), Paving.WHITE_LINE, false));
+                for (int k = 1; k < lanes; k++) {
+                    lines.add(new Line(sign * (median + side * k / lanes), Paving.WHITE_LINE, true));
+                }
+            }
+        } else if (width >= 14) {
             lines.add(new Line(0.0, Paving.YELLOW_LINE, false));
         } else if (walk > 0) {
             lines.add(new Line(0.0, Paving.WHITE_LINE, false));
         }
-        if (walk > 0) {
+        if (walk > 0 && column.surface != Surface.BOULEVARD) {
             lines.add(new Line(carriage - 0.5, Paving.WHITE_LINE, false));
             lines.add(new Line(-(carriage - 0.5), Paving.WHITE_LINE, false));
         }
-        if (carriage >= 5.0) {
+        if (carriage >= 5.0 && column.surface != Surface.BOULEVARD) {
             lines.add(new Line(0.5 * carriage, Paving.WHITE_LINE, true));
             lines.add(new Line(-0.5 * carriage, Paving.WHITE_LINE, true));
         }
@@ -253,7 +281,7 @@ public final class ChunkLayer {
                         }
                         int c = x * 16 + z;
                         int level = bridge ? 1 : 0;
-                        if (surface == Surface.ARTERIAL) {
+                        if (marked(surface)) {
                             if (first[level][c] < 0) {
                                 first[level][c] = p;
                                 firstIndex[level][c] = index;
@@ -288,7 +316,7 @@ public final class ChunkLayer {
         for (int c = 0; c < 256; c++) {
             Column column = columns[c];
             int level = column.bridge ? 1 : 0;
-            if (column.surface == Surface.ARTERIAL && junction[level][c]) {
+            if (marked(column.surface) && junction[level][c]) {
                 columns[c] = new Column(column.surface, column.bridge, column.deck, column.across, column.heading,
                         column.along, column.width, true, carriage[level][c]);
             }
@@ -448,6 +476,7 @@ public final class ChunkLayer {
     private static Surface surface(StreetSegment g) {
         return switch (g.streetClass()) {
             case ARTERIAL, COLLECTOR -> Surface.ARTERIAL;
+            case BOULEVARD -> Surface.BOULEVARD;
             case OLD_ROAD -> Surface.OLD_ROAD;
             case STREET -> Surface.STREET;
             case LANE -> Surface.LANE;

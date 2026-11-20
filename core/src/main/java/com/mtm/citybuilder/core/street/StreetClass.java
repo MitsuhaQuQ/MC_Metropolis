@@ -6,6 +6,11 @@ public enum StreetClass {
     OLD_ROAD,
     /** A main street, dividing districts and carrying traffic across town. */
     ARTERIAL,
+    /**
+     * A boulevard: a wide main street divided by a planted median, as Kyoto's Horikawa-dori or the avenue in front of
+     * a station; a town has one or two.
+     */
+    BOULEVARD,
     /** A collector, gathering a district's traffic to the arterials. */
     COLLECTOR,
     /** A street, laying out blocks. */

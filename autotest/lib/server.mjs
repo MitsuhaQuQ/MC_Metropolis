@@ -26,5 +26,7 @@ export const server = {
   blocks: (x1, z1, x2, z2) => call('/blocks', { x1, z1, x2, z2 }),
   tick: () => call('/tick'),
   planAround: (x, z) => call('/plan-around', { x, z }),
+  /** The nearest piece of a class of street (BOULEVARD, ARTERIAL, ...) in this world's plan: {found, x, z, heading, width}. */
+  street: (x, z, streetClass) => call('/street', { x, z, class: streetClass }),
   stop: () => call('/stop'),
 };

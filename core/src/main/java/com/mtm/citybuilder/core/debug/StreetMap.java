@@ -90,6 +90,7 @@ public final class StreetMap {
         for (StreetSegment segment : plan.segments()) {
             g.setColor(switch (segment.streetClass()) {
                 case OLD_ROAD -> new Color(140, 80, 30);
+                case BOULEVARD -> new Color(120, 0, 60);
                 case ARTERIAL -> segment.era() == com.mtm.citybuilder.core.street.Era.MODERN
                         ? new Color(30, 40, 120) : new Color(15, 15, 15);
                 case COLLECTOR -> segment.era() == com.mtm.citybuilder.core.street.Era.MODERN

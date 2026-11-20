@@ -74,6 +74,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/blocks", this::blocks);
             route(http, "/tick", this::tick);
             route(http, "/plan-around", this::planAround);
+            route(http, "/street", this::street);
             route(http, "/stop", this::stop);
             http.start();
             // The JDK's HTTP dispatcher thread is not a daemon: stopped with the server, or the process never exits
@@ -299,6 +300,42 @@ public final class TestKit implements DedicatedServerModInitializer {
     private Object planAround(Map<String, String> query, String body) {
         CityPlanner.planAround(overworld(), Double.parseDouble(query.get("x")), Double.parseDouble(query.get("z")));
         return Map.of("queued", true);
+    }
+
+    /**
+     * The nearest piece of a class of street ({@code class}, e.g. BOULEVARD) to (x, z) in the plan of the town owning
+     * that point, as this world planned it (the settlements are planned in the order they are needed, so a town here
+     * may differ a little from one the tools plan), well inside a run of it: its middle and heading in degrees, or found
+     * false.
+     */
+    private Object street(Map<String, String> query, String body) {
+        double x = Double.parseDouble(query.get("x"));
+        double z = Double.parseDouble(query.get("z"));
+        com.mtm.citybuilder.core.street.StreetClass wanted = com.mtm.citybuilder.core.street.StreetClass.valueOf(query.get("class"));
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if (logic == null || logic.urban(x, z).owner() == null) {
+            return Map.of("found", false);
+        }
+        com.mtm.citybuilder.core.street.StreetSegment best = null;
+        double nearest = Double.POSITIVE_INFINITY;
+        java.util.List<com.mtm.citybuilder.core.street.StreetSegment> of = logic.streetPlan(logic.urban(x, z).owner()).segments()
+                .stream().filter(g -> g.streetClass() == wanted).toList();
+        for (com.mtm.citybuilder.core.street.StreetSegment g : of) {
+            double mx = 0.5 * (g.x1() + g.x2());
+            double mz = 0.5 * (g.z1() + g.z2());
+            double d = Math.hypot(mx - x, mz - z);
+            // Well inside a run of the class, not at its end: as many pieces of it within 60 as a straight run has
+            long around = of.stream().filter(o -> Math.hypot(0.5 * (o.x1() + o.x2()) - mx, 0.5 * (o.z1() + o.z2()) - mz) < 60).count();
+            if (around * Math.max(1.0, g.length()) >= 100 && d < nearest) {
+                nearest = d;
+                best = g;
+            }
+        }
+        if (best == null) {
+            return Map.of("found", false);
+        }
+        return Map.of("found", true, "x", 0.5 * (best.x1() + best.x2()), "z", 0.5 * (best.z1() + best.z2()),
+                "heading", Math.toDegrees(Math.atan2(best.z2() - best.z1(), best.x2() - best.x1())), "width", best.width());
     }
 
     private Object stop(Map<String, String> query, String body) {

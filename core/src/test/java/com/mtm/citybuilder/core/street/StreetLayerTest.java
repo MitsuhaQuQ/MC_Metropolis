@@ -119,7 +119,7 @@ class StreetLayerTest {
         // roads squeezed beside another, and a hierarchy: main roads a minority of the arterials and collectors
         double sharp = StreetMetrics.acute(castle.segments(), 30.0);
         java.util.function.Predicate<StreetSegment> main = s -> s.streetClass() == StreetClass.ARTERIAL
-                || s.streetClass() == StreetClass.COLLECTOR;
+                || s.streetClass() == StreetClass.COLLECTOR || s.streetClass() == StreetClass.BOULEVARD;
         double squeezed = StreetMetrics.squeezed(castle.segments(), main, 12.0);
         double arterial = castle.length(StreetClass.ARTERIAL);
         double collector = castle.length(StreetClass.COLLECTOR);
@@ -128,6 +128,11 @@ class StreetLayerTest {
         assertTrue(sharp <= 0.03, shape);
         assertTrue(squeezed <= 0.06, shape);
         assertTrue(collector > 0.2 * (arterial + collector) && arterial > 0.3 * (arterial + collector), shape);
+        // One or two boulevards: the station's and downtown's, each a stretch of town, not a network
+        double boulevard = castle.length(StreetClass.BOULEVARD);
+        assertTrue(boulevard >= 0.5 * SETTINGS.streets.downtownBoulevard
+                && boulevard <= 2 * SETTINGS.streets.boulevardLength + SETTINGS.streets.downtownBoulevard + 500, shape
+                + ", boulevard " + boulevard);
 
         StreetPlan capital = logic.streetPlan(city, Formation.JORI);
         // Measured within the planned city, the grid

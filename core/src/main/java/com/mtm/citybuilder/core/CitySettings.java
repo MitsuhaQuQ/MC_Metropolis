@@ -575,6 +575,16 @@ public final class CitySettings {
          */
         public double sharpJoin = 35.0;
         /**
+         * Boulevards, divided by a planted median of {@code boulevardMedian}: the station avenue's first
+         * {@code boulevardLength} from the station, and in a city or metropolis the most used arterial within
+         * {@code boulevardReach} of the heart, run on straight for up to {@code downtownBoulevard} in all.
+         */
+        public double boulevardWidth = 30.0;
+        public double boulevardMedian = 4.0;
+        public double boulevardLength = 1200.0;
+        public double boulevardReach = 1500.0;
+        public double downtownBoulevard = 2000.0;
+        /**
          * A collector or street with less land than this between its edge and a road of its class or higher running
          * beside it the same way leaves no room to build between them: it is taken out.
          */

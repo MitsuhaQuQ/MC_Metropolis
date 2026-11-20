@@ -47,4 +47,15 @@ test('the castle town seen from the test client', async ({}, testInfo) => {
   await view('town-above', TOWN.x, 150, TOWN.z, 0, 90, testInfo);
   await view('town-oblique', TOWN.x, 100, TOWN.z + 120, 180, 35, testInfo);
   await view('town-street', TOWN.x + 20, 72, TOWN.z + 20, 135, 10, testInfo);
+  // The boulevard nearest the centre, as this world planned it: from above, then along it
+  const b = await server.street(TOWN.x, TOWN.z, 'BOULEVARD');
+  expect(b.found).toBe(true);
+  const bx = Math.round(b.x);
+  const bz = Math.round(b.z);
+  await server.generate(bx - 48, bz - 48, bx + 47, bz + 47);
+  await view('boulevard-above', bx, 130, bz, 0, 90, testInfo);
+  // Standing 40 back along it, a little to one side of the median, looking along it (Minecraft's yaw: 0 faces +z)
+  const h = (b.heading * Math.PI) / 180;
+  const yaw = (Math.atan2(-Math.cos(h), Math.sin(h)) * 180) / Math.PI;
+  await view('boulevard-along', bx - 40 * Math.cos(h) - 6 * Math.sin(h), 74, bz - 40 * Math.sin(h) + 6 * Math.cos(h), yaw, 12, testInfo);
 });
