@@ -46,6 +46,17 @@ def main():
     write(os.path.join(BLOCKSTATES, 'asphalt.json'), {'variants': {
         'low=false': {'model': 'citybuilder:block/asphalt'},
         'low=true': {'model': 'citybuilder:block/asphalt_low'}}})
+    # Asphalt painted white all over (a zebra crossing's stripe)
+    write(os.path.join(MODELS, 'asphalt_white.json'), {'parent': 'minecraft:block/cube_bottom_top',
+                                                       'textures': {'top': 'citybuilder:block/asphalt_white',
+                                                                    'side': 'citybuilder:block/asphalt',
+                                                                    'bottom': 'citybuilder:block/asphalt'}})
+    write(os.path.join(MODELS, 'asphalt_white_low.json'), {'parent': 'citybuilder:block/lowered',
+                                                           'textures': {'top': 'citybuilder:block/asphalt_white',
+                                                                        'side': 'citybuilder:block/asphalt'}})
+    write(os.path.join(BLOCKSTATES, 'asphalt_white.json'), {'variants': {
+        'low=false': {'model': 'citybuilder:block/asphalt_white'},
+        'low=true': {'model': 'citybuilder:block/asphalt_white_low'}}})
     # Marked asphalt
     for colour in ('white', 'yellow'):
         variants = {}

@@ -82,6 +82,22 @@ def marking(colour, angle, offset):
     return rows
 
 
+def painted():
+    """Asphalt painted white all over, a zebra crossing's stripe: the paint a little worn, the asphalt showing through
+    in a few pixels."""
+    rows = []
+    for y in range(16):
+        row = []
+        for x in range(16):
+            if noise(x, y, 6) > 0.82:
+                row.append(asphalt(x, y))
+            else:
+                n = noise(x, y, 7) * 6
+                row.append((clamp(226 + n), clamp(226 + n), clamp(220 + n)))
+        rows.append(row)
+    return rows
+
+
 def sidewalk():
     """Light grey paving slabs, 8 pixels square, offset by half a slab every other row."""
     rows = []
@@ -125,6 +141,7 @@ def main():
         for angle in range(ANGLES):
             for offset in range(OFFSETS):
                 png(os.path.join(OUT, 'line', f'{name}_{angle}_{offset}.png'), marking(colour, angle, offset))
+    png(os.path.join(OUT, 'asphalt_white.png'), painted())
     png(os.path.join(OUT, 'sidewalk.png'), sidewalk())
     png(os.path.join(OUT, 'sidewalk_side.png'), sidewalk_side())
 

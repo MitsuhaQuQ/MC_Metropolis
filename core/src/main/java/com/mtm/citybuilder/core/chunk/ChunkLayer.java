@@ -3,6 +3,7 @@ package com.mtm.citybuilder.core.chunk;
 import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.extent.UrbanSample;
 import com.mtm.citybuilder.core.settlement.Settlement;
+import com.mtm.citybuilder.core.street.StationPlaza;
 import com.mtm.citybuilder.core.street.StreetPlan;
 import com.mtm.citybuilder.core.street.StreetSegment;
 import com.mtm.citybuilder.core.street.StreetStructure;
@@ -32,7 +33,9 @@ public final class ChunkLayer {
         OLD_ROAD,
         ARTERIAL,
         /** A boulevard, divided by a planted median. */
-        BOULEVARD
+        BOULEVARD,
+        /** A station's square (its own paving, {@link Column#plaza}), over whatever streets ran there. */
+        PLAZA
     }
 
     /** A canal's water: the column is dug out, the water a block below the ground and two deep, on stone. */
@@ -83,10 +86,22 @@ public final class ChunkLayer {
      * @param canal   a canal under the column: {@link #CANAL_WATER} its water, {@link #CANAL_WALL} its stone wall, 0
      *                none; under a street, a little bridge carries the street over it (see {@link #slabDeck},
      *                {@link #parapet})
+     * @param plaza   a station square's paving here ({@link Surface#PLAZA}), null elsewhere
      */
     public record Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
-                         double width, boolean junction, boolean carriageway, int canal) {
+                         double width, boolean junction, boolean carriageway, int canal, Mark plaza) {
         public static final Column EMPTY = new Column(Surface.NONE, false, Double.NaN, 0.0, 0.0, 0.0, 0.0, false, false, 0);
+
+        /** A column of streets, perhaps over a canal. */
+        public Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
+                      double width, boolean junction, boolean carriageway, int canal) {
+            this(surface, bridge, deck, across, heading, along, width, junction, carriageway, canal, null);
+        }
+
+        /** A column of a station's square, paved as it says. */
+        public static Column plaza(Mark mark) {
+            return new Column(Surface.PLAZA, false, Double.NaN, 0.0, 0.0, 0.0, 0.0, false, false, 0, mark);
+        }
 
         /** A column of streets, without a canal. */
         public Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
@@ -112,7 +127,11 @@ public final class ChunkLayer {
         /** Paving slabs: a pavement beside a wide street, or a lane. */
         SIDEWALK,
         /** The planted median of a boulevard: grass. */
-        MEDIAN
+        MEDIAN,
+        /** Asphalt painted white all over: a zebra crossing's stripe. */
+        PAINT,
+        /** A shelter's place beside a berth in a station's square. */
+        SHELTER
     }
 
     /** Directions a line may cross its block at: every 180 / ANGLES degrees, from along +x towards +z. */
@@ -161,6 +180,9 @@ public final class ChunkLayer {
      * unbroken from block to block instead of stepping a whole block at a time.
      */
     public static Mark mark(Column column) {
+        if (column.plaza != null) {
+            return column.plaza;
+        }
         switch (column.surface) {
             case NONE:
                 return new Mark(Paving.NONE, 0, 0);
@@ -386,7 +408,7 @@ public final class ChunkLayer {
      * continue it: of its class, sharing an end, within 30 degrees of its line.
      */
     private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links,
-                         Map<Long, List<double[]>> canals) {
+                         Map<Long, List<double[]>> canals, Map<Long, List<StationPlaza>> plazas) {
         /** Whether two pieces are of one street: the same, continuing each other, or with one piece between. */
         boolean sameStreet(int p, int q) {
             if (p == q) {
@@ -441,9 +463,11 @@ public final class ChunkLayer {
         double minX = chunkX * 16.0;
         double minZ = chunkZ * 16.0;
         List<double[]> canals = new ArrayList<>();
+        List<StationPlaza> plazas = new ArrayList<>();
         for (Settlement town : towns(minX, minZ)) {
             Index index = index(town);
             canals.addAll(index.canals.getOrDefault(key(chunkX, chunkZ), List.of()));
+            plazas.addAll(index.plazas.getOrDefault(key(chunkX, chunkZ), List.of()));
             List<Integer> pieces = index.byChunk.get(key(chunkX, chunkZ));
             if (pieces == null) {
                 continue;
@@ -547,7 +571,174 @@ public final class ChunkLayer {
                 }
             }
         }
+        // The station squares over whatever ran there: their own paving, the station building's land left bare
+        for (StationPlaza plaza : plazas) {
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    double cx = minX + x + 0.5;
+                    double cz = minZ + z + 0.5;
+                    StationPlaza.Part part = plaza.part(cx, cz);
+                    if (part == StationPlaza.Part.NONE || columns[x * 16 + z].bridge) {
+                        continue;
+                    }
+                    columns[x * 16 + z] = part == StationPlaza.Part.BUILDING ? Column.EMPTY
+                            : Column.plaza(plazaMark(plaza, cx, cz));
+                }
+            }
+        }
         return columns;
+    }
+
+    /**
+     * How a position in a station's square is paved (null for none: outside it, or on the station building's land).
+     * The forecourt and the pavements are paving slabs, a shelter's place smooth stone, an island grass. The
+     * carriageways are laid low, a kerb below the paving: a loop has white edge lines and a dashed white line between
+     * its lanes, solid along a berth, a berth white lines across its outer lane at its ends (yellow for the taxi
+     * stand); a throat white lines beside its median and at its edges; the frontage road is marked as a street of its
+     * width; where a loop and a link meet, plain asphalt. The taxi pool's lanes are parted by white lines and marked in
+     * stalls. A zebra crossing is stripes a block wide along the traffic, painted and not.
+     */
+    public static Mark plazaMark(StationPlaza plaza, double wx, double wz) {
+        double[] l = plaza.local(wx, wz);
+        double u = l[0];
+        double v = l[1];
+        double alongU = plaza.heading();
+        switch (plaza.partAt(u, v)) {
+            case NONE:
+            case BUILDING:
+                return null;
+            case PLAZA:
+                return new Mark(Paving.SIDEWALK, 0, 0);
+            case SHELTER:
+                return new Mark(Paving.SHELTER, 0, 0);
+            case ISLAND:
+                return new Mark(Paving.MEDIAN, 0, 0);
+            case CROSSING:
+                for (StationPlaza.Crossing crossing : plaza.crossings()) {
+                    if (crossing.area().contains(u, v)) {
+                        double w = crossing.alongU() ? v : u;
+                        boolean stripe = Math.floorMod((long) Math.floor(w), 2L) == 0;
+                        return new Mark(stripe ? Paving.PAINT : Paving.ASPHALT, 0, 0, true);
+                    }
+                }
+                return new Mark(Paving.ASPHALT, 0, 0, true);
+            case TAXI_POOL:
+                for (StationPlaza.Rect pool : plaza.taxiPools()) {
+                    if (pool.contains(u, v)) {
+                        // Lanes along the pool, parted by white lines, and stalls across them
+                        double middle = 0.5 * (pool.v1() + pool.v2());
+                        double half = 0.5 * Math.abs(pool.v2() - pool.v1());
+                        int lanes = Math.max(1, (int) Math.round(2 * half / 3.0));
+                        List<Line> lines = new ArrayList<>();
+                        for (int k = 1; k < lanes; k++) {
+                            lines.add(new Line(-half + 2 * half * k / lanes, Paving.WHITE_LINE, false));
+                        }
+                        Mark mark = draw(lines, plaza.side() * (v - middle), alongU, u, true);
+                        if (mark.paving() != Paving.ASPHALT) {
+                            return mark;
+                        }
+                        double outward = plaza.worldHeading(0, 1);
+                        double origin = across(plaza, outward, wx, wz);
+                        List<Line> stalls = new ArrayList<>();
+                        double first = Math.min(pool.u1(), pool.u2());
+                        for (double at = first + 6.0; at < Math.max(pool.u1(), pool.u2()) - 3.0; at += 6.0) {
+                            double[] p = plaza.world(at, v);
+                            stalls.add(new Line(across(plaza, outward, p[0], p[1]), Paving.WHITE_LINE, false));
+                        }
+                        return draw(stalls, origin, outward, 0.0, true);
+                    }
+                }
+                return new Mark(Paving.ASPHALT, 0, 0, true);
+            default:
+                break;
+        }
+        // A carriageway: of a loop, a link, or both where they meet
+        StationPlaza.Loop onLoop = null;
+        int on = 0;
+        for (StationPlaza.Loop loop : plaza.loops()) {
+            if (Math.abs(loop.radial(u, v)) <= 0.5 * loop.lane()) {
+                onLoop = loop;
+                on++;
+            }
+        }
+        StationPlaza.Link onLink = null;
+        for (StationPlaza.Link link : plaza.links()) {
+            if (link.carriage(u, v)) {
+                onLink = link;
+                on++;
+            }
+        }
+        if (on != 1) {
+            return new Mark(Paving.ASPHALT, 0, 0, true);
+        }
+        if (onLink != null) {
+            double heading = plaza.worldHeading(onLink.u2() - onLink.u1(), onLink.v2() - onLink.v1());
+            double[] a = plaza.world(onLink.u1(), onLink.v1());
+            double across = (wx - a[0]) * -Math.sin(heading) + (wz - a[1]) * Math.cos(heading);
+            double along = wx * Math.cos(heading) + wz * Math.sin(heading);
+            if (onLink.median() <= 0) {
+                Mark mark = mark(new Column(Surface.ARTERIAL, false, Double.NaN, across, heading, along, onLink.width()));
+                return new Mark(mark.paving(), mark.angle(), mark.offset(), true);
+            }
+            // A throat: white lines beside its median and at its edges, a dashed line between two lanes a way
+            double carriage = 0.5 * onLink.width() - onLink.walk();
+            double inner = 0.5 * onLink.median();
+            List<Line> lines = new ArrayList<>();
+            for (int sign : new int[]{1, -1}) {
+                lines.add(new Line(sign * (inner + 0.5), Paving.WHITE_LINE, false));
+                lines.add(new Line(sign * (carriage - 0.5), Paving.WHITE_LINE, false));
+                if (carriage - inner >= 6.0) {
+                    lines.add(new Line(sign * 0.5 * (carriage + inner), Paving.WHITE_LINE, true));
+                }
+            }
+            return draw(lines, across, heading, along, true);
+        }
+        StationPlaza.Loop loop = onLoop;
+        int index = plaza.loops().indexOf(loop);
+        double rho = loop.radial(u, v);
+        double s = loop.arc(u, v);
+        double perimeter = loop.perimeter();
+        // A berth's lines across its outer lane, at its ends
+        StationPlaza.Berth berth = null;
+        for (StationPlaza.Berth b : plaza.berths()) {
+            if (b.loop() != index || !b.holds(s, perimeter, 1.5)) {
+                continue;
+            }
+            Paving colour = b.use() == StationPlaza.Use.TAXI ? Paving.YELLOW_LINE : Paving.WHITE_LINE;
+            if (rho >= 0) {
+                for (double end : new double[]{b.s1(), b.s2()}) {
+                    double[] p = loop.point(end);
+                    double out = plaza.worldHeading(p[2], p[3]);
+                    double[] at = plaza.world(p[0], p[1]);
+                    Mark mark = draw(List.of(new Line(across(plaza, out, at[0], at[1]), colour, false)),
+                            across(plaza, out, wx, wz), out, 0.0, true);
+                    if (mark.paving() != Paving.ASPHALT) {
+                        return mark;
+                    }
+                }
+            }
+            if (b.holds(s, perimeter, 0.0)) {
+                berth = b;
+            }
+        }
+        // Along the loop: its tangent, turning round its core
+        double[] p = loop.point(s);
+        double heading = plaza.worldHeading(-p[3], p[2]);
+        List<Line> lines = new ArrayList<>();
+        double edge = 0.5 * loop.lane() - 0.5;
+        lines.add(new Line(edge, Paving.WHITE_LINE, false));
+        lines.add(new Line(-edge, Paving.WHITE_LINE, false));
+        if (berth != null) {
+            lines.add(new Line(0.0, berth.use() == StationPlaza.Use.TAXI ? Paving.YELLOW_LINE : Paving.WHITE_LINE, false));
+        } else {
+            lines.add(new Line(0.0, Paving.WHITE_LINE, true));
+        }
+        return draw(lines, rho, heading, s, true);
+    }
+
+    /** How far a world position lies to the left of a line through the square's origin at a heading. */
+    private static double across(StationPlaza plaza, double heading, double wx, double wz) {
+        return (wx - plaza.x()) * -Math.sin(heading) + (wz - plaza.z()) * Math.cos(heading);
     }
 
     /**
@@ -714,7 +905,17 @@ public final class ChunkLayer {
                 }
             }
         }
-        return new Index(byChunk, segments, deck, links, canals);
+        // The station squares by chunk
+        Map<Long, List<StationPlaza>> plazas = new HashMap<>();
+        for (StationPlaza plaza : plan.plazas()) {
+            double[] b = plaza.bounds();
+            for (int cx = Math.floorDiv((int) Math.floor(b[0]), 16); cx <= Math.floorDiv((int) Math.floor(b[2]), 16); cx++) {
+                for (int cz = Math.floorDiv((int) Math.floor(b[1]), 16); cz <= Math.floorDiv((int) Math.floor(b[3]), 16); cz++) {
+                    plazas.computeIfAbsent(key(cx, cz), q -> new ArrayList<>()).add(plaza);
+                }
+            }
+        }
+        return new Index(byChunk, segments, deck, links, canals, plazas);
     }
 
     private static Surface surface(StreetSegment g) {

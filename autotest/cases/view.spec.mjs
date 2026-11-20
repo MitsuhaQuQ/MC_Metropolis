@@ -79,6 +79,22 @@ test('the castle town seen from the test client', async ({}, testInfo) => {
   const cyaw = (Math.atan2(-Math.cos(ch), Math.sin(ch)) * 180) / Math.PI;
   await view('canal', c.x - 14 * Math.cos(ch) + 3 * Math.sin(ch), (cg.ground ?? 70) + 1, c.z - 14 * Math.sin(ch) - 3 * Math.cos(ch),
     cyaw + 15, 25, testInfo);
+  // The main station's square: from above, then from over the avenue looking back at it across the throat
+  const st = await server.station(TOWN.x, TOWN.z);
+  console.log('station', JSON.stringify(st));
+  expect(st.found).toBe(true);
+  const [sx, sz] = st.middle;
+  await server.generate(Math.round(sx) - 80, Math.round(sz) - 80, Math.round(sx) + 79, Math.round(sz) + 79);
+  const sg = await server.station(TOWN.x, TOWN.z);
+  const ground = sg.ground ?? 70;
+  await view('station-above', Math.round(sx), ground + 90, Math.round(sz), 0, 90, testInfo);
+  const oh = (st.outward * Math.PI) / 180;
+  const [mx, mz] = st.mouth;
+  // Minecraft's yaw: 0 faces +z; facing back toward the station is facing -outward
+  const back = (Math.atan2(Math.cos(oh), -Math.sin(oh)) * 180) / Math.PI;
+  await view('station-throat', mx + 25 * Math.cos(oh), ground + 22, mz + 25 * Math.sin(oh), back, 30, testInfo);
+  const [lx, lz] = st.loop;
+  await view('station-loop', lx, ground + 3, lz, back + 180, 15, testInfo);
   // The nearest airport: its runway's end from above, then along the runway from beside it
   const a = await server.airport(TOWN.x, TOWN.z);
   console.log('airport', JSON.stringify(a));

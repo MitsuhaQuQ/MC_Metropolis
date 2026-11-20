@@ -342,10 +342,17 @@ public final class TownPlots {
                         true, false);
             }
             if (back.length == 3) {
-                // The lot behind takes it, as the back of its land: the position measured from that lot's street
+                // The lots behind take it, as the back of their land: the position measured from their street, in
+                // the lot (as built) it lies behind there, which need not be the one behind the small lot's middle
                 Plot joined = project(back[0], back[1], x, z);
                 if (joined != null) {
-                    return joined(joined, back[2]);
+                    double[] starts = cuts.get(joined.chain())[joined.side() > 0 ? 0 : 1];
+                    int index = 0;
+                    while (index + 2 < starts.length && starts[index + 1] <= joined.along()) {
+                        index++;
+                    }
+                    int own = absorber(nominal(joined, index));
+                    return joined(joined, own >= 0 ? own : back[2]);
                 }
             }
             return new Plot(plot.id(), plot.chain(), plot.side(), plot.index(), plot.start(), plot.end(), plot.along(),
@@ -548,8 +555,8 @@ public final class TownPlots {
         if (district == District.NONE || district == District.GROUNDS || district == District.HIGH_SPEED) {
             return null;
         }
-        // A canal and its walls belong to no lot
-        if (inCanal(x, z)) {
+        // A canal and its walls belong to no lot, nor a station's square (its building is placed with the square)
+        if (inCanal(x, z) || plan.plazaAt(x, z) != null) {
             return null;
         }
         List<Integer> near = cells.get(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL));

@@ -77,6 +77,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/street", this::street);
             route(http, "/canal", this::canal);
             route(http, "/airport", this::airport);
+            route(http, "/station", this::station);
             route(http, "/stop", this::stop);
             http.start();
             // The JDK's HTTP dispatcher thread is not a daemon: stopped with the server, or the process never exits
@@ -283,7 +284,8 @@ public final class TestKit implements DedicatedServerModInitializer {
 
     private static boolean ours(Block block) {
         return block == CityBlocks.ASPHALT.get() || block == CityBlocks.ASPHALT_LINE_WHITE.get()
-                || block == CityBlocks.ASPHALT_LINE_YELLOW.get() || block == CityBlocks.SIDEWALK.get();
+                || block == CityBlocks.ASPHALT_LINE_YELLOW.get() || block == CityBlocks.SIDEWALK.get()
+                || block == CityBlocks.ASPHALT_WHITE.get();
     }
 
     /** The slowest of the last hundred ticks, in milliseconds. */
@@ -433,6 +435,51 @@ public final class TestKit implements DedicatedServerModInitializer {
         found.put("elevation", best.elevation());
         found.put("threshold", java.util.List.of(threshold[0], threshold[1]));
         found.put("apron", java.util.List.of(apron[0], apron[1]));
+        return found;
+    }
+
+    /**
+     * The square of the main station of the town owning (x, z), as this world planned it: {found, template, x, z (the
+     * station's middle), heading of the platforms and outward (toward the avenue), in degrees, depth, along, middle:
+     * the square's middle, loop: the first loop's middle, mouth, ground at the middle once loaded}.
+     */
+    private Object station(Map<String, String> query, String body) {
+        double x = Double.parseDouble(query.get("x"));
+        double z = Double.parseDouble(query.get("z"));
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if (logic == null || logic.urban(x, z).owner() == null) {
+            return Map.of("found", false);
+        }
+        com.mtm.citybuilder.core.street.StationPlaza best = null;
+        for (com.mtm.citybuilder.core.street.StationPlaza plaza : logic.streetPlan(logic.urban(x, z).owner()).plazas()) {
+            if (best == null || Math.hypot(plaza.x() - x, plaza.z() - z) < Math.hypot(best.x() - x, best.z() - z)) {
+                best = plaza;
+            }
+        }
+        if (best == null) {
+            return Map.of("found", false);
+        }
+        double[] middle = best.world(0.5 * (best.from() + best.to()), best.front() + 0.5 * best.depth());
+        com.mtm.citybuilder.core.street.StationPlaza.Loop first = best.loops().get(0);
+        double[] loop = best.world(first.u(), first.v());
+        double[] mouth = best.mouth();
+        Map<String, Object> found = new java.util.LinkedHashMap<>();
+        found.put("found", true);
+        found.put("template", best.template().name());
+        found.put("x", best.x());
+        found.put("z", best.z());
+        found.put("heading", Math.toDegrees(best.heading()));
+        found.put("outward", Math.toDegrees(best.worldHeading(0, 1)));
+        found.put("depth", best.depth());
+        found.put("along", best.to() - best.from());
+        found.put("middle", java.util.List.of(middle[0], middle[1]));
+        found.put("loop", java.util.List.of(loop[0], loop[1]));
+        found.put("mouth", java.util.List.of(mouth[0], mouth[1]));
+        int mx = (int) Math.floor(middle[0]);
+        int mz = (int) Math.floor(middle[1]);
+        if (overworld().hasChunk(mx >> 4, mz >> 4)) {
+            found.put("ground", overworld().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, mx, mz));
+        }
         return found;
     }
 

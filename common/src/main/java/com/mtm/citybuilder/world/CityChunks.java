@@ -42,6 +42,8 @@ public final class CityChunks {
             case YELLOW_LINE -> line(CityBlocks.ASPHALT_LINE_YELLOW.get(), mark);
             case SIDEWALK -> CityBlocks.SIDEWALK.get().defaultBlockState();
             case MEDIAN -> net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState();
+            case PAINT -> CityBlocks.ASPHALT_WHITE.get().defaultBlockState().setValue(PavingBlock.LOW, mark.low());
+            case SHELTER -> Blocks.SMOOTH_STONE.defaultBlockState();
             case NONE -> null;
         };
     }
@@ -54,7 +56,8 @@ public final class CityChunks {
     private static boolean paving(BlockState state) {
         Block block = state.getBlock();
         return block == CityBlocks.ASPHALT.get() || block == CityBlocks.ASPHALT_LINE_WHITE.get()
-                || block == CityBlocks.ASPHALT_LINE_YELLOW.get() || block == CityBlocks.SIDEWALK.get();
+                || block == CityBlocks.ASPHALT_LINE_YELLOW.get() || block == CityBlocks.SIDEWALK.get()
+                || block == CityBlocks.ASPHALT_WHITE.get() || block == Blocks.SMOOTH_STONE;
     }
 
     private static ChunkLayer.Column[] columns(WorldGenLevel level, ChunkAccess chunk) {

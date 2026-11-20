@@ -18,6 +18,8 @@ public final class CityBlocks {
     public static Supplier<Block> ASPHALT_LINE_WHITE;
     /** Asphalt with a yellow line across it: the centre line where no overtaking is allowed. */
     public static Supplier<Block> ASPHALT_LINE_YELLOW;
+    /** Asphalt painted white all over: a zebra crossing's stripes (lowered as a carriageway is). */
+    public static Supplier<Block> ASPHALT_WHITE;
     /** Paving slabs of a pavement and of a lane, kerb stones on its sides. */
     public static Supplier<Block> SIDEWALK;
 
@@ -30,6 +32,7 @@ public final class CityBlocks {
         ASPHALT = platform.registerBlock("asphalt", () -> new PavingBlock(properties()));
         ASPHALT_LINE_WHITE = platform.registerBlock("asphalt_line_white", () -> new MarkingBlock(properties()));
         ASPHALT_LINE_YELLOW = platform.registerBlock("asphalt_line_yellow", () -> new MarkingBlock(properties()));
+        ASPHALT_WHITE = platform.registerBlock("asphalt_white", () -> new PavingBlock(properties()));
         SIDEWALK = platform.registerBlock("sidewalk", () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE_BRICKS)));
     }
 

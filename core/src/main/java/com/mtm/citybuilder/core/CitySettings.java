@@ -31,6 +31,7 @@ public final class CitySettings {
     public Transit transit = new Transit();
     public Plots plots = new Plots();
     public Airports airports = new Airports();
+    public Plazas plazas = new Plazas();
 
     public static final class General {
         /** Edge of a logic region in blocks: the unit results are cached in, never a boundary of any rule. */
@@ -402,12 +403,11 @@ public final class CitySettings {
          */
         public double lineOffset = 1200.0;
         /**
-         * Station land: the main station's platform length, width and square; a town line station's width; a suburban
-         * or reserved site's width; an interchange's square.
+         * Station land: the main station's platform length and width (its square is laid by {@link Plazas}); a town
+         * line station's width; a suburban or reserved site's width; an interchange's square.
          */
         public double mainLength = 300.0;
         public double mainWidth = 40.0;
-        public double mainPlaza = 80.0;
         public double townLineWidth = 14.0;
         public double siteWidth = 20.0;
         public double interchangePlaza = 30.0;
@@ -822,6 +822,40 @@ public final class CitySettings {
         public double distanceWeight = 0.5;
         /** An airport keeps this many times a town's target radius from its middle (villages aside). */
         public double townClearance = 1.25;
+    }
+
+    /**
+     * The squares in front of the main stations (L5, ekimae), after Toyama's south square: a template by the town's
+     * tier, laid on the station's front toward its avenue (design document L5, "站前广场"). Every template has the
+     * station building's land against the platforms, a pedestrian forecourt in front of it, and a nearly round one-way
+     * loop ({@code lane} wide: a lane to stop in and one to drive on) round an island, ringed by a pavement
+     * {@code walk} wide, its throat on the avenue split by a planted {@code median}. Per template {building width,
+     * building depth, forecourt depth, loop radius}: a town's small turning circle with a {@code taxiBay} and a bus
+     * stop; a city's rotary with {@code cityBerths} bus berths ({@code berth} long each, two more for every line
+     * meeting at the station) round its outer edge, a taxi stand, a drop-off and a taxi pool of {@code poolLanes} lanes
+     * of {@code poolLane} in stalls {@code stall} long in its island; a metropolis's split terminal, a bus loop (its last
+     * number its radius) with berths all round and a car loop with the taxi pool, {@code gap} apart, both on a frontage
+     * road {@code frontage} wide that the avenue meets. The loops' straights are as short as the berths allow, so the
+     * squares are compact. The avenue leaves the throat straight out for {@code approach} before turning to the
+     * network.
+     */
+    public static final class Plazas {
+        public double lane = 7.0;
+        public double walk = 4.0;
+        public double berth = 15.0;
+        public double taxiBay = 10.0;
+        public double median = 4.0;
+        public double poolLane = 3.0;
+        public int poolLanes = 4;
+        public double stall = 6.0;
+        public double frontage = 14.0;
+        public double gap = 16.0;
+        public double approach = 30.0;
+        public int[] cityBerths = {4, 8};
+        public int[] metropolisBerths = {6, 10};
+        public double[] town = {30, 12, 8, 12};
+        public double[] city = {70, 20, 14, 22};
+        public double[] metropolis = {110, 25, 18, 20, 24};
     }
 
     /** One tier of settlements. */

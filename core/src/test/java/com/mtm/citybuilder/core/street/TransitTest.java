@@ -167,6 +167,30 @@ class TransitTest {
     }
 
     @Test
+    void theMainStationHasItsSquare() {
+        StationSite main = plan.sites().stream().filter(s -> s.kind() == StationSite.Kind.MAIN).findFirst().orElseThrow();
+        StationPlaza square = plan.plazas().stream().filter(q -> Math.hypot(q.x() - main.x(), q.z() - main.z()) < 1.0)
+                .findFirst().orElseThrow();
+        assertTrue(square.template() == StationPlaza.Template.TERMINAL, "a metropolis's terminal: " + square.template());
+        assertTrue(Math.abs(square.heading() - main.heading()) < 1e-9 && Math.abs(square.depth() - main.plaza()) < 1e-9,
+                "the square along the platforms, as deep as the site says");
+        // The avenue leaves its mouth straight out, as wide as the throat
+        double[] mouth = square.mouth();
+        StreetSegment out = plan.segments().stream().filter(g -> Math.hypot(g.x1() - mouth[0], g.z1() - mouth[1]) < 1.0)
+                .findFirst().orElseThrow();
+        double[] l = square.local(out.x2(), out.z2());
+        assertTrue(Math.abs(l[0]) < 1.0 && l[1] > square.front() + square.depth(), "the avenue straight out of the mouth");
+        // No bus stop inside it (and no lot: the plot layer leaves out what plazaAt finds)
+        for (StationSite site : plan.sites()) {
+            if (site.kind() == StationSite.Kind.BUS) {
+                assertTrue(!square.contains(site.x(), site.z()), "a bus stop in the station square");
+            }
+        }
+        double[] middle = square.world(0.5 * (square.from() + square.to()), square.front() + 0.5 * square.depth());
+        assertTrue(plan.plazaAt(middle[0], middle[1]) == square, "the square found where it lies");
+    }
+
+    @Test
     void highSpeedLinesKeepOutOfDowntownAndTheOldTown() {
         for (List<double[]> line : plan.highSpeed()) {
             for (double[] p : line) {
