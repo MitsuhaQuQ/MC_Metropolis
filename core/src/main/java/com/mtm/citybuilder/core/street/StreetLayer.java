@@ -591,8 +591,9 @@ public final class StreetLayer {
             run = 0.0;
             double x = segment.x2();
             double z = segment.z2();
-            // In the old town's houses, not downtown, whose blocks are built over whole
-            if (!window.old(x, z) || districts.at(x, z) == District.CENTRAL) {
+            // In the old town's houses, not a castle town's downtown, whose blocks are built over whole; a capital's
+            // grid has roji behind its avenues too
+            if (!window.old(x, z) || districts.at(x, z) == District.CENTRAL && window.capital == null) {
                 continue;
             }
             long hash = Hash.of(settlement.id(), Math.round(x), Math.round(z));
@@ -2682,7 +2683,10 @@ public final class StreetLayer {
             if (built[k]) {
                 double x = (double) (window.originX + k / size) * grid;
                 double z = (double) (window.originZ + k % size) * grid;
-                rank[k] = window.intensity[k] - 1e-7 * Math.hypot(x - cx, z - cz);
+                // A capital has no heart to gather round: business lines the grid's avenues (Kyoto's Shijo, Karasuma,
+                // Kawaramachi), and the blocks between them and the town beyond the grid come after
+                double weight = window.capital != null && !(window.inCapital(x, z) && onAvenue(window, x, z)) ? 0.75 : 1.0;
+                rank[k] = weight * window.intensity[k] - 1e-7 * Math.hypot(x - cx, z - cz);
                 order.add(k);
             }
         }
@@ -2791,6 +2795,15 @@ public final class StreetLayer {
     }
 
     private static final int[][] NEIGHBOURS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+    /** Whether a position lies on one of a capital's avenues, the lines of its grid a spacing apart from its edges. */
+    private boolean onAvenue(Window window, double x, double z) {
+        double[] c = window.capital;
+        double spacing = config.joriSpacing;
+        double dx = Math.abs(Math.IEEEremainder(x - c[0], spacing));
+        double dz = Math.abs(Math.IEEEremainder(z - c[1], spacing));
+        return Math.min(dx, dz) <= 0.75 * grid;
+    }
 
     /** Distance in blocks from every node to the nearest marked node, over the grid (a two-pass chamfer). */
     private double[] distances(boolean[] marked, int size) {
