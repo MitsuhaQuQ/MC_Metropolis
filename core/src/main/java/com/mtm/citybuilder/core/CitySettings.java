@@ -481,6 +481,11 @@ public final class CitySettings {
          */
         public double leveeHeight = 3.0;
         public double bankOffset = 24.0;
+        /**
+         * Bank roads follow only water at least this wide: narrower arms, inlets and creeks are crossed on a short
+         * bridge where the bank road passes their mouth, not followed in.
+         */
+        public double bankMinWidth = 40.0;
         public double riversideArterial = 600.0;
         public double bankJoin = 120.0;
         /** Built land the arterials miss in patches of at least this many grid nodes is linked by a bridge of its own. */

@@ -134,6 +134,23 @@ class StreetTerrainTest {
     }
 
     @Test
+    void aNarrowRiverIsBridgedNotFollowed() {
+        // A river 30 wide: wider than a culvert, narrower than bank roads follow
+        CityLogic logic = new CityLogic(3L, SETTINGS, new SyntheticTerrain(0.0, 20000, 30, Landform.PLAINS));
+        StreetPlan plan = logic.streetPlan(city(20300, 0), Formation.CASTLE_TOWN);
+        assertTrue(plan.embankments().isEmpty(), "no bank roads along a narrow river");
+        long bridges = plan.segments().stream().filter(s -> s.structure() == StreetStructure.BRIDGE
+                && Math.min(s.x1(), s.x2()) < 20000 && Math.max(s.x1(), s.x2()) > 20000).count();
+        assertTrue(bridges > 5, "bridges over the narrow river: " + bridges);
+        for (StreetSegment segment : plan.segments()) {
+            boolean crosses = Math.min(segment.x1(), segment.x2()) < 20000 && Math.max(segment.x1(), segment.x2()) > 20000;
+            if (crosses && segment.streetClass() != StreetClass.LANE) {
+                assertTrue(segment.structure() == StreetStructure.BRIDGE, "crosses the river not on a bridge: " + segment);
+            }
+        }
+    }
+
+    @Test
     void embankmentsStandAboveTheWater() {
         CityLogic logic = new CityLogic(3L, SETTINGS, new SyntheticTerrain(0.0, 20000, 80, Landform.PLAINS));
         StreetPlan plan = logic.streetPlan(city(20300, 0), Formation.CASTLE_TOWN);

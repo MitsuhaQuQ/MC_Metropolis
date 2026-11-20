@@ -797,7 +797,24 @@ public final class StreetLayer {
      */
     private List<StreetSegment> riverside(Window window, List<StreetSegment> segments, List<Embankment> embankments) {
         int size = window.fineSize;
-        float[] d = window.edge;
+        // The water wide enough to follow: what a disc of half the least width fits in (a morphological opening), so
+        // narrow arms, inlets and creeks fall away; the distance to its edge
+        int cells = size * size;
+        boolean[] land = new boolean[cells];
+        for (int k = 0; k < cells; k++) {
+            land[k] = window.edge[k] >= 0f;
+        }
+        double[] depth = distances(land, size, FINE);
+        double radius = 0.5 * config.bankMinWidth;
+        boolean[] wide = new boolean[cells];
+        for (int k = 0; k < cells; k++) {
+            wide[k] = !land[k] && depth[k] > radius;
+        }
+        double[] toWide = distances(wide, size, FINE);
+        float[] d = new float[cells];
+        for (int k = 0; k < cells; k++) {
+            d[k] = (float) (Math.min(toWide[k], 1e4) - radius);
+        }
         double level = config.bankOffset;
         double baseX = (double) window.originX * grid;
         double baseZ = (double) window.originZ * grid;
@@ -963,12 +980,24 @@ public final class StreetLayer {
         }
         List<StreetSegment> laid = new ArrayList<>();
         List<double[]> run = new ArrayList<>();
+        // Water the road passes over, the mouth of an arm too narrow to follow, held until land follows: bridged if
+        // short enough, the run ended if not
+        List<double[]> pending = new ArrayList<>();
         for (int k = 0; k <= points.size(); k++) {
             boolean ok = k < points.size() && window.built(points.get(k)[0], points.get(k)[1]);
             if (ok) {
+                run.addAll(pending);
+                pending.clear();
                 run.add(points.get(k));
                 continue;
             }
+            boolean wet = k < points.size() && window.inside(points.get(k)[0], points.get(k)[1])
+                    && window.water(points.get(k)[0], points.get(k)[1]) && !window.inGrounds(points.get(k)[0], points.get(k)[1]);
+            if (wet && !run.isEmpty() && (pending.size() + 1) * config.step <= config.streetBridge) {
+                pending.add(points.get(k));
+                continue;
+            }
+            pending.clear();
             if (run.size() >= 3) {
                 List<double[]> crest = new ArrayList<>();
                 for (double[] p : run) {
@@ -983,8 +1012,11 @@ public final class StreetLayer {
                     double mx = 0.5 * (a[0] + b[0]);
                     double mz = 0.5 * (a[1] + b[1]);
                     Era era = window.intensity(mx, mz) > config.oldTownIntensity ? Era.TOWN : Era.MODERN;
-                    StreetSegment piece = sloped(window, a[0], a[1], b[0], b[1],
-                            arterial ? StreetClass.ARTERIAL : StreetClass.STREET, era,
+                    boolean over = window.water(a[0], a[1]) || window.water(b[0], b[1]) || window.water(mx, mz);
+                    StreetSegment piece = over
+                            ? new StreetSegment(a[0], a[1], b[0], b[1], arterial ? StreetClass.ARTERIAL : StreetClass.STREET,
+                            era, arterial ? config.arterialWidth : config.streetWidth, StreetStructure.BRIDGE)
+                            : sloped(window, a[0], a[1], b[0], b[1], arterial ? StreetClass.ARTERIAL : StreetClass.STREET, era,
                             arterial ? config.arterialWidth : config.streetWidth);
                     if (piece == null) {
                         continue;
@@ -1761,9 +1793,14 @@ public final class StreetLayer {
 
     /** Distance in blocks from every node to the nearest marked node, over the grid (a two-pass chamfer). */
     private double[] distances(boolean[] marked, int size) {
+        return distances(marked, size, grid);
+    }
+
+    /** Distance from every cell to the nearest marked cell, on a grid of cells {@code cell} blocks across. */
+    private static double[] distances(boolean[] marked, int size, double cell) {
         double[] d = new double[size * size];
-        double straight = grid;
-        double diagonal = grid * Math.sqrt(2.0);
+        double straight = cell;
+        double diagonal = cell * Math.sqrt(2.0);
         for (int k = 0; k < d.length; k++) {
             d[k] = marked[k] ? 0.0 : Double.POSITIVE_INFINITY;
         }
@@ -2234,9 +2271,11 @@ public final class StreetLayer {
             double x = station.x() + (extent.coreX() - station.x()) * t;
             double z = station.z() + (extent.coreZ() - station.z()) * t;
             if (window.inside(x, z) && !window.inGrounds(x, z) && !window.inGrounds(px, pz)) {
+                boolean over = window.water(x, z) || window.water(px, pz) || window.water(0.5 * (x + px), 0.5 * (z + pz));
                 double grade = Math.abs(window.height(x, z) - window.height(px, pz)) / config.step;
-                if (grade <= config.maxGrade) {
-                    segments.add(new StreetSegment(px, pz, x, z, StreetClass.ARTERIAL, Era.MODERN, config.stationAvenueWidth));
+                if (over || grade <= config.maxGrade) {
+                    segments.add(new StreetSegment(px, pz, x, z, StreetClass.ARTERIAL, Era.MODERN, config.stationAvenueWidth,
+                            over ? StreetStructure.BRIDGE : StreetStructure.GROUND));
                 }
             }
             px = x;
