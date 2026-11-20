@@ -57,5 +57,10 @@ test('the castle town seen from the test client', async ({}, testInfo) => {
   // Standing 40 back along it, a little to one side of the median, looking along it (Minecraft's yaw: 0 faces +z)
   const h = (b.heading * Math.PI) / 180;
   const yaw = (Math.atan2(-Math.cos(h), Math.sin(h)) * 180) / Math.PI;
+  // Where a boulevard ends, at a junction
+  const e = await server.street(TOWN.x, TOWN.z, 'BOULEVARD', true);
+  expect(e.found).toBe(true);
+  await server.generate(Math.round(e.x) - 48, Math.round(e.z) - 48, Math.round(e.x) + 47, Math.round(e.z) + 47);
+  await view('boulevard-end', Math.round(e.x), 130, Math.round(e.z), 0, 90, testInfo);
   await view('boulevard-along', bx - 40 * Math.cos(h) - 6 * Math.sin(h), 74, bz - 40 * Math.sin(h) + 6 * Math.cos(h), yaw, 12, testInfo);
 });

@@ -27,6 +27,6 @@ export const server = {
   tick: () => call('/tick'),
   planAround: (x, z) => call('/plan-around', { x, z }),
   /** The nearest piece of a class of street (BOULEVARD, ARTERIAL, ...) in this world's plan: {found, x, z, heading, width}. */
-  street: (x, z, streetClass) => call('/street', { x, z, class: streetClass }),
+  street: (x, z, streetClass, end = false) => call('/street', { x, z, class: streetClass, end: end ? 1 : 0 }),
   stop: () => call('/stop'),
 };

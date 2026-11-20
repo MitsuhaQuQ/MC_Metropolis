@@ -2786,64 +2786,67 @@ public final class StreetLayer {
     }
 
     /**
-     * A town's one or two boulevards: the station avenue for its first {@code boulevardLength} from the station, and
+     * A town's one or two boulevards: the station avenue out from the station for about {@code boulevardLength}, and
      * in a city or metropolis the most used arterial piece within {@code boulevardReach} of the heart (by
      * {@code used}, each piece's through traffic) and the arterials running on straight from it either way, up to
-     * {@code downtownBoulevard} in all.
+     * about {@code downtownBoulevard} in all. Each ends at a junction, where its median would end anyway: the station's
+     * at the junction nearest its length (within half of it either way), downtown's run cut back to the last
+     * junction within its length.
      */
     private void boulevards(Settlement settlement, CityExtent extent, List<Anchor> anchors, List<StreetSegment> segments,
                             double[] used) {
         Map<Long, List<Integer>> byNode = new HashMap<>();
+        Map<Long, Integer> degree = new HashMap<>();
         for (int k = 0; k < segments.size(); k++) {
             StreetSegment g = segments.get(k);
-            if (g.streetClass() == StreetClass.ARTERIAL && g.length() > 1e-6) {
+            if (g.streetClass() == StreetClass.LANE || g.length() < 1e-6) {
+                continue;
+            }
+            degree.merge(nodeKey(g.x1(), g.z1()), 1, Integer::sum);
+            degree.merge(nodeKey(g.x2(), g.z2()), 1, Integer::sum);
+            if (g.streetClass() == StreetClass.ARTERIAL) {
                 byNode.computeIfAbsent(nodeKey(g.x1(), g.z1()), q -> new ArrayList<>()).add(k);
                 byNode.computeIfAbsent(nodeKey(g.x2(), g.z2()), q -> new ArrayList<>()).add(k);
             }
         }
         java.util.Set<Integer> chosen = new java.util.TreeSet<>();
         // The station avenue, out from the station
+        double avenue = config.stationAvenueWidth - 1e-6;
         for (Anchor anchor : anchors) {
             if (anchor.kind() != Anchor.Kind.STATION) {
                 continue;
             }
             int start = -1;
             double nearest = config.boulevardLength;
+            long startNode = 0;
             for (int k = 0; k < segments.size(); k++) {
                 StreetSegment g = segments.get(k);
-                if (g.streetClass() == StreetClass.ARTERIAL && g.width() >= config.stationAvenueWidth - 1e-6) {
-                    double d = Math.min(Math.hypot(g.x1() - anchor.x(), g.z1() - anchor.z()), Math.hypot(g.x2() - anchor.x(), g.z2() - anchor.z()));
-                    if (d < nearest) {
-                        nearest = d;
+                if (g.streetClass() == StreetClass.ARTERIAL && g.width() >= avenue) {
+                    double d1 = Math.hypot(g.x1() - anchor.x(), g.z1() - anchor.z());
+                    double d2 = Math.hypot(g.x2() - anchor.x(), g.z2() - anchor.z());
+                    if (Math.min(d1, d2) < nearest) {
+                        nearest = Math.min(d1, d2);
                         start = k;
+                        startNode = d1 <= d2 ? nodeKey(g.x1(), g.z1()) : nodeKey(g.x2(), g.z2());
                     }
                 }
             }
             if (start < 0) {
                 continue;
             }
-            // Along the avenue's pieces, as far from the station as the boulevard runs
-            Map<Integer, Double> reached = new HashMap<>();
-            ArrayDeque<Integer> queue = new ArrayDeque<>();
-            reached.put(start, nearest);
-            queue.add(start);
-            while (!queue.isEmpty()) {
-                int k = queue.poll();
-                StreetSegment g = segments.get(k);
-                double at = reached.get(k);
-                if (at >= config.boulevardLength) {
-                    continue;
-                }
-                chosen.add(k);
-                for (long end : new long[]{nodeKey(g.x1(), g.z1()), nodeKey(g.x2(), g.z2())}) {
-                    for (int q : byNode.getOrDefault(end, List.of())) {
-                        if (!reached.containsKey(q) && segments.get(q).width() >= config.stationAvenueWidth - 1e-6) {
-                            reached.put(q, at + g.length());
-                            queue.add(q);
-                        }
-                    }
+            List<Integer> chain = follow(segments, byNode, start, startNode, chosen,
+                    q -> segments.get(q).width() >= avenue, 1.5 * config.boulevardLength, 0.0);
+            int keep = toJunction(segments, chain, startNode, degree, config.boulevardLength,
+                    0.5 * config.boulevardLength, 1.5 * config.boulevardLength);
+            if (keep < 0) {
+                // No junction near: cut at the length
+                double length = 0.0;
+                keep = 0;
+                while (keep < chain.size() && length < config.boulevardLength) {
+                    length += segments.get(chain.get(keep++)).length();
                 }
             }
+            chosen.addAll(chain.subList(0, keep));
         }
         // Downtown: the busiest arterial near the heart, and straight on from it
         if (settlement.tier() == SettlementTier.CITY || settlement.tier() == SettlementTier.METROPOLIS) {
@@ -2860,46 +2863,25 @@ public final class StreetLayer {
             }
             if (best >= 0) {
                 StreetSegment b = segments.get(best);
-                java.util.Set<Integer> run = new java.util.TreeSet<>();
+                List<Integer> run = new ArrayList<>();
                 run.add(best);
-                double length = b.length();
-                for (boolean forward : new boolean[]{true, false}) {
-                    int piece = best;
-                    long node = forward ? nodeKey(b.x2(), b.z2()) : nodeKey(b.x1(), b.z1());
-                    double side = 0.0;
-                    while (side < 0.5 * (config.downtownBoulevard - b.length())) {
-                        StreetSegment g = segments.get(piece);
-                        boolean out = nodeKey(g.x1(), g.z1()) == node;
-                        // The piece's direction into the node
-                        double ux = out ? g.x1() - g.x2() : g.x2() - g.x1();
-                        double uz = out ? g.z1() - g.z2() : g.z2() - g.z1();
-                        int next = -1;
-                        double straightest = Math.cos(Math.toRadians(30));
-                        for (int q : byNode.getOrDefault(node, List.of())) {
-                            StreetSegment o = segments.get(q);
-                            if (q == piece || run.contains(q) || chosen.contains(q)) {
-                                continue;
-                            }
-                            boolean from = nodeKey(o.x1(), o.z1()) == node;
-                            double ox = from ? o.x2() - o.x1() : o.x1() - o.x2();
-                            double oz = from ? o.z2() - o.z1() : o.z1() - o.z2();
-                            double cos = (ux * ox + uz * oz) / (Math.hypot(ux, uz) * Math.hypot(ox, oz));
-                            if (cos > straightest) {
-                                straightest = cos;
-                                next = q;
-                            }
-                        }
-                        if (next < 0) {
-                            break;
-                        }
-                        StreetSegment o = segments.get(next);
-                        node = nodeKey(o.x1(), o.z1()) == node ? nodeKey(o.x2(), o.z2()) : nodeKey(o.x1(), o.z1());
-                        run.add(next);
-                        side += o.length();
-                        length += o.length();
-                        piece = next;
+                double half = 0.5 * (config.downtownBoulevard - b.length());
+                for (long node : new long[]{nodeKey(b.x2(), b.z2()), nodeKey(b.x1(), b.z1())}) {
+                    java.util.Set<Integer> taken = new java.util.HashSet<>(chosen);
+                    taken.addAll(run);
+                    List<Integer> side = follow(segments, byNode, best, node, taken,
+                            q -> segments.get(q).streetClass() == StreetClass.ARTERIAL, half, b.length());
+                    // follow() starts with the piece itself
+                    side = side.subList(1, side.size());
+                    double length = side.stream().mapToDouble(q -> segments.get(q).length()).sum();
+                    if (length >= half - config.step) {
+                        // Cut by the length, not at a junction: back to the last junction on the way
+                        int keep = toJunction(segments, side, node, degree, length, 0.0, length);
+                        side = side.subList(0, Math.max(0, keep));
                     }
+                    run.addAll(side);
                 }
+                double length = run.stream().mapToDouble(q -> segments.get(q).length()).sum();
                 // A short run is no boulevard
                 if (length >= 0.5 * config.downtownBoulevard) {
                     chosen.addAll(run);
@@ -2911,6 +2893,90 @@ public final class StreetLayer {
             segments.set(k, new StreetSegment(g.x1(), g.z1(), g.x2(), g.z2(), StreetClass.BOULEVARD, g.era(),
                     config.boulevardWidth, g.structure()));
         }
+    }
+
+    /**
+     * A chain of pieces from {@code first}, leaving it by the end other than {@code from}, and on through each node
+     * by the straightest piece (within 30 degrees) that passes {@code fits} and is not taken, until {@code limit} long
+     * past {@code already} or nothing runs on; the first piece included.
+     */
+    private static List<Integer> follow(List<StreetSegment> segments, Map<Long, List<Integer>> byNode, int first, long from,
+                                        java.util.Set<Integer> taken, java.util.function.IntPredicate fits, double limit,
+                                        double already) {
+        List<Integer> chain = new ArrayList<>();
+        chain.add(first);
+        StreetSegment g0 = segments.get(first);
+        long node = nodeKey(g0.x1(), g0.z1()) == from ? nodeKey(g0.x2(), g0.z2()) : nodeKey(g0.x1(), g0.z1());
+        // The first piece is counted only when the chain starts at it, not when it is the run it extends
+        double length = already > 0 ? 0.0 : g0.length();
+        if (already > 0) {
+            node = from;
+        }
+        int piece = first;
+        while (length < limit) {
+            StreetSegment g = segments.get(piece);
+            boolean out = nodeKey(g.x1(), g.z1()) == node;
+            // The piece's direction into the node
+            double ux = out ? g.x1() - g.x2() : g.x2() - g.x1();
+            double uz = out ? g.z1() - g.z2() : g.z2() - g.z1();
+            int next = -1;
+            double straightest = Math.cos(Math.toRadians(30));
+            for (int q : byNode.getOrDefault(node, List.of())) {
+                StreetSegment o = segments.get(q);
+                if (q == piece || chain.contains(q) || taken.contains(q) || !fits.test(q)) {
+                    continue;
+                }
+                boolean leaves = nodeKey(o.x1(), o.z1()) == node;
+                double ox = leaves ? o.x2() - o.x1() : o.x1() - o.x2();
+                double oz = leaves ? o.z2() - o.z1() : o.z1() - o.z2();
+                double cos = (ux * ox + uz * oz) / (Math.hypot(ux, uz) * Math.hypot(ox, oz));
+                if (cos > straightest) {
+                    straightest = cos;
+                    next = q;
+                }
+            }
+            if (next < 0) {
+                break;
+            }
+            StreetSegment o = segments.get(next);
+            node = nodeKey(o.x1(), o.z1()) == node ? nodeKey(o.x2(), o.z2()) : nodeKey(o.x1(), o.z1());
+            chain.add(next);
+            length += o.length();
+            piece = next;
+        }
+        return chain;
+    }
+
+    /**
+     * How many pieces of a chain (leaving node {@code from}) to keep for it to end at a junction: where three pieces
+     * or more meet, or where a piece of it is crossed; the junction whose distance along the chain is nearest
+     * {@code target} between {@code min} and {@code max}, or -1 if there is none.
+     */
+    private static int toJunction(List<StreetSegment> segments, List<Integer> chain, long from, Map<Long, Integer> degree,
+                                  double target, double min, double max) {
+        int best = -1;
+        double bestGap = Double.POSITIVE_INFINITY;
+        double length = 0.0;
+        long node = from;
+        for (int i = 0; i < chain.size(); i++) {
+            StreetSegment g = segments.get(chain.get(i));
+            node = nodeKey(g.x1(), g.z1()) == node ? nodeKey(g.x2(), g.z2()) : nodeKey(g.x1(), g.z1());
+            length += g.length();
+            boolean junction = degree.getOrDefault(node, 0) >= 3;
+            if (!junction) {
+                for (StreetSegment o : segments) {
+                    if (o.streetClass() != StreetClass.LANE && properlyCross(g, o)) {
+                        junction = true;
+                        break;
+                    }
+                }
+            }
+            if (junction && length >= min && length <= max && Math.abs(length - target) < bestGap) {
+                bestGap = Math.abs(length - target);
+                best = i + 1;
+            }
+        }
+        return best;
     }
 
     /**

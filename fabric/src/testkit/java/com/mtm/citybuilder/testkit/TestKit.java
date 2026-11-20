@@ -305,7 +305,7 @@ public final class TestKit implements DedicatedServerModInitializer {
     /**
      * The nearest piece of a class of street ({@code class}, e.g. BOULEVARD) to (x, z) in the plan of the town owning
      * that point, as this world planned it (the settlements are planned in the order they are needed, so a town here
-     * may differ a little from one the tools plan), well inside a run of it: its middle and heading in degrees, or found
+     * may differ a little from one the tools plan), well inside a run of it (with end=1, at an end of a run): its middle and heading in degrees, or found
      * false.
      */
     private Object street(Map<String, String> query, String body) {
@@ -326,7 +326,12 @@ public final class TestKit implements DedicatedServerModInitializer {
             double d = Math.hypot(mx - x, mz - z);
             // Well inside a run of the class, not at its end: as many pieces of it within 60 as a straight run has
             long around = of.stream().filter(o -> Math.hypot(0.5 * (o.x1() + o.x2()) - mx, 0.5 * (o.z1() + o.z2()) - mz) < 60).count();
-            if (around * Math.max(1.0, g.length()) >= 100 && d < nearest) {
+            // Or, with end=1, the end of a run: an end no other piece of the class shares
+            boolean fits = "1".equals(query.get("end"))
+                    ? of.stream().noneMatch(o -> o != g && near(o, g.x1(), g.z1()))
+                    || of.stream().noneMatch(o -> o != g && near(o, g.x2(), g.z2()))
+                    : around * Math.max(1.0, g.length()) >= 100;
+            if (fits && d < nearest) {
                 nearest = d;
                 best = g;
             }
@@ -336,6 +341,10 @@ public final class TestKit implements DedicatedServerModInitializer {
         }
         return Map.of("found", true, "x", 0.5 * (best.x1() + best.x2()), "z", 0.5 * (best.z1() + best.z2()),
                 "heading", Math.toDegrees(Math.atan2(best.z2() - best.z1(), best.x2() - best.x1())), "width", best.width());
+    }
+
+    private static boolean near(com.mtm.citybuilder.core.street.StreetSegment o, double x, double z) {
+        return Math.hypot(o.x1() - x, o.z1() - z) < 0.5 || Math.hypot(o.x2() - x, o.z2() - z) < 0.5;
     }
 
     private Object stop(Map<String, String> query, String body) {
