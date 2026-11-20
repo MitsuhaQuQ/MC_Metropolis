@@ -4,6 +4,8 @@ import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.CitySettings;
 import com.mtm.citybuilder.core.extent.CityExtent;
 import com.mtm.citybuilder.core.noise.Hash;
+import com.mtm.citybuilder.core.rail.Approach;
+import com.mtm.citybuilder.core.rail.RailClass;
 import com.mtm.citybuilder.core.rail.RailEdge;
 import com.mtm.citybuilder.core.rail.RailRoute;
 import com.mtm.citybuilder.core.rail.RailStation;
@@ -678,6 +680,10 @@ public final class StreetLayer {
                 castleMoats(settlement, anchor, window, moats);
             }
         }
+        List<CityRailway> railways = new ArrayList<>();
+        if (formation != Formation.VILLAGE) {
+            mainStation(settlement, window, anchors, railways);
+        }
         Districts districts = districts(window, anchors);
         List<StreetSegment> segments = new ArrayList<>();
         List<double[]> oldRoad = oldRoads(settlement, window, segments);
@@ -723,8 +729,144 @@ public final class StreetLayer {
                 lanes(settlement, formation, window, segments);
             }
         }
-        return new StreetPlan(settlement, formation, anchors, segments, moats, districts);
+        return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways);
     }
+
+    /**
+     * The main station of a town where intercity lines end, and each line's stretch from the edge of the built land to
+     * it. The lines' L4b routes run to the town's centre, knowing nothing of the town; here each is cut where it first
+     * enters the built land from outside. The station goes where the old town meets the modern town, on flat land, a
+     * little way from the centre, towards the side the lines come from, as Japanese towns' stations stand at the old
+     * town's edge with the new quarter in front. The lines run to it by the heading search the corridors use, dear
+     * through downtown and the old town and kept out of grounds; the first, a trunk before branches, sets the
+     * platform's axis, and the others arrive along it, so the platform is one straight.
+     */
+    private void mainStation(Settlement settlement, Window window, List<Anchor> anchors, List<CityRailway> railways) {
+        CityExtent extent = window.extent;
+        double reach = 4000.0;
+        List<RailRoute> routes = new ArrayList<>();
+        for (RailEdge edge : logic.railLines(extent.coreX() - reach, extent.coreZ() - reach, extent.coreX() + reach,
+                extent.coreZ() + reach)) {
+            if (edge.a().id() != settlement.id() && edge.b().id() != settlement.id()) {
+                continue;
+            }
+            RailRoute route = logic.railRoute(edge);
+            if (route.exists()) {
+                routes.add(route);
+            }
+        }
+        if (routes.isEmpty()) {
+            return;
+        }
+        routes.sort((a, b) -> a.edge().railClass() != b.edge().railClass()
+                ? (a.edge().railClass() == RailClass.TRUNK ? -1 : 1)
+                : Long.compare(a.edge().a().id() ^ a.edge().b().id(), b.edge().a().id() ^ b.edge().b().id()));
+        // Where each line enters the built land, walking in from its far end: {sample, x, z, heading}
+        List<double[]> entries = new ArrayList<>();
+        List<RailRoute> entering = new ArrayList<>();
+        for (RailRoute route : routes) {
+            boolean here = route.edge().a().id() == settlement.id();
+            int n = route.samples();
+            int step = here ? -1 : 1;
+            int previous = here ? n - 1 : 0;
+            for (int k = previous + step; k >= 0 && k < n; k += step) {
+                double x = route.x(k);
+                double z = route.z(k);
+                if (window.inside(x, z) && !window.water(x, z) && window.intensity(x, z) > config.builtIntensity) {
+                    entries.add(new double[]{k, x, z, Math.atan2(z - route.z(previous), x - route.x(previous))});
+                    entering.add(route);
+                    break;
+                }
+                previous = k;
+            }
+        }
+        if (entries.isEmpty()) {
+            return;
+        }
+        // The site: where the old town meets the modern town, flat, off the centre, towards the lines
+        Districts base = districts(window, anchors);
+        double cx = extent.coreX();
+        double cz = extent.coreZ();
+        double[] best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        double[] fallback = null;
+        double fallbackScore = Double.NEGATIVE_INFINITY;
+        for (int i = 1; i < window.size - 1; i++) {
+            for (int j = 1; j < window.size - 1; j++) {
+                District district = base.node(i, j);
+                if (district != District.OLD_TOWN && district != District.RESIDENTIAL) {
+                    continue;
+                }
+                int k = i * window.size + j;
+                double x = (double) (window.originX + i) * grid;
+                double z = (double) (window.originZ + j) * grid;
+                double distance = Math.hypot(x - cx, z - cz);
+                double toward = 0.0;
+                for (double[] entry : entries) {
+                    double ex = entry[1] - cx;
+                    double ez = entry[2] - cz;
+                    double length = Math.hypot(ex, ez) * Math.max(1e-6, distance);
+                    toward += ((x - cx) * ex + (z - cz) * ez) / Math.max(1e-6, length);
+                }
+                double edge = Math.abs(window.intensity[k] - config.oldTownIntensity);
+                double score = -edge / config.stationBand + 0.6 * toward / entries.size() - 0.2 * distance / 1000.0;
+                if (score > fallbackScore) {
+                    fallbackScore = score;
+                    fallback = new double[]{x, z};
+                }
+                double steepest = 0.0;
+                for (int[] d : NEIGHBOURS) {
+                    int nk = (i + d[0]) * window.size + j + d[1];
+                    if (!window.water[nk]) {
+                        steepest = Math.max(steepest, Math.abs(window.height[nk] - window.height[k]) / grid);
+                    }
+                }
+                if (edge > config.stationBand || steepest > config.stationGrade || distance < config.stationDistance) {
+                    continue;
+                }
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = new double[]{x, z};
+                }
+            }
+        }
+        double[] site = best != null ? best : fallback;
+        if (site == null) {
+            return;
+        }
+        anchors.add(new Anchor(Anchor.Kind.STATION, site[0], site[1]));
+        // Each line's stretch to it
+        CitySettings.Rail rail = logic.settings().rail;
+        Approach.CellCost cost = (i, j) -> {
+            int k = i * window.size + j;
+            if (window.water[k]) {
+                return 1.0 + rail.bridgeCost;
+            }
+            return switch (base.node(i, j)) {
+                case GROUNDS -> Double.POSITIVE_INFINITY;
+                case CENTRAL -> config.railCentralCost;
+                case OLD_TOWN -> config.railOldTownCost;
+                case RESIDENTIAL -> config.railHousesCost;
+                default -> 1.0;
+            };
+        };
+        double axis = Double.NaN;
+        for (int e = 0; e < entries.size(); e++) {
+            double[] entry = entries.get(e);
+            RailRoute route = entering.get(e);
+            double minRadius = route.edge().railClass() == RailClass.TRUNK ? rail.trunkMinRadius : rail.branchMinRadius;
+            Approach.Route stretch = Approach.route(window.originX, window.originZ, window.size, window.size, grid,
+                    entry[1], entry[2], entry[3], site[0], site[1], axis, minRadius, rail.turnCost, rail.maxRadius, cost);
+            if (stretch == null) {
+                continue;
+            }
+            if (Double.isNaN(axis)) {
+                axis = stretch.arrival();
+            }
+            railways.add(new CityRailway(route.edge(), (int) entry[0], stretch.line()));
+        }
+    }
+
 
     /**
      * The districts of a town, node by node over its window. Downtown is the share of the built land nearest the
@@ -1168,11 +1310,12 @@ public final class StreetLayer {
     private List<Anchor> anchors(Settlement settlement, CityExtent extent, Formation formation, Window window) {
         List<Anchor> anchors = new ArrayList<>();
         anchors.add(new Anchor(Anchor.Kind.CORE, extent.coreX(), extent.coreZ()));
-        // Stations of the intercity lines serving this town
+        // Stations of the intercity lines passing through this town; where lines end here, the main station is
+        // chosen later, with the districts
         double reach = 4000.0;
         for (RailEdge edge : logic.railLines(extent.coreX() - reach, extent.coreZ() - reach, extent.coreX() + reach,
                 extent.coreZ() + reach)) {
-            if (edge.a().id() != settlement.id() && edge.b().id() != settlement.id()) {
+            if (edge.a().id() == settlement.id() || edge.b().id() == settlement.id()) {
                 continue;
             }
             RailRoute route = logic.railRoute(edge);

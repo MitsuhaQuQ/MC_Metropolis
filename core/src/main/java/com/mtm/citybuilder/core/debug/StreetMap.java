@@ -107,6 +107,20 @@ public final class StreetMap {
             g.draw(new Line2D.Double((segment.x1() - left) / scale, (segment.z1() - top) / scale,
                     (segment.x2() - left) / scale, (segment.z2() - top) / scale));
         }
+        // The intercity lines' stretches to the main station: black with white ties
+        for (com.mtm.citybuilder.core.street.CityRailway railway : plan.railways()) {
+            for (int pass = 0; pass < 2; pass++) {
+                g.setColor(pass == 0 ? Color.BLACK : Color.WHITE);
+                g.setStroke(pass == 0 ? new BasicStroke(5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                        : new BasicStroke(2f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 1f, new float[]{4f, 4f}, 0f));
+                for (int k = 1; k < railway.line().size(); k++) {
+                    double[] a = railway.line().get(k - 1);
+                    double[] b = railway.line().get(k);
+                    g.draw(new Line2D.Double((a[0] - left) / scale, (a[1] - top) / scale, (b[0] - left) / scale,
+                            (b[1] - top) / scale));
+                }
+            }
+        }
         g.setStroke(new BasicStroke(1.2f));
         for (Anchor anchor : plan.anchors()) {
             int px = (int) Math.round((anchor.x() - left) / scale);

@@ -394,6 +394,18 @@ public final class CityMap {
         StreetPlan plan = logic.streetPlan(nearest);
         System.out.printf("L5 %s: laid out in %.1f s; anchors %s%n", plan.formation(), (System.nanoTime() - start) / 1e9,
                 plan.anchors().stream().map(a -> a.kind().toString()).toList());
+        for (com.mtm.citybuilder.core.street.Anchor anchor : plan.anchors()) {
+            if (anchor.kind() == com.mtm.citybuilder.core.street.Anchor.Kind.STATION) {
+                System.out.printf("  station %.0f from the centre, in %s%n",
+                        Math.hypot(anchor.x() - logic.extent(nearest).coreX(), anchor.z() - logic.extent(nearest).coreZ()),
+                        plan.districts().at(anchor.x(), anchor.z()));
+            }
+        }
+        for (com.mtm.citybuilder.core.street.CityRailway railway : plan.railways()) {
+            System.out.printf("  line to %s: %.0f in town from its sample %d%n",
+                    railway.edge().a().id() == nearest.id() ? railway.edge().b().tier() : railway.edge().a().tier(),
+                    railway.length(), railway.entry());
+        }
         for (StreetClass streetClass : StreetClass.values()) {
             double length = plan.length(streetClass);
             if (length > 0) {

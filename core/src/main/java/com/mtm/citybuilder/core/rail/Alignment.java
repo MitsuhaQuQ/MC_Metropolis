@@ -61,6 +61,15 @@ final class Alignment {
      */
     static List<Integer> search(int width, int height, double grid, int start, int goal, int[] steps, double turnCost,
                                 StepCost stepCost) {
+        return search(width, height, grid, start, goal, steps, turnCost, stepCost, 0, 0);
+    }
+
+    /**
+     * As {@link #search(int, int, double, int, int, int[], double, StepCost)}, leaving the start only in the headings
+     * of a mask (bit d for heading d) and reaching the goal only in those of another; 0 allows every heading.
+     */
+    static List<Integer> search(int width, int height, double grid, int start, int goal, int[] steps, double turnCost,
+                                StepCost stepCost, int startHeadings, int goalHeadings) {
         int cells = width * height;
         float[] cost = new float[cells * HEADINGS];
         Arrays.fill(cost, Float.POSITIVE_INFINITY);
@@ -75,6 +84,9 @@ final class Alignment {
         PriorityQueue<double[]> queue = new PriorityQueue<>((a, b) -> a[0] != b[0] ? Double.compare(a[0], b[0])
                 : Double.compare(a[1], b[1]));
         for (int d = 0; d < HEADINGS; d++) {
+            if (startHeadings != 0 && (startHeadings & (1 << d)) == 0) {
+                continue;
+            }
             int state = start * HEADINGS + d;
             cost[state] = 0f;
             previous[state] = -1;
@@ -91,7 +103,7 @@ final class Alignment {
             int heading = state % HEADINGS;
             int i = cell / height;
             int j = cell % height;
-            if (Math.hypot(i - goalI, j - goalJ) <= longest) {
+            if (Math.hypot(i - goalI, j - goalJ) <= longest && (goalHeadings == 0 || (goalHeadings & (1 << heading)) != 0)) {
                 end = state;
                 break;
             }

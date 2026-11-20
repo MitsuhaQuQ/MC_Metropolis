@@ -9,6 +9,9 @@ import com.mtm.citybuilder.core.terrain.Landform;
 import com.mtm.citybuilder.core.terrain.SyntheticTerrain;
 import org.junit.jupiter.api.Test;
 
+import com.mtm.citybuilder.core.rail.RailRoute;
+
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -104,5 +107,42 @@ class DistrictsTest {
         CityLogic b = new CityLogic(3L, SETTINGS, new SyntheticTerrain(0.0, 20000, 80, Landform.PLAINS));
         assertEquals(a.streetPlan(city(20800, 0), Formation.CASTLE_TOWN).districts().counts(),
                 b.streetPlan(city(20800, 0), Formation.CASTLE_TOWN).districts().counts());
+    }
+
+    @Test
+    void theMainStationStandsAtTheOldTownsEdgeAndTheLinesReachIt() {
+        CityLogic logic = new CityLogic(3L, SETTINGS, SyntheticTerrain.flatPlains());
+        Settlement city = null;
+        for (Settlement settlement : logic.settlements(6000, -20000, 42000, 20000)) {
+            if (settlement.tier() == SettlementTier.METROPOLIS) {
+                city = settlement;
+                break;
+            }
+        }
+        assertTrue(city != null);
+        StreetPlan plan = logic.streetPlan(city, Formation.CASTLE_TOWN);
+        assertTrue(!plan.railways().isEmpty(), "lines into the metropolis");
+        List<Anchor> stations = plan.anchors().stream().filter(a -> a.kind() == Anchor.Kind.STATION).toList();
+        assertEquals(1, stations.size(), "one main station");
+        Anchor station = stations.get(0);
+        District at = plan.districts().at(station.x(), station.z());
+        assertTrue(at == District.STATION_FRONT, "the station in " + at);
+        double intensity = logic.extent(city).intensity((int) Math.round(station.x() / 64), (int) Math.round(station.z() / 64));
+        assertTrue(Math.abs(intensity - SETTINGS.streets.oldTownIntensity) <= SETTINGS.streets.stationBand + 0.05,
+                "station not at the old town's edge: intensity " + intensity);
+        double cx = logic.extent(city).coreX();
+        double cz = logic.extent(city).coreZ();
+        assertTrue(Math.hypot(station.x() - cx, station.z() - cz) >= SETTINGS.streets.stationDistance - 64);
+        for (CityRailway railway : plan.railways()) {
+            RailRoute route = logic.railRoute(railway.edge());
+            double[] first = railway.line().get(0);
+            double[] last = railway.line().get(railway.line().size() - 1);
+            assertTrue(Math.hypot(first[0] - route.x(railway.entry()), first[1] - route.z(railway.entry())) < 1.0,
+                    "the stretch leaves the line at its entry");
+            assertTrue(Math.hypot(last[0] - station.x(), last[1] - station.z()) < 1.0, "the stretch ends at the station");
+            for (double[] point : railway.line()) {
+                assertTrue(plan.districts().at(point[0], point[1]) != District.GROUNDS, "a line through grounds");
+            }
+        }
     }
 }

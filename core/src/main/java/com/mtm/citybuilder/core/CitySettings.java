@@ -486,6 +486,19 @@ public final class CitySettings {
         public double portDepth = 256.0;
         public double portGrade = 0.05;
         public double stationFront = 400.0;
+        /**
+         * The main station of a town where intercity lines end: on built land whose intensity is within
+         * {@code stationBand} of the old town's edge, no steeper than {@code stationGrade}, at least
+         * {@code stationDistance} from the centre, towards the side the lines come from. Their stretch from the town's
+         * edge to it costs per block these times more through downtown, the old town and houses than through works,
+         * and never crosses grounds.
+         */
+        public double stationBand = 0.12;
+        public double stationGrade = 0.02;
+        public double stationDistance = 400.0;
+        public double railCentralCost = 8.0;
+        public double railOldTownCost = 4.0;
+        public double railHousesCost = 1.6;
         /** Most streamlines traced for one town. */
         public int maxLines = 20000;
     }
