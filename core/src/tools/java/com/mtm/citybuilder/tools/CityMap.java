@@ -117,6 +117,13 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = StreetMap.render(logic, plan, centerX, centerZ, scale, size, layer.equals("districts"));
             }
+            case "plots" -> {
+                StreetPlan plan = streetStats(logic, centerX, centerZ);
+                com.mtm.citybuilder.core.plot.TownPlots plots = logic.plots().town(plan.settlement());
+                plotStats(logic, plan, plots);
+                start = System.nanoTime();
+                image = com.mtm.citybuilder.core.debug.PlotMap.render(plots, centerX, centerZ, scale, size);
+            }
             case "highspeed" -> {
                 List<HighSpeedLine> lines = highSpeedStats(logic, centerX, centerZ, half);
                 start = System.nanoTime();
@@ -132,7 +139,7 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = RoadMap.render(logic, edges, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed or streets");
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed, streets, districts or plots");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();
@@ -141,6 +148,52 @@ public final class CityMap {
         }
         ImageIO.write(image, "png", out);
         System.out.println("Wrote " + out.getAbsolutePath());
+    }
+
+    /**
+     * The plots of a town: how its built land divides into streets, lots and block interiors, sampled every 4 blocks
+     * over it, and the lots' mean frontage and depth by district.
+     */
+    private static void plotStats(CityLogic logic, StreetPlan plan, com.mtm.citybuilder.core.plot.TownPlots plots) {
+        long start = System.nanoTime();
+        double cx = logic.extent(plan.settlement()).coreX();
+        double cz = logic.extent(plan.settlement()).coreZ();
+        double radius = 1.3 * Math.sqrt(logic.builtArea(plan.settlement()) * 1e6 / Math.PI);
+        int street = 0;
+        int lot = 0;
+        int interior = 0;
+        int remnant = 0;
+        java.util.Map<com.mtm.citybuilder.core.street.District, java.util.Map<Long, double[]>> lots = new java.util.TreeMap<>();
+        for (double x = cx - radius; x < cx + radius; x += 4) {
+            for (double z = cz - radius; z < cz + radius; z += 4) {
+                com.mtm.citybuilder.core.plot.Plot plot = plots.at(x, z);
+                if (plot == null) {
+                    if (plots.onStreet(x, z)) {
+                        street++;
+                    }
+                    continue;
+                }
+                if (plot.interior()) {
+                    interior++;
+                } else if (plot.remnant()) {
+                    remnant++;
+                } else {
+                    lot++;
+                    lots.computeIfAbsent(plot.district(), k -> new java.util.HashMap<>())
+                            .putIfAbsent(plot.id(), new double[]{plot.frontage(), plot.maxDepth()});
+                }
+            }
+        }
+        System.out.printf("L7 plots: %d chains, %d lots; found in %.1f s%n", plots.chainCount(), plots.lotCount(),
+                (System.nanoTime() - start) / 1e9);
+        int all = Math.max(1, street + lot + interior + remnant);
+        System.out.printf("  of the town's street and plotted land: streets %.0f%%, lots %.0f%%, remnants %.1f%%, block interiors %.0f%%%n",
+                100.0 * street / all, 100.0 * lot / all, 100.0 * remnant / all, 100.0 * interior / all);
+        for (var entry : lots.entrySet()) {
+            double frontage = entry.getValue().values().stream().mapToDouble(v -> v[0]).average().orElse(0);
+            double depth = entry.getValue().values().stream().mapToDouble(v -> v[1]).average().orElse(0);
+            System.out.printf("  %-14s %6d lots, frontage %.1f, depth %.1f%n", entry.getKey(), entry.getValue().size(), frontage, depth);
+        }
     }
 
     /** Times each logic region the map covers and spreads suitability and height over the kinds of land. */

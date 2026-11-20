@@ -450,6 +450,18 @@ public final class CityLogic {
 
     private com.mtm.citybuilder.core.chunk.ChunkLayer chunks;
 
+    /** L7: the towns' plots. */
+    public com.mtm.citybuilder.core.plot.PlotLayer plots() {
+        synchronized (this) {
+            if (plots == null) {
+                plots = new com.mtm.citybuilder.core.plot.PlotLayer(this);
+            }
+            return plots;
+        }
+    }
+
+    private com.mtm.citybuilder.core.plot.PlotLayer plots;
+
     private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {
     }
 }

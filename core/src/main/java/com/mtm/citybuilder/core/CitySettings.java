@@ -29,6 +29,7 @@ public final class CitySettings {
     public HighSpeed highSpeed = new HighSpeed();
     public Streets streets = new Streets();
     public Transit transit = new Transit();
+    public Plots plots = new Plots();
 
     public static final class General {
         /** Edge of a logic region in blocks: the unit results are cached in, never a boundary of any rule. */
@@ -690,6 +691,32 @@ public final class CitySettings {
         public double railHousesCost = 1.6;
         /** Most streamlines traced for one town. */
         public int maxLines = 20000;
+    }
+
+    /**
+     * L7 plots: the land along each street cut into lots, each {frontage from, frontage to, depth from, depth to} by
+     * district (the lot's frontage along the street and how deep it runs back, drawn by its hash): downtown and the
+     * station front wide enough for offices, the old town's machiya narrow and deep (Kyoto's "eels' beds"), houses
+     * on 9-14, works and quays wide. Lots along a lane are its row houses (roji).
+     */
+    public static final class Plots {
+        public double[] central = {8, 20, 20, 30};
+        public double[] stationFront = {10, 24, 20, 30};
+        public double[] oldTown = {5, 8, 18, 30};
+        public double[] residential = {9, 14, 12, 20};
+        public double[] industrial = {30, 70, 30, 60};
+        public double[] port = {30, 60, 30, 50};
+        public double[] lane = {5, 8, 8, 12};
+        /**
+         * Land goes to the street whose edge is nearest, a wider street's edge counting this much nearer: its lots
+         * run deeper, the front street (omotedori) taking the corners from the back streets.
+         */
+        public double priorityBoulevard = 10.0;
+        public double priorityArterial = 8.0;
+        public double priorityCollector = 5.0;
+        public double priorityOldRoad = 4.0;
+        public double priorityStreet = 0.0;
+        public double priorityLane = -2.0;
     }
 
     /** One tier of settlements. */
