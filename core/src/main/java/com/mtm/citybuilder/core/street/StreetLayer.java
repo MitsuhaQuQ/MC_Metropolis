@@ -700,6 +700,7 @@ public final class StreetLayer {
             arterials.bridging = true;
             arterials.run(arterialSeeds(anchors, oldRoad, window, spacing), segments);
             linkPatches(window, arterials, segments, spacing);
+            demoteDeadEnds(window, segments, anchors);
             for (Anchor anchor : anchors) {
                 if (anchor.kind() == Anchor.Kind.STATION) {
                     avenue(anchor, extent, window, segments);
@@ -731,6 +732,240 @@ public final class StreetLayer {
             }
         }
         return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways);
+    }
+
+    /**
+     * Arterials that run into water without a bridge and end there, made streets back to where they last meet another
+     * line: an arterial leading nowhere is a stub no town would build, but the road itself serves the land along it,
+     * as a street ending at the embankment. A run is taken piece by piece from its water end while the node behind
+     * joins no other line; it stops at a junction, at a piece another line crosses, at a bridge and at an anchor.
+     */
+    private void demoteDeadEnds(Window window, List<StreetSegment> segments, List<Anchor> anchors) {
+        int count = segments.size();
+        Map<Long, List<Integer>> ends = new HashMap<>();
+        for (int s = 0; s < count; s++) {
+            StreetSegment segment = segments.get(s);
+            ends.computeIfAbsent(nodeKey(segment.x1(), segment.z1()), k -> new ArrayList<>()).add(s);
+            ends.computeIfAbsent(nodeKey(segment.x2(), segment.z2()), k -> new ArrayList<>()).add(s);
+        }
+        // Pieces another line crosses mid-way hold a junction: they are never cut
+        boolean[] crossed = new boolean[count];
+        Map<Integer, List<Integer>> partners = new HashMap<>();
+        double cell = 64.0;
+        Map<Long, List<Integer>> cells = new HashMap<>();
+        for (int s = 0; s < count; s++) {
+            StreetSegment g = segments.get(s);
+            for (long cx = (long) Math.floor(Math.min(g.x1(), g.x2()) / cell); cx <= (long) Math.floor(Math.max(g.x1(), g.x2()) / cell); cx++) {
+                for (long cz = (long) Math.floor(Math.min(g.z1(), g.z2()) / cell); cz <= (long) Math.floor(Math.max(g.z1(), g.z2()) / cell); cz++) {
+                    cells.computeIfAbsent((cx << 32) ^ (cz & 0xFFFFFFFFL), k -> new ArrayList<>()).add(s);
+                }
+            }
+        }
+        for (List<Integer> list : cells.values()) {
+            for (int p = 0; p < list.size(); p++) {
+                for (int q = p + 1; q < list.size(); q++) {
+                    StreetSegment a = segments.get(list.get(p));
+                    StreetSegment b = segments.get(list.get(q));
+                    if (properlyCross(a, b)) {
+                        crossed[list.get(p)] = true;
+                        crossed[list.get(q)] = true;
+                        partners.computeIfAbsent(list.get(p), k -> new ArrayList<>()).add(list.get(q));
+                        partners.computeIfAbsent(list.get(q), k -> new ArrayList<>()).add(list.get(p));
+                    }
+                }
+            }
+        }
+        boolean[] removed = new boolean[count];
+        // Pieces cut where the last line crosses them: {piece, crossing x, z, whether the arterial part is its first end's}
+        List<double[]> cuts = new ArrayList<>();
+        boolean any = false;
+        for (Map.Entry<Long, List<Integer>> entry : new ArrayList<>(ends.entrySet())) {
+            List<Integer> at = entry.getValue();
+            if (at.size() != 1) {
+                continue;
+            }
+            int s = at.get(0);
+            StreetSegment segment = segments.get(s);
+            if (removed[s] || segment.streetClass() != StreetClass.ARTERIAL) {
+                continue;
+            }
+            boolean first = nodeKey(segment.x1(), segment.z1()) == entry.getKey();
+            double x = first ? segment.x1() : segment.x2();
+            double z = first ? segment.z1() : segment.z2();
+            if (!nearWater(window, x, z) || nearAnchor(anchors, x, z)) {
+                continue;
+            }
+            // Walk back from the water end while the run joins nothing
+            long node = entry.getKey();
+            int current = s;
+            while (true) {
+                StreetSegment piece = segments.get(current);
+                if (piece.streetClass() != StreetClass.ARTERIAL || piece.structure() == StreetStructure.BRIDGE) {
+                    break;
+                }
+                if (crossed[current]) {
+                    // The stub past the crossing nearest the dead end goes; the rest stays an arterial
+                    double ex = nodeKey(piece.x1(), piece.z1()) == node ? piece.x1() : piece.x2();
+                    double ez = nodeKey(piece.x1(), piece.z1()) == node ? piece.z1() : piece.z2();
+                    double[] cut = null;
+                    double nearest = Double.POSITIVE_INFINITY;
+                    for (int other : partners.get(current)) {
+                        double[] p = intersection(piece, segments.get(other));
+                        if (p != null && Math.hypot(p[0] - ex, p[1] - ez) < nearest) {
+                            nearest = Math.hypot(p[0] - ex, p[1] - ez);
+                            cut = p;
+                        }
+                    }
+                    if (cut != null && nearest > 0.5) {
+                        cuts.add(new double[]{current, cut[0], cut[1], nodeKey(piece.x1(), piece.z1()) == node ? 0 : 1});
+                        any = true;
+                    }
+                    break;
+                }
+                removed[current] = true;
+                any = true;
+                long k1 = nodeKey(piece.x1(), piece.z1());
+                long next = k1 == node ? nodeKey(piece.x2(), piece.z2()) : k1;
+                double nx = k1 == node ? piece.x2() : piece.x1();
+                double nz = k1 == node ? piece.z2() : piece.z1();
+                int live = 0;
+                int following = -1;
+                for (int t : ends.get(next)) {
+                    if (!removed[t]) {
+                        live++;
+                        following = t;
+                    }
+                }
+                if (live != 1 || nearAnchor(anchors, nx, nz)) {
+                    break;
+                }
+                node = next;
+                current = following;
+            }
+        }
+        if (!any) {
+            return;
+        }
+        for (int s = 0; s < count; s++) {
+            if (removed[s]) {
+                StreetSegment g = segments.get(s);
+                segments.set(s, new StreetSegment(g.x1(), g.z1(), g.x2(), g.z2(), StreetClass.STREET, g.era(),
+                        config.streetWidth, g.structure()));
+            }
+        }
+        for (double[] cut : cuts) {
+            int s = (int) cut[0];
+            StreetSegment g = segments.get(s);
+            boolean firstIsStub = cut[3] == 0;
+            double ax = firstIsStub ? g.x2() : g.x1();
+            double az = firstIsStub ? g.z2() : g.z1();
+            double sx = firstIsStub ? g.x1() : g.x2();
+            double sz = firstIsStub ? g.z1() : g.z2();
+            segments.set(s, new StreetSegment(ax, az, cut[1], cut[2], g.streetClass(), g.era(), g.width(), g.structure()));
+            segments.add(new StreetSegment(cut[1], cut[2], sx, sz, StreetClass.STREET, g.era(), config.streetWidth, g.structure()));
+        }
+    }
+
+    /** Where two pieces cross, or null. */
+    private static double[] intersection(StreetSegment a, StreetSegment b) {
+        double rx = a.x2() - a.x1();
+        double rz = a.z2() - a.z1();
+        double sx = b.x2() - b.x1();
+        double sz = b.z2() - b.z1();
+        double denominator = rx * sz - rz * sx;
+        if (Math.abs(denominator) < 1e-9) {
+            return null;
+        }
+        double t = ((b.x1() - a.x1()) * sz - (b.z1() - a.z1()) * sx) / denominator;
+        double u = ((b.x1() - a.x1()) * rz - (b.z1() - a.z1()) * rx) / denominator;
+        if (t < 0 || t > 1 || u < 0 || u > 1) {
+            return null;
+        }
+        return new double[]{a.x1() + rx * t, a.z1() + rz * t};
+    }
+
+    private static long nodeKey(double x, double z) {
+        return (Math.round(x * 10.0) << 32) ^ (Math.round(z * 10.0) & 0xFFFFFFFFL);
+    }
+
+    /** Whether two pieces cut through each other, not merely meeting at an end. */
+    private static boolean properlyCross(StreetSegment a, StreetSegment b) {
+        double d1 = side(b, a.x1(), a.z1());
+        double d2 = side(b, a.x2(), a.z2());
+        double d3 = side(a, b.x1(), b.z1());
+        double d4 = side(a, b.x2(), b.z2());
+        return d1 * d2 < -1e-6 && d3 * d4 < -1e-6;
+    }
+
+    private static double side(StreetSegment s, double px, double pz) {
+        return (s.x2() - s.x1()) * (pz - s.z1()) - (s.z2() - s.z1()) * (px - s.x1());
+    }
+
+    /** Whether water lies within a little more than a step of a point. */
+    private boolean nearWater(Window window, double x, double z) {
+        if (window.water(x, z)) {
+            return true;
+        }
+        double reach = 3.0 * config.step;
+        for (int a = 0; a < 16; a++) {
+            double angle = 2.0 * Math.PI * a / 16;
+            for (double r = config.step; r <= reach; r += config.step) {
+                if (window.water(x + r * Math.cos(angle), z + r * Math.sin(angle))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean nearAnchor(List<Anchor> anchors, double x, double z) {
+        for (Anchor anchor : anchors) {
+            if (Math.hypot(anchor.x() - x, anchor.z() - z) < 32.0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Joins the far end of a bridge to the nearest end of an arterial or old road within a spacing, straight, where
+     * the join runs over built land no steeper than arterials climb; leaves it as it is otherwise.
+     */
+    private void connect(Window window, List<StreetSegment> segments, double x, double z, double spacing) {
+        double[] best = null;
+        double bestDistance = spacing;
+        for (StreetSegment segment : segments) {
+            if (segment.streetClass() != StreetClass.ARTERIAL && segment.streetClass() != StreetClass.OLD_ROAD) {
+                continue;
+            }
+            for (double[] p : new double[][]{{segment.x1(), segment.z1()}, {segment.x2(), segment.z2()}}) {
+                double d = Math.hypot(p[0] - x, p[1] - z);
+                if (d > 1.0 && d < bestDistance) {
+                    bestDistance = d;
+                    best = p;
+                }
+            }
+        }
+        if (best == null) {
+            return;
+        }
+        int pieces = Math.max(1, (int) Math.ceil(bestDistance / config.step));
+        for (int q = 1; q < pieces; q++) {
+            double t = (double) q / pieces;
+            if (!window.built(x + (best[0] - x) * t, z + (best[1] - z) * t)) {
+                return;
+            }
+        }
+        if (Math.abs(window.height(best[0], best[1]) - window.height(x, z)) / bestDistance > config.maxGrade) {
+            return;
+        }
+        for (int q = 0; q < pieces; q++) {
+            double ax = x + (best[0] - x) * q / pieces;
+            double az = z + (best[1] - z) * q / pieces;
+            double bx = x + (best[0] - x) * (q + 1) / pieces;
+            double bz = z + (best[1] - z) * (q + 1) / pieces;
+            segments.add(new StreetSegment(ax, az, bx, bz, StreetClass.ARTERIAL, Era.MODERN, config.arterialWidth));
+        }
     }
 
     /**
@@ -920,6 +1155,7 @@ public final class StreetLayer {
                     }
                     arterials.bridges.add(new double[]{0.5 * (best[0] + best[2]), 0.5 * (best[1] + best[3]),
                             arterials.bridgeSpacing(length)});
+                    connect(window, segments, best[2], best[3], spacing);
                     seedX = best[0];
                     seedZ = best[1];
                 } else {

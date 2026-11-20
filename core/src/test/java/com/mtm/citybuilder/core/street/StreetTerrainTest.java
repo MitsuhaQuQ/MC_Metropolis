@@ -76,6 +76,39 @@ class StreetTerrainTest {
         }
     }
 
+    private static double distanceTo(StreetSegment s, double x, double z) {
+        double dx = s.x2() - s.x1();
+        double dz = s.z2() - s.z1();
+        double t = Math.max(0, Math.min(1, ((x - s.x1()) * dx + (z - s.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+        return Math.hypot(s.x1() + dx * t - x, s.z1() + dz * t - z);
+    }
+
+    @Test
+    void noArterialEndsAtTheRiverWithoutABridge() {
+        CityLogic logic = new CityLogic(3L, SETTINGS, new SyntheticTerrain(0.0, 20000, 80, Landform.PLAINS));
+        StreetPlan plan = logic.streetPlan(city(20300, 0), Formation.CASTLE_TOWN);
+        java.util.Map<Long, Integer> degree = new java.util.HashMap<>();
+        List<StreetSegment> arterials = plan.segments().stream()
+                .filter(s -> s.streetClass() == StreetClass.ARTERIAL || s.streetClass() == StreetClass.OLD_ROAD).toList();
+        for (StreetSegment segment : arterials) {
+            degree.merge(Math.round(segment.x1() * 10) * 1_000_003L + Math.round(segment.z1() * 10), 1, Integer::sum);
+            degree.merge(Math.round(segment.x2() * 10) * 1_000_003L + Math.round(segment.z2() * 10), 1, Integer::sum);
+        }
+        for (StreetSegment segment : arterials) {
+            if (segment.streetClass() != StreetClass.ARTERIAL || segment.structure() == StreetStructure.BRIDGE) {
+                continue;
+            }
+            for (double[] end : new double[][]{{segment.x1(), segment.z1()}, {segment.x2(), segment.z2()}}) {
+                // A dead end, not an end on another line's piece (a T where the stub past a crossing was cut)
+                boolean onAnother = arterials.stream().anyMatch(o -> o != segment && distanceTo(o, end[0], end[1]) < 0.5);
+                if (degree.get(Math.round(end[0] * 10) * 1_000_003L + Math.round(end[1] * 10)) == 1 && !onAnother) {
+                    // The river's banks are 40 either side of x = 20000; the grid reads water to its nearest node
+                    assertTrue(Math.abs(end[0] - 20000) > 40 + 64, "an arterial ends at the river: " + segment);
+                }
+            }
+        }
+    }
+
     @Test
     void streetsCrossASmallStreamOnCulverts() {
         CityLogic logic = new CityLogic(3L, SETTINGS, new SyntheticTerrain(0.0, 20000, 8, Landform.PLAINS));
