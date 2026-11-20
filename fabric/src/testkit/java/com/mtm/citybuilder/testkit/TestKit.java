@@ -76,6 +76,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/plan-around", this::planAround);
             route(http, "/street", this::street);
             route(http, "/canal", this::canal);
+            route(http, "/airport", this::airport);
             route(http, "/stop", this::stop);
             http.start();
             // The JDK's HTTP dispatcher thread is not a daemon: stopped with the server, or the process never exits
@@ -395,6 +396,43 @@ public final class TestKit implements DedicatedServerModInitializer {
         if (overworld().hasChunk(bx >> 4, bz >> 4)) {
             found.put("ground", overworld().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz));
         }
+        return found;
+    }
+
+    /**
+     * The airport nearest (x, z) within 40 km, as this world sited it: {found, kind, x, z, heading in degrees, length,
+     * width, elevation, threshold: a point on the runway's centre line 20 in from an end, apron: the apron's middle}.
+     */
+    private Object airport(Map<String, String> query, String body) {
+        double x = Double.parseDouble(query.get("x"));
+        double z = Double.parseDouble(query.get("z"));
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if (logic == null) {
+            return Map.of("found", false);
+        }
+        com.mtm.citybuilder.core.airport.Airport best = null;
+        for (com.mtm.citybuilder.core.airport.Airport a : logic.airports().airports(x - 40000, z - 40000, x + 40000, z + 40000)) {
+            if (best == null || Math.hypot(a.x() - x, a.z() - z) < Math.hypot(best.x() - x, best.z() - z)) {
+                best = a;
+            }
+        }
+        if (best == null) {
+            return Map.of("found", false);
+        }
+        double[] threshold = best.world(-0.5 * best.length() + 20, 0);
+        double[] apron = best.world(0, best.taxiwayOffset() + 0.5 * com.mtm.citybuilder.core.airport.Airport.TAXIWAY + 20
+                + 0.5 * best.apronDepth());
+        Map<String, Object> found = new java.util.LinkedHashMap<>();
+        found.put("found", true);
+        found.put("kind", best.kind().name());
+        found.put("x", best.x());
+        found.put("z", best.z());
+        found.put("heading", Math.toDegrees(best.heading()));
+        found.put("length", best.length());
+        found.put("width", best.width());
+        found.put("elevation", best.elevation());
+        found.put("threshold", java.util.List.of(threshold[0], threshold[1]));
+        found.put("apron", java.util.List.of(apron[0], apron[1]));
         return found;
     }
 

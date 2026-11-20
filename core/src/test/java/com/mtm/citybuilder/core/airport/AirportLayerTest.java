@@ -59,6 +59,60 @@ class AirportLayerTest {
     }
 
     @Test
+    void theChunkLayerPavesTheRunwayAndGradesTheField() {
+        CityLogic logic = new CityLogic(3L, SETTINGS, new SyntheticTerrain(0.0, 20000, 80, Landform.PLAINS));
+        Settlement metropolis = logic.settlements(6000, -20000, 42000, 20000).stream()
+                .filter(s -> s.tier() == SettlementTier.METROPOLIS).findFirst().orElseThrow();
+        Airport airport = logic.airports().airport(metropolis);
+        assertNotNull(airport);
+        // The runway's middle: paved, marked along the centre now and then, at the field's level
+        int runway = 0;
+        int lined = 0;
+        int white = 0;
+        java.util.List<Double> along = new java.util.ArrayList<>();
+        // 20 in from the end, in the threshold's stripes, then all along
+        along.add(-0.5 * airport.length() + 20);
+        for (double u = -0.5 * airport.length() + 45; u < 0.5 * airport.length(); u += 37) {
+            along.add(u);
+        }
+        for (double u : along) {
+            double[] p = airport.world(u, 0.3);
+            int cx = Math.floorDiv((int) Math.floor(p[0]), 16);
+            int cz = Math.floorDiv((int) Math.floor(p[1]), 16);
+            com.mtm.citybuilder.core.chunk.ChunkLayer.AirportCell[] cells = logic.chunks().airports(cx, cz);
+            assertNotNull(cells);
+            com.mtm.citybuilder.core.chunk.ChunkLayer.AirportCell cell =
+                    cells[((int) Math.floor(p[0]) - cx * 16) * 16 + (int) Math.floor(p[1]) - cz * 16];
+            assertNotNull(cell);
+            assertEquals(Airport.Part.RUNWAY, cell.part());
+            assertEquals((int) airport.elevation(), cell.level());
+            runway++;
+            if (cell.white()) {
+                white++;
+            } else if (cell.mark().paving() == com.mtm.citybuilder.core.chunk.ChunkLayer.Paving.WHITE_LINE) {
+                lined++;
+            }
+        }
+        assertTrue(white > 0, "no threshold stripe");
+        assertTrue(lined > 0 && lined < runway, "centre line " + lined + " of " + runway);
+        // Round a field on land, slopes; at sea none
+        double[] beyond = airport.world(0, airport.fieldNear() - 40);
+        int bx = Math.floorDiv((int) Math.floor(beyond[0]), 16);
+        int bz = Math.floorDiv((int) Math.floor(beyond[1]), 16);
+        com.mtm.citybuilder.core.chunk.ChunkLayer.AirportCell[] outside = logic.chunks().airports(bx, bz);
+        com.mtm.citybuilder.core.chunk.ChunkLayer.AirportCell slope = outside == null ? null
+                : outside[((int) Math.floor(beyond[0]) - bx * 16) * 16 + (int) Math.floor(beyond[1]) - bz * 16];
+        if (airport.kind() == Airport.Kind.OFFSHORE) {
+            assertTrue(slope == null, "slopes at sea");
+        } else {
+            assertNotNull(slope);
+            assertTrue(slope.outside() > 30 && slope.part() == Airport.Part.NONE, "slope " + slope);
+        }
+        // No trees on the field
+        assertTrue(!logic.chunks().treeAllowed((int) airport.x(), (int) airport.z()));
+    }
+
+    @Test
     void anAirportsPartsLieWhereItsLayoutPutsThem() {
         Airport airport = new Airport(1L, 2L, Airport.Kind.LAND, 1000, 2000, 0.3, 3000, 60, 70, 0);
         double t = airport.taxiwayOffset();

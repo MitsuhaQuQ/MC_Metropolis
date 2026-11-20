@@ -105,5 +105,13 @@ public final class CityPlanner {
             CityBuilder.LOGGER.info("Planned the {} at {} {} ahead of the players in {} s", town.tier(),
                     Math.round(town.x()), Math.round(town.z()), String.format("%.1f", (System.nanoTime() - start) / 1e9));
         }
+        // The airports whose fields may reach within AHEAD (sited once per town, then kept): their siting reads the
+        // terrain all round a town, tens of seconds when it is new
+        long start = System.nanoTime();
+        int airports = logic.airports().airports(x - AHEAD, z - AHEAD, x + AHEAD, z + AHEAD).size();
+        double seconds = (System.nanoTime() - start) / 1e9;
+        if (seconds > 1.0) {
+            CityBuilder.LOGGER.info("Sited {} airports ahead of the players in {} s", airports, String.format("%.1f", seconds));
+        }
     }
 }

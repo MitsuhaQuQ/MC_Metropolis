@@ -134,7 +134,11 @@ public final class ChunkLayer {
     }
 
     /** A line along a street: how far from the centre line, its colour, whether dashed. */
-    private record Line(double at, Paving paving, boolean dashed) {
+    private record Line(double at, Paving paving, double on, double off) {
+        /** A street's line: solid, or dashed 5 painted and 5 not. */
+        Line(double at, Paving paving, boolean dashed) {
+            this(at, paving, dashed ? 5.0 : 0.0, dashed ? 5.0 : 0.0);
+        }
     }
 
     public static Paving paving(Column column) {
@@ -207,32 +211,163 @@ public final class ChunkLayer {
             lines.add(new Line(0.5 * carriage, Paving.WHITE_LINE, true));
             lines.add(new Line(-0.5 * carriage, Paving.WHITE_LINE, true));
         }
-        int angle = angle(column.heading);
+        // A carriageway with pavements beside it is laid low
+        return draw(lines, column.across, column.heading, column.along, walk > 0);
+    }
+
+    /**
+     * The asphalt of a column with lines along it: the line whose centre crosses the block (at the angle of the
+     * {@link #ANGLES} nearest the heading, at the position it crosses at), or plain asphalt.
+     *
+     * @param across how far the column's middle lies from the centre line the lines are measured from
+     * @param along  the column's middle along the heading, for dashes
+     */
+    private static Mark draw(List<Line> lines, double across, double heading, double along, boolean low) {
+        int angle = angle(heading);
         double theta = Math.PI * angle / ANGLES;
         // Moving across the block along the angle's normal moves across the street at this rate
-        double rate = Math.cos(theta - column.heading);
+        double rate = Math.cos(theta - heading);
         double span = 0.5 * (Math.abs(Math.sin(theta)) + Math.abs(Math.cos(theta)));
         Line best = null;
         double bestShift = Double.POSITIVE_INFINITY;
         for (Line line : lines) {
-            if (line.dashed && Math.floorMod((long) Math.floor(column.along), 10) >= 5) {
+            if (line.off > 0 && Math.floorMod((long) Math.floor(along), (long) (line.on + line.off)) >= line.on) {
                 continue;
             }
             // How far from the column's middle, across the block, the line's centre passes; half open, so a line
             // along a block's edge is drawn in one of the two blocks, not both
-            double shift = (line.at - column.across) / rate;
+            double shift = (line.at - across) / rate;
             if (shift > -span && shift <= span && Math.abs(shift) < Math.abs(bestShift)) {
                 bestShift = shift;
                 best = line;
             }
         }
-        // A carriageway with pavements beside it is laid low
-        boolean low = walk > 0;
         if (best == null) {
             return new Mark(Paving.ASPHALT, angle, 0, low);
         }
         int offset = (int) Math.floor((bestShift + span) / (2.0 * span) * OFFSETS);
         return new Mark(best.paving, angle, Math.max(0, Math.min(OFFSETS - 1, offset)), low);
+    }
+
+    /**
+     * A column of an airport, or of the slopes graded round its field.
+     *
+     * @param airport  the airport
+     * @param part     what the column is (NONE on the slopes outside the field)
+     * @param outside  how far the column lies outside the field, 0 within it: the slopes round a field on land fall
+     *                 off from its level by half this (1 in 2); an island at sea has none, its rim a revetment
+     * @param rim      whether the column is the island's revetment: the field's outermost block at sea
+     * @param mark     the paving of the runway and taxiways (asphalt and their lines), null elsewhere
+     * @param white    whether the column is a white block: the runway's threshold stripes
+     */
+    public record AirportCell(com.mtm.citybuilder.core.airport.Airport airport, com.mtm.citybuilder.core.airport.Airport.Part part,
+                              double outside, boolean rim, Mark mark, boolean white) {
+        /** The height the field is graded to, the block its surface is laid at. */
+        public int level() {
+            return (int) airport.elevation();
+        }
+    }
+
+    /** How far round an airport's field on land its slopes are graded: enough for a cut or fill of half this. */
+    public static final double AIRPORT_SLOPES = 160.0;
+
+    /**
+     * The airports' columns in a chunk, x-major as {@link #columns}, null for a column no airport reaches (or the whole
+     * array null where none does).
+     */
+    public AirportCell[] airports(int chunkX, int chunkZ) {
+        double minX = chunkX * 16.0;
+        double minZ = chunkZ * 16.0;
+        List<com.mtm.citybuilder.core.airport.Airport> airports = logic.airports().airports(minX - AIRPORT_SLOPES,
+                minZ - AIRPORT_SLOPES, minX + 16 + AIRPORT_SLOPES, minZ + 16 + AIRPORT_SLOPES);
+        if (airports.isEmpty()) {
+            return null;
+        }
+        AirportCell[] cells = new AirportCell[256];
+        boolean any = false;
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                double cx = minX + x + 0.5;
+                double cz = minZ + z + 0.5;
+                com.mtm.citybuilder.core.airport.Airport nearest = null;
+                double nearestOutside = Double.POSITIVE_INFINITY;
+                for (com.mtm.citybuilder.core.airport.Airport airport : airports) {
+                    double[] l = airport.local(cx, cz);
+                    double du = Math.max(0, Math.abs(l[0]) - airport.fieldHalfLength());
+                    double dv = Math.max(0, Math.max(airport.fieldNear() - l[1], l[1] - airport.fieldFar()));
+                    double outside = Math.hypot(du, dv);
+                    double reach = airport.kind() == com.mtm.citybuilder.core.airport.Airport.Kind.OFFSHORE ? 0.0 : AIRPORT_SLOPES;
+                    if (outside <= reach && outside < nearestOutside) {
+                        nearest = airport;
+                        nearestOutside = outside;
+                    }
+                }
+                if (nearest != null) {
+                    cells[x * 16 + z] = airportCell(nearest, cx, cz, nearestOutside);
+                    any = true;
+                }
+            }
+        }
+        return any ? cells : null;
+    }
+
+    private static AirportCell airportCell(com.mtm.citybuilder.core.airport.Airport airport, double cx, double cz, double outside) {
+        com.mtm.citybuilder.core.airport.Airport.Part part = airport.part(cx, cz);
+        double[] l = airport.local(cx, cz);
+        double u = l[0];
+        double v = l[1];
+        boolean rim = airport.kind() == com.mtm.citybuilder.core.airport.Airport.Kind.OFFSHORE
+                && (Math.abs(u) > airport.fieldHalfLength() - 1.5 || v < airport.fieldNear() + 1.5 || v > airport.fieldFar() - 1.5);
+        Mark mark = null;
+        boolean white = false;
+        double half = 0.5 * airport.length();
+        if (part == com.mtm.citybuilder.core.airport.Airport.Part.RUNWAY) {
+            // Threshold stripes ("piano keys") across both ends, 30 long; a dashed centre line (30 painted, 20 not) and
+            // solid edge lines between
+            double fromEnd = half - Math.abs(u);
+            double edge = 0.5 * airport.width() - 1.0;
+            if (fromEnd >= 6 && fromEnd <= 36 && Math.abs(v) <= edge - 2) {
+                white = Math.floorMod((long) Math.floor((Math.abs(v) + 0.9) / 1.8), 2) == 0;
+            }
+            List<Line> lines = new ArrayList<>();
+            lines.add(new Line(edge, Paving.WHITE_LINE, 0.0, 0.0));
+            lines.add(new Line(-edge, Paving.WHITE_LINE, 0.0, 0.0));
+            if (fromEnd > 40) {
+                lines.add(new Line(0.0, Paving.WHITE_LINE, 30.0, 20.0));
+            }
+            mark = draw(lines, v, airport.heading(), u + half, false);
+        } else if (part == com.mtm.citybuilder.core.airport.Airport.Part.TAXIWAY) {
+            // A yellow centre line along the parallel taxiway, and along each link across
+            double t = airport.taxiwayOffset();
+            List<Line> centre = List.of(new Line(0.0, Paving.YELLOW_LINE, 0.0, 0.0));
+            if (Math.abs(v - t) <= 0.5 * com.mtm.citybuilder.core.airport.Airport.TAXIWAY) {
+                mark = draw(centre, v - t, airport.heading(), u, false);
+            } else {
+                double link = Double.NaN;
+                for (double at : new double[]{-half + 0.5 * com.mtm.citybuilder.core.airport.Airport.TAXIWAY, -0.5 * half, 0.0,
+                        0.5 * half, half - 0.5 * com.mtm.citybuilder.core.airport.Airport.TAXIWAY}) {
+                    if (Double.isNaN(link) || Math.abs(u - at) < Math.abs(u - link)) {
+                        link = at;
+                    }
+                }
+                mark = draw(centre, -(u - link), airport.heading() + 0.5 * Math.PI, v, false);
+            }
+        }
+        return new AirportCell(airport, part, outside, rim, mark, white);
+    }
+
+    /** Whether a position lies on an airport's field or its slopes, where no tree grows. */
+    public boolean airportAt(int x, int z) {
+        for (com.mtm.citybuilder.core.airport.Airport airport : logic.airports().airports(x - AIRPORT_SLOPES, z - AIRPORT_SLOPES,
+                x + AIRPORT_SLOPES, z + AIRPORT_SLOPES)) {
+            double[] l = airport.local(x + 0.5, z + 0.5);
+            double du = Math.max(0, Math.abs(l[0]) - airport.fieldHalfLength());
+            double dv = Math.max(0, Math.max(airport.fieldNear() - l[1], l[1] - airport.fieldFar()));
+            if (Math.hypot(du, dv) <= AIRPORT_SLOPES) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The direction of the {@link #ANGLES} nearest a heading, a line having no sense. */
@@ -421,6 +556,9 @@ public final class ChunkLayer {
      * the town, by the position's own hash, none from an intensity of {@link #TREELESS} on, where houses will stand.
      */
     public boolean treeAllowed(int x, int z) {
+        if (airportAt(x, z)) {
+            return false;
+        }
         UrbanSample sample = logic.urban(x + 0.5, z + 0.5);
         double built = logic.settings().streets.builtIntensity;
         if (sample.owner() == null || sample.intensity() <= built) {

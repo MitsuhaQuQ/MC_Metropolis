@@ -79,4 +79,14 @@ test('the castle town seen from the test client', async ({}, testInfo) => {
   const cyaw = (Math.atan2(-Math.cos(ch), Math.sin(ch)) * 180) / Math.PI;
   await view('canal', c.x - 14 * Math.cos(ch) + 3 * Math.sin(ch), (cg.ground ?? 70) + 1, c.z - 14 * Math.sin(ch) - 3 * Math.cos(ch),
     cyaw + 15, 25, testInfo);
+  // The nearest airport: its runway's end from above, then along the runway from beside it
+  const a = await server.airport(TOWN.x, TOWN.z);
+  console.log('airport', JSON.stringify(a));
+  expect(a.found).toBe(true);
+  const [tx, tz] = a.threshold;
+  await server.generate(Math.round(tx) - 64, Math.round(tz) - 64, Math.round(tx) + 63, Math.round(tz) + 63);
+  await view('airport-above', Math.round(tx), a.elevation + 70, Math.round(tz), 0, 90, testInfo);
+  const ah = (a.heading * Math.PI) / 180;
+  const ayaw = (Math.atan2(-Math.cos(ah), Math.sin(ah)) * 180) / Math.PI;
+  await view('airport-runway', tx - 30 * Math.cos(ah), a.elevation + 12, tz - 30 * Math.sin(ah), ayaw, 15, testInfo);
 });

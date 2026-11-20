@@ -32,7 +32,10 @@ public final class CityChunks {
     }
 
     private static BlockState paving(ChunkLayer.Column column) {
-        ChunkLayer.Mark mark = ChunkLayer.mark(column);
+        return paving(ChunkLayer.mark(column));
+    }
+
+    private static BlockState paving(ChunkLayer.Mark mark) {
         return switch (mark.paving()) {
             case ASPHALT -> CityBlocks.ASPHALT.get().defaultBlockState().setValue(PavingBlock.LOW, mark.low());
             case WHITE_LINE -> line(CityBlocks.ASPHALT_LINE_WHITE.get(), mark);
@@ -87,7 +90,7 @@ public final class CityChunks {
         }
     }
 
-    /** Before decoration: paving on the ground, decks over water, headroom cleared. */
+    /** Before decoration: paving on the ground, decks over water, headroom cleared; the airports graded and paved. */
     public static void pave(WorldGenLevel level, ChunkAccess chunk) {
         ChunkLayer.Column[] columns = columns(level, chunk);
         if (columns == null) {
@@ -97,8 +100,13 @@ public final class CityChunks {
         int baseZ = chunk.getPos().getMinBlockZ();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int top = chunk.getMaxBuildHeight() - 1;
+        ChunkLayer.AirportCell[] airports = airports(level, chunk);
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
+                if (airports != null && airports[x * 16 + z] != null) {
+                    airport(chunk, airports[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
+                    continue;
+                }
                 ChunkLayer.Column column = columns[x * 16 + z];
                 BlockState block = paving(column);
                 if (block == null) {
@@ -150,6 +158,89 @@ public final class CityChunks {
                 if (ChunkLayer.parapet(column)) {
                     chunk.setBlockState(pos.set(baseX + x, y + 1, baseZ + z), Blocks.STONE_BRICK_WALL.defaultBlockState(), false);
                 }
+            }
+        }
+    }
+
+    private static ChunkLayer.AirportCell[] airports(WorldGenLevel level, ChunkAccess chunk) {
+        try {
+            CityLogic logic = CityWorlds.of(level.getLevel());
+            return logic == null ? null : logic.chunks().airports(chunk.getPos().x, chunk.getPos().z);
+        } catch (RuntimeException e) {
+            failed = true;
+            CityBuilder.LOGGER.error("City logic failed at chunk {}; no more cities are built this session", chunk.getPos(), e);
+            return null;
+        }
+    }
+
+    /**
+     * An airport's column: within the field graded to its level (cut down, or filled up with stone under dirt; at sea
+     * filled up from the sea floor, its rim a stone-brick revetment) and surfaced by part (the runway and taxiways
+     * asphalt with their lines, the runway's threshold stripes white, the apron light grey concrete, the terminal's
+     * land smooth stone, the rest grass); round a field on land, slopes of 1 in 2 down to the ground (fill) or up to it
+     * (cut), grassed.
+     */
+    private static void airport(ChunkAccess chunk, ChunkLayer.AirportCell cell, int wx, int wz, int x, int z,
+                                BlockPos.MutableBlockPos pos, int top) {
+        int floor = Math.min(top, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
+        BlockState state = chunk.getBlockState(pos.set(wx, floor, wz));
+        while (floor > chunk.getMinBuildHeight() + 1 && !state.blocksMotion()) {
+            state = chunk.getBlockState(pos.set(wx, --floor, wz));
+        }
+        int level = cell.level();
+        int ground = floor;
+        int surface;
+        if (cell.outside() > 0) {
+            // The slopes: down from the field's level to the ground, or up from it, 1 in 2
+            int drop = (int) Math.floor(0.5 * cell.outside());
+            if (ground > level + drop) {
+                surface = level + drop;
+            } else if (ground < level - drop) {
+                surface = level - drop;
+            } else {
+                return;
+            }
+        } else {
+            surface = level;
+        }
+        if (surface + HEADROOM > top || surface < chunk.getMinBuildHeight() + 2) {
+            return;
+        }
+        boolean sea = cell.airport().kind() == com.mtm.citybuilder.core.airport.Airport.Kind.OFFSHORE;
+        // Fill up to the surface: stone, dirt in the last blocks on land
+        for (int y = Math.max(chunk.getMinBuildHeight() + 1, ground + 1); y < surface; y++) {
+            BlockState fill = cell.rim() ? Blocks.STONE_BRICKS.defaultBlockState()
+                    : !sea && y >= surface - 3 ? Blocks.DIRT.defaultBlockState() : Blocks.STONE.defaultBlockState();
+            chunk.setBlockState(pos.set(wx, y, wz), fill, false);
+        }
+        BlockState block;
+        if (cell.rim()) {
+            block = Blocks.STONE_BRICKS.defaultBlockState();
+        } else if (cell.white()) {
+            block = Blocks.WHITE_CONCRETE.defaultBlockState();
+        } else if (cell.mark() != null) {
+            block = paving(cell.mark());
+        } else {
+            block = switch (cell.part()) {
+                case APRON -> Blocks.LIGHT_GRAY_CONCRETE.defaultBlockState();
+                case TERMINAL -> Blocks.SMOOTH_STONE.defaultBlockState();
+                default -> Blocks.GRASS_BLOCK.defaultBlockState();
+            };
+        }
+        if (block == null) {
+            block = Blocks.GRASS_BLOCK.defaultBlockState();
+        }
+        // Grass grows on dirt: under a field's grass, dirt even where it was cut down into stone
+        if (block.is(Blocks.GRASS_BLOCK) && surface - 1 > chunk.getMinBuildHeight()) {
+            chunk.setBlockState(pos.set(wx, surface - 1, wz), Blocks.DIRT.defaultBlockState(), false);
+        }
+        chunk.setBlockState(pos.set(wx, surface, wz), block, false);
+        // Cut down to the surface: what stood above it cleared, the old ground and what grew on it
+        int clearTo = Math.min(top, Math.max(surface + HEADROOM, ground + 8));
+        for (int y = surface + 1; y <= clearTo; y++) {
+            BlockState above = chunk.getBlockState(pos.set(wx, y, wz));
+            if (!above.isAir()) {
+                chunk.setBlockState(pos, Blocks.AIR.defaultBlockState(), false);
             }
         }
     }
