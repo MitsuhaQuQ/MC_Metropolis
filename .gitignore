@@ -28,3 +28,4 @@ Thumbs.db
 autotest/node_modules/
 autotest/test-results/
 run-client/
+__pycache__/
