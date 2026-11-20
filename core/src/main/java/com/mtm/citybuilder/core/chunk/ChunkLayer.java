@@ -268,6 +268,12 @@ public final class ChunkLayer {
                                 || surface == old.surface && d < Math.abs(old.across));
                         if (old.surface == Surface.NONE || wins) {
                             double across = (cx - g.x1()) * -uz + (cz - g.z1()) * ux;
+                            // Past the piece's ends (the round caps that fill a bend's outside) the offset is the
+                            // distance to the end, so no line runs on along the tangent onto the pavement
+                            double t = (cx - g.x1()) * ux + (cz - g.z1()) * uz;
+                            if (t < 0 || t > length) {
+                                across = (across < 0 ? -1.0 : 1.0) * d;
+                            }
                             double along = cx * ux + cz * uz;
                             double deck = bridge ? Math.max(index.deck[p], old.bridge ? old.deck : Double.NEGATIVE_INFINITY) : Double.NaN;
                             columns[x * 16 + z] = new Column(surface, bridge, deck, across, heading, along, g.width());

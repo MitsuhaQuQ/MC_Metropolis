@@ -63,6 +63,41 @@ class ChunkLayerTest {
         assertTrue(Math.abs(at.across()) <= 0.5 * arterial.width() + 1e-9, "offset " + at.across());
         // The same chunk asked again gives the same columns
         assertArrayEquals(columns, layer.columns(cx, cz));
+        // Round the bends of arterials, the centre line keeps to the centre: it does not run on along a piece's
+        // tangent past its end onto the pavement
+        List<StreetSegment> marked = plan.segments().stream().filter(g -> (g.streetClass() == StreetClass.ARTERIAL
+                || g.streetClass() == StreetClass.COLLECTOR) && g.structure() == StreetStructure.GROUND).toList();
+        int bends = 0;
+        for (int i = 0; i < marked.size() && bends < 6; i++) {
+            StreetSegment a = marked.get(i);
+            StreetSegment b = i + 1 < marked.size() ? marked.get(i + 1) : null;
+            if (b == null || Math.hypot(a.x2() - b.x1(), a.z2() - b.z1()) > 1e-6 || a.width() < 14) {
+                continue;
+            }
+            double turn = Math.abs(Math.IEEEremainder(Math.atan2(b.z2() - b.z1(), b.x2() - b.x1())
+                    - Math.atan2(a.z2() - a.z1(), a.x2() - a.x1()), 2 * Math.PI));
+            if (turn < Math.toRadians(10) || turn > Math.toRadians(60)) {
+                continue;
+            }
+            bends++;
+            int jx = Math.floorDiv((int) Math.floor(a.x2()), 16);
+            int jz = Math.floorDiv((int) Math.floor(a.z2()), 16);
+            for (int ox = -1; ox <= 1; ox++) {
+                for (int oz = -1; oz <= 1; oz++) {
+                    ChunkLayer.Column[] near = layer.columns(jx + ox, jz + oz);
+                    for (int c = 0; c < 256; c++) {
+                        if (ChunkLayer.paving(near[c]) != ChunkLayer.Paving.YELLOW_LINE) {
+                            continue;
+                        }
+                        double x = (jx + ox) * 16 + c / 16 + 0.5;
+                        double z = (jz + oz) * 16 + c % 16 + 0.5;
+                        double nearest = marked.stream().mapToDouble(g -> distance(g, x, z)).min().orElse(1e9);
+                        assertTrue(nearest <= 1.0, "a centre line " + nearest + " off the centre at " + x + " " + z);
+                    }
+                }
+            }
+        }
+        assertTrue(bends > 0, "no bend looked at");
         // A bridge's columns carry a deck above the sea level
         StreetSegment bridge = plan.segments().stream().filter(g -> g.structure() == StreetStructure.BRIDGE).findFirst().orElse(null);
         if (bridge != null) {
@@ -84,6 +119,13 @@ class ChunkLayerTest {
         for (ChunkLayer.Column column : empty) {
             assertEquals(ChunkLayer.Surface.NONE, column.surface());
         }
+    }
+
+    private static double distance(StreetSegment g, double x, double z) {
+        double dx = g.x2() - g.x1();
+        double dz = g.z2() - g.z1();
+        double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+        return Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z);
     }
 
     private static ChunkLayer.Paving paving(ChunkLayer.Surface surface, double across, double along, double width) {
