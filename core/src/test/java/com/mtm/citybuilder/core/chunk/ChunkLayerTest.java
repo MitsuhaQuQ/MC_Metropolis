@@ -75,6 +75,10 @@ class ChunkLayerTest {
                 assertTrue(column.deck() > SyntheticTerrain.SEA, "deck " + column.deck());
             }
         }
+        // No trees at the heart of the town; trees outside it
+        assertTrue(!layer.treeAllowed((int) Math.floor(logic.extent(town).coreX()), (int) Math.floor(logic.extent(town).coreZ())),
+                "a tree at the town's heart");
+        assertTrue(layer.treeAllowed(-16000, 0), "no tree at sea");
         // Out at sea (west of x = 0), nothing
         ChunkLayer.Column[] empty = layer.columns(-1000, 0);
         for (ChunkLayer.Column column : empty) {

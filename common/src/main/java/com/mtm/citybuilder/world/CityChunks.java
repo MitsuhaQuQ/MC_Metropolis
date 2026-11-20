@@ -66,6 +66,21 @@ public final class CityChunks {
         }
     }
 
+    /** Whether the biome may grow a tree at a position: not in a town's built land (see {@link ChunkLayer#treeAllowed}). */
+    public static boolean treeAllowed(WorldGenLevel level, BlockPos origin) {
+        if (failed) {
+            return true;
+        }
+        try {
+            CityLogic logic = CityWorlds.of(level.getLevel());
+            return logic == null || logic.chunks().treeAllowed(origin.getX(), origin.getZ());
+        } catch (RuntimeException e) {
+            failed = true;
+            CityBuilder.LOGGER.error("City logic failed at {}; no more cities are built this session", origin, e);
+            return true;
+        }
+    }
+
     /** Before decoration: paving on the ground, decks over water, headroom cleared. */
     public static void pave(WorldGenLevel level, ChunkAccess chunk) {
         ChunkLayer.Column[] columns = columns(level, chunk);
@@ -87,13 +102,19 @@ public final class CityChunks {
                 if (column.bridge()) {
                     y = (int) column.deck();
                 } else {
-                    // The solid ground (not the plants on it: a heightmap holds the height above its top block), or
-                    // the water's surface where a street crosses a stream, the water under it filled
-                    int floor = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z) - 1;
-                    y = floor;
-                    while (y + 1 < top && !chunk.getBlockState(pos.set(baseX + x, y + 1, baseZ + z)).getFluidState().isEmpty()) {
-                        y++;
+                    // The ground: down from the top past air and plants to the first solid block, the heightmaps not
+                    // being trusted here; where water lies on top, its surface, the water under the street filled
+                    int surface = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2;
+                    int floor = Math.min(top, surface);
+                    int waterTop = Integer.MIN_VALUE;
+                    BlockState state = chunk.getBlockState(pos.set(baseX + x, floor, baseZ + z));
+                    while (floor > chunk.getMinBuildHeight() && !state.blocksMotion()) {
+                        if (waterTop == Integer.MIN_VALUE && !state.getFluidState().isEmpty()) {
+                            waterTop = floor;
+                        }
+                        state = chunk.getBlockState(pos.set(baseX + x, --floor, baseZ + z));
                     }
+                    y = waterTop == Integer.MIN_VALUE ? floor : waterTop;
                     for (int fill = floor + 1; fill < y; fill++) {
                         chunk.setBlockState(pos.set(baseX + x, fill, baseZ + z), Blocks.STONE.defaultBlockState(), false);
                     }

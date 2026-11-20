@@ -25,6 +25,9 @@ test('the streets are paved, marked and clear overhead', async () => {
   expect(asphalt).toBeGreaterThan(500);
   expect(lines).toBeGreaterThan(50);
   expect(sidewalk).toBeGreaterThan(50);
+  // No forest in the town: trees' trunks top few of its columns (the leaves are looked through)
+  const logs = Object.entries(top).filter(([k]) => k.endsWith('_log')).reduce((a, [, v]) => a + v, 0);
+  expect(logs).toBeLessThan(0.002 * (2 * R) * (2 * R));
   // Nothing grown or built over the paving
   const paved = Object.values(blocks.pavedHeights).reduce((a, b) => a + b, 0);
   expect(blocks.pavedCovered).toBeLessThan(0.01 * paved);

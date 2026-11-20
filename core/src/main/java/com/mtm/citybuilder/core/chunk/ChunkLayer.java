@@ -173,6 +173,31 @@ public final class ChunkLayer {
         return columns;
     }
 
+    /**
+     * Whether a tree may grow at a position: everywhere outside the towns' built land, in a castle's, palace's or
+     * temple's grounds and along a reserved high-speed corridor (kept green); in the built land fewer the more intense
+     * the town, by the position's own hash, none from an intensity of {@link #TREELESS} on, where houses will stand.
+     */
+    public boolean treeAllowed(int x, int z) {
+        UrbanSample sample = logic.urban(x + 0.5, z + 0.5);
+        double built = logic.settings().streets.builtIntensity;
+        if (sample.owner() == null || sample.intensity() <= built) {
+            return true;
+        }
+        if (logic.streetPlanReady(sample.owner())) {
+            com.mtm.citybuilder.core.street.District district = logic.streetPlan(sample.owner()).districts().at(x, z);
+            if (district == com.mtm.citybuilder.core.street.District.GROUNDS
+                    || district == com.mtm.citybuilder.core.street.District.HIGH_SPEED) {
+                return true;
+            }
+        }
+        double keep = 1.0 - (sample.intensity() - built) / (TREELESS - built);
+        return keep > 0 && com.mtm.citybuilder.core.noise.Hash.unit(com.mtm.citybuilder.core.noise.Hash.of(0x7EE5L, x, z)) < keep;
+    }
+
+    /** Town intensity from which no tree grows: the built-up town, not its leafy edge. */
+    public static final double TREELESS = 0.3;
+
     /** The towns whose built land touches a chunk: the owners at its corners and middle. */
     private Set<Settlement> towns(double minX, double minZ) {
         Set<Settlement> towns = new LinkedHashSet<>();
