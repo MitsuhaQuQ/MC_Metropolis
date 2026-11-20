@@ -150,14 +150,14 @@ class RailStructureTest {
             Model m = c.apply(v.build());
             for (double s = 1; s < 159; s += 0.5) {
                 for (int tc : v.trackCentres()) {
-                    double[] pt = c.place(s, tc);
+                    double[] pt = c.place(s, tc + 0.5);  // the middle of the track's blocks
                     int x = (int) Math.floor(pt[0]), z = (int) Math.floor(pt[1]);
                     assertEquals(P.ballast(), m.get(x, 8, z), radius + ": bed at s " + s);
                     for (int y = 9; y <= 13; y++) {
                         assertFalse(m.has(x, y, z), radius + ": train at s " + s + " y " + y);
                     }
                 }
-                double[] e = c.place(s, -v.halfWidth());
+                double[] e = c.place(s, -v.halfWidth() + 0.5);
                 boolean parapet = false;
                 for (int dx = -1; dx <= 1; dx++) {
                     for (int dz = -1; dz <= 1; dz++) {
@@ -172,6 +172,15 @@ class RailStructureTest {
             assertEquals(Math.signum(radius) * 100 / Math.abs(radius), end[2], 1e-9);
             assertStates(m);
         }
+        // Before the arc the structure is laid exactly where it was built
+        Viaduct v = Viaduct.builder(Viaduct.Deck.RAIL, 80, 9).tracks(2).build();
+        Model straight = v.build();
+        Model laid = new Curve(60, 200, 20).apply(straight);
+        straight.forEach((x, y, z, s) -> {
+            if (x < 55) {
+                assertEquals(s, laid.get(x, y, z), "unmoved at " + x + "," + y + "," + z);
+            }
+        });
         assertEquals("x[facing=east]", Curve.rotate("x[facing=north]", 1));
         assertEquals("x[north=true,south=true]", Curve.rotate("x[east=true,west=true]", 1));
         assertEquals("x[axis=x]", Curve.rotate("x[axis=z]", -1));

@@ -11,7 +11,8 @@ import java.util.TreeMap;
  * (viaducts of every kind, footbridges) can be curved this way, at any radius and length.
  *
  * <p>Each block of the result is filled from the straight structure at the point it maps back to (its distance along
- * the centre line and its offset from it), so the curve has no gaps; block states that face a way (stairs, edge
+ * the centre line and its offset from it; the straight structure's block (s, d) covers [s, s + 1) x [d, d + 1), so its
+ * centre line z = 0 runs along the middle of the blocks at d = 0 when placed at d + 0.5), so the curve has no gaps; block states that face a way (stairs, edge
  * pieces, joints, bars) are turned by the nearest quarter turn of the centre line's heading there. Positive radii turn
  * towards +z (clockwise seen from above, east to south), negative towards -z. Heights are kept.
  *
@@ -111,7 +112,8 @@ public final class Curve {
         for (int x = (int) Math.floor(minX); x <= (int) Math.ceil(maxX); x++) {
             for (int z = (int) Math.floor(minZ); z <= (int) Math.ceil(maxZ); z++) {
                 double[] sd = project(x + 0.5, z + 0.5);
-                int s = (int) Math.floor(sd[0]), d = (int) Math.floor(sd[1] + 0.5);
+                // A straight structure's block (s, d) covers [s, s + 1) x [d, d + 1), as any block: same convention here
+                int s = (int) Math.floor(sd[0]), d = (int) Math.floor(sd[1]);
                 TreeMap<Integer, String> col = columns.get(key(s, d));
                 if (col == null) {
                     continue;
