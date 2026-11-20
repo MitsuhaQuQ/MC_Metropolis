@@ -19,7 +19,8 @@ and slabs where the surface sits in the lower half of a block.
 
 Usage:
     python -I tools/assets/plateau_voxel.py extract <citygml.zip> <buildings.csv> <out> [--id GMLID ...]
-    python -I tools/assets/plateau_voxel.py build <buildings.csv> <out> [--id GMLID ...]
+    python -I tools/assets/plateau_voxel.py build <buildings.csv> <out> [--id GMLID ...] [--no-textures]
+                                                  [--mc-jar <1.20.1 client jar>]
 
 Without --id the built-in list LANDMARKS is used. Source: 3D city models of Project PLATEAU
 (MLIT; copyright Kyoto City), PLATEAU site policy (compatible with CC BY 4.0): ATTRIBUTION is
@@ -40,6 +41,15 @@ import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from osm_buildings import project  # noqa: E402
+
+try:
+    from PIL import Image
+except ImportError:  # python -I leaves out the user site-packages, where pip --user puts Pillow
+    import site
+    sys.path.append(site.getusersitepackages())
+    from PIL import Image
+
+MC_JAR = os.path.expanduser("~/.gradle/caches/fabric-loom/1.20.1/minecraft-client.jar")
 
 # (gml id, slug, name, palette or None for automatic). Names are what stands at these coordinates
 # in central Kyoto; the PLATEAU data itself carries no names.
@@ -92,7 +102,7 @@ def local(tag):
 # ---------------------------------------------------------------- extract
 
 def surfaces(building):
-    """[class, exterior ring, [interior rings]] per LOD2 polygon."""
+    """[class, exterior ring, [interior rings], polygon id] per LOD2 polygon."""
     out = []
 
     def ring(e):
@@ -117,7 +127,7 @@ def surfaces(building):
                     if r:
                         holes.append(r)
             if ext:
-                out.append([cls, ext, holes])
+                out.append([cls, ext, holes, e.get(GML_ID)])
             return
         for c in e:
             walk(c, cls)
@@ -127,12 +137,30 @@ def surfaces(building):
 
 
 def extract_mesh(args):
+    """Surfaces of the wanted buildings, and the texture (atlas image, texture coordinates of the
+    exterior ring) of each of their polygons; the appearance section follows the buildings."""
     zpath, name, ids = args
     found = {}
+    owner = {}  # polygon id -> building id
     with zipfile.ZipFile(zpath) as z, z.open(name) as fh:
         depth = 0
         for ev, el in ET.iterparse(fh, events=("start", "end")):
-            if local(el.tag) != "Building":
+            t = local(el.tag)
+            if t == "ParameterizedTexture" and ev == "end":
+                image = None
+                for c in el:
+                    if local(c.tag) == "imageURI":
+                        image = (c.text or "").strip()
+                    elif local(c.tag) == "target":
+                        pid = (c.get("uri") or "").lstrip("#")
+                        if pid in owner and image:
+                            for tc in c.iter():
+                                if local(tc.tag) == "textureCoordinates" and tc.text:
+                                    found[owner[pid]]["tex"][pid] = [image, [float(x) for x in tc.text.split()]]
+                                    break
+                el.clear()
+                continue
+            if t != "Building":
                 continue
             if ev == "start":
                 depth += 1
@@ -142,7 +170,11 @@ def extract_mesh(args):
                 continue
             gid = el.get(GML_ID)
             if gid in ids:
-                found[gid] = surfaces(el)
+                surf = surfaces(el)
+                found[gid] = {"surfaces": surf, "tex": {}}
+                for sf in surf:
+                    if sf[3]:
+                        owner[sf[3]] = gid
             el.clear()
     return name, found
 
@@ -159,12 +191,22 @@ def extract(zpath, rows, out, ids):
         return
     jobs = [(zpath, f"udx/bldg/{m}_bldg_6697_op.gml", s) for m, s in sorted(by_mesh.items())]
     print(f"{sum(len(s) for s in by_mesh.values())} buildings in {len(jobs)} mesh files", flush=True)
+    images = set()
     with multiprocessing.Pool(min(len(jobs), max(1, (os.cpu_count() or 2) - 1))) as pool:
         for name, found in pool.imap_unordered(extract_mesh, jobs):
-            for gid, surf in found.items():
+            for gid, b in found.items():
                 with open(os.path.join(out, "geom", gid + ".json"), "w", encoding="utf-8") as fh:
-                    json.dump({"id": gid, "surfaces": surf}, fh)
-            print(f"{name}: {len(found)} buildings", flush=True)
+                    json.dump({"id": gid, **b}, fh)
+                images |= {im for im, _ in b["tex"].values()}
+            print(f"{name}: {len(found)} buildings, "
+                  f"{sum(len(b['tex']) for b in found.values())} textured polygons", flush=True)
+    with zipfile.ZipFile(zpath) as z:  # the atlases (aerial photographs) those polygons use
+        for im in sorted(images):
+            dst = os.path.join(out, "tex", im)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with open(dst, "wb") as fh:
+                fh.write(z.read("udx/bldg/" + im))
+    print(f"{len(images)} texture atlases", flush=True)
 
 
 # ---------------------------------------------------------------- voxelize
@@ -183,7 +225,8 @@ def open_ring(r):
 
 
 def sample_polygon(pts, holes=(), step=STEP):
-    """Points every `step` over a planar polygon with holes (any shape) and along its edges."""
+    """(x, y, z, inner) every `step` over a planar polygon with holes (any shape) and along its
+    edges; edge points are not inner (their texture may bleed into the atlas background)."""
     pts = open_ring(pts)
     holes = [open_ring(h) for h in holes if len(open_ring(h)) >= 3]
     if len(pts) < 3:
@@ -192,7 +235,7 @@ def sample_polygon(pts, holes=(), step=STEP):
         n = max(1, int(math.dist(p, q) / step))
         for i in range(n):
             t = i / n
-            yield tuple(p[k] + (q[k] - p[k]) * t for k in range(3))
+            yield tuple(p[k] + (q[k] - p[k]) * t for k in range(3)) + (False,)
     n = newell(pts)
     k = max(range(3), key=lambda i: abs(n[i]))
     if abs(n[k]) < 1e-9:
@@ -211,7 +254,7 @@ def sample_polygon(pts, holes=(), step=STEP):
                 p = [0.0, 0.0, 0.0]
                 p[a], p[b] = s, t
                 p[k] = (d - n[a] * s - n[b] * t) / n[k]
-                yield tuple(p)
+                yield (p[0], p[1], p[2], True)
                 s += step
         t += step
 
@@ -233,17 +276,17 @@ def fill_columns(ring, holes=()):
 
 def to_local(surf):
     """Lat/lon/height -> metres (x east, y up, z south), turned so walls follow the axes."""
-    allp = [p for _, ring, _ in surf for p in ring]
+    allp = [p for _, ring, _, _ in surf for p in ring]
     lat0 = sum(p[0] for p in allp) / len(allp)
     lon0 = sum(p[1] for p in allp) / len(allp)
     proj = project(lat0, lon0)
 
     def loc(ring):
         return [(e, h, -n) for (e, n), h in ((proj(a, b), h) for a, b, h in ring)]
-    rings = [(cls, loc(ring), [loc(h) for h in holes]) for cls, ring, holes in surf]
+    rings = [(cls, loc(ring), [loc(h) for h in holes], pid) for cls, ring, holes, pid in surf]
     # Dominant wall direction modulo 90 degrees, weighted by area.
     c4 = s4 = 0.0
-    for cls, ring, _ in rings:
+    for cls, ring, _, _ in rings:
         if cls != "wall":
             continue
         nx, _, nz = newell(ring)
@@ -256,31 +299,98 @@ def to_local(surf):
     c, s = math.cos(-theta), math.sin(-theta)
     def turn(r):
         return [(x * c - z * s, y, x * s + z * c) for x, y, z in r]
-    rings = [(cls, turn(r), [turn(h) for h in hs]) for cls, r, hs in rings]
-    grounds = [p[1] for cls, ring, _ in rings if cls == "ground" for p in ring]
-    y0 = min(grounds) if grounds else min(p[1] for _, ring, _ in rings for p in ring)
-    x0 = min(p[0] for _, ring, _ in rings for p in ring)
-    z0 = min(p[2] for _, ring, _ in rings for p in ring)
+    rings = [(cls, turn(r), [turn(h) for h in hs], pid) for cls, r, hs, pid in rings]
+    grounds = [p[1] for cls, ring, _, _ in rings if cls == "ground" for p in ring]
+    y0 = min(grounds) if grounds else min(p[1] for _, ring, _, _ in rings for p in ring)
+    x0 = min(p[0] for _, ring, _, _ in rings for p in ring)
+    z0 = min(p[2] for _, ring, _, _ in rings for p in ring)
 
     def shift(r):
         return [(x - x0, y - y0, z - z0) for x, y, z in r]
-    rings = [(cls, shift(r), [shift(h) for h in hs]) for cls, r, hs in rings]
+    rings = [(cls, shift(r), [shift(h) for h in hs], pid) for cls, r, hs, pid in rings]
     return rings, math.degrees(theta), (lat0, lon0)
 
 
-def voxelize(rings):
+def texture_map(ring, uv):
+    """Affine map from a point on the polygon's plane to texture coordinates, fitted to its vertices."""
+    image, coords = uv
+    pts = list(ring)
+    pairs = [(coords[i], coords[i + 1]) for i in range(0, len(coords) - 1, 2)]
+    m = min(len(pts), len(pairs))
+    if m < 3:
+        return None
+    n = newell(open_ring(pts))
+    k = max(range(3), key=lambda i: abs(n[i]))
+    a, b = [i for i in range(3) if i != k]
+    S = [[0.0] * 3 for _ in range(3)]
+    ru, rv = [0.0] * 3, [0.0] * 3
+    for p, (u, v) in zip(pts[:m], pairs[:m]):
+        f = (1.0, p[a], p[b])
+        for i in range(3):
+            for j in range(3):
+                S[i][j] += f[i] * f[j]
+            ru[i] += f[i] * u
+            rv[i] += f[i] * v
+    cu, cv = solve3(S, ru), solve3(S, rv)
+    if cu is None or cv is None:
+        return None
+    return image, a, b, cu, cv
+
+
+def solve3(A, r):
+    M = [row[:] + [r[i]] for i, row in enumerate(A)]
+    for c in range(3):
+        piv = max(range(c, 3), key=lambda i: abs(M[i][c]))
+        if abs(M[piv][c]) < 1e-12:
+            return None
+        M[c], M[piv] = M[piv], M[c]
+        for i in range(3):
+            if i != c:
+                f = M[i][c] / M[c][c]
+                M[i] = [x - f * y for x, y in zip(M[i], M[c])]
+    return [M[i][3] / M[i][i] for i in range(3)]
+
+
+ATLASES = {}
+
+
+def atlas(path):
+    im = ATLASES.get(path)
+    if im is None:
+        img = Image.open(path).convert("RGB")
+        im = ATLASES[path] = (img.load(), img.size[0], img.size[1])
+    return im
+
+
+def voxelize(rings, tex=None, texdir=None):
+    """Solid voxels, the class of each surface voxel, the roof height per column and, with
+    textures, up to 32 colour samples per surface voxel and class."""
     surf = {}  # voxel -> class
     height = {}  # column -> highest roof point
+    colours = {}  # (voxel, class) -> [rgb]
     columns = set()
     prio = {"ground": 0, "wall": 1, "roof": 2}
-    for cls, ring, holes in rings:
+    for cls, ring, holes, pid in rings:
         if cls == "ground":
             columns |= fill_columns([(p[0], p[2]) for p in ring], [[(p[0], p[2]) for p in h] for h in holes])
-        for x, y, z in sample_polygon(ring, holes):
+        tm = texture_map(ring, tex[pid]) if tex and pid in tex and cls != "ground" else None
+        if tm:
+            pix, W, H = atlas(os.path.join(texdir, tm[0]))
+            _, ta, tb, cu, cv = tm
+        for x, y, z, inner in sample_polygon(ring, holes):
             v = (math.floor(x), max(0, math.floor(y - 0.01)), math.floor(z))
             old = surf.get(v)
             if old is None or prio[cls] > prio[old]:
                 surf[v] = cls
+            if tm and inner:
+                p = (x, y, z)
+                u = cu[0] + cu[1] * p[ta] + cu[2] * p[tb]
+                w = cv[0] + cv[1] * p[ta] + cv[2] * p[tb]
+                px, py = int(u * W), int((1 - w) * H)
+                if 0 <= px < W and 0 <= py < H:
+                    lst = colours.setdefault((v, cls), [])
+                    if len(lst) < 32:
+                        lst.append(pix[px, py])
             if cls == "roof":
                 col = (v[0], v[2])
                 if y > height.get(col, -1e9):
@@ -289,7 +399,7 @@ def voxelize(rings):
     # at every non-vertical face (ground, roofs, undersides of overhangs); fill between pairs.
     # Filling each column up to its highest face would fill everything under an overhang.
     hits = {}
-    for cls, ring, holes in rings:
+    for cls, ring, holes, _ in rings:
         r, hs = open_ring(ring), [open_ring(h) for h in holes]
         if len(r) < 3:
             continue
@@ -316,7 +426,7 @@ def voxelize(rings):
                 solid.add((col[0], y, col[1]))
     if odd:
         print(f"  {odd} of {len(hits)} columns cross the surface an odd number of times", flush=True)
-    return solid, surf, height
+    return solid, surf, height, colours
 
 
 # ---------------------------------------------------------------- palettes
@@ -438,6 +548,235 @@ def roof_block(v, height, P, pitched):
     return (P["roof"], None)
 
 
+# ---------------------------------------------------------------- materials from the textures
+
+def _family(full, stem=None, tex=None):
+    stem = stem or full
+    return full, stem + "_stairs", stem + "_slab", tex or full
+
+
+# Roof materials: full block, stairs, slab, texture of the full block.
+ROOF_FAMILIES = [_family(*f) for f in [
+    ("deepslate_tiles", "deepslate_tile"), ("deepslate_bricks", "deepslate_brick"), ("polished_deepslate",),
+    ("cobbled_deepslate",), ("polished_blackstone_bricks", "polished_blackstone_brick"), ("polished_blackstone",),
+    ("blackstone",), ("stone_bricks", "stone_brick"), ("mossy_stone_bricks", "mossy_stone_brick"), ("stone",),
+    ("cobblestone",), ("andesite",), ("polished_andesite",), ("diorite",), ("polished_diorite",), ("granite",),
+    ("polished_granite",), ("smooth_quartz", None, "quartz_block_bottom"),
+    ("smooth_sandstone", None, "sandstone_top"), ("smooth_red_sandstone", None, "red_sandstone_top"),
+    ("bricks", "brick"), ("mud_bricks", "mud_brick"), ("prismarine",), ("prismarine_bricks", "prismarine_brick"),
+    ("dark_prismarine",), ("cut_copper",), ("exposed_cut_copper",), ("weathered_cut_copper",),
+    ("oxidized_cut_copper",), ("end_stone_bricks", "end_stone_brick"), ("nether_bricks", "nether_brick"),
+    ("red_nether_bricks", "red_nether_brick"),
+]] + [_family(w + "_planks", w) for w in
+      ("oak", "spruce", "birch", "dark_oak", "jungle", "acacia", "mangrove", "cherry", "crimson", "warped")]
+COLOURS16 = ["white", "light_gray", "gray", "black", "brown", "red", "orange", "yellow", "lime", "green",
+             "cyan", "light_blue", "blue", "purple", "magenta", "pink"]
+# Flat roofs may also be these (no stairs; smooth stone has a slab).
+FLAT_EXTRA = [c + "_concrete" for c in COLOURS16] + ["smooth_stone"]
+WALL_BLOCKS = ([c + "_concrete" for c in COLOURS16] + ["terracotta"] + [c + "_terracotta" for c in COLOURS16]
+               + [f[0] for f in ROOF_FAMILIES] + ["quartz_block", "calcite", "smooth_stone", "iron_block",
+                                                 "packed_mud", "stripped_oak_log", "stripped_spruce_log",
+                                                 "stripped_dark_oak_log", "stripped_birch_log"])
+GLASS_BLOCKS = ["glass"] + [c + "_stained_glass" for c in
+                            ("white", "light_gray", "gray", "black", "light_blue", "cyan", "blue", "brown", "green")]
+TEXTURE = {f[0]: f[3] for f in ROOF_FAMILIES}
+TEXTURE.update({"quartz_block": "quartz_block_side", "smooth_stone": "smooth_stone"})
+STAIRS = {f[0]: f[1] for f in ROOF_FAMILIES}
+SLAB = {f[0]: f[2] for f in ROOF_FAMILIES}
+SLAB["smooth_stone"] = "smooth_stone_slab"
+FULL_OF = {v: k for k, v in STAIRS.items()}
+FULL_OF.update({v: k for k, v in SLAB.items()})
+
+
+def block_colours(jar, cache):
+    """Average colour (alpha-weighted, first animation frame) of each candidate block's texture in
+    the vanilla client jar. Read locally to pick blocks; nothing from the jar is written out
+    except these averages, cached in `cache`."""
+    names = sorted(set(WALL_BLOCKS + GLASS_BLOCKS + FLAT_EXTRA + [f[0] for f in ROOF_FAMILIES]))
+    if os.path.exists(cache):
+        with open(cache, encoding="utf-8") as fh:
+            got = json.load(fh)
+        if all(n in got for n in names):
+            return {k: tuple(v) for k, v in got.items()}
+    import io
+    out = {}
+    with zipfile.ZipFile(jar) as z:
+        for n in names:
+            img = Image.open(io.BytesIO(z.read(f"assets/minecraft/textures/block/{TEXTURE.get(n, n)}.png"))).convert("RGBA")
+            w = img.size[0]
+            img = img.crop((0, 0, w, min(w, img.size[1])))
+            tot = [0.0, 0.0, 0.0, 0.0]
+            for r, g, b, a in img.get_flattened_data():
+                tot[0] += r * a
+                tot[1] += g * a
+                tot[2] += b * a
+                tot[3] += a
+            out[n] = tuple(round(c / tot[3]) for c in tot[:3])
+    with open(cache, "w", encoding="utf-8") as fh:
+        json.dump(out, fh, indent=0)
+    return out
+
+
+def lab(rgb):
+    def lin(c):
+        c /= 255
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = (lin(c) for c in rgb)
+    x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.9505
+    y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.089
+
+    def f(t):
+        return t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+    fx, fy, fz = f(x), f(y), f(z)
+    return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
+
+
+def median_rgb(samples):
+    n = len(samples)
+    return tuple(sorted(c[i] for c in samples)[n // 2] for i in range(3))
+
+
+class Matcher:
+    def __init__(self, bc, names):
+        self.items = [(n, lab(bc[n])) for n in names]
+        self.cache = {}
+
+    def __call__(self, rgb):
+        key = (rgb[0] >> 2, rgb[1] >> 2, rgb[2] >> 2)
+        hit = self.cache.get(key)
+        if hit is None:
+            L = lab(rgb)
+            hit = self.cache[key] = min(self.items, key=lambda it: (it[1][0] - L[0]) ** 2
+                                        + (it[1][1] - L[1]) ** 2 + (it[1][2] - L[2]) ** 2)[0]
+        return hit
+
+
+def luminance(c):
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+
+def kmeans(points, k, rounds=10):
+    """Deterministic k-means in Lab: starts at evenly spaced lightness quantiles."""
+    if len(points) <= k:
+        return list(points), list(range(len(points)))
+    order = sorted(points)
+    centres = [order[int((i + 0.5) * len(order) / k)] for i in range(k)]
+    assign = [0] * len(points)
+    for _ in range(rounds):
+        for i, q in enumerate(points):
+            assign[i] = min(range(k), key=lambda c: (centres[c][0] - q[0]) ** 2 + (centres[c][1] - q[1]) ** 2
+                            + (centres[c][2] - q[2]) ** 2)
+        sums = [[0.0, 0.0, 0.0, 0] for _ in range(k)]
+        for q, c in zip(points, assign):
+            s_ = sums[c]
+            s_[0] += q[0]
+            s_[1] += q[1]
+            s_[2] += q[2]
+            s_[3] += 1
+        centres = [(s_[0] / s_[3], s_[1] / s_[3], s_[2] / s_[3]) if s_[3] else centres[i]
+                   for i, s_ in enumerate(sums)]
+    return centres, assign
+
+
+class LabMatcher:
+    def __init__(self, bc, names):
+        self.items = [(n, lab(bc[n])) for n in names]
+
+    def __call__(self, L):
+        return min(self.items, key=lambda it: (it[1][0] - L[0]) ** 2 + (it[1][1] - L[1]) ** 2
+                   + (it[1][2] - L[2]) ** 2)[0]
+
+
+WALL_CLUSTERS, ROOF_CLUSTERS = 8, 5
+
+
+def recolour(blocks, solid, colours, pal, bc):
+    """Give every outside block whose surface has texture samples a material from the photographs,
+    keeping its shape (stairs and slabs stay stairs and slabs of the matched material).
+
+    The photographs are lit from one side, and streets shade the lower floors: each face direction
+    (walls facing each way in 4 m bands, roof slopes facing each way, flat roofs) is brought to the
+    same median brightness (walls only lifted, roofs both ways), then the whole building
+    is lifted so the bright walls are near white. Colours are clustered per building (walls 8,
+    roofs 5) and each cluster becomes one block, so a facade reads as a few materials rather than
+    speckle; a majority filter among neighbours cleans up what is left."""
+    if not colours:
+        return 0
+    found = []  # (voxel, role, shape, orientation, rgb)
+    for v, (name, props) in blocks.items():
+        x, y, z = v
+        sides = [d for d in ((1, 0), (-1, 0), (0, 1), (0, -1)) if (x + d[0], y, z + d[1]) not in solid]
+        top = (x, y + 1, z) not in solid
+        if not top and not sides:
+            continue  # not on the outside
+        shape = "stairs" if props and "facing" in props else "slab" if props and "type" in props else "full"
+        role = "roof" if shape != "full" or (top and (v, "roof") in colours) else "wall"
+        lst = colours.get((v, role)) or colours.get((v, "wall" if role == "roof" else "roof"))
+        if not lst:
+            continue
+        if role == "roof":
+            orient = props["facing"] if shape == "stairs" else "up"
+        else:
+            orient = (sides[0], y // 4) if sides else "under"  # walls: per direction and 4 m band
+        found.append((v, role, shape, orient, median_rgb(lst)))
+    if not found:
+        return 0
+    groups = {}
+    for v, role, shape, orient, rgb in found:
+        groups.setdefault((role, orient), []).append(luminance(rgb))
+    target = {}
+    for role in ("wall", "roof"):
+        allv = sorted(l for (r, _), ls in groups.items() if r == role for l in ls)
+        if allv:
+            target[role] = allv[len(allv) // 2]
+    scale = {}
+    for key, ls in groups.items():
+        ls.sort()
+        med = max(ls[len(ls) // 2], 8)
+        lo = 0.5 if key[0] == "roof" else 1.0  # roofs: one material, glare and shade both evened out; walls: lift shade only
+        scale[key] = max(lo, min(3.0, target[key[0]] / med)) if len(ls) >= 20 else 1.0
+    adj = [tuple(min(255.0, c * scale[(role, orient)]) for c in rgb) for _, role, _, orient, rgb in found]
+    walls_l = sorted(luminance(c) for c, f in zip(adj, found) if f[1] == "wall")
+    gain = max(1.0, min(1.8, 215 / max(walls_l[int(len(walls_l) * 0.9)], 1))) if len(walls_l) >= 50 else 1.0
+    labs = [lab(tuple(min(255.0, c * gain) for c in rgb)) for rgb in adj]
+    walls = LabMatcher(bc, WALL_BLOCKS + ([] if pal == "temple" else GLASS_BLOCKS))
+    roofs = {"full": LabMatcher(bc, [f[0] for f in ROOF_FAMILIES] + FLAT_EXTRA),
+             "stairs": LabMatcher(bc, [f[0] for f in ROOF_FAMILIES]),
+             "slab": LabMatcher(bc, [f[0] for f in ROOF_FAMILIES] + ["smooth_stone"])}
+    chosen = {}
+    for role, k in (("wall", WALL_CLUSTERS), ("roof", ROOF_CLUSTERS)):
+        idx = [i for i, f in enumerate(found) if f[1] == role]
+        if not idx:
+            continue
+        centres, assign = kmeans([labs[i] for i in idx], k)
+        for i, c in zip(idx, assign):
+            v, _, shape, _, _ = found[i]
+            m = walls(centres[c]) if role == "wall" else roofs[shape](centres[c])
+            chosen[v] = (role, shape, m)
+    final = {}
+    for v, (role, shape, mat) in chosen.items():
+        x, y, z = v
+        votes = {mat: 2}
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    o = chosen.get((x + dx, y + dy, z + dz))
+                    if o and o[0] == role and o[1] == shape and (dx or dy or dz):
+                        votes[o[2]] = votes.get(o[2], 0) + 1
+        final[v] = max(votes, key=votes.get)
+    for v, mat in final.items():
+        name, props = blocks[v]
+        role, shape, _ = chosen[v]
+        if shape == "stairs":
+            blocks[v] = (STAIRS[mat], props)
+        elif shape == "slab":
+            blocks[v] = (SLAB[mat], props)
+        else:
+            blocks[v] = (mat, None)
+    return len(final)
+
+
 # ---------------------------------------------------------------- NBT
 
 def nbt_string(s):
@@ -495,7 +834,7 @@ COLOURS = {
 }
 
 
-def render(blocks, size, path, max_px=1800):
+def render(blocks, size, path, bc, max_px=1800):
     sx, sy, sz = size
     s = 2
     while s < 8 and (sx + sz) * (s + 2) <= max_px and ((sx + sz) * (s + 2)) // 2 + sy * (s + 2) <= max_px:
@@ -531,8 +870,10 @@ def render(blocks, size, path, max_px=1800):
         name, props = blocks[v]
         if (x + 1, y, z) in blocks and (x, y, z + 1) in blocks and (x, y + 1, z) in blocks:
             continue
-        rgb = COLOURS.get(name, 0xFF00FF)
-        r, g, b = rgb >> 16, (rgb >> 8) & 255, rgb & 255
+        if name == "spruce_planks" and props is None and name not in bc:
+            pass
+        r, g, b = bc.get(FULL_OF.get(name, name)) or ((COLOURS[name] >> 16, (COLOURS[name] >> 8) & 255,
+                                                      COLOURS[name] & 255) if name in COLOURS else (255, 0, 255))
         bx, by = proj(x, y, z)
         bx, by = int(bx) + ox, int(by) + oy
         spr = half if props and props.get("type") == "bottom" else full
@@ -566,19 +907,21 @@ def write_png(path, w, h, rgb):
 # ---------------------------------------------------------------- build
 
 def build_one(args):
-    out, gid, slug, name, pal, row = args
+    out, gid, slug, name, pal, row, bc, textured = args
     with open(os.path.join(out, "geom", gid + ".json"), encoding="utf-8") as fh:
-        surf = json.load(fh)["surfaces"]
+        geom = json.load(fh)
+    surf = geom["surfaces"]
     if not surf:
         return None
     rings, angle, (lat, lon) = to_local(surf)
-    solid, cls, height = voxelize(rings)
+    solid, cls, height, colours = voxelize(rings, geom.get("tex") if textured else None, os.path.join(out, "tex"))
     pal = pal or choose_palette(row)
     sh = storey_height(row)
     blocks = assign_blocks(solid, cls, height, pal, sh)
+    recoloured = recolour(blocks, solid, colours, pal, bc)
     size = tuple(max(v[i] for v in blocks) + 1 for i in range(3))
     write_nbt(os.path.join(out, slug + ".nbt"), blocks, size)
-    render(blocks, size, os.path.join(out, slug + ".png"))
+    render(blocks, size, os.path.join(out, slug + ".png"), bc)
     counts = {}
     for n, _ in blocks.values():
         counts[n] = counts.get(n, 0) + 1
@@ -588,11 +931,13 @@ def build_one(args):
             "roof_shape": row.get("roof_shape"), "roof_pitch": row.get("roof_pitch"),
             "palette": pal, "storey_height": sh, "rotation_deg": round(angle, 1),
             "size": list(size), "blocks": len(blocks), "surfaces": len(surf),
+            "textured_polygons": len(geom.get("tex", {})), "recoloured_blocks": recoloured,
             "block_counts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
 
 
-def build(rows, out, chosen):
-    jobs = [(out, gid, slug, name, pal, rows.get(gid, {})) for gid, slug, name, pal in chosen
+def build(rows, out, chosen, jar=MC_JAR, textured=True):
+    bc = block_colours(jar, os.path.join(out, "block_colours.json"))
+    jobs = [(out, gid, slug, name, pal, rows.get(gid, {}), bc, textured) for gid, slug, name, pal in chosen
             if os.path.exists(os.path.join(out, "geom", gid + ".json"))]
     entries = []
     with multiprocessing.Pool(max(1, min(len(jobs), (os.cpu_count() or 2) - 1))) as pool:
@@ -600,7 +945,8 @@ def build(rows, out, chosen):
             if e:
                 entries.append(e)
                 print(f"{e['slug']:24s} {e['name']:16s} {e['size'][0]:4d}x{e['size'][1]:3d}x{e['size'][2]:4d} "
-                      f"{e['blocks']:7d} blocks  {e['palette']:6s} turned {e['rotation_deg']:+.1f}", flush=True)
+                      f"{e['blocks']:7d} blocks  {e['palette']:6s} turned {e['rotation_deg']:+.1f}  "
+                      f"{e['recoloured_blocks']} from textures", flush=True)
     with open(os.path.join(out, "library.json"), "w", encoding="utf-8") as fh:
         json.dump({"source": "PLATEAU Kyoto City FY2025 LOD2", "attribution": "ATTRIBUTION",
                    "buildings": entries}, fh, ensure_ascii=False, indent=1)
@@ -632,6 +978,8 @@ def main(argv):
     else:
         zpath, csvpath, out, rest = None, argv[1], argv[2], argv[3:]
     ids = [rest[i + 1] for i, a in enumerate(rest) if a == "--id"]
+    jar = next((rest[i + 1] for i, a in enumerate(rest) if a == "--mc-jar"), MC_JAR)
+    textured = "--no-textures" not in rest
     chosen = [(g, s, n, p) for g, s, n, p in LANDMARKS if not ids or g in ids]
     known = {c[0] for c in chosen}
     chosen += [(g, g.split("_")[1][:8], g, None) for g in ids if g not in known]
@@ -648,7 +996,7 @@ def main(argv):
     if cmd == "extract":
         extract(zpath, rows, out, [g for g in want if g in rows])
     else:
-        build(rows, out, chosen)
+        build(rows, out, chosen, jar, textured)
     return 0
 
 

@@ -33,7 +33,7 @@ python -I tools/assets/nbt_survey.py <目录或 .nbt>   # 原版结构模板（�
 gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验证）
 ```
 
-- 建筑数据（2026-11-20）：PLATEAU 京都市 2025 年度 CityGML 在 `F:\MC\citybuilder\core\build\plateau\`（2.7 GB，用户同意下载；授权见设计文档"素材来源"），OSM 建筑在 `core/build/osm/*-bld.json`；都不进仓库，只把统计结果写进设计文档。脚本在 `tools/assets/`，纯 Python 标准库，用 `python -I` 运行
+- 建筑数据（2026-11-20）：PLATEAU 京都市 2025 年度 CityGML 在 `F:\MC\citybuilder\core\build\plateau\`（2.7 GB，用户同意下载；授权见设计文档"素材来源"），OSM 建筑在 `core/build/osm/*-bld.json`；都不进仓库，只把统计结果写进设计文档。脚本在 `tools/assets/`，纯 Python 标准库，用 `python -I` 运行；只有 `plateau_voxel.py` 要 Pillow（`pip install --user pillow`，脚本自己把用户 site-packages 加进路径，因为 `-I` 不带它），还从 Loom 缓存里的 1.20.1 客户端 jar 读方块贴图算平均色（只在本地用，缓存成 `block_colours.json`，不复制贴图）
 - 性能测量（2026-11-20 第一轮优化用的）：`gradlew :core:cityMap -Players=spawn -Px=-10232 -Pz=-10272` 冷启动计时新世界第一个区块要的全部规划（逐层计时、统计碰到的 worldgen 区域数），`-Pjfr=<文件>` 记录 Flight Recorder 采样（`jfr print --events jdk.ExecutionSample`），`-PworldgenCache=<N>` 改 worldgen 的区域缓存大小做对照、`-Pthreads=<N>` 限制公共线程池；`gradlew :core:terrainCost` 计时 worldgen 各查询第一次进入一个区域和之后每点的开销
 - `cityMap` 还接受 `-Psize=<像素>`、`-Pout=<文件>`；它会打印统计：L1 是每个逻辑区域的耗时、各地貌的平均适宜度和海拔；L1.5 是每个文化单元的耗时、亚洲风格的面积比例、边界落在各地貌上的比例、洪泛未到达的边界节点比例。调参后先出图看效果，再看测试
 - 只要统计、不要大图时，用小尺寸覆盖同样的范围，比如 `-Pscale=2048 -Psize=64`
