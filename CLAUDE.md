@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 本项目是 **MTM_worldgen**（`F:\MC\MTM_worldgen`，真实地貌地形生成）与 **MTR Advanced**（`P:\Minecraft-Transit-Railway-391ce5d1800fbc70b7f565571c692287828867fa`，MTR 3.2.2 的运营模拟分支）的共同配套 mod：在大地形尺度上自然地生成城市，并让城市按规则逐步扩展。建筑模型素材取自网络上 MIT、CC 等开放协议授权的作品。
 
-> 当前状态（2026-11-20）：实现顺序的第 1–4、7 步，第 5、6 步的规划部分，以及第 8 步的 8a（城市路网骨架）、8b（支路和小巷，按 OSM 指标校准）、8c（桥、暗渠、坡道、台阶、参道）以及第 8 步其余的规划（功能分区、主站、城内铁路、车站用地、公交站、高速线改线），第 9 步的地块（L7）第一版已完成（L2 已改为按规划块规划、存盘）：`CityLogic`、`CitySettings`、L1 适宜度场、L1.5 文化区、外来区域的排除、L2 聚落选址与分级、L3 城市范围和强度、L3.5 土地用途、L4 城际道路、L4b 城际铁路走廊，以及它们的调试图（`cityMap`）。区块层第一版已接进游戏（铺路面、标线、人行道和路缘、林荫大道、桥面），在开发服务器和测试客户端上自动测试过（见下文"游戏内自动测试"），Forge 还没在游戏里跑过；建筑还没有。下文标 **【待决定】** 的是尚未确定的事项，括号内为建议默认值；确定后删除标记。
+> 当前状态（2026-11-20）：实现顺序的第 1–4、7 步，第 5、6 步的规划部分，以及第 8 步的 8a（城市路网骨架）、8b（支路和小巷，按 OSM 指标校准）、8c（桥、暗渠、坡道、台阶、参道）以及第 8 步其余的规划（功能分区、主站、城内铁路、车站用地、公交站、高速线改线），第 9 步的地块（L7）第一版已完成（L2 已改为按规划块规划、存盘）：`CityLogic`、`CitySettings`、L1 适宜度场、L1.5 文化区、外来区域的排除、L2 聚落选址与分级、L3 城市范围和强度、L3.5 土地用途、L4 城际道路、L4b 城际铁路走廊，以及它们的调试图（`cityMap`）。区块层第一版已接进游戏（铺路面、标线、人行道和路缘、林荫大道、桥面），在开发服务器和测试客户端上自动测试过（见下文"游戏内自动测试"），Forge 还没在游戏里跑过；建筑还没放进城里，但建筑库在做（2026-11-21：PLATEAU 体素化的地标，程序化生成的寺社、灯台和竞技场，以及地标用的本 mod 方块：跑道、草皮、内野土及其标线、看台座椅、菲涅耳透镜、LED 面板，在游戏里验证过）。下文标 **【待决定】** 的是尚未确定的事项，括号内为建议默认值；确定后删除标记。
 
 ## 常用命令
 
@@ -28,8 +28,9 @@ python -I tools/assets/plateau_buildings.py F:/MC/citybuilder/core/build/plateau
 python -I tools/assets/plateau_stats.py F:/MC/citybuilder/core/build/plateau/kyoto-buildings.csv [--box 34.975,135.735,35.035,135.785 --streets F:/MC/citybuilder/core/build/osm/kyoto.osm]   # 层高、占地、屋顶、圆环、按临街道路等级的层数（设计文档第 6 节"京都实测"）
 python -I tools/assets/plateau_voxel.py extract F:/MC/citybuilder/core/build/plateau/26100_kyoto-shi_city_2025_citygml_1_op.zip F:/MC/citybuilder/core/build/plateau/kyoto-buildings.csv F:/MC/citybuilder/core/build/plateau/library   # 取出 LANDMARKS 里大型和特殊建筑的 LOD2 面，约半分钟
 python -I tools/assets/plateau_voxel.py specs F:/MC/citybuilder/core/build/plateau/library   # 寺社的生成参数（TEMPLES）写成 temple_specs.json
-gradlew :core:templeModels -Pin=F:/MC/citybuilder/core/build/plateau/library/temple_specs.json -Pout=F:/MC/citybuilder/core/build/plateau/library/models   # 按参数生成塔和佛堂（core.building.temple），在 worktree 里要加 -Pmtm_worldgen_dir=F:/MC/MTM_worldgen
+gradlew :core:templeModels -Pin=F:/MC/citybuilder/core/build/plateau/library/temple_specs.json -Pout=F:/MC/citybuilder/core/build/plateau/library/models   # 按参数生成寺社（core.building.temple）和灯台、竞技场（core.building.landmark），在 worktree 里要加 -Pmtm_worldgen_dir=F:/MC/MTM_worldgen
 python -I tools/assets/plateau_voxel.py build F:/MC/citybuilder/core/build/plateau/kyoto-buildings.csv F:/MC/citybuilder/core/build/plateau/library   # 体素化成原版结构模板 .nbt、等轴预览 .png、library.json、preview.html（一页看全部），十几秒
+python tools/textures/landmark_textures.py; python tools/textures/landmark_models.py   # 地标方块的贴图，再写方块状态、模型、物品模型、掉落表、语言（道路方块同理是 road_textures.py、road_models.py），在仓库根目录跑
 python -I tools/assets/osm_buildings.py F:/MC/citybuilder/core/build/osm/kanazawa-bld.json --streets F:/MC/citybuilder/core/build/osm/kanazawa.osm   # OSM 建筑统计（Overpass 的 out geom JSON）
 python -I tools/assets/nbt_survey.py <目录或 .nbt>   # 原版结构模板（如 kogtyv-TAV）的尺寸、DataVersion、1.20.1 没有的方块、拼图池、层高估计
 gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验证）
