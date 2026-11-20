@@ -62,7 +62,7 @@ public final class TownPlots {
      */
     private final Map<Long, int[]> behind = new java.util.concurrent.ConcurrentHashMap<>();
 
-    TownPlots(CitySettings.Plots config, StreetPlan plan, long seed) {
+    public TownPlots(CitySettings.Plots config, StreetPlan plan, long seed) {
         this.config = config;
         this.plan = plan;
         this.seed = seed;
@@ -680,6 +680,45 @@ public final class TownPlots {
             count += c[0].length - 1 + c[1].length - 1;
         }
         return count;
+    }
+
+    /** A street's class. */
+    public StreetClass chainClass(int chain) {
+        return pieces.get(chains.get(chain)[0]).streetClass();
+    }
+
+    /** A street's width. */
+    public double chainWidth(int chain) {
+        return pieces.get(chains.get(chain)[0]).width();
+    }
+
+    /** A street's length. */
+    public double chainLength(int chain) {
+        return lengths.get(chain);
+    }
+
+    /** The point at a distance along a street, and its direction there: {x, z, ux, uz}. */
+    public double[] chainPoint(int chain, double along) {
+        return pointAt(chain, along);
+    }
+
+    /** How many lots a side of a street was cut into (1 to its left, -1 to its right). */
+    public int lotCount(int chain, int side) {
+        return cuts.get(chain)[side > 0 ? 0 : 1].length - 1;
+    }
+
+    /** A lot's id, as {@link #at} gives it. */
+    public long lotId(int chain, int side, int index) {
+        return Hash.of(seed ^ 0x9107L, chain, side, index);
+    }
+
+    /** The middle of a lot as cut: half its frontage along, half its depth back from the street's edge. */
+    public double[] lotCentre(int chain, int side, int index) {
+        int s = side > 0 ? 0 : 1;
+        double[] starts = cuts.get(chain)[s];
+        double[] p = pointAt(chain, 0.5 * (starts[index] + starts[index + 1]));
+        double back = 0.5 * chainWidth(chain) + 0.5 * depths.get(chain)[s][index];
+        return new double[]{p[0] - p[3] * side * back, p[1] + p[2] * side * back};
     }
 
     /** How many chains (streets) the town's pieces form. */

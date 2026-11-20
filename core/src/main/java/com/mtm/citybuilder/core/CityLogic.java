@@ -474,6 +474,18 @@ public final class CityLogic {
 
     private com.mtm.citybuilder.core.airport.AirportLayer airports;
 
+    /** What the towns' streets and land are for: street functions, facilities and landmarks. */
+    public com.mtm.citybuilder.core.function.FunctionLayer functions() {
+        synchronized (this) {
+            if (functions == null) {
+                functions = new com.mtm.citybuilder.core.function.FunctionLayer(this);
+            }
+            return functions;
+        }
+    }
+
+    private com.mtm.citybuilder.core.function.FunctionLayer functions;
+
     private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {
     }
 }

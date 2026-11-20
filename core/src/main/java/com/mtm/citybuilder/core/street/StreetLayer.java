@@ -1354,7 +1354,7 @@ public final class StreetLayer {
                 : sites(settlement, window, anchors, railways, urban, segments);
         List<List<double[]>> highSpeed = highSpeedCorridor(settlement, window, districts, anchors);
         return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments, urban,
-                window.capital == null ? null : window.capital.clone(), sites, highSpeed, canals);
+                window.capital == null ? null : window.capital.clone(), sites, highSpeed, canals, window.estates);
     }
 
     /** Points every {@code spacing} blocks along a line, its two ends included, as {x, z}. */

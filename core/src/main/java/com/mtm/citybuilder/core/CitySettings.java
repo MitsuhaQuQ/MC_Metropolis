@@ -31,6 +31,80 @@ public final class CitySettings {
     public Transit transit = new Transit();
     public Plots plots = new Plots();
     public Airports airports = new Airports();
+    public Functions functions = new Functions();
+
+    /**
+     * What a town's streets and facilities are for (see core.function and the design document, "城市细部功能"),
+     * calibrated on PLATEAU's buildings along OpenStreetMap's streets (tools/assets/plateau_uses.py).
+     * <p>
+     * Shopping streets by distance from the town's middle {0-0.5, 0.5-1, 1-2, over 2 km}, the chance a street, a lane
+     * or an old road is one (Kanazawa and Himeji: 38-49% of the streets within 0.5 km, 4-15% to 1 km, next to none
+     * beyond; lanes more), the chance doubled in the station front and half again downtown. A metropolis's downtown
+     * streets are office streets at {@code officeMetropolis} (Tokyo's Chuo: 60-90%), a city's at {@code officeCity}.
+     * A castle town lines {@code templeStreets} streets at its old town's edge with temples; its streets within
+     * {@code samuraiReach} of the castle are samurai streets at {@code samuraiChance}.
+     * <p>
+     * Area facilities {per km2 of built land, least radius, greatest radius}; temples per km2 of old town. Lot
+     * facilities per km2 of built land. Landmarks by chance. Tokyo's Taito (PLATEAU's detailed uses, sites of buildings
+     * within 30 m of each other) has 17 school sites a km2 (kindergartens and crammers included), 14 clinics and
+     * hospitals, 29 temples and shrines (most small), 9 government (police boxes too), 1.8 bathhouses.
+     */
+    public static final class Functions {
+        public double[] shoppingStreet = {0.4, 0.10, 0.03, 0.01};
+        public double[] shoppingLane = {0.35, 0.15, 0.07, 0.03};
+        public double[] shoppingOldRoad = {0.6, 0.4, 0.2, 0.05};
+        public double officeMetropolis = 0.6;
+        public double officeCity = 0.1;
+        public int templeStreets = 2;
+        public double samuraiReach = 900.0;
+        public double samuraiChance = 0.7;
+
+        public double[] elementarySchool = {0.9, 50, 65};
+        public double[] juniorHighSchool = {0.4, 55, 70};
+        public double[] highSchool = {0.15, 65, 85};
+        public double[] hospital = {0.12, 45, 75};
+        public double[] park = {1.2, 25, 55};
+        public double[] temple = {3.0, 22, 45};
+        public double[] shrine = {0.8, 18, 40};
+        public double[] university = {0.0, 180, 250};
+        public double[] centralPark = {0.0, 120, 160};
+        public double[] sportsPark = {0.0, 130, 180};
+        public double[] cityHall = {0.0, 40, 50};
+
+        public double clinic = 6.0;
+        public double policeBox = 1.5;
+        public double fireStation = 0.4;
+        public double postOffice = 1.0;
+        public double bathhouse = 0.8;
+        public double smallShrine = 3.0;
+        public double smallTemple = 3.0;
+
+        public double castleKeep = 0.8;
+        public double pagodaTempleTown = 0.9;
+        public double pagoda = 0.25;
+        public double towerMetropolis = 0.6;
+        public double towerCity = 0.15;
+        public double departmentStoreCity = 0.6;
+        public double lighthouse = 0.7;
+        public double greatTorii = 0.4;
+
+        /**
+         * Historic pleasure quarters (hanamachi, chaya-gai) of the old town, each laid along one street that its
+         * buildings face: how many a metropolis may have, the chance a city or town has one, the spine's length
+         * {min, max} and its distance from the middle {min, max} (widened to the old town's inner edge, where the
+         * quarter is sought, plus a kilometre); side lanes up to {@code hanamachiBranch} long that
+         * leave the spine join it, the shortest {@code hanamachiBranches} of them.
+         */
+        public int hanamachiMetropolis = 2;
+        public double hanamachiCity = 0.7;
+        public double hanamachiTown = 0.3;
+        /** A castle town has a quarter (Kanazawa's style) always, and a second at this chance. */
+        public double hanamachiCastleSecond = 0.5;
+        public double[] hanamachiLength = {120, 300};
+        public double[] hanamachiReach = {300, 1800};
+        public double hanamachiBranch = 150;
+        public int hanamachiBranches = 6;
+    }
 
     public static final class General {
         /** Edge of a logic region in blocks: the unit results are cached in, never a boundary of any rule. */

@@ -8,14 +8,16 @@ import java.util.List;
  * The streets of one settlement as far as they are laid out: its formation, its anchors, its street pieces, a castle
  * town's moats, the districts the town is zoned into, the intercity lines' stretches to its main station, the embankments along its water, its own railway lines, and a capital's planned city {min x, min z, max x, max z} (null
  * for every other town), the land kept for its stations and stops, and the reserved high-speed lines through it, routed round the old
- * town, and the irrigation canals through its old town.
+ * town, the irrigation canals through its old town, and its large estates no street enters ({x, z, radius}: the
+ * land for its temples, schools and parks).
  */
 public record StreetPlan(Settlement settlement, Formation formation, List<Anchor> anchors, List<StreetSegment> segments,
                          List<Moat> moats, Districts districts, List<CityRailway> railways, List<Embankment> embankments,
                          List<UrbanLine> urbanLines, double[] capital, List<StationSite> sites,
-                         List<List<double[]>> highSpeed, List<Canal> canals) {
+                         List<List<double[]>> highSpeed, List<Canal> canals, List<double[]> estates) {
     public StreetPlan {
         canals = List.copyOf(canals);
+        estates = List.copyOf(estates);
         highSpeed = List.copyOf(highSpeed);
         sites = List.copyOf(sites);
         urbanLines = List.copyOf(urbanLines);

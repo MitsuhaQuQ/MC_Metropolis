@@ -124,6 +124,16 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = com.mtm.citybuilder.core.debug.PlotMap.render(plots, centerX, centerZ, scale, size);
             }
+            case "functions" -> {
+                StreetPlan plan = streetStats(logic, centerX, centerZ);
+                com.mtm.citybuilder.core.plot.TownPlots plots = logic.plots().town(plan.settlement());
+                long t0 = System.nanoTime();
+                com.mtm.citybuilder.core.function.TownFunctions functions = logic.functions().town(plan.settlement());
+                System.out.printf("Functions laid out in %.1f s%n", (System.nanoTime() - t0) / 1e9);
+                functionStats(logic, plan, plots, functions);
+                start = System.nanoTime();
+                image = com.mtm.citybuilder.core.debug.FunctionMap.render(plots, functions, centerX, centerZ, scale, size);
+            }
             case "airports" -> {
                 long t0 = System.nanoTime();
                 List<com.mtm.citybuilder.core.airport.Airport> airports = logic.airports().airports(centerX - half, centerZ - half,
@@ -156,7 +166,7 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = RoadMap.render(logic, edges, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed, streets, districts, plots or airports");
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed, streets, districts, plots, functions or airports");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();
@@ -165,6 +175,55 @@ public final class CityMap {
         }
         ImageIO.write(image, "png", out);
         System.out.println("Wrote " + out.getAbsolutePath());
+    }
+
+    /**
+     * A town's functions, as tools/assets/plateau_uses.py measures real towns: the share of street length of each
+     * function by distance from the middle and street class, and the facilities per km2 of built land.
+     */
+    private static void functionStats(CityLogic logic, StreetPlan plan, com.mtm.citybuilder.core.plot.TownPlots plots,
+                                      com.mtm.citybuilder.core.function.TownFunctions functions) {
+        double cx = logic.extent(plan.settlement()).coreX();
+        double cz = logic.extent(plan.settlement()).coreZ();
+        java.util.Map<String, java.util.Map<com.mtm.citybuilder.core.function.StreetFunction, Double>> table = new java.util.TreeMap<>();
+        for (int c = 0; c < plots.chainCount(); c++) {
+            double[] mid = plots.chainPoint(c, 0.5 * plots.chainLength(c));
+            double d = Math.hypot(mid[0] - cx, mid[1] - cz);
+            String ring = d < 500 ? "0 0-0.5 km" : d < 1000 ? "1 0.5-1 km" : d < 2000 ? "2 1-2 km" : d < 3000 ? "3 2-3 km" : "4 3 km+";
+            StreetClass cls = plots.chainClass(c);
+            String street = cls == StreetClass.LANE ? "lane" : cls == StreetClass.STREET || cls == StreetClass.OLD_ROAD ? "street" : "main";
+            table.computeIfAbsent(ring + " " + street, k -> new java.util.EnumMap<>(com.mtm.citybuilder.core.function.StreetFunction.class))
+                    .merge(functions.function(c), plots.chainLength(c), Double::sum);
+        }
+        System.out.println("Street functions, shares of length:");
+        for (var entry : table.entrySet()) {
+            double total = entry.getValue().values().stream().mapToDouble(Double::doubleValue).sum();
+            StringBuilder line = new StringBuilder(String.format("  %-18s %6.1f km:", entry.getKey().substring(2), total / 1000));
+            for (var f : entry.getValue().entrySet()) {
+                line.append(String.format(" %s %.0f%%", f.getKey(), 100 * f.getValue() / total));
+            }
+            System.out.println(line);
+        }
+        double km2 = logic.builtArea(plan.settlement());
+        java.util.Map<com.mtm.citybuilder.core.function.Facility.Kind, Integer> counts = new java.util.EnumMap<>(com.mtm.citybuilder.core.function.Facility.Kind.class);
+        for (var f : functions.facilities()) {
+            counts.merge(f.kind(), 1, Integer::sum);
+        }
+        StringBuilder line = new StringBuilder(String.format("Facilities on %.1f km2 (per km2):", km2));
+        for (var e : counts.entrySet()) {
+            line.append(String.format(" %s %d (%.2f)", e.getKey(), e.getValue(), e.getValue() / km2));
+        }
+        System.out.println(line);
+        for (var h : functions.hanamachi()) {
+            double branches = 0;
+            for (int b : h.branches()) {
+                branches += plots.chainLength(b);
+            }
+            int lots = plots.lotCount(h.spine(), 1) + plots.lotCount(h.spine(), -1);
+            System.out.printf("Hanamachi (%s) at %.0f %.0f: spine %s %.0f m (%.0f wide, %d lots), %d branches %.0f m, %.0f m from the middle%n",
+                    h.style(), h.x(), h.z(), plots.chainClass(h.spine()), h.length(), plots.chainWidth(h.spine()), lots,
+                    h.branches().size(), branches, Math.hypot(h.x() - plan.settlement().x(), h.z() - plan.settlement().z()));
+        }
     }
 
     /**
