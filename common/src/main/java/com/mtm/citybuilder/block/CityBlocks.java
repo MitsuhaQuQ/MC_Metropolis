@@ -8,7 +8,8 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import java.util.function.Supplier;
 
 /**
- * This mod's own blocks: the streets' paving and markings. Their textures are drawn for this mod (see
+ * This mod's own blocks: the streets' paving and markings, and the details of bridges and viaducts (parapets,
+ * railings, sound barriers, steel girders, bearings, joints, drains). Their textures are drawn for this mod (see
  * {@code assets/citybuilder/ATTRIBUTION}).
  */
 public final class CityBlocks {
@@ -21,6 +22,27 @@ public final class CityBlocks {
     /** Paving slabs of a pavement and of a lane, kerb stones on its sides. */
     public static Supplier<Block> SIDEWALK;
 
+    /** A bridge's concrete wall parapet (壁高欄) along the deck's edge. */
+    public static Supplier<Block> CONCRETE_PARAPET;
+    /** A steel railing (高欄, 防護柵) along a deck's or a footbridge's edge. */
+    public static Supplier<Block> BRIDGE_RAILING;
+    /** A sound barrier's ribbed metal panel (遮音壁). */
+    public static Supplier<Block> SOUND_BARRIER;
+    /** A sound barrier's clear panel (透光板), the upper part of tall barriers. */
+    public static Supplier<Block> SOUND_BARRIER_CLEAR;
+    /** Plate girders' webs with their stiffeners, painted grey, green or blue. */
+    public static Supplier<Block> STEEL_GIRDER_GRAY;
+    public static Supplier<Block> STEEL_GIRDER_GREEN;
+    public static Supplier<Block> STEEL_GIRDER_BLUE;
+    /** A bearing (支承) under a girder's end. */
+    public static Supplier<Block> BRIDGE_BEARING;
+    /** A deck block with a finger expansion joint (伸縮装置) across it. */
+    public static Supplier<Block> EXPANSION_JOINT;
+    /** A deck block with a drain grate (排水桝). */
+    public static Supplier<Block> DECK_DRAIN;
+    /** A drain pipe (排水管) down a pier's side. */
+    public static Supplier<Block> DRAIN_PIPE;
+
     private CityBlocks() {
     }
 
@@ -31,6 +53,29 @@ public final class CityBlocks {
         ASPHALT_LINE_WHITE = platform.registerBlock("asphalt_line_white", () -> new MarkingBlock(properties()));
         ASPHALT_LINE_YELLOW = platform.registerBlock("asphalt_line_yellow", () -> new MarkingBlock(properties()));
         SIDEWALK = platform.registerBlock("sidewalk", () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE_BRICKS)));
+        CONCRETE_PARAPET = platform.registerBlock("concrete_parapet",
+                () -> new EdgeBlock(thin(Blocks.LIGHT_GRAY_CONCRETE), 0, 16, 16, 5));
+        BRIDGE_RAILING = platform.registerBlock("bridge_railing",
+                () -> new EdgeBlock(thin(Blocks.IRON_BARS), 0, 16, 16, 2));
+        SOUND_BARRIER = platform.registerBlock("sound_barrier",
+                () -> new EdgeBlock(thin(Blocks.IRON_BLOCK), 0, 16, 16, 2));
+        SOUND_BARRIER_CLEAR = platform.registerBlock("sound_barrier_clear",
+                () -> new EdgeBlock(thin(Blocks.GLASS), 0, 16, 16, 1));
+        STEEL_GIRDER_GRAY = platform.registerBlock("steel_girder_gray",
+                () -> new Block(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)));
+        STEEL_GIRDER_GREEN = platform.registerBlock("steel_girder_green",
+                () -> new Block(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)));
+        STEEL_GIRDER_BLUE = platform.registerBlock("steel_girder_blue",
+                () -> new Block(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)));
+        BRIDGE_BEARING = platform.registerBlock("bridge_bearing", () -> new BearingBlock(thin(Blocks.IRON_BLOCK)));
+        EXPANSION_JOINT = platform.registerBlock("expansion_joint", () -> new JointBlock(properties()));
+        DECK_DRAIN = platform.registerBlock("deck_drain", () -> new Block(properties()));
+        DRAIN_PIPE = platform.registerBlock("drain_pipe", () -> new EdgeBlock(thin(Blocks.IRON_BARS), 6, 10, 16, 4));
+    }
+
+    /** Properties of a block that does not fill its cube (light and faces behind it show). */
+    private static BlockBehaviour.Properties thin(Block like) {
+        return BlockBehaviour.Properties.copy(like).noOcclusion();
     }
 
     private static BlockBehaviour.Properties properties() {

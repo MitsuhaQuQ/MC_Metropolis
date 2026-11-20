@@ -117,6 +117,32 @@ class RailStructureTest {
     }
 
     @Test
+    void steelSpansSitOnBearingsBetweenJoints() {
+        for (int gap : new int[] {24, 36, 60}) {
+            Viaduct v = Viaduct.builder(Viaduct.Deck.RAIL, 140, 10).keepClear(50, 50 + gap).soundWall(true).build();
+            Model m = v.build();
+            Spans.Span steel = v.spans().stream().filter(s -> s.kind() != Spans.Kind.CONCRETE).findFirst()
+                    .orElseThrow();
+            for (int x : new int[] {steel.from(), steel.to()}) {
+                int bearings = 0, joints = 0;
+                for (int y = 0; y < 10; y++) {
+                    for (int z = -v.halfWidth(); z <= v.halfWidth(); z++) {
+                        String b = m.get(x, y, z);
+                        bearings += b != null && b.equals(P.bearing()) ? 1 : 0;
+                        joints += b != null && base(b).equals(P.joint()) ? 1 : 0;
+                    }
+                }
+                assertTrue(bearings >= 2, gap + ": bearings at " + x);
+                assertTrue(joints >= 2, gap + ": joint at " + x);
+            }
+            int h = v.halfWidth();
+            assertEquals(P.parapet() + "[facing=north]", m.get(70, 10, -h));
+            assertEquals(P.barrier() + "[facing=south]", m.get(70, 11, h));
+            assertEquals(P.barrierClear() + "[facing=south]", m.get(70, 12, h));
+        }
+    }
+
+    @Test
     void footbridgesOfAnySpanClearTheRoadAndReachTheGround() {
         for (Ground g : TERRAIN) {
             for (int road : new int[] {7, 12, 18, 26, 34}) {
@@ -259,6 +285,7 @@ class RailStructureTest {
     }
 
     private static void assertStates(Model m) {
-        m.forEach((x, y, z, s) -> assertTrue(s.startsWith("minecraft:") && !s.contains("null"), s));
+        m.forEach((x, y, z, s) -> assertTrue((s.startsWith("minecraft:") || s.startsWith("citybuilder:"))
+                && !s.contains("null"), s));
     }
 }

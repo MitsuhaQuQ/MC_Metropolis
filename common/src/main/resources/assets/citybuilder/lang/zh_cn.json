@@ -1,6 +1,17 @@
 {
-  "block.citybuilder.asphalt": "\u6ca5\u9752",
-  "block.citybuilder.asphalt_line_white": "\u6ca5\u9752\uff08\u767d\u7ebf\uff09",
-  "block.citybuilder.asphalt_line_yellow": "\u6ca5\u9752\uff08\u9ec4\u7ebf\uff09",
-  "block.citybuilder.sidewalk": "\u4eba\u884c\u9053\u7816"
+  "block.citybuilder.asphalt": "沥青",
+  "block.citybuilder.asphalt_line_white": "沥青（白线）",
+  "block.citybuilder.asphalt_line_yellow": "沥青（黄线）",
+  "block.citybuilder.sidewalk": "人行道砖",
+  "block.citybuilder.concrete_parapet": "桥梁混凝土护墙",
+  "block.citybuilder.bridge_railing": "桥梁栏杆",
+  "block.citybuilder.sound_barrier": "隔音墙",
+  "block.citybuilder.sound_barrier_clear": "透光隔音板",
+  "block.citybuilder.steel_girder_gray": "钢梁（灰）",
+  "block.citybuilder.steel_girder_green": "钢梁（绿）",
+  "block.citybuilder.steel_girder_blue": "钢梁（蓝）",
+  "block.citybuilder.bridge_bearing": "桥梁支座",
+  "block.citybuilder.expansion_joint": "伸缩缝",
+  "block.citybuilder.deck_drain": "桥面排水口",
+  "block.citybuilder.drain_pipe": "排水管"
 }

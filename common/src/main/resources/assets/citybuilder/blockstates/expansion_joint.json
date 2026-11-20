@@ -1,0 +1,11 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "citybuilder:block/expansion_joint"
+    },
+    "axis=z": {
+      "model": "citybuilder:block/expansion_joint",
+      "y": 90
+    }
+  }
+}

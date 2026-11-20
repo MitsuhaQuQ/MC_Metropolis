@@ -36,6 +36,7 @@ import glob
 import math
 import os
 import re
+import struct
 import sys
 import zipfile
 import xml.etree.ElementTree as ET
@@ -531,6 +532,21 @@ def colours(names, cache):
     if missing:
         with zipfile.ZipFile(pv.MC_JAR) as z:
             for n in missing:
+                if n.startswith('citybuilder:'):
+                    path = os.path.join(MOD_TEXTURES, n.split(':', 1)[1] + '.png')
+                    if not os.path.exists(path):
+                        continue
+                    with open(path, 'rb') as fh:
+                        data = fh.read()
+                    img = pv.Image.open(io.BytesIO(data)).convert('RGBA')
+                    tot = [0.0] * 4
+                    for r, g, b, a in img.get_flattened_data():
+                        tot[0] += r * a
+                        tot[1] += g * a
+                        tot[2] += b * a
+                        tot[3] += a
+                    got[n] = tuple(round(c / max(tot[3], 1)) for c in tot[:3])
+                    continue
                 tex = n
                 for suffix in ('_slab', '_stairs'):
                     if tex.endswith(suffix):
@@ -559,6 +575,45 @@ def colours(names, cache):
     return got
 
 
+MOD_TEXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'common', 'src', 'main',
+                            'resources', 'assets', 'citybuilder', 'textures', 'block')
+
+
+def state(s):
+    """'ns:x[a=b]' -> ('x' for vanilla, 'citybuilder:x' for this mod's, {'a': 'b'} or None)."""
+    name, _, props = s.partition('[')
+    if name.startswith('minecraft:'):
+        name = name[len('minecraft:'):]
+    return name, (dict(kv.split('=', 1) for kv in props.rstrip(']').split(',')) if props else None)
+
+
+def write_nbt(path, blocks, size):
+    """plateau_voxel.write_nbt, keeping this mod's namespace."""
+    import gzip
+    import plateau_voxel as pv
+    states, index, entries = [], {}, []
+    for (x, y, z), (name, props) in sorted(blocks.items(), key=lambda kv: (kv[0][1], kv[0][2], kv[0][0])):
+        key = (name, tuple(sorted(props.items())) if props else ())
+        if key not in index:
+            index[key] = len(states)
+            items = [('Name', 8, pv.nbt_string(name if ':' in name else 'minecraft:' + name))]
+            if props:
+                items.append(('Properties', 10, pv.nbt_compound([(k, 8, pv.nbt_string(v))
+                                                                 for k, v in sorted(props.items())])))
+            states.append(pv.nbt_compound(items))
+        entries.append(pv.nbt_compound([('pos', 9, pv.nbt_int_list([x, y, z])),
+                                        ('state', 3, struct.pack('>i', index[key]))]))
+    root = pv.nbt_compound([
+        ('DataVersion', 3, struct.pack('>i', 3465)),  # 1.20.1
+        ('size', 9, pv.nbt_int_list(list(size))),
+        ('palette', 9, pv.nbt_compound_list(states)),
+        ('blocks', 9, pv.nbt_compound_list(entries)),
+        ('entities', 9, pv.nbt_compound_list([])),
+    ])
+    with gzip.open(path, 'wb') as fh:
+        fh.write(bytes([10]) + pv.nbt_string('') + root)
+
+
 def build(out):
     """Structure templates (.nbt), isometric previews (.png), library.json and preview.html from <out>/models."""
     import base64
@@ -570,14 +625,14 @@ def build(out):
     for f in sorted(glob.glob(os.path.join(out, 'models', '*.json'))):
         with open(f, encoding='utf-8') as fh:
             models[os.path.splitext(os.path.basename(f))[0]] = json.load(fh)
-    used = sorted({pv.parse_state(b[3])[0] for m in models.values() for b in m['blocks']})
+    used = sorted({state(b[3])[0] for m in models.values() for b in m['blocks']})
     used = sorted(set(used) | {pv.FULL_OF.get(n, pv.PREVIEW_ALIAS.get(n, n)) for n in used})  # as render looks up
     bc = colours(used, os.path.join(out, 'block_colours.json'))
     entries = []
     for slug, model in models.items():
-        blocks = {(x, y, z): pv.parse_state(st) for x, y, z, st in model['blocks']}
+        blocks = {(x, y, z): state(st) for x, y, z, st in model['blocks']}
         size = tuple(model['size'])
-        pv.write_nbt(os.path.join(out, slug + '.nbt'), blocks, size)
+        write_nbt(os.path.join(out, slug + '.nbt'), blocks, size)
         pv.render(blocks, size, os.path.join(out, slug + '.png'), bc)
         spec = names.get(slug, {})
         e = {'slug': slug, 'name': spec.get('name', slug), 'kind': spec.get('kind'), 'size': list(size),

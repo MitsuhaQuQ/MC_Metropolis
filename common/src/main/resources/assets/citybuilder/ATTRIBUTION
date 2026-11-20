@@ -2,3 +2,7 @@ City Builder assets and where they come from.
 
 textures/block/asphalt.png, asphalt_line_white.png, asphalt_line_yellow.png, sidewalk.png
   Drawn for this mod by tools/textures/road_textures.py (no outside sources); the mod's own licence.
+
+textures/block/concrete_parapet*.png, bridge_railing*.png, sound_barrier*.png, steel_girder_*.png, bridge_bearing*.png,
+expansion_joint.png, deck_side.png, deck_drain.png, drain_pipe.png
+  Drawn for this mod by tools/textures/bridge_textures.py (no outside sources); the mod's own licence.

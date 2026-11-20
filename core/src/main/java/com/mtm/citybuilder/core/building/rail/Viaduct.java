@@ -263,6 +263,7 @@ public final class Viaduct {
             bent(m, x, levelAt(x) - 2 - Math.max(girderDepth(a), girderDepth(b)));
         }
         surface(m);
+        details(m);
         if (catenary) {
             int last = -1000;
             List<Integer> at = new ArrayList<>(bents());
@@ -302,19 +303,7 @@ public final class Viaduct {
             }
             case STEEL_GIRDER -> {
                 // Plate girders a block in from the edges and under the tracks or every sixth block
-                List<Integer> under = new ArrayList<>();
-                under.add(-h + 1);
-                under.add(h - 1);
-                if (deck == Deck.RAIL) {
-                    for (int tc : trackZ) {
-                        under.add(tc);
-                    }
-                } else {
-                    for (int z = -h + 6; z < h - 3; z += 6) {
-                        under.add(z);
-                    }
-                }
-                for (int z : under) {
+                for (int z : girderZ()) {
                     for (int x = s.from(); x <= s.to(); x++) {
                         int top = levelAt(x) - 1;
                         for (int y = top - gd; y < top; y++) {
@@ -371,6 +360,64 @@ public final class Viaduct {
         }
     }
 
+    /** z of the plate girders under a steel span. */
+    List<Integer> girderZ() {
+        int h = halfWidth();
+        List<Integer> under = new ArrayList<>();
+        under.add(-h + 1);
+        under.add(h - 1);
+        if (deck == Deck.RAIL) {
+            for (int tc : trackZ) {
+                under.add(tc);
+            }
+        } else {
+            for (int z = -h + 6; z < h - 3; z += 6) {
+                under.add(z);
+            }
+        }
+        return under;
+    }
+
+    /**
+     * Where steel spans end: bearings under their girders (on the cap or the abutment) and an expansion joint across
+     * the deck; joints at the abutments of every deck.
+     */
+    private void details(Model m) {
+        int h = halfWidth();
+        java.util.Set<Integer> joints = new java.util.TreeSet<>(List.of(0, length));
+        for (Spans.Span s : spans) {
+            if (s.kind() == Spans.Kind.CONCRETE) {
+                continue;
+            }
+            int gd = girderDepth(s);
+            List<Integer> zs = s.kind() == Spans.Kind.TRUSS ? List.of(-h, h) : girderZ();
+            for (int x : new int[] {s.from(), s.to()}) {
+                int y = levelAt(x) - 2 - gd;
+                for (int z : zs) {
+                    m.set(x, y, z, p.bearing());
+                }
+                joints.add(x);
+            }
+        }
+        for (int x : joints) {
+            int top = levelAt(x) - 1;
+            for (int z = -h + 1; z <= h - 1; z++) {
+                String at = m.get(x, top, z);
+                if (at != null && !at.equals(p.ballast())) {
+                    m.set(x, top, z, RailPalette.jointAcross(p.joint()));
+                }
+            }
+        }
+        if (deck != Deck.RAIL) {  // drain grates by the parapets
+            for (int x = 6; x < length - 2; x += 12) {
+                if (!joints.contains(x)) {
+                    m.set(x, levelAt(x) - 1, -h + 1, p.drain());
+                    m.set(x, levelAt(x) - 1, h - 1, p.drain());
+                }
+            }
+        }
+    }
+
     private void bent(Model m, int x, int capTop) {
         int h = halfWidth();
         int pl = pierLength();
@@ -397,6 +444,14 @@ public final class Viaduct {
                         m.set(x0 + dx, y, z, p.concrete());
                     }
                 }
+            }
+        }
+        // A drain pipe down the +z face of the outermost column
+        int last = cz[cz.length - 1];
+        int pz = last - across / 2 + across;
+        if (pz <= h) {
+            for (int y = ground.at(x0, pz) + 1; y <= capTop - capDepth; y++) {
+                m.setIfEmpty(x0, y, pz, RailPalette.edgeZ(p.pipe(), true));
             }
         }
         // A tie beam halfway up a tall rigid frame
@@ -446,12 +501,7 @@ public final class Viaduct {
                             }
                         }
                     }
-                    m.set(x, lv, -h, p.concrete());
-                    m.set(x, lv, h, p.concrete());
-                    if (soundWall) {
-                        m.set(x, lv + 1, -h, p.concrete());
-                        m.set(x, lv + 1, h, p.concrete());
-                    }
+                    parapets(m, x, lv);
                     // Cable troughs along the walkways
                     m.setIfEmpty(x, lv, -h + 1, RailPalette.slab(p.concreteSlab(), false));
                     m.setIfEmpty(x, lv, h - 1, RailPalette.slab(p.concreteSlab(), false));
@@ -465,12 +515,7 @@ public final class Viaduct {
                         boolean walk = Math.abs(z) > h - 1 - walkWidth;
                         m.set(x, lv - 1, z, walk ? p.walk() : p.road());
                     }
-                    m.set(x, lv, -h, p.concrete());
-                    m.set(x, lv, h, p.concrete());
-                    if (soundWall) {
-                        m.set(x, lv + 1, -h, p.glass());
-                        m.set(x, lv + 1, h, p.glass());
-                    }
+                    parapets(m, x, lv);
                 }
             }
             case FOOT -> {
@@ -479,9 +524,22 @@ public final class Viaduct {
                     for (int z = -h + 1; z <= h - 1; z++) {
                         m.set(x, lv - 1, z, p.walk());
                     }
-                    m.set(x, lv, -h, RailPalette.bars(p.rail(), true));
-                    m.set(x, lv, h, RailPalette.bars(p.rail(), true));
+                    m.set(x, lv, -h, RailPalette.edgeZ(p.railing(), true));
+                    m.set(x, lv, h, RailPalette.edgeZ(p.railing(), false));
                 }
+            }
+        }
+    }
+
+    /** Wall parapets on both edges, a sound barrier (metal, then clear) above them where asked. */
+    private void parapets(Model m, int x, int lv) {
+        int h = halfWidth();
+        for (boolean low : new boolean[] {true, false}) {
+            int z = low ? -h : h;
+            m.set(x, lv, z, RailPalette.edgeZ(p.parapet(), low));
+            if (soundWall) {
+                m.set(x, lv + 1, z, RailPalette.edgeZ(p.barrier(), low));
+                m.set(x, lv + 2, z, RailPalette.edgeZ(p.barrierClear(), low));
             }
         }
     }

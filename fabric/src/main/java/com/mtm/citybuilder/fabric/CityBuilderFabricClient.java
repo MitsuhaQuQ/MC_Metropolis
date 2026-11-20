@@ -1,0 +1,15 @@
+package com.mtm.citybuilder.fabric;
+
+import com.mtm.citybuilder.block.CityBlocks;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
+import net.minecraft.client.renderer.RenderType;
+
+/** Render layers of the blocks that are partly see-through (Forge reads them from the models' render_type). */
+public final class CityBuilderFabricClient implements ClientModInitializer {
+    @Override
+    public void onInitializeClient() {
+        BlockRenderLayerMap.INSTANCE.putBlock(CityBlocks.BRIDGE_RAILING.get(), RenderType.cutout());
+        BlockRenderLayerMap.INSTANCE.putBlock(CityBlocks.SOUND_BARRIER_CLEAR.get(), RenderType.translucent());
+    }
+}
