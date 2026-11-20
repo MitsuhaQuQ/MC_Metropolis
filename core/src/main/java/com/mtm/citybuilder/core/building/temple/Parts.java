@@ -138,6 +138,27 @@ final class Parts {
         }
     }
 
+    /**
+     * A wooden veranda (縁) one block wide round {@code walls} on the floor at {@code floor - 1}, with a railing
+     * (高欄) round its edge, open where the platform's (or stair's) steps come up on the south side.
+     */
+    static void veranda(Model m, TemplePalette p, Rect walls, int floor, Rect steps) {
+        Rect deck = walls.grow(1);
+        int mid = (steps.x0() + steps.x1()) / 2, half = Math.max(1, steps.width() / 8);
+        for (int x = deck.x0(); x < deck.x1(); x++) {
+            for (int z = deck.z0(); z < deck.z1(); z++) {
+                if (walls.contains(x, z)) {
+                    continue;
+                }
+                m.set(x, floor - 1, z, p.wood());
+                boolean gap = z == deck.z1() - 1 && Math.abs(x - mid) <= half;
+                if (!gap) {
+                    m.set(x, floor, z, p.rail());
+                }
+            }
+        }
+    }
+
     /** Columns only, about {@code bay} apart round a rectangle, with a head beam round the top: an open pavilion. */
     static void columns(Model m, TemplePalette p, Rect r, int bottom, int top, double bay) {
         for (int x = r.x0(); x < r.x1(); x++) {

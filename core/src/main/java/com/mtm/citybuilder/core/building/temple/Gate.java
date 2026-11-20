@@ -46,15 +46,23 @@ public record Gate(int width, int depth, double eave, double ridge, RoofType roo
         Rect lowerOutline = twoStorey() ? Rect.centred(cx, cz, lowerWidth, lowerDepth) : main;
         Rect lower = twoStorey() ? lowerOutline.grow(-lowerOverhang) : upper;
         Rect base0 = lower.grow(1);
-        if (sanro > 0 && twoStorey()) { // the platform runs on under the stair houses
+        if (sanro > 0) { // the platform runs on under the stair houses or corridors
             base0 = new Rect(lowerOutline.x0() - sanro, base0.z0(), lowerOutline.x1() + sanro, base0.z1());
         }
         Parts.platform(m, p, base0, platform, true); // steps on both sides of the way through
         boolean zen = style == GateStyle.ZEN;
 
-        Roof mainRoof = new Roof(p, main.x0(), main.z0(), main.width(), main.depth(), eave, ridge, roof, 0.35,
+        Roof mainRoof = new Roof(p, main.x0(), main.z0(), main.width(), main.depth(), eave, ridge, roof, p.roofCurve(),
                 Math.min(2.0, 0.8 + width / 30.0), gableInset).walls(upper.x0(), upper.z0(), upper.x1(), upper.z1());
         int steps = (overhang >= 4 ? 2 : 1) + (zen ? 1 : 0); // Zen gates: a deep band of brackets
+        if (style == GateStyle.ROMON) {
+            romon(m, p, upper, mainRoof, steps);
+            if (sanro > 0) {
+                corridor(m, p, upper, -1);
+                corridor(m, p, upper, 1);
+            }
+            return m;
+        }
         if (!twoStorey()) {
             int top = Math.max(platform + 4, Hall.wallTop(mainRoof, upper) - steps);
             lowerStorey(m, p, upper, top);
@@ -103,6 +111,50 @@ public record Gate(int width, int depth, double eave, double ridge, RoofType roo
             stairHouse(m, p, lowerOutline, lower, base, 1);
         }
         return m;
+    }
+
+    /**
+     * A romon (楼門): the lower storey up to a little under half the height, the balcony (縁) on a row of brackets
+     * with its railing, the upper storey above, one roof over all.
+     */
+    private void romon(Model m, TemplePalette p, Rect body, Roof roof, int steps) {
+        int top = Math.max(platform + 9, Hall.wallTop(roof, body) - steps);
+        int lTop = platform + Math.max(4, (int) Math.round((top - platform) * 0.45));
+        lowerStorey(m, p, body, lTop);
+        Parts.brackets(m, p, body, lTop, 1, roof); // the balcony's brackets (腰組)
+        int deckY = lTop + 2;
+        Rect deck = body.grow(1);
+        for (int x = deck.x0(); x < deck.x1(); x++) {
+            for (int z = deck.z0(); z < deck.z1(); z++) {
+                m.set(x, deckY, z, p.wood());
+                boolean edge = x == deck.x0() || x == deck.x1() - 1 || z == deck.z0() || z == deck.z1() - 1;
+                if (edge) {
+                    m.set(x, deckY + 1, z, p.rail());
+                }
+            }
+        }
+        Parts.walls(m, p, body, deckY + 1, top, body.width() / (double) bays);
+        Parts.brackets(m, p, body, top, steps, roof);
+        roof.build(m);
+        Parts.closeToRoof(m, p, body, top + 1, (int) Math.ceil(ridge) + 2);
+    }
+
+    /**
+     * A corridor (回廊) running off one end of a romon: columns, lattice windows (連子窓) below and white plaster
+     * above, under a low gable roof along it.
+     */
+    private void corridor(Model m, TemplePalette p, Rect gate, int side) {
+        int d = Math.max(4, gate.depth() - 2);
+        int z0 = (gate.z0() + gate.z1()) / 2 - d / 2;
+        int x0 = side < 0 ? gate.x0() - sanro : gate.x1(), x1 = side < 0 ? gate.x0() : gate.x1() + sanro;
+        Rect body = new Rect(x0, z0, x1, z0 + d);
+        Rect roofRect = new Rect(side < 0 ? x0 - 1 : x0, z0 - 2, side < 0 ? x1 : x1 + 1, z0 + d + 2);
+        double e = platform + 4.5, rdg = e + 0.55 * roofRect.depth() / 2.0;
+        Roof r = new Roof(p, roofRect.x0(), roofRect.z0(), roofRect.width(), roofRect.depth(), e, rdg, RoofType.GABLE,
+                0.4, 0.5, 0).walls(body.x0(), body.z0(), body.x1(), body.z1());
+        int top = Math.max(platform + 3, Hall.wallTop(r, body));
+        Parts.walls(m, p, body, platform, top, 2.5);
+        r.build(m);
     }
 
     /**

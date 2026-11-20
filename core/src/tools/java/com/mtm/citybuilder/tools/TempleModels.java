@@ -9,6 +9,10 @@ import com.mtm.citybuilder.core.building.temple.Belfry;
 import com.mtm.citybuilder.core.building.temple.Gate;
 import com.mtm.citybuilder.core.building.temple.GateStyle;
 import com.mtm.citybuilder.core.building.temple.Hall;
+import com.mtm.citybuilder.core.building.temple.Honden;
+import com.mtm.citybuilder.core.building.temple.Pavilion;
+import com.mtm.citybuilder.core.building.temple.Torii;
+import com.mtm.citybuilder.core.building.temple.ToriiTunnel;
 import com.mtm.citybuilder.core.building.temple.Model;
 import com.mtm.citybuilder.core.building.temple.Pagoda;
 import com.mtm.citybuilder.core.building.temple.RoofType;
@@ -27,9 +31,9 @@ import java.util.List;
  * Builds temple models (halls, pagodas) from a list of specs and writes each as JSON for
  * {@code tools/assets/plateau_voxel.py}, which turns them into structure templates and previews.
  *
- * <p>Input: a JSON array of objects with {@code slug}, {@code kind} ({@code hall}, {@code pagoda}, {@code gate} or {@code belfry}), {@code role} (a
+ * <p>Input: a JSON array of objects with {@code slug}, {@code kind} ({@code hall}, {@code pagoda}, {@code gate}, {@code belfry}, {@code honden}, {@code pavilion}, {@code torii} or {@code torii_tunnel}), {@code role} (a
  * {@link SacredBuilding}: temple or shrine and the building's role, written into the output), {@code palette}
- * ({@code NATURAL}, {@code VERMILION}, {@code COPPER} or {@code WEATHERED}) and the fields of {@link Hall}, {@link Pagoda}, {@link Gate} or {@link Belfry}. Output:
+ * ({@code NATURAL}, {@code VERMILION}, {@code COPPER}, {@code WEATHERED}, {@code HIWADA}, {@code DARK} or {@code INARI}) and the fields of {@link Hall}, {@link Pagoda}, {@link Gate}, {@link Belfry}, {@link Honden}, {@link Pavilion} or {@link Torii}. Output:
  * {@code <out>/<slug>.json} with {@code role}, {@code religion}, {@code size} and {@code blocks} ([x, y, z, state], from 0).
  */
 public final class TempleModels {
@@ -63,7 +67,8 @@ public final class TempleModels {
             case "hall" -> new Hall(i(o, "width"), i(o, "depth"), d(o, "eave"), d(o, "ridge"),
                     RoofType.valueOf(str(o, "roof", "IRIMOYA")), d(o, "gableInset", 0), i(o, "overhang", 4),
                     i(o, "mokoshiWidth", 0), i(o, "mokoshiDepth", 0), d(o, "mokoshiEave", 0),
-                    i(o, "mokoshiOverhang", 0), i(o, "platform", 2), d(o, "bay", 4.5), palette).build();
+                    i(o, "mokoshiOverhang", 0), i(o, "platform", 2), d(o, "bay", 4.5), bool(o, "veranda"),
+                    palette).build();
             case "pagoda" -> new Pagoda(i(o, "storeys"), i(o, "span"), i(o, "topSpan"), i(o, "body"), i(o, "topBody"),
                     d(o, "firstEave"), d(o, "topEave"), d(o, "apex"), i(o, "height"), i(o, "platform", 2),
                     d(o, "pitch", 0.42), palette).build();
@@ -75,8 +80,20 @@ public final class TempleModels {
             case "belfry" -> new Belfry(i(o, "width"), i(o, "depth"), d(o, "eave"), d(o, "ridge"),
                     RoofType.valueOf(str(o, "roof", "IRIMOYA")), d(o, "gableInset", 0), i(o, "overhang", 3),
                     o.has("skirt") && o.get("skirt").getAsBoolean(), i(o, "platform", 1), palette).build();
+            case "honden" -> new Honden(i(o, "width"), i(o, "bodyWidth"), i(o, "bodyDepth"), i(o, "porch"),
+                    d(o, "eave"), d(o, "ridge"), i(o, "floor", 2), bool(o, "chigi"), palette).build();
+            case "pavilion" -> new Pavilion(i(o, "width"), i(o, "depth"), d(o, "eave"), d(o, "ridge"),
+                    RoofType.valueOf(str(o, "roof", "IRIMOYA")), d(o, "gableInset", 0), i(o, "overhang", 2),
+                    i(o, "floor", 2), bool(o, "lanterns"), bool(o, "panels"), bool(o, "fence"), palette).build();
+            case "torii" -> new Torii(i(o, "span"), i(o, "height"), palette).build();
+            case "torii_tunnel" -> new ToriiTunnel(i(o, "length"), i(o, "span"), i(o, "height"), i(o, "spacing", 2),
+                    palette).build();
             default -> throw new IllegalArgumentException("unknown kind: " + o.get("kind"));
         };
+    }
+
+    private static boolean bool(JsonObject o, String k) {
+        return o.has(k) && o.get(k).getAsBoolean();
     }
 
     private static String str(JsonObject o, String k, String def) {

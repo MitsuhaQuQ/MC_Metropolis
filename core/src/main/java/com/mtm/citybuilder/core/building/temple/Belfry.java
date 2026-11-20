@@ -32,7 +32,7 @@ public record Belfry(int width, int depth, double eave, double ridge, RoofType r
         Rect main = new Rect(0, 0, width, depth);
         Rect body = main.grow(-overhang);
         Parts.platform(m, p, body.grow(1), platform);
-        Roof r = new Roof(p, 0, 0, width, depth, eave, ridge, roof, 0.35, Math.min(1.5, 0.6 + width / 20.0), gableInset)
+        Roof r = new Roof(p, 0, 0, width, depth, eave, ridge, roof, p.roofCurve(), Math.min(1.5, 0.6 + width / 20.0), gableInset)
                 .walls(body.x0(), body.z0(), body.x1(), body.z1());
         int top = Math.max(platform + (skirt ? 8 : 5), Hall.wallTop(r, body) - 1);
         int floor = platform; // the level the bell hangs over

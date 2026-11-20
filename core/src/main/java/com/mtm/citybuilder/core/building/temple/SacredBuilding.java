@@ -36,8 +36,10 @@ public enum SacredBuilding {
     HEIDEN(Religion.SHRINE, "幣殿"),
     /** 楼門 / 神門: a shrine gate (the torii is a separate structure). */
     SHRINE_GATE(Religion.SHRINE, "楼門"),
-    /** 神楽殿 / 舞殿: the hall for sacred dances. */
-    KAGURADEN(Religion.SHRINE, "神楽殿"),
+    /** 神楽殿 / 舞殿: the hall for sacred dances, an open pavilion. */
+    KAGURADEN(Religion.SHRINE, "神楽殿・舞殿"),
+    /** 鳥居: the gateway at a shrine's approaches. */
+    TORII(Religion.SHRINE, "鳥居"),
     /** 社務所: the shrine office. */
     SHAMUSHO(Religion.SHRINE, "社務所");
 

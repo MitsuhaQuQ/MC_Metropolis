@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TempleTest {
     /** Tō-ji's kondō as measured on PLATEAU's LOD2: a pent roof round an irimoya hall. */
     private static final Hall KONDO = new Hall(37, 23, 18.2, 24.9, RoofType.IRIMOYA, 3.2, 4, 45, 29, 11.4, 3, 2, 4.5,
-            TemplePalette.NATURAL);
+            false, TemplePalette.NATURAL);
     /** Tō-ji's five-storey pagoda. */
     private static final Pagoda PAGODA = new Pagoda(5, 19, 15, 9, 7, 10.5, 35.6, 40.2, 55, 2, 0.42,
             TemplePalette.NATURAL);
@@ -91,7 +91,7 @@ class TempleTest {
     @Test
     void eavesOverhangTheWalls() {
         // The eave outline is the model's outline, wider than the walls by the overhang on each side.
-        Model m = new Hall(31, 19, 9, 18, RoofType.HIP, 0, 4, 0, 0, 0, 0, 2, 4.5, TemplePalette.VERMILION).build();
+        Model m = new Hall(31, 19, 9, 18, RoofType.HIP, 0, 4, 0, 0, 0, 0, 2, 4.5, false, TemplePalette.VERMILION).build();
         assertEquals(31, m.maxX() - m.minX() + 1);
         assertTrue(m.maxZ() - m.minZ() + 1 >= 19);
         // The walls (columns) stand 4 in from the eaves.
@@ -193,5 +193,93 @@ class TempleTest {
             // Hung clear of the floor: open to the platform, or above the gallery on a raised base.
             assertTrue(bellLow[0] >= (skirt ? 5 : 2), "bell at " + bellLow[0]);
         }
+    }
+
+    /** The lowest roof block over a column, scanning down from the top. */
+    private static int roofAt(Model m, int x, int z) {
+        int low = Integer.MAX_VALUE;
+        for (int y = m.maxY(); y >= 0; y--) {
+            String s = m.get(x, y, z);
+            if (s != null && (s.contains("dark_oak_s") || s.contains("dark_oak_planks"))) {
+                low = y;
+            } else if (low != Integer.MAX_VALUE) {
+                break;
+            }
+        }
+        return low;
+    }
+
+    @Test
+    void nagareSanctuaryRunsItsFrontSlopeLongAndLow() {
+        // Inari's main sanctuary: a five-bay nagare-zukuri. The front slope reaches past the porch, lower than the back.
+        Honden h = new Honden(31, 23, 11, 6, 6.0, 9.1, 2, false, TemplePalette.INARI);
+        Model m = h.build();
+        int x = 15;
+        int back = roofAt(m, x, m.minZ()), front = roofAt(m, x, m.maxZ());
+        assertTrue(front < back, "front eave " + front + " not under the back eave " + back);
+        assertTrue(m.maxZ() - m.minZ() + 1 >= 4 + 11 + 6, "the roof reaches over the porch");
+        // The porch columns stand on the ground in front of the walls.
+        assertTrue(m.get(4, 0, 4 + 11 + 6 - 1) != null && m.get(4, 0, 4 + 11 + 6 - 1).contains("orange_concrete"));
+    }
+
+    @Test
+    void romonHasABalconyBetweenItsStoreys() {
+        Gate g = new Gate(15, 11, 10.0, 13.8, RoofType.IRIMOYA, 2.5, 3, 3, 1, 0, 0, 0, 3, 1, GateStyle.ROMON, 7,
+                TemplePalette.INARI);
+        Model m = g.build();
+        int[] rail = {Integer.MAX_VALUE, Integer.MIN_VALUE};
+        m.forEach((x, y, z, s) -> {
+            if (s.endsWith("_fence") && x == 2) { // outside the walls (x 3..11): the balcony, not the lattice
+                rail[0] = Math.min(rail[0], y);
+                rail[1] = Math.max(rail[1], y);
+            }
+        });
+        assertTrue(rail[0] >= 5 && rail[0] <= 9, "balcony railing at " + rail[0]);
+        assertEquals(15 + 2 * 7, m.maxX() - m.minX() + 1, "the gate with its corridors: LOD1's 30 m");
+        int cx = (m.minX() + m.maxX()) / 2;
+        for (int z = 3 + 1; z < 3 + 5 - 1; z++) {
+            assertTrue(!m.has(cx, 2, z), "way through blocked at " + z);
+        }
+    }
+
+    @Test
+    void outerWorshipHallHasPanelsLanternsAndFence() {
+        Model m = new Pavilion(17, 13, 7.5, 9.8, RoofType.IRIMOYA, 3, 2, 1, true, true, true, TemplePalette.INARI)
+                .build();
+        int[] plaster = {0}, lanterns = {0}, fence = {0};
+        m.forEach((x, y, z, s) -> {
+            if (s.equals(TemplePalette.INARI.plaster())) {
+                plaster[0]++;
+            }
+            if (s.equals(Pavilion.LANTERN)) {
+                lanterns[0]++;
+            }
+            if (y == 0 && s.endsWith("_fence")) {
+                fence[0]++;
+            }
+        });
+        assertTrue(plaster[0] > 20 && lanterns[0] > 10 && fence[0] > 30,
+                plaster[0] + " panels, " + lanterns[0] + " lanterns, " + fence[0] + " fence");
+    }
+
+    @Test
+    void toriiIsSymmetricAndTunnelsRepeatIt() {
+        Torii t = new Torii(10, 13, TemplePalette.INARI);
+        Model m = t.build();
+        assertEquals(13, m.maxY(), "the upper beam's top at 13, its tips one higher");
+        int sx = m.minX() + m.maxX();
+        m.forEach((x, y, z, s) -> {
+            String o = m.get(sx - x, y, z);
+            assertTrue(o != null && o.replaceAll("\\[.*", "").equals(s.replaceAll("\\[.*", "")),
+                    x + "," + y + " " + s + " / " + o);
+        });
+        Model tunnel = new ToriiTunnel(40, 3, 5, 2, TemplePalette.INARI).build();
+        int[] feet = {0};
+        tunnel.forEach((x, y, z, s) -> {
+            if (y == 0) {
+                feet[0]++;
+            }
+        });
+        assertEquals(20 * 2, feet[0], "twenty torii, two black feet each");
     }
 }

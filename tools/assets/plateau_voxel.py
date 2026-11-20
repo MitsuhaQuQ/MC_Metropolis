@@ -82,6 +82,11 @@ LANDMARKS = [
     ("bldg_ce127903-06cf-494d-aeaa-12a932fcb11f", "higashi_honganji_goeidomon", "東本願寺 御影堂門", "temple"),
     ("bldg_8ff4cd35-4d98-4664-8b70-8265b187f269", "nishi_honganji_goeidomon", "西本願寺 御影堂門", "temple"),
     ("bldg_088dbe5d-5014-44a6-93f1-993e4701d889", "nanzenji_sanmon", "南禅寺 三門", "temple"),
+    ("bldg_cecd5425-2c83-4cec-934d-7007ba1f20a3", "yasaka_honden", "八坂神社 本殿", "temple"),
+    ("bldg_a142fc0b-88ff-47c5-9073-4a3bf547eb30", "yasaka_buden", "八坂神社 舞殿", "temple"),
+    ("bldg_70a2c83b-e0ad-4027-8422-72520fc2620a", "inari_romon", "伏見稲荷大社 楼門", "temple"),
+    ("bldg_a42ada8b-afff-438c-ab50-b0d6bc9d047a", "inari_gaihaiden", "伏見稲荷大社 外拝殿", "temple"),
+    ("bldg_143a1271-fbe6-4704-aae8-e78634da2291", "inari_honden", "伏見稲荷大社 本殿", "temple"),
 ]
 
 # Buildings whose LOD2 shape is too coarse to voxelize (a pagoda is a box with a hip roof, halls lose their eaves
@@ -116,6 +121,32 @@ TEMPLES = {
                             roof="IRIMOYA", gableInset=3.5, overhang=4, bays=5, passages=3, lowerWidth=31,
                             lowerDepth=19, lowerEave=10.0, lowerOverhang=3, platform=2, style="ZEN", sanro=8,
                             palette="WEATHERED"),
+    # LOD1 only: 43.0 x 30.9 m, 14.6 m high. Gion-zukuri (祇園造): main sanctuary and worship hall under one
+    # cypress-bark irimoya roof, a lower roof (孫庇) all round, vermilion and white, black lattice, a railed
+    # veranda; the eave heights after photographs.
+    "yasaka_honden": dict(kind="hall", role="HONDEN", width=37, depth=25, eave=9.5, ridge=14.6, roof="IRIMOYA",
+                          gableInset=4, overhang=4, mokoshiWidth=43, mokoshiDepth=31, mokoshiEave=6.5,
+                          mokoshiOverhang=3, platform=1, bay=4.0, veranda=True, palette="HIWADA"),
+    # LOD1 only: 14.0 x 12.9 m, 10.1 m high, just south of the main hall. The dance hall (舞殿): open on a raised
+    # floor with a railing, dark wood, lanterns between the columns.
+    "yasaka_buden": dict(kind="pavilion", role="KAGURADEN", width=15, depth=13, eave=6.0, ridge=10.1,
+                         roof="IRIMOYA", gableInset=2.5, overhang=2, floor=2, lanterns=True, palette="DARK"),
+    # Fushimi Inari, all LOD1 only; the parts after photographs. The romon: 30.5 x 11.8 m with its corridors,
+    # 13.8 m high; two storeys under one cypress-bark irimoya roof, a railed balcony between, corridors both sides.
+    "inari_romon": dict(kind="gate", role="SHRINE_GATE", width=15, depth=11, eave=10.0, ridge=13.8, roof="IRIMOYA",
+                        gableInset=2.5, overhang=3, bays=3, passages=1, platform=1, style="ROMON", sanro=7,
+                        palette="INARI"),
+    # The outer worship hall (外拝殿): 17.6 x 12.5 m, 9.8 m high; open on a raised floor, white panels under the
+    # beams, lanterns, a vermilion fence round the foot.
+    "inari_gaihaiden": dict(kind="pavilion", role="HAIDEN", width=17, depth=13, eave=7.5, ridge=9.8,
+                            roof="IRIMOYA", gableInset=3, overhang=2, floor=1, lanterns=True, panels=True,
+                            fence=True, palette="INARI"),
+    # The main sanctuary with its inner worship hall: 31.2 x 22.9 m, 9.1 m high; a five-bay nagare-zukuri.
+    "inari_honden": dict(kind="honden", role="HONDEN", width=31, bodyWidth=23, bodyDepth=11, porch=6, eave=6.0,
+                         ridge=9.1, floor=2, palette="INARI"),
+    "inari_otorii": dict(kind="torii", role="TORII", span=10, height=13, palette="INARI"),
+    "inari_senbon_torii": dict(kind="torii_tunnel", role="TORII", length=40, span=3, height=5, spacing=2,
+                               palette="INARI"),
     # Not from PLATEAU: the same generators in the painted styles (Senso-ji's vermilion pagoda, a shrine hall
     # under a copper roof), to check the palettes.
     "demo_pagoda_vermilion": dict(kind="pagoda", role="PAGODA", storeys=5, span=19, topSpan=15, body=9, topBody=7, firstEave=10.5,
@@ -127,6 +158,12 @@ TEMPLES = {
                              gableInset=2, overhang=2, platform=2),
     "demo_belfry_hakamagoshi": dict(kind="belfry", role="BELFRY", width=11, depth=11, eave=12.0, ridge=16.0,
                                     roof="IRIMOYA", gableInset=2, overhang=2, skirt=True, platform=1),
+    "demo_honden_nagare": dict(kind="honden", role="HONDEN", width=11, bodyWidth=7, bodyDepth=5, porch=4,
+                               eave=5.0, ridge=8.5, floor=2, palette="HIWADA"),
+    "demo_honden_chigi": dict(kind="honden", role="HONDEN", width=11, bodyWidth=7, bodyDepth=5, porch=3,
+                              eave=5.0, ridge=9.0, floor=2, chigi=True, palette="WEATHERED"),
+    "demo_torii": dict(kind="torii", role="TORII", span=6, height=8, palette="VERMILION"),
+    "demo_otorii": dict(kind="torii", role="TORII", span=12, height=15, palette="VERMILION"),
     "demo_hall_copper": dict(kind="hall", role="HAIDEN", width=29, depth=21, eave=8.0, ridge=17.0, roof="IRIMOYA", gableInset=4,
                              overhang=4, platform=2, bay=4.0, palette="COPPER"),
 }
@@ -150,11 +187,18 @@ LABELS = {
     "higashi_honganji_goeidomon": ("sacred", TEMPLE, "TEMPLE_GATE"),
     "nishi_honganji_goeidomon": ("sacred", TEMPLE, "TEMPLE_GATE"),
     "nanzenji_sanmon": ("sacred", TEMPLE, "TEMPLE_GATE"),
+    "yasaka_honden": ("sacred", SHRINE, "HONDEN"), "yasaka_buden": ("sacred", SHRINE, "KAGURADEN"),
+    "inari_romon": ("sacred", SHRINE, "SHRINE_GATE"), "inari_gaihaiden": ("sacred", SHRINE, "HAIDEN"),
+    "inari_honden": ("sacred", SHRINE, "HONDEN"), "inari_otorii": ("sacred", SHRINE, "TORII"),
+    "inari_senbon_torii": ("sacred", SHRINE, "TORII"),
+    "demo_honden_nagare": ("sacred", SHRINE, "HONDEN"), "demo_honden_chigi": ("sacred", SHRINE, "HONDEN"),
+    "demo_torii": ("sacred", SHRINE, "TORII"), "demo_otorii": ("sacred", SHRINE, "TORII"),
     "demo_gate_vermilion": ("sacred", TEMPLE, "TEMPLE_GATE"), "demo_belfry_open": ("sacred", TEMPLE, "BELFRY"),
     "demo_belfry_hakamagoshi": ("sacred", TEMPLE, "BELFRY"),
     "demo_pagoda_vermilion": ("sacred", TEMPLE, "PAGODA"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
 }
-DEMO_NAMES = {"demo_gate_vermilion": "二重門（朱塗り、宝蔵門風）", "demo_belfry_open": "鐘楼（吹放し）",
+DEMO_NAMES = {"inari_otorii": "伏見稲荷大社 大鳥居", "inari_senbon_torii": "伏見稲荷大社 千本鳥居", "demo_honden_nagare": "本殿（流造、檜皮葺）", "demo_honden_chigi": "本殿（千木・鰹木）",
+              "demo_torii": "鳥居（明神鳥居）", "demo_otorii": "大鳥居", "demo_gate_vermilion": "二重門（朱塗り、宝蔵門風）", "demo_belfry_open": "鐘楼（吹放し）",
               "demo_belfry_hakamagoshi": "鐘楼（袴腰）","demo_pagoda_vermilion": "五重塔（朱塗り、浅草寺風）", "demo_hall_copper": "拝殿（銅板葺、神社）"}
 
 
@@ -919,7 +963,8 @@ COLOURS = {
 }
 
 
-PREVIEW_ALIAS = {"waxed_weathered_copper": "weathered_cut_copper", "chain": "polished_blackstone",
+PREVIEW_ALIAS = {"acacia_stairs": "acacia_planks", "green_terracotta": "green_terracotta", "lantern": "gold_block", "spruce_slab": "spruce_planks", "dark_oak_slab": "dark_oak_planks",
+                 "yellow_terracotta": "yellow_terracotta", "waxed_weathered_copper": "weathered_cut_copper", "chain": "polished_blackstone",
                  "stripped_spruce_log": "spruce_planks", "dark_oak_fence": "dark_oak_planks", "mangrove_fence": "mangrove_planks",
                  "polished_blackstone_wall": "polished_blackstone", "iron_trapdoor": "iron_block",
                  "dark_oak_trapdoor": "dark_oak_planks", "iron_bars": "iron_block", "lightning_rod": "cut_copper",
@@ -990,7 +1035,30 @@ def render(blocks, size, path, bc, max_px=1800):
             if 0 <= X < w and 0 <= Y < h:
                 i = (Y * w + X) * 3
                 img[i:i + 3] = cols[f]
-    write_png(path, w, h, img)
+    # Beside it, the front (south) elevation, flat-on: what stands nearest the viewer in each column of the
+    # facade, darker the further back it stands; the proportions of walls, columns and eaves read here.
+    front = {}
+    for (x, y, z) in blocks:
+        if z > front.get((x, y), -1):
+            front[(x, y)] = z
+    fs = max(2, s)
+    fw, fh = sx * fs, sy * fs
+    W, H = w + 16 + fw, max(h, fh + 8)
+    out = bytearray(bytes((0xf4, 0xf1, 0xea)) * (W * H))
+    for row in range(h):
+        out[row * W * 3:(row * W + w) * 3] = img[row * w * 3:(row + 1) * w * 3]
+    for (x, y), z in front.items():
+        name, props = blocks[(x, y, z)]
+        r, g, b = bc.get(FULL_OF.get(name, PREVIEW_ALIAS.get(name, name))) or ((COLOURS[name] >> 16, (COLOURS[name] >> 8) & 255,
+                                                      COLOURS[name] & 255) if name in COLOURS else (255, 0, 255))
+        k = 0.95 - 0.45 * (sz - 1 - z) / max(1, sz - 1)
+        col = bytes((int(r * k), int(g * k), int(b * k)))
+        for py in range(fs):  # slabs and stairs drawn whole: a roof's steps would show the sky between them
+            Y = H - 4 - (y + 1) * fs + py
+            X0 = w + 16 + x * fs
+            if 0 <= Y < H:
+                out[(Y * W + X0) * 3:(Y * W + X0 + fs) * 3] = col * fs
+    write_png(path, W, H, out)
 
 
 def thin(name):
@@ -1083,7 +1151,7 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
             or slug in TEMPLES and os.path.exists(os.path.join(out, "models", slug + ".json"))]  # LOD1-only ones too
     if len(chosen) == len(LANDMARKS) or any(c[1].startswith("demo_") for c in chosen):
         jobs += [(out, None, slug, DEMO_NAMES.get(slug, slug), None, {}, bc, textured) for slug in TEMPLES
-                 if slug.startswith("demo_") and os.path.exists(os.path.join(out, "models", slug + ".json"))]
+                 if slug not in {c[1] for c in LANDMARKS} and os.path.exists(os.path.join(out, "models", slug + ".json"))]
     entries = []
     with multiprocessing.Pool(max(1, min(len(jobs), (os.cpu_count() or 2) - 1))) as pool:
         for e in pool.imap(build_one, jobs):

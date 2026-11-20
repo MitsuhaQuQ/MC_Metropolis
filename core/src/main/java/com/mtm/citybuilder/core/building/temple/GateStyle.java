@@ -9,5 +9,11 @@ public enum GateStyle {
      * side bays of the middle row closed by boards, great plank doors opened back in the passages, and a deep band
      * of brackets set between the columns too (詰組).
      */
-    ZEN
+    ZEN,
+    /**
+     * 楼門: two storeys under a single roof, as at Fushimi Inari and Yasaka: the lower storey (和様, with lattice),
+     * then a railed balcony on brackets all round, the upper storey and the roof; no roof between. Its stair houses
+     * ({@code sanro}) become corridors (回廊) running off both ends.
+     */
+    ROMON
 }

@@ -68,9 +68,50 @@ public record TemplePalette(String roof, String roofStairs, String roofSlab, Str
             m("dark_oak_trapdoor"), m("polished_blackstone_wall"), m("stripped_spruce_log"), m("dark_oak_planks"),
             null, m("dark_oak_planks"));
 
-    /** By name: NATURAL, VERMILION, COPPER or WEATHERED. */
+    /**
+     * A cypress-bark roof (檜皮葺, brown) over vermilion and white, black lattice, gilded rafter ends and fittings:
+     * the great shrine halls (Yasaka's main hall).
+     */
+    public static final TemplePalette HIWADA = new TemplePalette(m("spruce_planks"), m("spruce_stairs"),
+            m("spruce_slab"), m("polished_blackstone_bricks"), m("polished_blackstone_brick_stairs"),
+            m("red_concrete"), m("red_concrete"), m("mangrove_stairs"), m("white_concrete"),
+            m("polished_blackstone"), m("stone_bricks"), m("stone_brick_stairs"), m("dark_oak_fence"),
+            m("dark_oak_trapdoor"), m("polished_blackstone_wall"), m("yellow_terracotta"), m("gilded_blackstone"),
+            null, m("gold_block"));
+
+    /**
+     * Dark unpainted wood under a dark copper-brown roof, white rafter ends, gilded ornaments: Yasaka's dance hall
+     * (舞殿) and similar pavilions.
+     */
+    public static final TemplePalette DARK = new TemplePalette(m("dark_oak_planks"), m("dark_oak_stairs"),
+            m("dark_oak_slab"), m("polished_blackstone_bricks"), m("polished_blackstone_brick_stairs"),
+            m("stripped_dark_oak_log"), m("dark_oak_planks"), m("dark_oak_stairs"), m("white_concrete"),
+            m("dark_oak_planks"), m("stone_bricks"), m("stone_brick_stairs"), m("dark_oak_fence"),
+            m("dark_oak_trapdoor"), m("polished_blackstone_wall"), m("white_concrete"), m("gold_block"),
+            null, m("gold_block"));
+
+    /**
+     * Fushimi Inari: bright orange vermilion, white, green lattice windows, a dark cypress-bark roof, gilded rafter
+     * ends and fittings, black-footed torii.
+     */
+    public static final TemplePalette INARI = new TemplePalette(m("dark_oak_planks"), m("dark_oak_stairs"),
+            m("dark_oak_slab"), m("polished_blackstone_bricks"), m("polished_blackstone_brick_stairs"),
+            m("orange_concrete"), m("orange_concrete"), m("acacia_stairs"), m("white_concrete"),
+            m("green_terracotta"), m("stone_bricks"), m("stone_brick_stairs"), m("mangrove_fence"),
+            m("dark_oak_trapdoor"), m("polished_blackstone_wall"), m("yellow_terracotta"), m("gold_block"),
+            null, m("gold_block"));
+
+    /** How concave the roof is: bark and copper roofs sweep up steeply to the ridge, tiled ones less. */
+    public double roofCurve() {
+        return roof.contains("planks") || roof.contains("copper") ? 0.5 : 0.35;
+    }
+
+    /** By name: NATURAL, VERMILION, COPPER, WEATHERED, HIWADA, DARK or INARI. */
     public static TemplePalette named(String name) {
         return switch (name) {
+            case "INARI" -> INARI;
+            case "HIWADA" -> HIWADA;
+            case "DARK" -> DARK;
             case "WEATHERED" -> WEATHERED;
             case "VERMILION" -> VERMILION;
             case "COPPER" -> COPPER;

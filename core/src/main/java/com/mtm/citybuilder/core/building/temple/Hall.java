@@ -23,11 +23,12 @@ import com.mtm.citybuilder.core.building.temple.Parts.Rect;
  * @param mokoshiOverhang the pent roof's eaves beyond its (outer) walls
  * @param platform        height of the stone platform
  * @param bay             distance between columns
+ * @param veranda         a wooden veranda (縁) with a railing (高欄) round the outer walls, as on shrine halls
  * @param palette         materials
  */
 public record Hall(int width, int depth, double eave, double ridge, RoofType roof, double gableInset, int overhang,
                    int mokoshiWidth, int mokoshiDepth, double mokoshiEave, int mokoshiOverhang, int platform,
-                   double bay, TemplePalette palette) {
+                   double bay, boolean veranda, TemplePalette palette) {
 
     /** The highest wall row under a roof: just below the roof's lowest piece over the wall line. */
     static int wallTop(Roof roof, Rect walls) {
@@ -58,8 +59,12 @@ public record Hall(int width, int depth, double eave, double ridge, RoofType roo
         Rect outerWalls = hasMokoshi() ? ring : body;
         int steps = overhang >= 4 ? 2 : 1;
 
-        Parts.platform(m, p, outerWalls.grow(Math.max(1, Math.min(3, overhang - 1))), platform);
-        Roof mainRoof = new Roof(p, main.x0(), main.z0(), main.width(), main.depth(), eave, ridge, roof, 0.35,
+        Rect plat = outerWalls.grow(Math.max(1, Math.min(3, overhang - 1)));
+        Parts.platform(m, p, plat, platform);
+        if (veranda) {
+            Parts.veranda(m, p, outerWalls, platform, plat);
+        }
+        Roof mainRoof = new Roof(p, main.x0(), main.z0(), main.width(), main.depth(), eave, ridge, roof, p.roofCurve(),
                 Math.min(2.0, 0.8 + width / 30.0), gableInset).walls(body.x0(), body.z0(), body.x1(), body.z1());
         // The walls reach the roof's underside where it passes over them, less the brackets.
         int top = Math.max(platform + 3, wallTop(mainRoof, body) - steps);

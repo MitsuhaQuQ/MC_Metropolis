@@ -26,7 +26,8 @@ final class Roof {
     private final double eave, rise, curve, cornerLift, gableInset;
     private final RoofType type;
     private final boolean alongX;
-    private final double half;
+    private double half;
+    private double ridgeZ = Double.NaN; // an off-centre gable ridge (流造), along x
     private Mask mask = (x, z) -> false;
     private int[] walls; // x0, z0, x1, z1 (exclusive) of the body under the roof, for the eaves' underside
     private boolean ridges = true;
@@ -72,9 +73,23 @@ final class Roof {
         return this;
     }
 
+    /**
+     * Puts a gable's ridge (along x) at {@code z} rather than in the middle, as on a nagare-zukuri (流造) sanctuary:
+     * the back slope runs from the ridge to the outline's first row at the given eave height, the front slope
+     * carries on past the mirror of the back eave at the eave's own slope, longer and lower, over the porch.
+     */
+    Roof ridgeAt(double z) {
+        this.ridgeZ = z;
+        this.half = z - z0;
+        return this;
+    }
+
     /** Distance of a column's centre to the sides along the ridge. */
     private double side(int x, int z) {
         double cx = x + 0.5, cz = z + 0.5;
+        if (!Double.isNaN(ridgeZ)) {
+            return half - Math.abs(cz - ridgeZ); // negative past the mirror of the back eave
+        }
         return alongX ? Math.min(cz - z0, z0 + d - cz) : Math.min(cx - x0, x0 + w - cx);
     }
 
@@ -86,12 +101,15 @@ final class Roof {
 
     /** Height at a distance from the eave. */
     double profile(double dist) {
-        double t = Math.max(0, Math.min(1, dist / half));
+        double t = Math.min(1, dist / half);
+        if (t < 0) { // beyond the eave line (a nagare roof's front): on at the eave's slope
+            return rise * (1 - curve) * t;
+        }
         return rise * ((1 - curve) * t + curve * t * t);
     }
 
     private double lift(double s, double e) {
-        double a = Math.max(0, 1 - s / half), b = Math.max(0, 1 - e / half);
+        double a = Math.max(0, Math.min(1, 1 - s / half)), b = Math.max(0, Math.min(1, 1 - e / half));
         return cornerLift * a * a * b * b;
     }
 
@@ -219,12 +237,12 @@ final class Roof {
     private void eaveEdge(Model m, Map<Long, Double> h) {
         for (Map.Entry<Long, Double> en : h.entrySet()) {
             int x = (int) (en.getKey() >> 32), z = en.getKey().intValue();
-            double s = side(x, z), e = end(x, z);
-            if (s >= 1 && e >= 1) {
+            boolean edgeX = x == x0 || x == x0 + w - 1, edgeZ = z == z0 || z == z0 + d - 1;
+            if (!edgeX && !edgeZ) {
                 continue;
             }
             int y = yOf(en.getValue()) - 1;
-            if (s < 1 && e < 1) {
+            if (edgeX && edgeZ) {
                 m.set(x, y, z, p.fitting());
                 if (p.bell() != null) {
                     m.setIfEmpty(x, y - 1, z, p.bell() + "[attachment=ceiling,facing=north]");
