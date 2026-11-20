@@ -85,6 +85,18 @@ public final class BuildingLayer {
         BAMBOO,
         /** A pot plant. */
         PLANT,
+        /** A garden tree's trunk. */
+        LOG,
+        /** A garden tree's crown. */
+        LEAVES,
+        /** A shrub by the walls (azalea). */
+        SHRUB,
+        /** A garden shed (物置). */
+        SHED,
+        /** A carport's post. */
+        POST,
+        /** A carport's roof. */
+        CARPORT,
         /** A light inside, so nothing spawns there. */
         LIGHT
     }
@@ -112,10 +124,14 @@ public final class BuildingLayer {
      * @param light    whether a light hangs in it, a column in a grid inside
      * @param door     whether the door is in it, or (just inside the front wall) behind it
      * @param inner    for a column just inside a wall (the second layer), which wall: what is set back stands here
+     * @param wing     whether it lies in the annex behind
+     * @param lot      in the ring, on which of the lot's own boundary lines: SIDE at the end of its frontage (the
+     *                 neighbour's wall is on its own end), BACK along its back, NONE elsewhere
      */
     public record Column(Building building, boolean ring, double u, double v, Face face, boolean corner, int eave,
-                         boolean ridge, boolean light, boolean door, Face inner) {
-        public static final Column EMPTY = new Column(null, false, 0.0, 0.0, Face.NONE, false, 0, false, false, false, Face.NONE);
+                         boolean ridge, boolean light, boolean door, Face inner, boolean wing, Face lot) {
+        public static final Column EMPTY = new Column(null, false, 0.0, 0.0, Face.NONE, false, 0, false, false, false,
+                Face.NONE, false, Face.NONE);
 
         public boolean edge() {
             return face != Face.NONE;
@@ -174,7 +190,7 @@ public final class BuildingLayer {
             return false;
         }
         double[] l = b.local(x, z);
-        return l[0] >= 0 && l[0] < b.width() && l[1] >= b.front() && l[1] < b.back();
+        return b.covers(l[0], l[1]);
     }
 
     private static boolean wide(StreetClass street) {
@@ -200,7 +216,17 @@ public final class BuildingLayer {
         long h = Hash.of(logic.seed() ^ 0xB111D1A6L, plot.id());
         District district = plot.district();
         boolean downtown = district == District.CENTRAL || district == District.STATION_FRONT;
-        if (!downtown && Hash.unit(h) < config.vacant) {
+        // A development (建売): runs of four lots along a residential street or lane, a third of them built by one
+        // developer as one house repeated, the doors alternating sides
+        long group = 0L;
+        boolean project = false;
+        if (district == District.RESIDENTIAL && (plot.street() == StreetClass.STREET || plot.street() == StreetClass.LANE)) {
+            long chainSide = Hash.of(logic.seed() ^ 0xDE7E10L, plot.chain(), plot.side());
+            int offset = (int) Math.floorMod(chainSide, (long) config.projectRun);
+            group = Hash.of(chainSide, Math.floorDiv(plot.index() + offset, config.projectRun));
+            project = Hash.unit(group) < config.projects;
+        }
+        if (!downtown && !project && Hash.unit(h) < config.vacant) {
             return null;
         }
         double[] shares = switch (district) {
@@ -229,6 +255,11 @@ public final class BuildingLayer {
         if (type == Building.Type.MACHIYA) {
             storeys = Math.min(storeys, 2);
         }
+        if (project) {
+            type = Building.Type.HOUSE;
+            // Kyoto's new houses on narrow lots are often three storeys
+            storeys = Hash.unit(Hash.of(group, 1)) < 0.3 ? 3 : 2;
+        }
 
         // Footprint: setback from the street, gaps at the sides and the back, depth within the kind's range
         double u3 = Hash.unit(Hash.of(h, 3));
@@ -238,10 +269,11 @@ public final class BuildingLayer {
         double depth;
         switch (type) {
             case HOUSE -> {
-                front = 1.0 + Math.floor(4.0 * u3);
+                long shape = project ? group : h;
+                front = 1.0 + Math.floor((project ? 2.0 : 4.0) * Hash.unit(Hash.of(shape, 3)));
                 sideGap = 1.0;
                 backGap = 2.0;
-                depth = 7.0 + 4.0 * Hash.unit(Hash.of(h, 4));
+                depth = 7.0 + 4.0 * Hash.unit(Hash.of(shape, 4));
             }
             case MACHIYA -> {
                 // A block's strip in front, under the pent roof
@@ -280,14 +312,83 @@ public final class BuildingLayer {
             sideGap = Math.max(0.0, 0.5 * (plot.frontage() - 5.0));
             width = Math.floor(plot.frontage() - 2.0 * sideGap);
         }
+        // A house and its garden are laid out together (suburban houses vary so): standard; parking beside the house,
+        // the house pushed to the other side; parking in front, the house set back; a garden in front. A development
+        // is laid out one way throughout
+        int layout = 0;
+        double shift = 0.0;
+        boolean parkLeft = false;
+        if (type == Building.Type.HOUSE) {
+            long lay = project ? group : h;
+            double r = Hash.unit(Hash.of(lay, 40));
+            parkLeft = Hash.unit(Hash.of(lay, 41)) < 0.5;
+            if (r < 0.3 && plot.frontage() >= 10.0) {
+                layout = 1;
+                double park = 3.5;
+                width = Math.floor(plot.frontage() - 1.0 - park);
+                shift = (parkLeft ? 1 : -1) * 0.5 * (park - 1.0);
+                front = 1.0 + Math.floor(2.0 * Hash.unit(Hash.of(lay, 42)));
+            } else if (r < 0.6 && plot.maxDepth() >= 5.0 + 7.0 + backGap) {
+                layout = 2;
+                front = 5.0;
+            } else if (r < 0.8 && plot.maxDepth() >= 4.0 + 7.0 + backGap) {
+                layout = 3;
+                front = 3.0 + Math.floor(2.0 * Hash.unit(Hash.of(lay, 42)));
+            }
+        }
         depth = Math.floor(Math.min(depth, plot.maxDepth() - front - backGap));
         if (width < 4.0 || depth < 4.0) {
             return null;
         }
-        double mid = 0.5 * (plot.start() + plot.end());
+        double mid = 0.5 * (plot.start() + plot.end()) + shift;
         double from = mid - 0.5 * width;
         double to = mid + 0.5 * width;
         double back = front + depth;
+        double parkFrom = 0.0;
+        double parkTo = 0.0;
+        double parkBack = 0.0;
+        if (layout == 1) {
+            parkFrom = parkLeft ? plot.start() - from + 0.5 : width;
+            parkTo = parkLeft ? 0.0 : plot.end() - from - 0.5;
+            parkBack = front + Math.min(depth, 6.0);
+        } else if (layout == 2) {
+            boolean left = parkLeft;
+            parkFrom = left ? 0.0 : width - 3.0;
+            parkTo = left ? 3.0 : width;
+            parkBack = front;
+        }
+
+        // The frame: the street at the middle of the frontage and the way into the lot
+        double[] p = plots.pointAt(plot.chain(), mid);
+        double nx = -p[3] * plot.side();
+        double nz = p[2] * plot.side();
+        double edge = 0.5 * plot.streetWidth();
+        double ox = p[0] + nx * edge;
+        double oz = p[1] + nz * edge;
+
+        // A corner lot: another street just beyond one side of the frontage. Shops, offices and flats there cut the
+        // corner off (隅切り) and, fronting two streets, may rise a storey higher
+        double chamferLeft = 0.0;
+        double chamferRight = 0.0;
+        boolean cornerType = type == Building.Type.SHOP || type == Building.Type.OFFICE || type == Building.Type.APARTMENT;
+        if (cornerType && width >= 8.0) {
+            for (int s = -1; s <= 1; s += 2) {
+                boolean street = false;
+                for (double out : new double[]{1.5, 3.5}) {
+                    double a = s * (0.5 * width + sideGap + out);
+                    double v = front + 2.0;
+                    street |= plots.onStreet(ox + p[2] * a + nx * v, oz + p[3] * a + nz * v);
+                }
+                if (street) {
+                    if (s < 0) {
+                        chamferLeft = 3.0;
+                    } else {
+                        chamferRight = 3.0;
+                    }
+                }
+            }
+        }
+        boolean corner = chamferLeft > 0 || chamferRight > 0;
 
         int ground = switch (type) {
             case SHOP, OFFICE -> config.shopFloor;
@@ -299,11 +400,15 @@ public final class BuildingLayer {
             case WORKS -> config.worksStorey;
             default -> config.storey;
         };
+        if (type == Building.Type.MACHIYA && Hash.unit(Hash.of(h, 30)) < config.lowUpper) {
+            // The low second storey of an older machiya (厨子二階), under the eaves
+            upper = 2;
+        }
         // The road slant line: the walls no higher than its factor times the far edge of the street, both sides set
         // back alike; two storeys are always allowed. Flats and offices drawn taller keep up to two storeys more, set
         // back behind a terrace
         double allowed = config.slant * (plot.streetWidth() + 2.0 * front);
-        int cap = Math.max(2, 1 + (int) Math.floor((allowed - ground) / upper));
+        int cap = Math.max(2, 1 + (int) Math.floor((allowed - ground) / upper) + (corner ? 1 : 0));
         int step = storeys;
         double stepBack = 0.0;
         if (storeys > cap && cap >= 3 && (type == Building.Type.OFFICE || type == Building.Type.APARTMENT)) {
@@ -334,17 +439,11 @@ public final class BuildingLayer {
             case WORKS -> config.roofsWorks;
             default -> storeys >= 4 ? config.roofsTall : config.roofsShop;
         };
-        Building.Roof roof = step < storeys ? Building.Roof.FLAT : Building.Roof.values()[draw(roofs, Hash.unit(Hash.of(h, 5)))];
+        Building.Roof roof = step < storeys ? Building.Roof.FLAT
+                : Building.Roof.values()[draw(roofs, Hash.unit(Hash.of(project ? group : h, 5)))];
         boolean ridgeAlong = type == Building.Type.MACHIYA || width >= depth;
         double slope = type == Building.Type.WORKS ? 0.5 : 1.0;
 
-        // The frame: the street at the middle of the frontage and the way into the lot
-        double[] p = plots.pointAt(plot.chain(), mid);
-        double nx = -p[3] * plot.side();
-        double nz = p[2] * plot.side();
-        double edge = 0.5 * plot.streetWidth();
-        double ox = p[0] + nx * edge;
-        double oz = p[1] + nz * edge;
         // The base: the ground under the footprint (a 3 × 3 grid over it), its median, and no lower than the ground
         // at the front door
         double[] samples = new double[9];
@@ -360,18 +459,50 @@ public final class BuildingLayer {
         Arrays.sort(samples);
         int base = (int) Math.floor(Math.max(samples[4], atDoor));
 
-        double door = type == Building.Type.HOUSE
-                ? 1.5 + Math.floor((width - 3.0) * Hash.unit(Hash.of(h, 6)))
-                : Math.floor(0.5 * width) + 0.5;
+        double door;
+        if (project) {
+            // One house repeated, mirrored lot by lot: the door at alternate ends
+            door = Math.floorMod(plot.index(), 2) == 0 ? 1.5 : width - 1.5;
+        } else if (type == Building.Type.HOUSE && layout == 2) {
+            door = parkLeft ? width - 1.5 : 1.5;
+        } else if (type == Building.Type.HOUSE) {
+            door = 1.5 + Math.floor((width - 3.0) * Hash.unit(Hash.of(h, 6)));
+        } else {
+            door = Math.floor(0.5 * width) + 0.5;
+        }
 
-        // Palette: lots in a run along the street share one, three in five of them
+        // An annex behind a house of two storeys or more (下屋): one storey, a lean-to roof falling away from the house,
+        // along one side, making the plan an L
+        double wingFrom = 0.0;
+        double wingTo = 0.0;
+        double wingBack = back;
+        if (type == Building.Type.HOUSE && !project && storeys >= 2 && Hash.unit(Hash.of(h, 31)) < config.annexes) {
+            double room = plot.maxDepth() - back - 1.0;
+            double wingDepth = Math.min(3.0 + Math.floor(2.0 * Hash.unit(Hash.of(h, 32))), Math.floor(room));
+            if (wingDepth >= 3.0) {
+                double wingWidth = Math.max(3.0, Math.floor(width * (0.4 + 0.3 * Hash.unit(Hash.of(h, 33)))));
+                if (Hash.unit(Hash.of(h, 34)) < 0.5) {
+                    wingTo = wingWidth;
+                } else {
+                    wingFrom = width - wingWidth;
+                    wingTo = width;
+                }
+                wingBack = back + wingDepth;
+            }
+        }
+
+        // Palette: lots in a run along the street share one, three in five of them; a development, its own
         List<Integer> family = Palette.of(type);
         long run = Hash.of(logic.seed() ^ 0x9A1E77EL, plot.chain(), (long) Math.floor(plot.start() / config.paletteRun));
-        long pick = Hash.unit(Hash.of(h, 7)) < 0.6 ? run : Hash.of(h, 8);
+        long pick = project ? Hash.of(group, 7) : Hash.unit(Hash.of(h, 7)) < 0.6 ? run : Hash.of(h, 8);
         int palette = family.get((int) Math.floorMod(Hash.mix(pick), family.size()));
+        long variant = project ? Hash.of(group, 9) : Hash.of(h, 9);
 
+        boolean carport = layout != 0 && Hash.unit(Hash.of(project ? group : h, 43)) < 0.45;
         return new Building(plot.id(), type, storeys, ground, upper, roof, ridgeAlong, slope, from, to, front, back,
-                step, stepBack, base, ox, oz, p[2], p[3], nx, nz, door, palette, Hash.of(h, 9));
+                step, stepBack, wingFrom, wingTo, wingBack, chamferLeft, chamferRight, layout, plot.start() - from,
+                plot.end() - from, plot.maxDepth(), parkFrom, parkTo, parkBack, carport, base, ox, oz, p[2], p[3], nx, nz,
+                door, palette, variant);
     }
 
     /** How far out in front a building's ring reaches: its whole front yard for houses and flats, else a block. */
@@ -428,12 +559,15 @@ public final class BuildingLayer {
                             break;
                         }
                     }
-                    columns[x * 16 + z] = column(b, wx, wz, edge, false);
+                    columns[x * 16 + z] = column(b, wx, wz, edge, false, plots[c]);
                 } else if (lots[c] != null) {
                     Building lot = lots[c];
                     double[] l = lot.local(wx, wz);
-                    if (l[0] >= -1 && l[0] < lot.width() + 1 && l[1] >= lot.front() - yard(lot) && l[1] < lot.back() + 1) {
-                        columns[x * 16 + z] = column(lot, wx, wz, false, true);
+                    // A house's ring is its whole lot: the garden
+                    boolean garden = lot.type() == Building.Type.HOUSE;
+                    if (garden || l[0] >= -1 && l[0] < lot.width() + 1 && l[1] >= lot.front() - yard(lot)
+                            && l[1] < Math.max(lot.back(), lot.wingBack()) + 1) {
+                        columns[x * 16 + z] = column(lot, wx, wz, false, true, plots[c]);
                     }
                 } else if (plots[c] == null) {
                     // Off the lots (a street's pavement): the front ring of a building standing on the street's edge,
@@ -445,7 +579,7 @@ public final class BuildingLayer {
                         }
                         double[] l = o.local(wx, wz);
                         if (l[0] >= 0 && l[0] < o.width() && l[1] >= o.front() - 1 && l[1] < o.front()) {
-                            columns[x * 16 + z] = column(o, wx, wz, false, true);
+                            columns[x * 16 + z] = column(o, wx, wz, false, true, null);
                             break;
                         }
                     }
@@ -456,11 +590,17 @@ public final class BuildingLayer {
     }
 
     /** A column of a building or its ring at a position. */
-    static Column column(Building b, double x, double z, boolean edge, boolean ring) {
+    static Column column(Building b, double x, double z, boolean edge, boolean ring, Plot plot) {
         double[] l = b.local(x, z);
         double u = l[0];
         double v = l[1];
         double w = b.width();
+        if (!ring && v >= b.back()) {
+            // The annex: walls where the mask says, a light in a grid inside
+            boolean light = !edge && Math.floorMod((long) Math.floor(u), 6) == 2 && Math.floorMod((long) Math.floor(v - b.back()), 6) == 1;
+            return new Column(b, false, u, v, edge ? Face.SIDE : Face.NONE, false, 0, false, light, false, Face.NONE, true,
+                    Face.NONE);
+        }
         Face face = Face.NONE;
         boolean corner = false;
         boolean door = false;
@@ -506,7 +646,15 @@ public final class BuildingLayer {
         boolean ridge = b.roof() != Building.Roof.FLAT && eave >= (int) Math.floor(0.5 * span - 0.5);
         boolean light = !ring && face == Face.NONE && Math.floorMod((long) Math.floor(u), 8) == 3
                 && Math.floorMod((long) Math.floor(v - b.front()), 8) == 3;
-        return new Column(b, ring, u, v, face, corner, eave, ridge, light, door, inner);
+        Face lot = Face.NONE;
+        if (ring && plot != null && plot.id() == b.id()) {
+            if (plot.end() - plot.along() < 1.0) {
+                lot = Face.SIDE;
+            } else if (plot.maxDepth() - plot.depth() < 1.0) {
+                lot = Face.BACK;
+            }
+        }
+        return new Column(b, ring, u, v, face, corner, eave, ridge, light, door, inner, false, lot);
     }
 
     /** The height of a pitched roof's surface over a column, in half blocks above the top of the walls. */
@@ -608,9 +756,12 @@ public final class BuildingLayer {
     /** The highest block a column of a building or its ring has; below the base where the ring carries nothing. */
     public static int top(Column c) {
         Building b = c.building();
+        if (c.wing()) {
+            return b.base() + wingRoof(b, c);
+        }
         if (c.ring()) {
             int top = -1;
-            for (int dy = 0; dy <= b.wallHeight() + 2; dy++) {
+            for (int dy = 0; dy <= Math.max(b.wallHeight() + 2, 8); dy++) {
                 if (ringPart(b, c, dy) != Part.NONE) {
                     top = dy;
                 }
@@ -648,6 +799,9 @@ public final class BuildingLayer {
             return Part.NONE;
         }
         int dy = y - b.base();
+        if (c.wing()) {
+            return wingPart(b, c, dy);
+        }
         if (c.ring()) {
             if (b.roof() != Building.Roof.FLAT && c.eave() >= -1 && dy == roofRow(b, c)) {
                 return c.ridge() ? Part.RIDGE : Math.floorMod(halves(b, c), 2) == 1 ? Part.ROOF_LOW : Part.ROOF_HIGH;
@@ -734,6 +888,152 @@ public final class BuildingLayer {
                 return Part.RIDGE;
             }
             return Math.floorMod(halves(b, c), 2) == 1 ? Part.ROOF_LOW : Part.ROOF_HIGH;
+        }
+        return Part.AIR;
+    }
+
+    /** A garden tree: {u, v of its trunk, trunk height, crown radius}. */
+    private record Tree(double u, double v, int trunk, int radius) {
+    }
+
+    /**
+     * A house's garden trees, from its layout: one or two in the corners of a front or back garden three blocks deep
+     * or more; none on the parking space or the path to the door.
+     */
+    private static java.util.List<Tree> trees(Building b) {
+        java.util.List<double[]> spots = new java.util.ArrayList<>();
+        double w = b.width();
+        if (b.front() >= 3.0) {
+            spots.add(new double[]{1.5, 1.5});
+            spots.add(new double[]{w - 1.5, 1.5});
+        }
+        double behind = Math.max(b.back(), b.wingBack());
+        if (b.lotDepth() - behind >= 3.0) {
+            double v = b.lotDepth() - 1.5;
+            spots.add(new double[]{b.lotFrom() + 2.0, v});
+            spots.add(new double[]{b.lotTo() - 2.0, v});
+            spots.add(new double[]{0.5 * w, v});
+        }
+        java.util.List<Tree> trees = new java.util.ArrayList<>();
+        int wanted = b.layout() == 3 ? 2 : chance(b, 50, 0.6) ? 1 : 0;
+        for (int k = 0; k < spots.size() && trees.size() < wanted; k++) {
+            double[] s = spots.get((k + choice(b, 51, spots.size())) % spots.size());
+            if (b.parking(s[0], s[1]) || Math.abs(s[0] - b.door()) < 2.0 && s[1] < b.front()) {
+                continue;
+            }
+            boolean big = s[1] > b.back() && chance(b, 52 + k, 0.4);
+            trees.add(new Tree(Math.floor(s[0]) + 0.5, Math.floor(s[1]) + 0.5, 3 + choice(b, 54 + k, 2), big ? 2 : 1));
+        }
+        return trees;
+    }
+
+    /**
+     * A house's garden, at a column of its lot: trees, the parking space and its carport, a shed in a back corner,
+     * shrubs at the foot of the walls, the lot's side and back boundary. Null where none of these is.
+     */
+    private static Part garden(Building b, Column c, int dy) {
+        double u = c.u();
+        double v = c.v();
+        for (Tree t : trees(b)) {
+            double du = Math.abs(u - t.u());
+            double dv = Math.abs(v - t.v());
+            if (du < 0.5 && dv < 0.5 && dy >= 1 && dy <= t.trunk()) {
+                return Part.LOG;
+            }
+            double d = Math.max(du, dv);
+            int crown = dy - t.trunk();
+            if (crown >= -1 && crown <= 1 && d < t.radius() + 0.5 && !(d >= t.radius() - 0.5 && Math.min(du, dv) >= t.radius() - 0.5)) {
+                return Part.LEAVES;
+            }
+            if (crown == 2 && d < t.radius() - 0.5 + 0.01) {
+                return Part.LEAVES;
+            }
+        }
+        if (b.parking(u, v)) {
+            if (dy == 0) {
+                return Part.PAVING;
+            }
+            if (b.carport()) {
+                boolean postU = u - b.parkFrom() < 1.0 || b.parkTo() - u < 1.0;
+                boolean postV = v < 1.0 || b.parkBack() - v < 1.0;
+                if (postU && postV && dy <= 2) {
+                    return Part.POST;
+                }
+                if (dy == 3) {
+                    return Part.CARPORT;
+                }
+            }
+            return Part.NONE;
+        }
+        // A shed in a back corner of the garden, clear of the trees
+        double behind = Math.max(b.back(), b.wingBack());
+        if (b.lotDepth() - behind >= 4.0 && chance(b, 56, 0.4)) {
+            boolean left = chance(b, 57, 0.5);
+            double su = left ? b.lotFrom() + 1.0 : b.lotTo() - 3.0;
+            double sv = b.lotDepth() - 3.0;
+            boolean clear = true;
+            for (Tree t : trees(b)) {
+                clear &= Math.abs(t.u() - (su + 1.0)) > 2.5 || Math.abs(t.v() - (sv + 1.0)) > 2.5;
+            }
+            if (clear && u >= su && u < su + 2.0 && v >= sv && v < sv + 2.0) {
+                return dy >= 1 && dy <= 2 ? Part.SHED : dy == 3 ? Part.ROOF_LOW : Part.NONE;
+            }
+        }
+        // The lot's own boundary: a block wall or a hedge along its end side and back, by the house's choice
+        if (c.lot() != Face.NONE && v >= 1.0 && dy == 1) {
+            int style = choice(b, 58, 4);
+            if (style <= 1) {
+                return Part.FENCE;
+            }
+            if (style == 2) {
+                return Part.HEDGE;
+            }
+        }
+        // Shrubs at the foot of the walls
+        boolean byWall = (u >= -1 && u < 0 || u >= b.width() && u < b.width() + 1) && v >= b.front() && v < b.back()
+                || v >= b.front() - 1 && v < b.front() && u >= 0 && u < b.width();
+        if (byWall && dy == 1 && Math.abs(u - b.door()) >= 1.0 && detail(b, c, 59) < 0.25) {
+            return Part.SHRUB;
+        }
+        return null;
+    }
+
+    /** Half blocks a lean-to's roof rises over a column of the annex, from its back eaves towards the house. */
+    private static int wingHalves(Building b, Column c) {
+        return (int) Math.floor(b.wingBack() - c.v()) + 1;
+    }
+
+    /** Height above the base of the annex's roof block over a column. */
+    private static int wingRoof(Building b, Column c) {
+        return b.ground() + 1 + Math.floorDiv(wingHalves(b, c) - 1, 2);
+    }
+
+    /** The annex behind a house: one storey as tall as the ground floor, windows by the house's bays, a lean-to roof. */
+    private static Part wingPart(Building b, Column c, int dy) {
+        if (dy < 0) {
+            return Part.FOUNDATION;
+        }
+        if (dy == 0) {
+            return c.edge() ? Part.TRIM : Part.FLOOR;
+        }
+        int height = b.ground();
+        if (dy < height) {
+            if (!c.edge()) {
+                return c.light() && dy == height - 1 ? Part.LIGHT : Part.AIR;
+            }
+            boolean backWall = b.wingBack() - c.v() < 1.0;
+            long s = (long) Math.floor(backWall ? c.u() : c.v() - b.back());
+            return Math.floorMod(s, 4) == 1 && dy <= height - 1 ? Part.WINDOW : Part.WALL;
+        }
+        if (dy == height) {
+            return c.edge() ? Part.ACCENT : Part.FLOOR;
+        }
+        int roof = wingRoof(b, c);
+        if (dy < roof) {
+            return c.edge() ? Part.ACCENT : Part.AIR;
+        }
+        if (dy == roof) {
+            return Math.floorMod(wingHalves(b, c), 2) == 1 ? Part.ROOF_LOW : Part.ROOF_HIGH;
         }
         return Part.AIR;
     }
@@ -868,6 +1168,12 @@ public final class BuildingLayer {
                 }
             }
             case HOUSE, APARTMENT -> {
+                if (b.type() == Building.Type.HOUSE) {
+                    Part garden = garden(b, c, dy);
+                    if (garden != null) {
+                        return garden;
+                    }
+                }
                 if (v < b.front() && u >= -1 && u < w + 1) {
                     boolean balconyBand = b.type() == Building.Type.APARTMENT && v >= b.front() - 1 && u >= 1 && u < w - 1;
                     if (balconyBand) {
@@ -887,7 +1193,7 @@ public final class BuildingLayer {
                     if (dy == 0 && toDoor) {
                         return Part.PAVING;
                     }
-                    if (boundary && !toDoor) {
+                    if (boundary && !toDoor && !b.parking(u, v)) {
                         int style = b.type() == Building.Type.APARTMENT ? 2 : yardStyle(b);
                         switch (style) {
                             case 0 -> {

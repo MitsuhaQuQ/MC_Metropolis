@@ -115,7 +115,8 @@ public final class CityBuildings {
     private static BlockState state(Block block, BuildingLayer.Part part, Direction facing) {
         BlockState state = block.defaultBlockState();
         if (block instanceof SlabBlock) {
-            state = state.setValue(SlabBlock.TYPE, part == BuildingLayer.Part.ROOF_HIGH ? SlabType.TOP : SlabType.BOTTOM);
+            boolean high = part == BuildingLayer.Part.ROOF_HIGH || part == BuildingLayer.Part.CARPORT;
+            state = state.setValue(SlabBlock.TYPE, high ? SlabType.TOP : SlabType.BOTTOM);
         } else if (block instanceof DoorBlock) {
             state = state.setValue(DoorBlock.FACING, facing)
                     .setValue(DoorBlock.HALF, part == BuildingLayer.Part.DOOR_UPPER ? DoubleBlockHalf.UPPER : DoubleBlockHalf.LOWER);

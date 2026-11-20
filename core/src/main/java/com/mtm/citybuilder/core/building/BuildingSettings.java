@@ -45,6 +45,17 @@ public final class BuildingSettings {
     /** Roofs of works and warehouses. */
     public double[] roofsWorks = {0.55, 0.0, 0.45};
 
+    /**
+     * Developments (建売住宅): residential lots along streets and lanes go in runs of {@code projectRun}, this share of
+     * the runs built as one house repeated (same storeys, roof, palette, setback and depth, the doors alternating).
+     */
+    public double projects = 0.35;
+    public int projectRun = 4;
+    /** Share of houses of two storeys or more with a one-storey annex behind (下屋), making the plan an L. */
+    public double annexes = 0.45;
+    /** Share of machiya with the low second storey of the older ones (厨子二階), two blocks high. */
+    public double lowUpper = 0.5;
+
     /** Along a street, lots in runs this long share a palette family (one developer, one era): colour changes by area. */
     public double paletteRun = 60.0;
 }

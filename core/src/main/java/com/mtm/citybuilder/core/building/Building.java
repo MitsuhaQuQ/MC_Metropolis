@@ -24,6 +24,21 @@ package com.mtm.citybuilder.core.building;
  * @param step       the storey from which the upper storeys are set back (above the road slant line); {@code storeys}
  *                   if none are
  * @param stepBack   how far back from the front wall those storeys stand
+ * @param wingFrom   an annex behind (下屋, a one-storey lean-to making the plan an L): where it starts across the
+ *                   frontage; {@code wingTo} equal to it if there is none
+ * @param wingTo     where it ends
+ * @param wingBack   how far back its back wall stands ({@code back} if there is none)
+ * @param chamferLeft  a corner cut off (隅切り) at the front's start, where another street runs beside: its size
+ * @param chamferRight and at the front's end
+ * @param layout     how a house and its garden are laid out on the lot: 0 standard, 1 parking beside the house,
+ *                   2 parking in front, 3 a garden in front ({@link #layout})
+ * @param lotFrom    the lot's side lines in the building's frame (u), at the middle of its depth: its start
+ * @param lotTo      its end
+ * @param lotDepth   how deep the lot runs back from the street's edge
+ * @param parkFrom   a parking space on the lot, across the frontage (u) from here; {@code parkTo} equal if none
+ * @param parkTo     to here
+ * @param parkBack   back from the street's edge to here
+ * @param carport    whether the parking space has a carport roof over it
  * @param base       the block its ground floor is laid on
  * @param ox         the frame's origin: the street's edge at the middle of the frontage, x
  * @param oz         z
@@ -37,7 +52,9 @@ package com.mtm.citybuilder.core.building;
  */
 public record Building(long id, Type type, int storeys, int ground, int upper, Roof roof, boolean ridgeAlong,
                        double slope, double from, double to, double front, double back, int step, double stepBack,
-                       int base, double ox, double oz, double tx, double tz, double nx, double nz, double door,
+                       double wingFrom, double wingTo, double wingBack, double chamferLeft, double chamferRight,
+                       int layout, double lotFrom, double lotTo, double lotDepth, double parkFrom, double parkTo,
+                       double parkBack, boolean carport, int base, double ox, double oz, double tx, double tz, double nx, double nz, double door,
                        int palette, long variant) {
     /** Kinds of buildings of the first version, Japanese. */
     public enum Type {
@@ -81,6 +98,25 @@ public record Building(long id, Type type, int storeys, int ground, int upper, R
     /** The footprint's depth back from the street. */
     public double depth() {
         return back - front;
+    }
+
+    /** Whether a position in the building's frame lies on its parking space. */
+    public boolean parking(double u, double v) {
+        return parkTo > parkFrom && u >= parkFrom && u < parkTo && v >= 0 && v < parkBack;
+    }
+
+    /** Whether the building has an annex behind. */
+    public boolean hasWing() {
+        return wingTo > wingFrom;
+    }
+
+    /** Whether a position in the building's frame lies inside its walls: the main rectangle less its cut corners, or the annex. */
+    public boolean covers(double u, double v) {
+        if (u >= 0 && u < width() && v >= front && v < back) {
+            double in = v - front;
+            return !(u + in < chamferLeft) && !(width() - u + in < chamferRight);
+        }
+        return hasWing() && u >= wingFrom && u < wingTo && v >= back && v < wingBack;
     }
 
     /** A position in the building's frame: {u across the frontage from its start, v back from the street's edge}. */

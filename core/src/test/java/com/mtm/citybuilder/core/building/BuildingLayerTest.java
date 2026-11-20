@@ -73,11 +73,18 @@ class BuildingLayerTest {
                 // Within its lot: frontage, depth
                 assertTrue(b.from() >= plot.start() - 1e-9 && b.to() <= plot.end() + 1e-9, "frontage " + b + " " + plot);
                 assertTrue(b.front() >= 0 && b.back() <= plot.maxDepth() + 1e-9, "depth " + b + " " + plot);
+                assertTrue(b.wingBack() <= plot.maxDepth() + 1e-9, "annex " + b + " " + plot);
+                // The footprint and the parking space lie within the lot's frontage, and apart
+                assertTrue(b.lotFrom() <= 1e-9 && b.lotTo() >= b.width() - 1e-9, "lot " + b + " " + plot);
+                assertTrue(b.parkTo() <= b.parkFrom() || b.parkTo() <= 1e-9 || b.parkFrom() >= b.width() - 1e-9
+                        || b.parkBack() <= b.front() + 1e-9, "parking " + b);
                 // Set-back upper storeys only on flat-roofed blocks, behind a terrace that leaves room inside
                 assertTrue(b.step() == b.storeys() || b.roof() == Building.Roof.FLAT && b.depth() - b.stepBack() >= 6);
                 assertTrue(b.width() >= 4 && b.depth() >= 4, "size " + b);
                 // The road slant line, two storeys always allowed
-                double allowed = config.slant * (plot.streetWidth() + 2.0 * b.front());
+                // A corner lot, on two streets, may rise a storey more
+                double allowed = config.slant * (plot.streetWidth() + 2.0 * b.front())
+                        + (b.chamferLeft() > 0 || b.chamferRight() > 0 ? b.upper() : 0);
                 int belowLine = b.step();
                 assertTrue(belowLine <= 2 || b.floorOf(belowLine) <= allowed + 1e-9, "slant " + b + " on " + plot.streetWidth());
                 storeys.computeIfAbsent(plot.street(), k -> new int[40])[b.storeys()]++;

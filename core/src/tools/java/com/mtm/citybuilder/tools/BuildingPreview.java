@@ -51,6 +51,10 @@ final class BuildingPreview {
                 {"bamboo_fence", 0xC9B157}, {"potted_azalea_bush", 0x6A8C32}, {"potted_fern", 0x4E7A3A},
                 {"potted_red_tulip", 0xB0302A}, {"potted_oak_sapling", 0x4D8A2A}, {"potted_flowering_azalea_bush", 0xB070A8},
                 {"potted_bamboo", 0x6E9A2C},
+                {"spruce_log", 0x3A2717}, {"dark_oak_log", 0x3C2E1A}, {"oak_log", 0x6D5532}, {"birch_log", 0xD8D7D2},
+                {"spruce_leaves", 0x3D5C3D}, {"oak_leaves", 0x4A7A28}, {"dark_oak_leaves", 0x3E6A22},
+                {"cherry_leaves", 0xE7A9C5}, {"azalea", 0x5E7C30}, {"flowering_azalea", 0x8A6E9E},
+                {"green_terracotta", 0x4C532A}, {"andesite_wall", 0x888888},
                 {"light_gray_concrete", 0x7D7D73},
         };
         for (Object[] row : table) {
@@ -79,7 +83,8 @@ final class BuildingPreview {
         return switch (part) {
             case ROOF_LOW -> new Voxel(colour(id), 0.5, 0);
             case ROOF_HIGH -> new Voxel(colour(id), 0.5, 0.5);
-            case PLANT -> new Voxel(colour(id), 0.5, 0);
+            case PLANT, SHRUB -> new Voxel(colour(id), 0.5, 0);
+            case CARPORT -> new Voxel(colour(id), 0.5, 0.5);
             default -> new Voxel(colour(id), 1, 0);
         };
     }

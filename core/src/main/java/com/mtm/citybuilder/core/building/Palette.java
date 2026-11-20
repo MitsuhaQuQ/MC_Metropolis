@@ -118,6 +118,13 @@ public record Palette(String wall, String accent, String trim, String window, St
     public static final String SHUTTER = m("smooth_stone");
     public static final String HEDGE = m("azalea_leaves");
     public static final String BAMBOO = m("bamboo_fence");
+    private static final String[] LOGS = {m("spruce_log"), m("dark_oak_log"), m("oak_log"), m("birch_log")};
+    private static final String[] CROWNS = {m("spruce_leaves"), m("oak_leaves"), m("azalea_leaves"), m("dark_oak_leaves"),
+            m("cherry_leaves")};
+    private static final String[] SHRUBS = {m("azalea"), m("flowering_azalea")};
+    private static final String[] SHEDS = {m("light_gray_concrete"), m("white_concrete"), m("iron_block"), m("green_terracotta")};
+    public static final String POST = m("andesite_wall");
+    public static final String CARPORT = m("smooth_stone_slab");
 
     private static String pick(String[] options, long hash) {
         return options[(int) Math.floorMod(com.mtm.citybuilder.core.noise.Hash.mix(hash), options.length)];
@@ -155,6 +162,12 @@ public record Palette(String wall, String accent, String trim, String window, St
             case HEDGE -> HEDGE;
             case BAMBOO -> BAMBOO;
             case PLANT -> pick(PLANTS, position);
+            case LOG -> pick(LOGS, variant ^ 0x55);
+            case LEAVES -> pick(CROWNS, variant ^ 0x55);
+            case SHRUB -> pick(SHRUBS, position);
+            case SHED -> pick(SHEDS, variant ^ 0x66);
+            case POST -> POST;
+            case CARPORT -> CARPORT;
         };
     }
 
