@@ -1057,6 +1057,8 @@ public final class StreetLayer {
             }
         }
         boolean[] used = new boolean[size * size];
+        // Round interchanges of two lines: a third keeps away, so no knot of three or more lines forms
+        boolean[] knot = new boolean[size * size];
         CitySettings.Rail rail = logic.settings().rail;
         Approach.CellCost cost = (i, j) -> {
             int k = i * size + j;
@@ -1078,6 +1080,9 @@ public final class StreetLayer {
                     default -> transit.openCost;
                 };
             }
+            if (knot[k]) {
+                c *= 20.0;
+            }
             return used[k] ? c * transit.reuseFactor : c;
         };
         // Ends taken by lines so far: another line ends elsewhere, so lines fan out to the suburbs instead of bundling
@@ -1085,6 +1090,7 @@ public final class StreetLayer {
         int alongCount = (count + 1) / 2;
         int acrossCount = count / 2;
         for (int l = 0; l < count; l++) {
+            markKnots(lines, window, knot, transit);
             // Lines two ways, the first along the main station's direction, the second across it; those one way set
             // apart through downtown
             boolean across = l % 2 == 1;
@@ -1094,10 +1100,26 @@ public final class StreetLayer {
             double offset = (rank - 0.5 * (ofWay - 1)) * transit.lineOffset;
             double px = downtown[0] - Math.sin(angle) * offset;
             double pz = downtown[1] + Math.cos(angle) * offset;
-            // The line's own point through downtown, drawn back towards the middle until it is on built land
-            for (double t = 0.9; t >= 0 && !window.built(px, pz); t -= 0.1) {
-                px = downtown[0] - Math.sin(angle) * offset * t;
-                pz = downtown[1] + Math.cos(angle) * offset * t;
+            // The line's own point through downtown: the built node nearest where it should be, not drawn back to the
+            // middle, where it would meet the other lines in one knot
+            if (!window.built(px, pz)) {
+                double best = Double.POSITIVE_INFINITY;
+                double bx = px;
+                double bz = pz;
+                for (int i = 0; i < size; i++) {
+                    for (int j = 0; j < size; j++) {
+                        double x = (double) (window.originX + i) * grid;
+                        double z = (double) (window.originZ + j) * grid;
+                        double d = Math.hypot(x - px, z - pz);
+                        if (d < best && window.built(x, z)) {
+                            best = d;
+                            bx = x;
+                            bz = z;
+                        }
+                    }
+                }
+                px = bx;
+                pz = bz;
             }
             double[][] ends = new double[2][];
             for (int side = 0; side < 2; side++) {
@@ -1185,6 +1207,41 @@ public final class StreetLayer {
         }
         return lines;
     }
+
+    /** Marks the cells round every station two lines share. */
+    private void markKnots(List<UrbanLine> lines, Window window, boolean[] knot, CitySettings.Transit transit) {
+        int size = window.size;
+        int reach = 3;
+        for (int a = 0; a < lines.size(); a++) {
+            for (double[] p : lines.get(a).stations()) {
+                boolean shared = false;
+                for (int b = 0; b < lines.size() && !shared; b++) {
+                    if (b == a) {
+                        continue;
+                    }
+                    for (double[] q : lines.get(b).stations()) {
+                        if (Math.hypot(p[0] - q[0], p[1] - q[1]) < 300) {
+                            shared = true;
+                            break;
+                        }
+                    }
+                }
+                if (!shared) {
+                    continue;
+                }
+                int ci = (int) Math.round(p[0] / grid) - window.originX;
+                int cj = (int) Math.round(p[1] / grid) - window.originZ;
+                for (int i = ci - reach; i <= ci + reach; i++) {
+                    for (int j = cj - reach; j <= cj + reach; j++) {
+                        if (i >= 0 && j >= 0 && i < size && j < size) {
+                            knot[i * size + j] = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 
     /**
      * A routed line made a line of the town: stations chosen along it, each moved onto a road running with the line
@@ -1363,11 +1420,16 @@ public final class StreetLayer {
         lines.forEach(l -> viaducts.add(l.points()));
         stack(points, viaducts, transit);
         int size = window.size;
+        int reach = transit.reuseReach;
         for (double[] p : points) {
-            int i = (int) Math.round(p[0] / grid) - window.originX;
-            int j = (int) Math.round(p[1] / grid) - window.originZ;
-            if (i >= 0 && j >= 0 && i < size && j < size) {
-                used[i * size + j] = true;
+            int ci = (int) Math.round(p[0] / grid) - window.originX;
+            int cj = (int) Math.round(p[1] / grid) - window.originZ;
+            for (int i = ci - reach; i <= ci + reach; i++) {
+                for (int j = cj - reach; j <= cj + reach; j++) {
+                    if (i >= 0 && j >= 0 && i < size && j < size) {
+                        used[i * size + j] = true;
+                    }
+                }
             }
         }
         List<double[]> stations = new ArrayList<>();

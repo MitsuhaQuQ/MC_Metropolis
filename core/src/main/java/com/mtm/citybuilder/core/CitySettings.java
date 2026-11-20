@@ -428,7 +428,9 @@ public final class CitySettings {
         public double openCost = 1.4;
         /** A line run straight from end to end must pass this close to the middle of downtown, else it is routed through the centre. */
         public double downtownReach = 800.0;
-        public double reuseFactor = 3.0;
+        public double reuseFactor = 6.0;
+        /** Cells within this many nodes of a line already laid count as used: lines cross, they do not run side by side. */
+        public int reuseReach = 2;
         /** Cost per block of running a town's line over water: lines go round a lake or along a shore, bridging only short gaps. */
         public double waterCost = 25.0;
         /**

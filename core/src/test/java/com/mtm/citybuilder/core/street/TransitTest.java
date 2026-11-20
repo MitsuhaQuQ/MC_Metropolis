@@ -77,6 +77,14 @@ class TransitTest {
                 }
             }
         }
+        // No knot of stations: within 300 blocks of any station, stations of at most two lines
+        for (UrbanLine line : all) {
+            for (double[] p : line.stations()) {
+                long lines = all.stream().filter(l -> l.stations().stream()
+                        .anyMatch(q -> Math.hypot(p[0] - q[0], p[1] - q[1]) < 300)).count();
+                assertTrue(lines <= 2, lines + " lines' stations together at " + p[0] + " " + p[1]);
+            }
+        }
         Anchor station = plan.anchors().stream().filter(a -> a.kind() == Anchor.Kind.STATION).findFirst().orElse(null);
         if (station != null) {
             boolean interchange = plan.urbanLines().stream().flatMap(l -> l.stations().stream())
