@@ -151,6 +151,19 @@ class ChunkLayerTest {
     }
 
     @Test
+    void noLineRunsOnAcrossAJunction() {
+        // On the centre line, where a yellow line would be drawn, but where two arterials meet
+        assertEquals(ChunkLayer.Paving.YELLOW_LINE, paving(ChunkLayer.Surface.ARTERIAL, 0.0, 0.0, 16.0));
+        assertEquals(ChunkLayer.Paving.ASPHALT, ChunkLayer.paving(new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false,
+                Double.NaN, 0.0, 0.0, 0.0, 16.0, true, true)));
+        // A pavement of one street is a carriageway of the other's: asphalt; off both carriageways: a pavement
+        assertEquals(ChunkLayer.Paving.ASPHALT, ChunkLayer.paving(new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false,
+                Double.NaN, 7.0, 0.0, 0.0, 16.0, true, true)));
+        assertEquals(ChunkLayer.Paving.SIDEWALK, ChunkLayer.paving(new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false,
+                Double.NaN, 7.0, 0.0, 0.0, 16.0, true, false)));
+    }
+
+    @Test
     void anglesStepEvery180OverTheirCount() {
         assertEquals(0, ChunkLayer.angle(0.0));
         assertEquals(0, ChunkLayer.angle(Math.PI));

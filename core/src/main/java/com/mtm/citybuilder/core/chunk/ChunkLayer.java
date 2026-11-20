@@ -43,10 +43,19 @@ public final class ChunkLayer {
      * @param heading the street's direction there, in radians
      * @param along   the column's middle measured along the street's direction from the world's origin, for dashes
      * @param width   the street's width
+     * @param junction    whether two marked streets (arterials) meet over it, not two pieces of one street: no lines
+     *                    run on across a junction
+     * @param carriageway whether it lies on the carriageway of any marked street over it, not only on a pavement
      */
     public record Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
-                         double width) {
-        public static final Column EMPTY = new Column(Surface.NONE, false, Double.NaN, 0.0, 0.0, 0.0, 0.0);
+                         double width, boolean junction, boolean carriageway) {
+        public static final Column EMPTY = new Column(Surface.NONE, false, Double.NaN, 0.0, 0.0, 0.0, 0.0, false, false);
+
+        /** A column of one street, not at a junction. */
+        public Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
+                      double width) {
+            this(surface, bridge, deck, across, heading, along, width, false, false);
+        }
     }
 
     /** How a column is paved. */
@@ -104,9 +113,13 @@ public final class ChunkLayer {
             default:
                 break;
         }
+        // Where arterials meet no line runs on across the junction, and no pavement cuts across a carriageway
+        if (column.junction) {
+            return new Mark(column.carriageway ? Paving.ASPHALT : Paving.SIDEWALK, 0, 0);
+        }
         double width = column.width;
         double half = 0.5 * width;
-        double walk = width >= 20 ? 4.0 : width >= 14 ? 3.0 : 0.0;
+        double walk = walk(width);
         double carriage = half - walk;
         if (Math.abs(column.across) > carriage) {
             return new Mark(Paving.SIDEWALK, 0, 0);
@@ -155,8 +168,33 @@ public final class ChunkLayer {
         return Math.floorMod(Math.round(steps), ANGLES);
     }
 
-    /** A town's street pieces bucketed by chunk, and its bridges' deck heights by piece. */
-    private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck) {
+    /** The pavement either side of a marked street: 3 from 14 wide, 4 from 20, none narrower. */
+    private static double walk(double width) {
+        return width >= 20 ? 4.0 : width >= 14 ? 3.0 : 0.0;
+    }
+
+    /**
+     * A town's street pieces bucketed by chunk, its bridges' deck heights by piece, and for each piece the pieces that
+     * continue it: of its class, sharing an end, within 30 degrees of its line.
+     */
+    private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links) {
+        /** Whether two pieces are of one street: the same, continuing each other, or with one piece between. */
+        boolean sameStreet(int p, int q) {
+            if (p == q) {
+                return true;
+            }
+            for (int r : links[p]) {
+                if (r == q) {
+                    return true;
+                }
+                for (int t : links[r]) {
+                    if (t == q) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
     }
 
     private static final int INDEXES = 16;
@@ -177,6 +215,14 @@ public final class ChunkLayer {
     public Column[] columns(int chunkX, int chunkZ) {
         Column[] columns = new Column[256];
         java.util.Arrays.fill(columns, Column.EMPTY);
+        // Per column and level (ground, bridge): the first marked piece over it, whether marked streets meet there,
+        // whether a marked street's carriageway covers it
+        int[][] first = new int[2][256];
+        java.util.Arrays.fill(first[0], -1);
+        java.util.Arrays.fill(first[1], -1);
+        Index[][] firstIndex = new Index[2][256];
+        boolean[][] junction = new boolean[2][256];
+        boolean[][] carriage = new boolean[2][256];
         double minX = chunkX * 16.0;
         double minZ = chunkZ * 16.0;
         for (Settlement town : towns(minX, minZ)) {
@@ -202,7 +248,20 @@ public final class ChunkLayer {
                         if (d > half) {
                             continue;
                         }
-                        Column old = columns[x * 16 + z];
+                        int c = x * 16 + z;
+                        int level = bridge ? 1 : 0;
+                        if (surface == Surface.ARTERIAL) {
+                            if (first[level][c] < 0) {
+                                first[level][c] = p;
+                                firstIndex[level][c] = index;
+                            } else if (firstIndex[level][c] != index || !index.sameStreet(first[level][c], p)) {
+                                junction[level][c] = true;
+                            }
+                            if (d <= half - walk(g.width())) {
+                                carriage[level][c] = true;
+                            }
+                        }
+                        Column old = columns[c];
                         // A bridge over the ground's streets; else the wider class; on a tie the nearer centre line
                         boolean wins = bridge && !old.bridge
                                 || bridge == old.bridge && (surface.ordinal() > old.surface.ordinal()
@@ -215,6 +274,14 @@ public final class ChunkLayer {
                         }
                     }
                 }
+            }
+        }
+        for (int c = 0; c < 256; c++) {
+            Column column = columns[c];
+            int level = column.bridge ? 1 : 0;
+            if (column.surface == Surface.ARTERIAL && junction[level][c]) {
+                columns[c] = new Column(column.surface, column.bridge, column.deck, column.across, column.heading,
+                        column.along, column.width, true, carriage[level][c]);
             }
         }
         return columns;
@@ -341,7 +408,32 @@ public final class ChunkLayer {
                 deck[p] = Math.floor(level);
             }
         }
-        return new Index(byChunk, segments, deck);
+        // Pieces continuing each other: of one class, an end shared, lines within 30 degrees
+        Map<Long, List<Integer>> allEnds = new HashMap<>();
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            allEnds.computeIfAbsent(point(g.x1(), g.z1()), k -> new ArrayList<>()).add(p);
+            allEnds.computeIfAbsent(point(g.x2(), g.z2()), k -> new ArrayList<>()).add(p);
+        }
+        double parallel = Math.cos(Math.toRadians(30));
+        int[][] links = new int[segments.size()][];
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            double gl = Math.max(1e-9, g.length());
+            List<Integer> linked = new ArrayList<>();
+            for (long end : new long[]{point(g.x1(), g.z1()), point(g.x2(), g.z2())}) {
+                for (int q : allEnds.get(end)) {
+                    StreetSegment o = segments.get(q);
+                    double ol = Math.max(1e-9, o.length());
+                    double cos = ((g.x2() - g.x1()) * (o.x2() - o.x1()) + (g.z2() - g.z1()) * (o.z2() - o.z1())) / (gl * ol);
+                    if (q != p && o.streetClass() == g.streetClass() && Math.abs(cos) >= parallel) {
+                        linked.add(q);
+                    }
+                }
+            }
+            links[p] = linked.stream().mapToInt(Integer::intValue).toArray();
+        }
+        return new Index(byChunk, segments, deck, links);
     }
 
     private static Surface surface(StreetSegment g) {
