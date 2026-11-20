@@ -402,6 +402,8 @@ public final class CitySettings {
         public double worksCost = 1.5;
         public double openCost = 2.0;
         public double reuseFactor = 3.0;
+        /** Cost per block of running a town's line over water: lines go round a lake or along a shore, bridging only short gaps. */
+        public double waterCost = 25.0;
         /**
          * Which way a stretch is built: a town's own lines run underground through downtown, the old town and the
          * station front, elevated through the rest of the built land, at grade where its intensity is below
@@ -573,6 +575,9 @@ public final class CitySettings {
         public double stationBand = 0.12;
         public double stationGrade = 0.02;
         public double stationDistance = 400.0;
+        /** ... and no further than this from it (a metropolis's: the second), within walking distance of the heart. */
+        public double stationMaxDistance = 3000.0;
+        public double stationMaxDistanceMetropolis = 5000.0;
         public double railCentralCost = 8.0;
         public double railOldTownCost = 4.0;
         public double railHousesCost = 1.6;

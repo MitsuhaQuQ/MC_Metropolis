@@ -973,7 +973,7 @@ public final class StreetLayer {
             }
             double c;
             if (window.water[k]) {
-                c = 1.0 + rail.bridgeCost;
+                c = transit.waterCost;
             } else if (along[k]) {
                 c = transit.alongCost;
             } else {
@@ -1955,6 +1955,8 @@ public final class StreetLayer {
         Districts base = districts(window, anchors);
         double cx = extent.coreX();
         double cz = extent.coreZ();
+        double farthest = settlement.tier() == SettlementTier.METROPOLIS ? config.stationMaxDistanceMetropolis
+                : config.stationMaxDistance;
         double[] best = null;
         double bestScore = Double.NEGATIVE_INFINITY;
         double[] fallback = null;
@@ -1977,7 +1979,10 @@ public final class StreetLayer {
                     toward += ((x - cx) * ex + (z - cz) * ez) / Math.max(1e-6, length);
                 }
                 double edge = Math.abs(window.intensity[k] - config.oldTownIntensity);
-                double score = -edge / config.stationBand + 0.6 * toward / entries.size() - 0.2 * distance / 1000.0;
+                double score = -edge / config.stationBand + 0.6 * toward / entries.size() - 0.6 * distance / 1000.0;
+                if (distance > farthest) {
+                    score -= 10.0;
+                }
                 if (score > fallbackScore) {
                     fallbackScore = score;
                     fallback = new double[]{x, z};
@@ -1989,7 +1994,8 @@ public final class StreetLayer {
                         steepest = Math.max(steepest, Math.abs(window.height[nk] - window.height[k]) / grid);
                     }
                 }
-                if (edge > config.stationBand || steepest > config.stationGrade || distance < config.stationDistance) {
+                if (edge > config.stationBand || steepest > config.stationGrade || distance < config.stationDistance
+                        || distance > farthest) {
                     continue;
                 }
                 if (score > bestScore) {
