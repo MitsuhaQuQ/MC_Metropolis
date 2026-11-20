@@ -3,7 +3,6 @@ package com.mtm.citybuilder.block;
 import com.mtm.citybuilder.platform.Platform;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 
 import java.util.function.Supplier;
@@ -15,9 +14,9 @@ import java.util.function.Supplier;
 public final class CityBlocks {
     /** Asphalt, the carriageway. */
     public static Supplier<Block> ASPHALT;
-    /** Asphalt with a white line along it, along its axis: lane and edge lines. */
+    /** Asphalt with a white line across it (see {@link MarkingBlock}): lane and edge lines. */
     public static Supplier<Block> ASPHALT_LINE_WHITE;
-    /** Asphalt with a yellow line along it, along its axis: the centre line where no overtaking is allowed. */
+    /** Asphalt with a yellow line across it: the centre line where no overtaking is allowed. */
     public static Supplier<Block> ASPHALT_LINE_YELLOW;
     /** Paving slabs of a pavement and of a lane. */
     public static Supplier<Block> SIDEWALK;
@@ -29,8 +28,8 @@ public final class CityBlocks {
     public static void register() {
         Platform platform = Platform.get();
         ASPHALT = platform.registerBlock("asphalt", () -> new Block(properties()));
-        ASPHALT_LINE_WHITE = platform.registerBlock("asphalt_line_white", () -> new RotatedPillarBlock(properties()));
-        ASPHALT_LINE_YELLOW = platform.registerBlock("asphalt_line_yellow", () -> new RotatedPillarBlock(properties()));
+        ASPHALT_LINE_WHITE = platform.registerBlock("asphalt_line_white", () -> new MarkingBlock(properties()));
+        ASPHALT_LINE_YELLOW = platform.registerBlock("asphalt_line_yellow", () -> new MarkingBlock(properties()));
         SIDEWALK = platform.registerBlock("sidewalk", () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE_BRICKS)));
     }
 

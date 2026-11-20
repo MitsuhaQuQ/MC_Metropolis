@@ -96,9 +96,9 @@ class ChunkLayerTest {
         assertEquals(ChunkLayer.Paving.SIDEWALK, paving(ChunkLayer.Surface.ARTERIAL, 7.5, 0.0, 16.0));
         assertEquals(ChunkLayer.Paving.SIDEWALK, paving(ChunkLayer.Surface.ARTERIAL, -5.5, 0.0, 16.0));
         assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.ARTERIAL, 4.5, 0.0, 16.0));
-        assertEquals(ChunkLayer.Paving.YELLOW_LINE, paving(ChunkLayer.Surface.ARTERIAL, 0.5, 0.0, 16.0));
+        assertEquals(ChunkLayer.Paving.YELLOW_LINE, paving(ChunkLayer.Surface.ARTERIAL, -0.5, 0.0, 16.0));
         // On an even width the centre falls between two columns: only one of them is yellow
-        assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.ARTERIAL, -0.5, 0.0, 16.0));
+        assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.ARTERIAL, 0.5, 0.0, 16.0));
         assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.ARTERIAL, 1.5, 0.0, 16.0));
         // A street: plain asphalt; a lane: paving slabs
         assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.STREET, 0.5, 0.0, 6.0));
@@ -111,5 +111,38 @@ class ChunkLayerTest {
             }
         }
         assertEquals(5, painted);
+    }
+
+    @Test
+    void aLineAtAnAngleRunsOnFromBlockToBlock() {
+        // A street heading 10 degrees off x, its centre line through the origin: walking along x, the yellow line's
+        // position across its blocks climbs steadily, never jumping more than one offset between neighbours
+        double heading = Math.toRadians(10);
+        double ux = Math.cos(heading);
+        double uz = Math.sin(heading);
+        int previous = -1;
+        int previousZ = Integer.MIN_VALUE;
+        for (int x = 0; x < 40; x++) {
+            int found = 0;
+            for (int z = -10; z <= 20; z++) {
+                double cx = x + 0.5;
+                double cz = z + 0.5;
+                double across = -cx * uz + cz * ux;
+                ChunkLayer.Mark mark = ChunkLayer.mark(new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false, Double.NaN,
+                        across, heading, cx * ux + cz * uz, 16.0));
+                if (mark.paving() == ChunkLayer.Paving.YELLOW_LINE) {
+                    found++;
+                    assertEquals(ChunkLayer.Orientation.X, mark.orientation());
+                    int position = z * ChunkLayer.OFFSETS + mark.offset();
+                    if (previous >= 0) {
+                        assertTrue(Math.abs(position - previous) <= 2, "the line jumps at x " + x + ": " + previous + " to " + position);
+                    }
+                    previous = position;
+                    previousZ = z;
+                }
+            }
+            assertEquals(1, found, "one block of the centre line at x " + x);
+        }
+        assertTrue(previousZ > 0, "the line climbed");
     }
 }

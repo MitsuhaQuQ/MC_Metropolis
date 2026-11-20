@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:block/cube_bottom_top",
   "textures": {
-    "top": "citybuilder:block/asphalt_line_yellow",
+    "top": "citybuilder:block/line/yellow_x_5",
     "side": "citybuilder:block/asphalt",
     "bottom": "citybuilder:block/asphalt"
   }

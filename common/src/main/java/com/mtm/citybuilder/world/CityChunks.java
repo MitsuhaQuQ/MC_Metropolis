@@ -2,14 +2,13 @@ package com.mtm.citybuilder.world;
 
 import com.mtm.citybuilder.CityBuilder;
 import com.mtm.citybuilder.block.CityBlocks;
+import com.mtm.citybuilder.block.MarkingBlock;
 import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.chunk.ChunkLayer;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -32,14 +31,19 @@ public final class CityChunks {
     }
 
     private static BlockState paving(ChunkLayer.Column column) {
-        Direction.Axis axis = ChunkLayer.alongX(column) ? Direction.Axis.X : Direction.Axis.Z;
-        return switch (ChunkLayer.paving(column)) {
+        ChunkLayer.Mark mark = ChunkLayer.mark(column);
+        return switch (mark.paving()) {
             case ASPHALT -> CityBlocks.ASPHALT.get().defaultBlockState();
-            case WHITE_LINE -> CityBlocks.ASPHALT_LINE_WHITE.get().defaultBlockState().setValue(RotatedPillarBlock.AXIS, axis);
-            case YELLOW_LINE -> CityBlocks.ASPHALT_LINE_YELLOW.get().defaultBlockState().setValue(RotatedPillarBlock.AXIS, axis);
+            case WHITE_LINE -> line(CityBlocks.ASPHALT_LINE_WHITE.get(), mark);
+            case YELLOW_LINE -> line(CityBlocks.ASPHALT_LINE_YELLOW.get(), mark);
             case SIDEWALK -> CityBlocks.SIDEWALK.get().defaultBlockState();
             case NONE -> null;
         };
+    }
+
+    private static BlockState line(Block block, ChunkLayer.Mark mark) {
+        return block.defaultBlockState().setValue(MarkingBlock.ORIENTATION, MarkingBlock.Orientation.of(mark.orientation()))
+                .setValue(MarkingBlock.OFFSET, mark.offset());
     }
 
     private static boolean paving(BlockState state) {

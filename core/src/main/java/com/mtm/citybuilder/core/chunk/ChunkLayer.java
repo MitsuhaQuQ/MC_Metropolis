@@ -62,50 +62,136 @@ public final class ChunkLayer {
     }
 
     /**
+     * Which way a line crosses its block: along x, along z, or along one of the diagonals ({@code DIAGONAL_PLUS}
+     * running towards +x and +z, {@code DIAGONAL_MINUS} towards +x and -z).
+     */
+    public enum Orientation {
+        X,
+        Z,
+        DIAGONAL_PLUS,
+        DIAGONAL_MINUS
+    }
+
+    /** Positions a line may take across its block, from one side to the other. */
+    public static final int OFFSETS = 8;
+
+    /**
+     * A column's paving, and for a line where it crosses the block: its orientation, and its position across the
+     * block from 0 to {@link #OFFSETS} - 1, measured along +z for a line along x, along +x for a line along z, along
+     * (-x, +z) for {@code DIAGONAL_PLUS} and along (+x, +z) for {@code DIAGONAL_MINUS}.
+     */
+    public record Mark(Paving paving, Orientation orientation, int offset) {
+    }
+
+    /** A line along a street: how far from the centre line, its colour, whether dashed. */
+    private record Line(double at, Paving paving, boolean dashed) {
+    }
+
+    public static Paving paving(Column column) {
+        return mark(column).paving();
+    }
+
+    /**
      * How a column is paved, as Japanese streets are: a wide street (an arterial, 14 or more wide) has pavements of 3
      * (4 from 20 wide) either side, a yellow centre line, white edge lines and, on a carriageway of two lanes a way,
      * dashed white lane lines (5 painted, 5 not); a street or an old road is plain asphalt, as narrow Japanese streets
      * have no centre line; a lane is paving slabs.
+     * <p>
+     * A line is drawn where its centre crosses the block, at the position it crosses at, so a line at an angle to
+     * the blocks runs on unbroken from block to block instead of stepping a whole block at a time: its orientation
+     * is the one of the four nearest the street's heading, and the block draws the line if the line crosses it within
+     * the block's span measured that way.
      */
-    public static Paving paving(Column column) {
+    public static Mark mark(Column column) {
         switch (column.surface) {
             case NONE:
-                return Paving.NONE;
+                return new Mark(Paving.NONE, Orientation.X, 0);
             case LANE:
-                return Paving.SIDEWALK;
+                return new Mark(Paving.SIDEWALK, Orientation.X, 0);
             case STREET:
             case OLD_ROAD:
-                return Paving.ASPHALT;
+                return new Mark(Paving.ASPHALT, Orientation.X, 0);
             default:
                 break;
         }
         double width = column.width;
-        double a = Math.abs(column.across);
         double half = 0.5 * width;
         double walk = width >= 20 ? 4.0 : width >= 14 ? 3.0 : 0.0;
         double carriage = half - walk;
-        if (a > carriage) {
-            return Paving.SIDEWALK;
+        if (Math.abs(column.across) > carriage) {
+            return new Mark(Paving.SIDEWALK, Orientation.X, 0);
         }
-        // Bands half open, so a line whose edge falls on a block's edge (an even width) takes one column, not a
-        // column either side by rounding
-        double signed = column.across;
-        if (width >= 14 && signed > -0.5 && signed <= 0.5) {
-            return Paving.YELLOW_LINE;
+        List<Line> lines = new ArrayList<>();
+        if (width >= 14) {
+            lines.add(new Line(0.0, Paving.YELLOW_LINE, false));
         }
-        if (walk > 0 && a > carriage - 1.0) {
-            return Paving.WHITE_LINE;
+        if (walk > 0) {
+            lines.add(new Line(carriage - 0.5, Paving.WHITE_LINE, false));
+            lines.add(new Line(-(carriage - 0.5), Paving.WHITE_LINE, false));
         }
-        if (carriage >= 5.0 && a - 0.5 * carriage > -0.5 && a - 0.5 * carriage <= 0.5
-                && Math.floorMod((long) Math.floor(column.along), 10) < 5) {
-            return Paving.WHITE_LINE;
+        if (carriage >= 5.0) {
+            lines.add(new Line(0.5 * carriage, Paving.WHITE_LINE, true));
+            lines.add(new Line(-0.5 * carriage, Paving.WHITE_LINE, true));
         }
-        return Paving.ASPHALT;
+        double ux = Math.cos(column.heading);
+        double uz = Math.sin(column.heading);
+        Orientation orientation = orientation(column.heading);
+        Line best = null;
+        double bestShift = Double.POSITIVE_INFINITY;
+        for (Line line : lines) {
+            if (line.dashed && Math.floorMod((long) Math.floor(column.along), 10) >= 5) {
+                continue;
+            }
+            // How far across the block, the way the orientation measures, the line's centre passes the column's
+            double shift = shift(orientation, line.at - column.across, ux, uz);
+            // Half open, so a line along a block's edge is drawn in one of the two blocks, not both
+            if (shift > -span(orientation) && shift <= span(orientation) && Math.abs(shift) < Math.abs(bestShift)) {
+                bestShift = shift;
+                best = line;
+            }
+        }
+        if (best == null) {
+            return new Mark(Paving.ASPHALT, orientation, 0);
+        }
+        double span = span(orientation);
+        int offset = (int) Math.floor((bestShift + span) / (2.0 * span) * OFFSETS);
+        return new Mark(best.paving, orientation, Math.max(0, Math.min(OFFSETS - 1, offset)));
     }
 
-    /** Whether a line in a column runs nearer the x axis than the z axis. */
-    public static boolean alongX(Column column) {
-        return Math.abs(Math.cos(column.heading)) >= Math.abs(Math.sin(column.heading));
+    /** The orientation nearest a heading. */
+    public static Orientation orientation(double heading) {
+        double a = Math.floorMod((long) Math.round(Math.toDegrees(heading) * 1000), 180_000) / 1000.0;
+        if (a < 22.5 || a >= 157.5) {
+            return Orientation.X;
+        }
+        if (a < 67.5) {
+            return Orientation.DIAGONAL_PLUS;
+        }
+        if (a < 112.5) {
+            return Orientation.Z;
+        }
+        return Orientation.DIAGONAL_MINUS;
+    }
+
+    /** Half the block's span across, the way an orientation measures it. */
+    private static double span(Orientation orientation) {
+        return orientation == Orientation.X || orientation == Orientation.Z ? 0.5 : Math.sqrt(0.5);
+    }
+
+    /**
+     * How far from the column's middle, measured across the block the way the orientation measures, a line lies whose
+     * offset from the street's centre exceeds the column's by {@code gap} (the street running along (ux, uz), offsets
+     * measured to its left, along (-uz, ux)).
+     */
+    private static double shift(Orientation orientation, double gap, double ux, double uz) {
+        double s = Math.sqrt(0.5);
+        double rate = switch (orientation) {
+            case X -> ux;                       // moving along +z
+            case Z -> -uz;                      // moving along +x
+            case DIAGONAL_PLUS -> (uz + ux) * s; // moving along (-x, +z)
+            case DIAGONAL_MINUS -> (ux - uz) * s; // moving along (+x, +z)
+        };
+        return Math.abs(rate) < 1e-9 ? Double.POSITIVE_INFINITY : gap / rate;
     }
 
     /** A town's street pieces bucketed by chunk, and its bridges' deck heights by piece. */

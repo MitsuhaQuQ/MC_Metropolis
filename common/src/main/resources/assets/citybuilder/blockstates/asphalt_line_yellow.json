@@ -1,14 +1,100 @@
 {
   "variants": {
-    "axis=z": {
-      "model": "citybuilder:block/asphalt_line_yellow"
+    "offset=0,orientation=x": {
+      "model": "citybuilder:block/line/yellow_x_0"
     },
-    "axis=y": {
-      "model": "citybuilder:block/asphalt_line_yellow"
+    "offset=1,orientation=x": {
+      "model": "citybuilder:block/line/yellow_x_1"
     },
-    "axis=x": {
-      "model": "citybuilder:block/asphalt_line_yellow",
-      "y": 90
+    "offset=2,orientation=x": {
+      "model": "citybuilder:block/line/yellow_x_2"
+    },
+    "offset=3,orientation=x": {
+      "model": "citybuilder:block/line/yellow_x_3"
+    },
+    "offset=4,orientation=x": {
+      "model": "citybuilder:block/line/yellow_x_4"
+    },
+    "offset=5,orientation=x": {
+      "model": "citybuilder:block/line/yellow_x_5"
+    },
+    "offset=6,orientation=x": {
+      "model": "citybuilder:block/line/yellow_x_6"
+    },
+    "offset=7,orientation=x": {
+      "model": "citybuilder:block/line/yellow_x_7"
+    },
+    "offset=0,orientation=z": {
+      "model": "citybuilder:block/line/yellow_z_0"
+    },
+    "offset=1,orientation=z": {
+      "model": "citybuilder:block/line/yellow_z_1"
+    },
+    "offset=2,orientation=z": {
+      "model": "citybuilder:block/line/yellow_z_2"
+    },
+    "offset=3,orientation=z": {
+      "model": "citybuilder:block/line/yellow_z_3"
+    },
+    "offset=4,orientation=z": {
+      "model": "citybuilder:block/line/yellow_z_4"
+    },
+    "offset=5,orientation=z": {
+      "model": "citybuilder:block/line/yellow_z_5"
+    },
+    "offset=6,orientation=z": {
+      "model": "citybuilder:block/line/yellow_z_6"
+    },
+    "offset=7,orientation=z": {
+      "model": "citybuilder:block/line/yellow_z_7"
+    },
+    "offset=0,orientation=diagonal_plus": {
+      "model": "citybuilder:block/line/yellow_diagonal_plus_0"
+    },
+    "offset=1,orientation=diagonal_plus": {
+      "model": "citybuilder:block/line/yellow_diagonal_plus_1"
+    },
+    "offset=2,orientation=diagonal_plus": {
+      "model": "citybuilder:block/line/yellow_diagonal_plus_2"
+    },
+    "offset=3,orientation=diagonal_plus": {
+      "model": "citybuilder:block/line/yellow_diagonal_plus_3"
+    },
+    "offset=4,orientation=diagonal_plus": {
+      "model": "citybuilder:block/line/yellow_diagonal_plus_4"
+    },
+    "offset=5,orientation=diagonal_plus": {
+      "model": "citybuilder:block/line/yellow_diagonal_plus_5"
+    },
+    "offset=6,orientation=diagonal_plus": {
+      "model": "citybuilder:block/line/yellow_diagonal_plus_6"
+    },
+    "offset=7,orientation=diagonal_plus": {
+      "model": "citybuilder:block/line/yellow_diagonal_plus_7"
+    },
+    "offset=0,orientation=diagonal_minus": {
+      "model": "citybuilder:block/line/yellow_diagonal_minus_0"
+    },
+    "offset=1,orientation=diagonal_minus": {
+      "model": "citybuilder:block/line/yellow_diagonal_minus_1"
+    },
+    "offset=2,orientation=diagonal_minus": {
+      "model": "citybuilder:block/line/yellow_diagonal_minus_2"
+    },
+    "offset=3,orientation=diagonal_minus": {
+      "model": "citybuilder:block/line/yellow_diagonal_minus_3"
+    },
+    "offset=4,orientation=diagonal_minus": {
+      "model": "citybuilder:block/line/yellow_diagonal_minus_4"
+    },
+    "offset=5,orientation=diagonal_minus": {
+      "model": "citybuilder:block/line/yellow_diagonal_minus_5"
+    },
+    "offset=6,orientation=diagonal_minus": {
+      "model": "citybuilder:block/line/yellow_diagonal_minus_6"
+    },
+    "offset=7,orientation=diagonal_minus": {
+      "model": "citybuilder:block/line/yellow_diagonal_minus_7"
     }
   }
 }

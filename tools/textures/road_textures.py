@@ -54,6 +54,33 @@ def line(colour):
     return rows
 
 
+ORIENTATIONS = ['x', 'z', 'diagonal_plus', 'diagonal_minus']
+OFFSETS = 8
+
+
+def marking(colour, orientation, offset):
+    """Asphalt with a line 3 pixels wide across it, as the chunk layer places it (core ChunkLayer.mark): the top face
+    runs u along +x and v along +z; the line along x sits at a position along +z, along z at a position along +x, a
+    diagonal at a position along (-x, +z) or (+x, +z), one of OFFSETS across the block's span."""
+    span = 0.5 if orientation in ('x', 'z') else 0.5 ** 0.5
+    centre = -span + (offset + 0.5) * 2 * span / OFFSETS
+    rows = []
+    for y in range(16):
+        row = []
+        for x in range(16):
+            px = (x + 0.5) / 16 - 0.5
+            pz = (y + 0.5) / 16 - 0.5
+            t = {'x': pz, 'z': px, 'diagonal_plus': (pz - px) * 0.5 ** 0.5,
+                 'diagonal_minus': (px + pz) * 0.5 ** 0.5}[orientation]
+            if abs(t - centre) <= 1.5 / 16:
+                n = noise(x, y, 3) * 6
+                row.append(tuple(clamp(c + n) for c in colour))
+            else:
+                row.append(asphalt(x, y))
+        rows.append(row)
+    return rows
+
+
 def sidewalk():
     """Light grey paving slabs, 8 pixels square, offset by half a slab every other row."""
     rows = []
@@ -70,10 +97,12 @@ def sidewalk():
 
 
 def main():
-    os.makedirs(OUT, exist_ok=True)
+    os.makedirs(os.path.join(OUT, 'line'), exist_ok=True)
     png(os.path.join(OUT, 'asphalt.png'), [[asphalt(x, y) for x in range(16)] for y in range(16)])
-    png(os.path.join(OUT, 'asphalt_line_white.png'), line((228, 228, 222)))
-    png(os.path.join(OUT, 'asphalt_line_yellow.png'), line((226, 178, 44)))
+    for name, colour in (('white', (228, 228, 222)), ('yellow', (226, 178, 44))):
+        for orientation in ORIENTATIONS:
+            for offset in range(OFFSETS):
+                png(os.path.join(OUT, 'line', f'{name}_{orientation}_{offset}.png'), marking(colour, orientation, offset))
     png(os.path.join(OUT, 'sidewalk.png'), sidewalk())
 
 
