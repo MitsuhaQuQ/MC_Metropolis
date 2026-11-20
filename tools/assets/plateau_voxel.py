@@ -1274,6 +1274,78 @@ def lift_shaded_floors(blocks, solid, bc, storey):
     return changed
 
 
+# ---------------------------------------------------------------- rooftops
+
+def tidy_roofs(blocks, solid, parapets=True):
+    """Flat roofs as the photographs show them are speckled with what stands on them (air conditioners, tanks,
+    skylights, their shadows), one block each. Each flat roof plane (full blocks open to the sky, connected at one
+    height) gets one material: its commonest block, keeping only patches of another block large enough to be a
+    real surface (a roof garden, a rooflight; at least 5% of the plane and 25 blocks). Where a plane ends at a drop,
+    a parapet one block high goes round it, of the wall below it. Pitched roofs (stairs, slabs) are left alone."""
+    top = {v for v, (n, pr) in blocks.items() if pr is None and (v[0], v[1] + 1, v[2]) not in blocks
+           and "glass" not in n}
+    seen, planes = set(), []
+    for v in top:
+        if v in seen:
+            continue
+        plane, stack = [], [v]
+        seen.add(v)
+        while stack:
+            c = stack.pop()
+            plane.append(c)
+            for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = (c[0] + dx, c[1], c[2] + dz)
+                if n in top and n not in seen:
+                    seen.add(n)
+                    stack.append(n)
+        if len(plane) >= 20:
+            planes.append(plane)
+    changed = 0
+    for plane in planes:
+        cells = set(plane)
+        # Patches of one block, connected.
+        patch_of, patches = {}, []
+        for v in plane:
+            if v in patch_of:
+                continue
+            name = blocks[v][0]
+            comp, stack = [], [v]
+            patch_of[v] = len(patches)
+            while stack:
+                c = stack.pop()
+                comp.append(c)
+                for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    n = (c[0] + dx, c[1], c[2] + dz)
+                    if n in cells and n not in patch_of and blocks[n][0] == name:
+                        patch_of[n] = len(patches)
+                        stack.append(n)
+            patches.append((name, comp))
+        big = max(25, len(plane) // 20)
+        count = {}
+        for name, comp in patches:
+            count[name] = count.get(name, 0) + len(comp)
+        main = max(count, key=count.get)
+        for name, comp in patches:
+            if name != main and len(comp) < big:
+                for c in comp:
+                    blocks[c] = (main, None)
+                    changed += 1
+        if not parapets or len(plane) < 30:
+            continue
+        for v in plane:
+            x, y, z = v
+            for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = (x + dx, y, z + dz)
+                if n not in solid and (x + dx, y - 1, z + dz) not in solid:
+                    below = blocks.get((x, y - 1, z))
+                    wall = below if below and below[1] is None and "glass" not in below[0] else (main, None)
+                    if (x, y + 1, z) not in blocks:
+                        blocks[(x, y + 1, z)] = wall
+                        changed += 1
+                    break
+    return changed
+
+
 # ---------------------------------------------------------------- NBT
 
 def nbt_string(s):
@@ -1609,6 +1681,7 @@ def build_one(args):
     recoloured = recolour(blocks, solid, colours, pal, bc)
     glazed = windows(blocks, solid, owners, facade_patterns(rings, tex, os.path.join(out, "tex")), bc) if tex else 0
     lifted = lift_shaded_floors(blocks, solid, bc, sh) if tex else 0
+    roofs = tidy_roofs(blocks, solid, parapets=pal in ("modern", "glass", "white", "brick")) if tex else 0
     if slug in LANDMARK_FIXES:
         LANDMARK_FIXES[slug](blocks)
     size = tuple(max(v[i] for v in blocks) + 1 for i in range(3))
@@ -1623,7 +1696,7 @@ def build_one(args):
             "roof_shape": row.get("roof_shape"), "roof_pitch": row.get("roof_pitch"),
             "palette": pal, "storey_height": sh, "rotation_deg": round(angle, 1),
             "size": list(size), "blocks": len(blocks), "surfaces": len(surf),
-            "textured_polygons": len(geom.get("tex", {})), "recoloured_blocks": recoloured, "window_blocks": glazed, "lifted_blocks": lifted,
+            "textured_polygons": len(geom.get("tex", {})), "recoloured_blocks": recoloured, "window_blocks": glazed, "lifted_blocks": lifted, "roof_blocks": roofs,
             "block_counts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
 
 
@@ -1642,7 +1715,7 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
                 entries.append(e)
                 print(f"{e['slug']:24s} {e['name']:16s} {e['size'][0]:4d}x{e['size'][1]:3d}x{e['size'][2]:4d} "
                       f"{e['blocks']:7d} blocks  {e['palette']:6s} turned {e['rotation_deg']:+.1f}  "
-                      f"{e['recoloured_blocks']} from textures, {e.get('window_blocks', 0)} facade blocks redone, {e.get('lifted_blocks', 0)} shaded lifted", flush=True)
+                      f"{e['recoloured_blocks']} from textures, {e.get('window_blocks', 0)} facade blocks redone, {e.get('lifted_blocks', 0)} shaded lifted, {e.get('roof_blocks', 0)} roof tidied", flush=True)
     with open(os.path.join(out, "library.json"), "w", encoding="utf-8") as fh:
         json.dump({"source": "PLATEAU Kyoto City FY2025 LOD2", "attribution": "ATTRIBUTION",
                    "buildings": entries}, fh, ensure_ascii=False, indent=1)
