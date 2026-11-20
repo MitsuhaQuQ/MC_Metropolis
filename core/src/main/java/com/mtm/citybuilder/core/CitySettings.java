@@ -624,6 +624,19 @@ public final class CitySettings {
         public double laneDepth = 0.4;
         public double laneStep = 4.0;
         public double laneWidth = 2.5;
+        /**
+         * Lanes into blocks' interiors (the land behind the lots): soundings every {@code interiorLaneSpacing} along the
+         * streets; where a block runs deeper than {@code interiorMin} from a street's edge to the next, a dead-end lane
+         * goes in, stopping {@code interiorBack} short of the street behind, at most {@code interiorMax} long, kept
+         * {@code interiorClear} from other streets and lanes, and laid only if at least {@code interiorMinLane} long.
+         * Two rows of the lane's lots (5-8 by 8-12) either side of it fill the spacing.
+         */
+        public double interiorLaneSpacing = 26.0;
+        public double interiorMin = 55.0;
+        public double interiorBack = 20.0;
+        public double interiorMax = 100.0;
+        public double interiorClear = 8.0;
+        public double interiorMinLane = 25.0;
         /** Streams this narrow are culverted: streets cross them, and later run along them. */
         public double culvertWidth = 12.0;
         /**

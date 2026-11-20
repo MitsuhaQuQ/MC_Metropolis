@@ -656,6 +656,194 @@ public final class StreetLayer {
         segments.addAll(lanes);
     }
 
+    /**
+     * Lanes into the blocks' interiors, the land behind the lots that no street reaches: from a street, every
+     * {@code interiorLaneSpacing} along it, the block is sounded square from its edge to the next street (or lane);
+     * where it runs deeper than {@code interiorMin}, a dead-end lane goes in, stopping {@code interiorBack} short of the
+     * street behind (for its lots) and {@code interiorClear} from any other street or lane. Lanes come in from one side
+     * of a block only, so the two streets either side of it do not reach in to meet: from the lesser street (the back
+     * street), between equals from the one facing north-east by the sounding's direction. Not in works and quays,
+     * whose lots run deep anyway.
+     */
+    private void interiorLanes(Settlement settlement, Window window, Districts districts, List<StreetSegment> segments) {
+        Sounding all = new Sounding(segments);
+        List<StreetSegment> lanes = new ArrayList<>();
+        int count = segments.size();
+        double run = 0.0;
+        for (int k = 0; k < count; k++) {
+            StreetSegment g = segments.get(k);
+            if (g.streetClass() == StreetClass.LANE || g.length() < 1e-6
+                    || g.structure() != StreetStructure.GROUND && g.structure() != StreetStructure.CULVERT) {
+                run = 0.0;
+                continue;
+            }
+            run += g.length();
+            if (run < config.interiorLaneSpacing) {
+                continue;
+            }
+            run = 0.0;
+            double ux = (g.x2() - g.x1()) / g.length();
+            double uz = (g.z2() - g.z1()) / g.length();
+            double px = g.x2();
+            double pz = g.z2();
+            for (int side : new int[]{1, -1}) {
+                double nx = -uz * side;
+                double nz = ux * side;
+                double edge = 0.5 * g.width();
+                double[] hit = all.sound(px + nx * edge, pz + nz * edge, nx, nz, 200.0, px, pz);
+                if (hit == null) {
+                    continue;
+                }
+                StreetSegment other = all.piece((int) hit[1]);
+                double free = hit[0] - 0.5 * other.width();
+                if (free < config.interiorMin) {
+                    continue;
+                }
+                // One side of a block only: the lesser street's, between equals the one facing north-east
+                int mine = Integer.compare(rank(other.streetClass()), rank(g.streetClass()));
+                if (mine < 0 || mine == 0 && nx + 0.7 * nz < 0) {
+                    continue;
+                }
+                District district = districts.at(px + nx * (edge + 0.5 * free), pz + nz * (edge + 0.5 * free));
+                if (district != District.OLD_TOWN && district != District.RESIDENTIAL && district != District.CENTRAL
+                        && district != District.STATION_FRONT) {
+                    continue;
+                }
+                double length = Math.min(free - config.interiorBack, config.interiorMax);
+                // In steps, while on built land and clear of every other street and lane
+                List<StreetSegment> lane = new ArrayList<>();
+                double ax = px;
+                double az = pz;
+                double laid = 0.0;
+                for (double t = config.laneStep; t <= edge + length; t += config.laneStep) {
+                    double bx = px + nx * t;
+                    double bz = pz + nz * t;
+                    if (!window.built(bx, bz) || t > edge + config.laneStep
+                            && all.near(bx, bz, config.interiorClear, px, pz)) {
+                        break;
+                    }
+                    lane.add(new StreetSegment(ax, az, bx, bz, StreetClass.LANE, window.old(bx, bz) ? Era.TOWN : Era.MODERN,
+                            config.laneWidth));
+                    ax = bx;
+                    az = bz;
+                    laid = t - edge;
+                }
+                if (laid < config.interiorMinLane) {
+                    continue;
+                }
+                for (StreetSegment piece : lane) {
+                    all.add(piece);
+                }
+                lanes.addAll(lane);
+            }
+        }
+        segments.addAll(lanes);
+    }
+
+    /**
+     * Every piece laid, lanes included, on a 64-block grid, to sound a block from a street: the first piece a ray
+     * crosses, and whether any piece passes near a point.
+     */
+    private static final class Sounding {
+        private static final double CELL = 64.0;
+        private final List<StreetSegment> pieces = new ArrayList<>();
+        private final Map<Long, List<Integer>> cells = new HashMap<>();
+
+        Sounding(List<StreetSegment> segments) {
+            for (StreetSegment g : segments) {
+                add(g);
+            }
+        }
+
+        StreetSegment piece(int k) {
+            return pieces.get(k);
+        }
+
+        void add(StreetSegment g) {
+            int k = pieces.size();
+            pieces.add(g);
+            for (long cx = (long) Math.floor(Math.min(g.x1(), g.x2()) / CELL); cx <= (long) Math.floor(Math.max(g.x1(), g.x2()) / CELL); cx++) {
+                for (long cz = (long) Math.floor(Math.min(g.z1(), g.z2()) / CELL); cz <= (long) Math.floor(Math.max(g.z1(), g.z2()) / CELL); cz++) {
+                    cells.computeIfAbsent((cx << 32) ^ (cz & 0xFFFFFFFFL), q -> new ArrayList<>()).add(k);
+                }
+            }
+        }
+
+        /** Whether a piece touches a point (ox, oz): one of the street a sounding or lane starts from. */
+        private static boolean touches(StreetSegment g, double ox, double oz) {
+            return Math.hypot(g.x1() - ox, g.z1() - oz) < 0.5 || Math.hypot(g.x2() - ox, g.z2() - oz) < 0.5
+                    || distance(g, ox, oz) < 0.5;
+        }
+
+        private static double distance(StreetSegment g, double x, double z) {
+            double dx = g.x2() - g.x1();
+            double dz = g.z2() - g.z1();
+            double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+            return Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z);
+        }
+
+        /**
+         * The first piece the ray from (x, z) along (nx, nz) crosses within a length, but those touching (ox, oz):
+         * {distance along the ray, piece}, or null.
+         */
+        double[] sound(double x, double z, double nx, double nz, double length, double ox, double oz) {
+            double best = length;
+            int found = -1;
+            java.util.Set<Integer> seen = new java.util.HashSet<>();
+            for (double t = 0; t <= length + CELL; t += 0.5 * CELL) {
+                long cx = (long) Math.floor((x + nx * Math.min(t, length)) / CELL);
+                long cz = (long) Math.floor((z + nz * Math.min(t, length)) / CELL);
+                for (long ix = cx - 1; ix <= cx + 1; ix++) {
+                    for (long iz = cz - 1; iz <= cz + 1; iz++) {
+                        for (int k : cells.getOrDefault((ix << 32) ^ (iz & 0xFFFFFFFFL), List.of())) {
+                            if (!seen.add(k)) {
+                                continue;
+                            }
+                            StreetSegment g = pieces.get(k);
+                            if (touches(g, ox, oz)) {
+                                continue;
+                            }
+                            // Where the ray meets the piece's line, between its ends
+                            double ex = g.x2() - g.x1();
+                            double ez = g.z2() - g.z1();
+                            double denominator = nx * ez - nz * ex;
+                            if (Math.abs(denominator) < 1e-9) {
+                                continue;
+                            }
+                            double s = ((g.x1() - x) * ez - (g.z1() - z) * ex) / denominator;
+                            double u = ((g.x1() - x) * nz - (g.z1() - z) * nx) / denominator;
+                            if (s > 0 && s < best && u >= 0 && u <= 1) {
+                                best = s;
+                                found = k;
+                            }
+                        }
+                    }
+                }
+                if (t > best + CELL) {
+                    break;
+                }
+            }
+            return found < 0 ? null : new double[]{best, found};
+        }
+
+        /** Whether a piece (but those touching (ox, oz)) passes within a distance of its edge of a point. */
+        boolean near(double x, double z, double distance, double ox, double oz) {
+            long cx = (long) Math.floor(x / CELL);
+            long cz = (long) Math.floor(z / CELL);
+            for (long ix = cx - 1; ix <= cx + 1; ix++) {
+                for (long iz = cz - 1; iz <= cz + 1; iz++) {
+                    for (int k : cells.getOrDefault((ix << 32) ^ (iz & 0xFFFFFFFFL), List.of())) {
+                        StreetSegment g = pieces.get(k);
+                        if (!touches(g, ox, oz) && distance(g, x, z) - 0.5 * g.width() < distance) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+    }
+
     private double streetSpacing(Formation formation) {
         return switch (formation) {
             case JORI -> config.streetSpacingJori;
@@ -877,6 +1065,7 @@ public final class StreetLayer {
                 squareJoins(window, segments);
                 unsqueeze(window, segments, bankPieces);
                 lanes(settlement, formation, window, districts, segments);
+                interiorLanes(settlement, window, districts, segments);
             }
             // Whatever was laid before the railway was known (old roads, arterials before the town's own lines) and
             // crosses it at grade crosses at a level crossing
