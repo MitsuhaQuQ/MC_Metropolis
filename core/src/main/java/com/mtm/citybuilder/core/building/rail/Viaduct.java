@@ -545,8 +545,11 @@ public final class Viaduct {
     }
 
     private void pole(Model m, int x) {
-        int h = halfWidth();
-        int lv = levelAt(x);
+        catenary(m, p, x, levelAt(x), halfWidth());
+    }
+
+    /** A catenary portal at x: poles a block in from both edges of a deck of half-width h, a beam across them. */
+    static void catenary(Model m, RailPalette p, int x, int lv, int h) {
         int height = 6;
         for (int side : new int[] {-h + 1, h - 1}) {
             for (int y = lv; y < lv + height; y++) {

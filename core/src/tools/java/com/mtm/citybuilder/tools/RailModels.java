@@ -5,9 +5,12 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.mtm.citybuilder.core.building.rail.BrickViaduct;
 import com.mtm.citybuilder.core.building.rail.CrossSection;
+import com.mtm.citybuilder.core.building.rail.Curve;
 import com.mtm.citybuilder.core.building.rail.ElevatedStation;
 import com.mtm.citybuilder.core.building.rail.Footbridge;
+import com.mtm.citybuilder.core.building.rail.FrameViaduct;
 import com.mtm.citybuilder.core.building.rail.Ground;
 import com.mtm.citybuilder.core.building.rail.GroundStation;
 import com.mtm.citybuilder.core.building.rail.RailPalette;
@@ -28,10 +31,11 @@ import java.util.List;
  * {@code tools/assets/plateau_bridges.py build}, which turns them into structure templates and previews.
  *
  * <p>Input: a JSON array of objects with {@code slug}, {@code kind} ({@code viaduct}, {@code footbridge},
- * {@code elevated_station} or {@code ground_station}), {@code palette} ({@code CONCRETE}, {@code WEATHERED},
+ * {@code elevated_station}, {@code ground_station}, {@code brick_viaduct} or {@code frame_viaduct}), {@code palette} ({@code CONCRETE}, {@code WEATHERED},
  * {@code BLUE}) and the constructor's fields: every size is a field. {@code spans} ([preferred, concreteMax,
  * girderMax]), {@code keepClear} ([[from, to], ...]), {@code section} (stations: e.g. {@code "TPT"}, {@code "PTTP"})
- * and {@code ground} ([[x, y], ...], the terrain along x) where the kind takes them. Output: {@code <out>/<slug>.json} with
+ * and {@code ground} ([[x, y], ...], the terrain along x) where the kind takes them; {@code curve} ([start, radius,
+ * length]) lays any of them on a curve. Output: {@code <out>/<slug>.json} with
  * {@code size}, {@code origin} (where the generator's (0, 0, 0) lies in the template: x = 0 the start, y = 0 the
  * ground course, z = 0 the centre line), {@code spans}, {@code tracks} (track centres' z), {@code level} and
  * {@code blocks} ([x, y, z, state], from 0).
@@ -54,6 +58,11 @@ public final class RailModels {
             long t0 = System.nanoTime();
             JsonObject meta = new JsonObject();
             Model m = build(o, meta);
+            if (o.has("curve")) {  // [start, radius, length]: the straight structure laid on a curve
+                JsonArray c = o.getAsJsonArray("curve");
+                m = new Curve(c.get(0).getAsDouble(), c.get(1).getAsDouble(), c.get(2).getAsDouble()).apply(m);
+                meta.add("curve", c);
+            }
             write(m, meta, out.resolve(slug + ".json"));
             System.out.printf("%-28s %4d x %3d x %3d  %7d blocks  spans %s  %d ms%n", slug,
                     m.maxX() - m.minX() + 1, m.maxY() - m.minY() + 1, m.maxZ() - m.minZ() + 1, m.size(),
@@ -108,6 +117,20 @@ public final class RailModels {
                 meta.addProperty("platformStart", s.platformStart());
                 meta.addProperty("platformEnd", s.platformEnd());
                 return s.build();
+            }
+            case "brick_viaduct" -> {
+                BrickViaduct v = new BrickViaduct(i(o, "length"), i(o, "level", 8), i(o, "bay", 10), clear(o),
+                        i(o, "tracks", 2), !o.has("catenary") || bool(o, "catenary"), o.has("seed")
+                        ? o.get("seed").getAsLong() : 1L, p, ground);
+                describe(meta, v.spans(), v.trackCentres(), v.level());
+                return v.build();
+            }
+            case "frame_viaduct" -> {
+                FrameViaduct v = new FrameViaduct(i(o, "length"), i(o, "level", 10), i(o, "bay", 8),
+                        i(o, "unitBays", 3), i(o, "tracks", 2), i(o, "trackSpacing", 4), i(o, "wallHeight", 2),
+                        clear(o), p, ground);
+                describe(meta, v.spans(), v.trackCentres(), v.level());
+                return v.build();
             }
             default -> throw new IllegalArgumentException("kind " + kind);
         }

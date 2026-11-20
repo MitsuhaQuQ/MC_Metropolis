@@ -143,6 +143,120 @@ class RailStructureTest {
     }
 
     @Test
+    void curvesLayTheDeckWithoutGaps() {
+        for (double radius : new double[] {60, -60, 160, -400}) {
+            Viaduct v = Viaduct.builder(Viaduct.Deck.RAIL, 160, 9).tracks(2).build();
+            Curve c = new Curve(30, radius, 100);
+            Model m = c.apply(v.build());
+            for (double s = 1; s < 159; s += 0.5) {
+                for (int tc : v.trackCentres()) {
+                    double[] pt = c.place(s, tc);
+                    int x = (int) Math.floor(pt[0]), z = (int) Math.floor(pt[1]);
+                    assertEquals(P.ballast(), m.get(x, 8, z), radius + ": bed at s " + s);
+                    for (int y = 9; y <= 13; y++) {
+                        assertFalse(m.has(x, y, z), radius + ": train at s " + s + " y " + y);
+                    }
+                }
+                double[] e = c.place(s, -v.halfWidth());
+                boolean parapet = false;
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        String b = m.get((int) Math.floor(e[0]) + dx, 9, (int) Math.floor(e[1]) + dz);
+                        parapet |= b != null && base(b).endsWith("parapet");
+                    }
+                }
+                assertTrue(parapet, radius + ": parapet at s " + s);
+            }
+            // The curve turns the line: its far end heads off at the arc's angle
+            double[] end = c.at(160);
+            assertEquals(Math.signum(radius) * 100 / Math.abs(radius), end[2], 1e-9);
+            assertStates(m);
+        }
+        assertEquals("x[facing=east]", Curve.rotate("x[facing=north]", 1));
+        assertEquals("x[north=true,south=true]", Curve.rotate("x[east=true,west=true]", 1));
+        assertEquals("x[axis=x]", Curve.rotate("x[axis=z]", -1));
+        assertEquals("x[facing=west,half=bottom]", Curve.rotate("x[facing=east,half=bottom]", 2));
+    }
+
+    @Test
+    void brickViaductsHoldShopsInTheirArches() {
+        for (Ground g : List.of(Ground.FLAT, SLOPE)) {
+            for (int bay : new int[] {8, 10, 12}) {
+                for (int length : new int[] {60, 137, 210}) {
+                    BrickViaduct v = new BrickViaduct(length, 9, bay, List.of(new int[] {40, 62}), 2, true, 7L, P, g);
+                    Model m = v.build();
+                    Set<BrickViaduct.Bay> kinds = new HashSet<>();
+                    for (Spans.Span s : v.spans()) {
+                        if (s.kind() == Spans.Kind.CONCRETE) {
+                            kinds.add(v.bay(s.from()));
+                            int mid = (s.from() + s.to()) / 2;
+                            int floor = g.at(mid, 0);
+                            assertTrue(m.has(mid, floor, 0), "floor in the vault at " + mid);
+                            assertFalse(m.has(mid, floor + 2, 0), "room in the vault at " + mid);
+                        } else {
+                            assertFalse(s.from() < 62 && s.to() > 40 && s.kind() == Spans.Kind.CONCRETE);
+                            assertEquals(P.bearing(), m.get(s.from(), 9 - 1 - Viaduct.girderDepth(s) - 1, v.trackCentres()[0]));
+                        }
+                    }
+                    for (int x = 40; x < Math.min(62, length - 1); x++) {
+                        for (int y = g.at(x, 0) + 1; y < 5; y++) {
+                            assertFalse(m.has(x, y, 0), "road under the brick viaduct at " + x + "," + y);
+                        }
+                    }
+                    if (length >= 137) {
+                        assertTrue(kinds.size() >= 3, "bays vary: " + kinds);
+                    }
+                    for (int tc : v.trackCentres()) {
+                        assertClear(m, 1, length - 1, 9, 13, tc - 1, tc + 1, "train on the brick viaduct");
+                    }
+                    assertStates(m);
+                }
+            }
+        }
+    }
+
+    @Test
+    void shinkansenFramesComeInUnitsWithJointsBetween() {
+        for (Ground g : List.of(Ground.FLAT, VALLEY)) {
+            for (int unit : new int[] {2, 3, 4}) {
+                for (int bay : new int[] {7, 8, 10}) {
+                    FrameViaduct v = new FrameViaduct(160, 12, bay, unit, 2, 4, 2, List.of(new int[] {70, 96}), P, g);
+                    Model m = v.build();
+                    int run = 0;
+                    for (int i = 0; i < v.spans().size(); i++) {
+                        Spans.Span s = v.spans().get(i);
+                        if (s.kind() != Spans.Kind.CONCRETE) {
+                            assertTrue(s.from() < 70 && s.to() >= 96, "steel only over the road: " + s);
+                            run = 0;
+                        } else if (v.gap(i)) {
+                            int mid = (s.from() + s.to()) / 2;
+                            assertEquals(P.joint(), base(m.get(mid, 11, -v.halfWidth() + 1)), "joint in the gap");
+                            assertFalse(m.has(mid, g.at(mid, v.columnZ()[0]) + 1, v.columnZ()[0]), "no column");
+                            run = 0;
+                        } else {
+                            run++;
+                            assertTrue(run <= unit, "unit of " + run + " bays");
+                            if (s.from() > 0) {
+                                int z = v.columnZ()[0];
+                                assertTrue(m.has(s.from(), g.at(s.from(), z) + 1, z), "column at " + s.from());
+                            }
+                        }
+                    }
+                    for (int x = 70; x < 96; x++) {
+                        for (int y = g.at(x, 0) + 1; y < 6; y++) {
+                            assertFalse(m.has(x, y, 0), "road under the shinkansen at " + x);
+                        }
+                    }
+                    for (int tc : v.trackCentres()) {
+                        assertClear(m, 1, 159, 12, 16, tc - 1, tc + 1, "shinkansen on its track");
+                    }
+                    assertStates(m);
+                }
+            }
+        }
+    }
+
+    @Test
     void footbridgesOfAnySpanClearTheRoadAndReachTheGround() {
         for (Ground g : TERRAIN) {
             for (int road : new int[] {7, 12, 18, 26, 34}) {
