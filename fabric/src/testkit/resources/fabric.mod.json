@@ -3,12 +3,15 @@
   "id": "citybuilder_testkit",
   "version": "0.0.1",
   "name": "City Builder TestKit",
-  "description": "Only for City Builder's automated in-game tests: a local HTTP interface to the test server. Never shipped.",
+  "description": "Only for City Builder's automated in-game tests: local HTTP interfaces to the test server and the test client. Never shipped.",
   "license": "MIT",
-  "environment": "server",
+  "environment": "*",
   "entrypoints": {
     "server": [
       "com.mtm.citybuilder.testkit.TestKit"
+    ],
+    "client": [
+      "com.mtm.citybuilder.testkit.TestKitClient"
     ]
   },
   "depends": {

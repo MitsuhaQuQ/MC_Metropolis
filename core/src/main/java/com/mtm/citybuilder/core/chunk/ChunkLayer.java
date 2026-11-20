@@ -87,13 +87,17 @@ public final class ChunkLayer {
         if (a > carriage) {
             return Paving.SIDEWALK;
         }
-        if (width >= 14 && a <= 0.5) {
+        // Bands half open, so a line whose edge falls on a block's edge (an even width) takes one column, not a
+        // column either side by rounding
+        double signed = column.across;
+        if (width >= 14 && signed > -0.5 && signed <= 0.5) {
             return Paving.YELLOW_LINE;
         }
         if (walk > 0 && a > carriage - 1.0) {
             return Paving.WHITE_LINE;
         }
-        if (carriage >= 5.0 && Math.abs(a - 0.5 * carriage) <= 0.5 && Math.floorMod((long) Math.floor(column.along), 10) < 5) {
+        if (carriage >= 5.0 && a - 0.5 * carriage > -0.5 && a - 0.5 * carriage <= 0.5
+                && Math.floorMod((long) Math.floor(column.along), 10) < 5) {
             return Paving.WHITE_LINE;
         }
         return Paving.ASPHALT;

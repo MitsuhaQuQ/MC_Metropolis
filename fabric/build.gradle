@@ -90,5 +90,10 @@ loom {
         server {
             source sourceSets.testkit
         }
+        // The test client in a directory of its own, so its log and options do not mix with the server's
+        client {
+            source sourceSets.testkit
+            runDir "run-client"
+        }
     }
 }

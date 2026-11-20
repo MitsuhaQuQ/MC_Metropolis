@@ -27,3 +27,4 @@ Thumbs.db
 # Automated tests
 autotest/node_modules/
 autotest/test-results/
+run-client/

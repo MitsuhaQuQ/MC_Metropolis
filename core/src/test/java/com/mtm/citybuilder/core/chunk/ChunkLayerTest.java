@@ -93,6 +93,8 @@ class ChunkLayerTest {
         assertEquals(ChunkLayer.Paving.SIDEWALK, paving(ChunkLayer.Surface.ARTERIAL, -5.5, 0.0, 16.0));
         assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.ARTERIAL, 4.5, 0.0, 16.0));
         assertEquals(ChunkLayer.Paving.YELLOW_LINE, paving(ChunkLayer.Surface.ARTERIAL, 0.5, 0.0, 16.0));
+        // On an even width the centre falls between two columns: only one of them is yellow
+        assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.ARTERIAL, -0.5, 0.0, 16.0));
         assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.ARTERIAL, 1.5, 0.0, 16.0));
         // A street: plain asphalt; a lane: paving slabs
         assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.STREET, 0.5, 0.0, 6.0));
