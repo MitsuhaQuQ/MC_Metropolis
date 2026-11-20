@@ -308,6 +308,11 @@ def main(argv):
 # ---------------------------------------------------------------- build: templates, views, plans
 
 MC_JAR = os.path.expanduser("~/.gradle/caches/fabric-loom/1.20.1/minecraft-client.jar")
+# This mod's blocks: their textures in common's assets (drawn by tools/textures/airport_textures.py)
+MOD_TEXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "common", "src", "main",
+                            "resources", "assets", "citybuilder", "textures", "block")
+MOD_TEXTURE = {"airport_seat": "seat_fabric", "wayfinding_sign": "sign/departures", "metal_roof_slab": "metal_roof",
+               "metal_roof_white_slab": "metal_roof_white", "escalator_step": "escalator_step"}
 ZONE_COLOURS = {
     "c": (190, 190, 190), "a": (255, 214, 153), "b": (255, 179, 102), "h": (204, 170, 136), "u": (255, 140, 140),
     "k": (153, 204, 255), "s": (255, 102, 102), "i": (230, 120, 200), "y": (190, 225, 255), "p": (255, 240, 120),
@@ -329,13 +334,31 @@ def texture_names(name):
     return tries
 
 
+def average(img):
+    w = img.size[0]
+    img = img.convert("RGBA").crop((0, 0, w, min(w, img.size[1])))
+    tot = [0.0, 0.0, 0.0, 0.0]
+    for r, g, b, a in (img.get_flattened_data() if hasattr(img, "get_flattened_data") else img.getdata()):
+        tot[0] += r * a
+        tot[1] += g * a
+        tot[2] += b * a
+        tot[3] += a
+    return [round(c / max(1.0, tot[3])) for c in tot[:3]]
+
+
 def colours(names, cache):
-    """The average colour of each block's texture in the vanilla 1.20.1 client jar, read locally; only the averages
-    are kept (cached), nothing of the jar is written out."""
+    """The average colour of each block's texture: this mod's from its assets, vanilla's from the 1.20.1 client jar,
+    read locally; only the vanilla averages are kept (cached), nothing of the jar is written out."""
     got = {}
     if os.path.exists(cache):
         with open(cache, encoding="utf-8") as fh:
             got = json.load(fh)
+    mod = {}
+    for n in names:
+        path = os.path.join(MOD_TEXTURES, MOD_TEXTURE.get(n, n) + ".png")
+        if os.path.exists(path):
+            mod[n] = average(Image.open(path))
+    names = [n for n in names if n not in mod]
     missing = [n for n in names if n not in got]
     if missing:
         import io
@@ -346,19 +369,11 @@ def colours(names, cache):
                 for t in texture_names(n):
                     path = f"assets/minecraft/textures/block/{t}.png"
                     if path in have:
-                        img = Image.open(io.BytesIO(z.read(path))).convert("RGBA")
-                        w = img.size[0]
-                        img = img.crop((0, 0, w, min(w, img.size[1])))
-                        tot = [0.0, 0.0, 0.0, 0.0]
-                        for r, g, b, a in (img.get_flattened_data() if hasattr(img, "get_flattened_data") else img.getdata()):
-                            tot[0] += r * a
-                            tot[1] += g * a
-                            tot[2] += b * a
-                            tot[3] += a
-                        got[n] = [round(c / max(1.0, tot[3])) for c in tot[:3]]
+                        got[n] = average(Image.open(io.BytesIO(z.read(path))))
                         break
         with open(cache, "w", encoding="utf-8") as fh:
             json.dump(got, fh, indent=0)
+    got.update(mod)
     return {k: tuple(v) for k, v in got.items()}
 
 

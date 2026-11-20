@@ -2,3 +2,8 @@ City Builder assets and where they come from.
 
 textures/block/asphalt.png, asphalt_line_white.png, asphalt_line_yellow.png, sidewalk.png
   Drawn for this mod by tools/textures/road_textures.py (no outside sources); the mod's own licence.
+
+textures/block/curtain_wall_*.png, metal_roof*.png, ceiling_light.png, terminal_tile.png, carpet_tile_*.png,
+seat_*.png, sign/*.png, flight_board.png, panel_side.png, bridge_*.png, baggage_belt*.png, escalator_*.png
+  Drawn for this mod by tools/textures/airport_textures.py (no outside sources; the pictograms drawn there in the
+  manner of airport signs, not copied from any standard's artwork); the mod's own licence.

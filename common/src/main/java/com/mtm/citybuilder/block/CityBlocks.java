@@ -27,6 +27,7 @@ public final class CityBlocks {
     /** Registers the blocks; called once from the mod's entry point. */
     public static void register() {
         Platform platform = Platform.get();
+        AirportBlocks.register();
         ASPHALT = platform.registerBlock("asphalt", () -> new PavingBlock(properties()));
         ASPHALT_LINE_WHITE = platform.registerBlock("asphalt_line_white", () -> new MarkingBlock(properties()));
         ASPHALT_LINE_YELLOW = platform.registerBlock("asphalt_line_yellow", () -> new MarkingBlock(properties()));

@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/outer_stairs",
+  "textures": {
+    "top": "citybuilder:block/escalator_step",
+    "bottom": "citybuilder:block/escalator_skirt",
+    "side": "citybuilder:block/escalator_skirt"
+  }
+}

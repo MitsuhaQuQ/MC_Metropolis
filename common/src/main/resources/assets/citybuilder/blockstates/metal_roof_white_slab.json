@@ -1,0 +1,30 @@
+{
+  "variants": {
+    "axis=x,type=bottom": {
+      "model": "citybuilder:block/metal_roof_white_slab",
+      "y": 90
+    },
+    "axis=x,type=top": {
+      "model": "citybuilder:block/metal_roof_white_slab_top",
+      "y": 90
+    },
+    "axis=x,type=double": {
+      "model": "citybuilder:block/metal_roof_white",
+      "x": 90,
+      "y": 90
+    },
+    "axis=z,type=bottom": {
+      "model": "citybuilder:block/metal_roof_white_slab",
+      "y": 0
+    },
+    "axis=z,type=top": {
+      "model": "citybuilder:block/metal_roof_white_slab_top",
+      "y": 0
+    },
+    "axis=z,type=double": {
+      "model": "citybuilder:block/metal_roof_white",
+      "x": 90,
+      "y": 0
+    }
+  }
+}

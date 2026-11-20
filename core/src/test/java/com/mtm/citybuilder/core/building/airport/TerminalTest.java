@@ -3,7 +3,11 @@ package com.mtm.citybuilder.core.building.airport;
 import com.mtm.citybuilder.core.building.temple.Model;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -25,10 +29,46 @@ class TerminalTest {
     }
 
     @Test
-    void blocksAreVanillaStates() {
-        for (Terminal t : List.of(TAKAMATSU, TerminalComposer.compose(7, true))) {
-            t.build().model().forEach((x, y, z, s) -> assertTrue(s.startsWith("minecraft:") && !s.contains("null"), s));
+    void blocksAreVanillaOrOurs() throws IOException {
+        // Vanilla blocks, or this mod's with a block state file that knows every property given
+        Set<String> seen = new HashSet<>();
+        for (Terminal t : List.of(TAKAMATSU, TerminalComposer.compose(7, true), TerminalComposer.compose(4, false))) {
+            t.build().model().forEach((x, y, z, s) -> {
+                assertTrue((s.startsWith("minecraft:") || s.startsWith("citybuilder:")) && !s.contains("null"), s);
+                seen.add(s);
+            });
         }
+        Path states = Path.of("..", "common", "src", "main", "resources", "assets", "citybuilder", "blockstates");
+        for (String s : seen) {
+            if (!s.startsWith("citybuilder:")) {
+                continue;
+            }
+            String id = base(s).substring("citybuilder:".length());
+            Path file = states.resolve(id + ".json");
+            assertTrue(Files.exists(file), "no block state for " + id);
+            String json = Files.readString(file);
+            if (s.contains("[")) {
+                for (String kv : s.substring(s.indexOf('[') + 1, s.length() - 1).split(",")) {
+                    String key = kv.substring(0, kv.indexOf('='));
+                    assertTrue(json.contains(key + "="), id + " has no property " + key);
+                    assertTrue(json.contains(kv), id + " has no variant with " + kv);
+                }
+            }
+        }
+    }
+
+    @Test
+    void floorsAreLit() {
+        // Every floor of every wing has its lights, and the bridges theirs
+        Model m = TAKAMATSU.build().model();
+        int[] lights = new int[20];
+        m.forEach((x, y, z, s) -> {
+            if (s.equals("citybuilder:ceiling_light")) {
+                lights[y]++;
+            }
+        });
+        assertTrue(lights[5] > 100, "ground floor: " + lights[5]);
+        assertTrue(lights[9] + lights[10] > 50, "gates' level and bridges: " + (lights[9] + lights[10]));
     }
 
     @Test
@@ -84,7 +124,7 @@ class TerminalTest {
         Model m = TAKAMATSU.build().model();
         int[] stairs = new int[17];
         m.forEach((x, y, z, s) -> {
-            if (s.startsWith("minecraft:smooth_stone_stairs")) {
+            if (s.startsWith("citybuilder:escalator_step")) {
                 stairs[y]++;
             }
         });

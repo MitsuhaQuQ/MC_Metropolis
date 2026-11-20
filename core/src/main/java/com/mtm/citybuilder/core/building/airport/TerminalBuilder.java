@@ -18,6 +18,9 @@ import java.util.Set;
  */
 final class TerminalBuilder {
     private static final String AIR = null;
+    private static final String BELLOWS = "citybuilder:bridge_bellows";
+    private static final String LIGHT = "citybuilder:ceiling_light";
+    private static final String BOARD = "citybuilder:flight_board";
     private static final String[] SIGNS = {"red_concrete", "blue_concrete", "orange_concrete", "green_concrete",
             "cyan_concrete", "purple_concrete", "yellow_concrete", "magenta_concrete", "lime_concrete", "pink_concrete"};
 
@@ -82,6 +85,7 @@ final class TerminalBuilder {
             concourse(wings.get(i));
         }
         decks();
+        lights();
         connect();
         Model m = new Model();
         for (Map.Entry<Long, String> e : blocks.entrySet()) {
@@ -273,10 +277,10 @@ final class TerminalBuilder {
                 // The roof: metal skin, a half step where it curves; a deck is flat and paved
                 int low = ceil[c] + 1;
                 for (int y = low; y <= roofTop[c]; y++) {
-                    set(x, y, z, w.deck() ? p.walk() : p.roof());
+                    set(x, y, z, w.deck() ? p.walk() : roof(w));
                 }
                 if (roofHalf[c]) {
-                    set(x, roofTop[c] + 1, z, p.roofSlab() + "[type=bottom]");
+                    set(x, roofTop[c] + 1, z, roofSlab(w));
                 }
                 walls(x, z, c, w);
             }
@@ -292,15 +296,32 @@ final class TerminalBuilder {
                 if (owner(x, z) >= 0) {
                     continue;
                 }
-                set(x, y, z, p.roof());
+                set(x, y, z, roof(hall));
                 if (half) {
-                    set(x, y + 1, z, p.roofSlab() + "[type=bottom]");
+                    set(x, y + 1, z, roofSlab(hall));
                 }
                 if (z == hall.z() - hall.overhang()) {
                     set(x, y - 1, z, p.fascia());
                 }
             }
         }
+    }
+
+    /** The roof's skin, its seams running down the slope: across the wing's long side. */
+    private String roof(Wing w) {
+        return p.roof() + (p.roof().startsWith("citybuilder:") ? "[axis=" + (w.alongX() ? "z" : "x") + "]" : "");
+    }
+
+    private String roofSlab(Wing w) {
+        return p.roofSlab() + "[type=bottom" + (p.roofSlab().startsWith("citybuilder:")
+                ? ",axis=" + (w.alongX() ? "z" : "x") : "") + "]";
+    }
+
+    /** A belt slab running along a or b of a frame. */
+    private String belt(Frame f, char along, boolean top) {
+        boolean x = f.alongX() == (along == 'a');
+        return p.belt() + "[type=" + (top ? "top" : "bottom")
+                + (p.belt().startsWith("citybuilder:") ? ",axis=" + (x ? "x" : "z") : "") + "]";
     }
 
     /** The facade of a square on a wing's edge: curtain walls with mullions, bands at the slabs, solid below. */
@@ -349,7 +370,7 @@ final class TerminalBuilder {
         if (lev == 0 && !landside && !(w.role() == Wing.Role.HALL && (side == 'W' || side == 'E'))) {
             return p.cladding();
         }
-        return Math.floorMod(along, 3) == 0 ? p.mullion() : p.glass();
+        return Math.floorMod(along, 9) == 0 ? p.mullion() : p.glass();
     }
 
     /** Doors: the landside entrances on the curbs' levels, the apron's service doors on the ground floor. */
@@ -450,9 +471,16 @@ final class TerminalBuilder {
                 reserved.add(rkey(1, fx - dx * s + lx * l, fz - dz * s + lz * l));
             }
         }
-        // The gate's counter beside the aisle
+        // The gate's counter beside the aisle, its board over it, the gate's sign over the aisle
         for (int l = 3; l <= 5; l++) {
             put(fx - dx * 4 + lx * l, y0 + 1, fz - dz * 4 + lz * l, p.counter());
+        }
+        String across = dz != 0 ? "north" : "east";
+        int sx = fx - dx * 3;
+        int sz = fz - dz * 3;
+        if (y0 + 4 <= top(1, sx, sz)) {
+            put(sx, y0 + 4, sz, Sign.GATES.state(across));
+            put(fx - dx * 4 + lx * 4, y0 + 3, fz - dz * 4 + lz * 4, BOARD + "[facing=" + across + "]");
         }
         for (int s = 1; s <= len + 1; s++) {
             boolean rotunda = s >= 7 && s <= 11;
@@ -465,11 +493,11 @@ final class TerminalBuilder {
                     // The canopy that closes round the aircraft's door
                     if (Math.abs(l) == 2) {
                         for (int y = y0; y <= y0 + 4; y++) {
-                            set(x, y, z, "minecraft:black_wool");
+                            set(x, y, z, BELLOWS);
                         }
                     } else if (Math.abs(l) < 2) {
-                        set(x, y0, z, "minecraft:black_wool");
-                        set(x, y0 + 4, z, "minecraft:black_wool");
+                        set(x, y0, z, BELLOWS);
+                        set(x, y0 + 4, z, BELLOWS);
                     }
                     continue;
                 }
@@ -483,6 +511,9 @@ final class TerminalBuilder {
                         set(x, y, z, wall);
                     }
                 }
+            }
+            if (s % 6 == 3 && s < len - 2) {
+                set(fx + dx * s, y0 + 3, fz + dz * s, LIGHT);
             }
             // The rotunda's column, the drive's legs and wheels
             if (s == 9) {
@@ -598,6 +629,34 @@ final class TerminalBuilder {
         put(x, lv[lev] + 1 + dy, z, s);
     }
 
+    /** Hangs a sign or a board on a level, kept clear squares or not, where the space is high and free. */
+    private void hang(int lev, Frame f, int a, int b, int dy, String s) {
+        int x = f.x(a, b);
+        int z = f.z(a, b);
+        int y = lv[lev] + 1 + dy;
+        if (owner(x, z) >= 0 && hasSlab(lev, x, z) && y <= top(lev, x, z) && get(x, y, z) == null) {
+            set(x, y, z, s);
+        }
+    }
+
+    /** Signs side by side along a, their panels spanning a (facing along b). */
+    private void signs(int lev, Frame f, int a, int b, Sign... icons) {
+        for (int i = 0; i < icons.length; i++) {
+            hang(lev, f, a + i, b, 3, icons[i].state(f.dir(0, 1)));
+        }
+    }
+
+    /** Flight boards over the check-in hall: groups three wide, two high, every 40 m along a. */
+    private void boards(int lev, Frame f, int a0, int a1, int b) {
+        for (int a = a0 + 16; a + 3 < a1; a += 40) {
+            for (int da = 0; da < 3; da++) {
+                for (int dy = 3; dy <= 4; dy++) {
+                    hang(lev, f, a + da, b, dy, BOARD + "[facing=" + f.dir(0, 1) + "]");
+                }
+            }
+        }
+    }
+
     private void reserve(int lev, Frame f, int a0, int b0, int a1, int b1) {
         for (int a = a0; a < a1; a++) {
             for (int b = b0; b < b1; b++) {
@@ -680,8 +739,8 @@ final class TerminalBuilder {
             if (passage.test(a)) {
                 continue;
             }
-            furn(lev, f, a, b, 0, Math.floorMod(a, 4) == 1 ? p.belt() + "[type=top]" : p.counter());
-            furn(lev, f, a, b + 2, 0, p.belt() + "[type=bottom]");
+            furn(lev, f, a, b, 0, Math.floorMod(a, 4) == 1 ? belt(f, 'a', true) : p.counter());
+            furn(lev, f, a, b + 2, 0, belt(f, 'a', false));
             String sign = "minecraft:" + SIGNS[Math.floorMod(a / 24, 4)];
             for (int dy = 0; dy < 4; dy++) {
                 furn(lev, f, a, b + 3, dy, dy == 3 ? sign : p.partition());
@@ -709,7 +768,7 @@ final class TerminalBuilder {
             furn(lev, f, a, mid + 1, 0, p.cladding());
             furn(lev, f, a, mid + 1, 1, p.cladding());
             for (int b = b0 + 1; b < b1 - 1; b++) {
-                furn(lev, f, a, b, 0, p.belt() + "[type=top]");
+                furn(lev, f, a, b, 0, belt(f, 'b', true));
             }
             furn(lev, f, a + 1, mid, 2, "minecraft:iron_block");
             furn(lev, f, a + 2, mid, 0, "minecraft:iron_bars");
@@ -809,7 +868,8 @@ final class TerminalBuilder {
         for (int b = b0; b < b1; b++) {
             for (int da = -2; da <= 1; da++) {
                 boolean ring = da == -2 || da == 1 || b == b0 || b == b1 - 1;
-                furn(lev, f, a + da, b, 0, ring ? p.belt() + "[type=bottom]" : p.cladding());
+                boolean end = b == b0 || b == b1 - 1;
+                furn(lev, f, a + da, b, 0, ring ? belt(f, end ? 'a' : 'b', false) : p.cladding());
             }
         }
     }
@@ -825,7 +885,7 @@ final class TerminalBuilder {
             for (int k = 0; k < rise; k++) {
                 int x = f.x(a0 + k, b);
                 int z = f.z(a0 + k, b);
-                set(x, lv[levFrom] + 1 + k, z, "minecraft:smooth_stone_stairs[facing=" + f.dir(1, 0) + "]");
+                set(x, lv[levFrom] + 1 + k, z, "citybuilder:escalator_step[facing=" + f.dir(1, 0) + "]");
                 for (int y = lv[levFrom] + 2 + k; y <= lv[levFrom] + 4 + k && y <= lv[levTo] + 3; y++) {
                     set(x, y, z, AIR);
                 }
@@ -843,6 +903,9 @@ final class TerminalBuilder {
         }
         for (int b = b0; b < b0 + 4; b++) {
             set(f.x(a0 + open - 1, b), lv[levTo] + 1, f.z(a0 + open - 1, b), "minecraft:glass_pane");
+        }
+        for (int b = b0 + 1; b <= b0 + 2; b++) {
+            hang(levFrom, f, a0 - 2, b, 3, Sign.ESCALATOR.state(f.dir(1, 0)));
         }
     }
 
@@ -866,6 +929,7 @@ final class TerminalBuilder {
             for (int y = lv[lev] + 1; y <= lv[lev] + 2; y++) {
                 set(f.x(a0 + 1, b0), y, f.z(a0 + 1, b0), AIR);
             }
+            hang(lev, f, a0 + 1, b0 - 1, 2, Sign.LIFT.state(f.dir(0, 1)));
         }
         for (int y = topY + 1; y <= topY + 2; y++) {
             set(f.x(a0 + 1, b0), y, f.z(a0 + 1, b0), AIR);
@@ -875,6 +939,7 @@ final class TerminalBuilder {
     /** Toilets: two rooms side by side, doors on the -b side. */
     private void restrooms(int lev, Frame f, int a0, int b0) {
         zone(lev, f, a0, b0, a0 + 12, b0 + 8, Zone.RESTROOM);
+        hang(lev, f, a0 + 6, b0 - 1, 3, Sign.TOILETS.state(f.dir(0, 1)));
         wallA(lev, f, a0, a0 + 12, b0, 6, 2, p.partition());
         wallA(lev, f, a0, a0 + 12, b0 + 7, 0, 0, p.partition());
         wallB(lev, f, a0, b0, b0 + 8, 0, 0, p.partition());
@@ -931,7 +996,7 @@ final class TerminalBuilder {
             if (claimEnd - 4 - start >= 8) {
                 carousel(0, f, a, start, claimEnd - 3);
                 for (int b = claimEnd - 3; b <= claimEnd + 2; b++) {
-                    furn(0, f, a - 2, b, 0, p.belt() + "[type=bottom]");
+                    furn(0, f, a - 2, b, 0, belt(f, 'b', false));
                 }
             }
         }
@@ -939,7 +1004,7 @@ final class TerminalBuilder {
         for (int b = claimEnd + 4; b < D - 3; b += 6) {
             for (int a = a0 + 4; a < a1 - 4; a++) {
                 if (Math.floorMod(a - a0, 40) < 32) {
-                    furn(0, f, a, b, 0, p.belt() + "[type=top]");
+                    furn(0, f, a, b, 0, belt(f, 'a', true));
                 }
             }
         }
@@ -947,6 +1012,15 @@ final class TerminalBuilder {
         int mid = (a0 + a1) / 2;
         for (int a = mid - 3; a <= mid + 3; a++) {
             furn(0, f, a, lobby / 2, 0, p.counter());
+        }
+        signs(0, f, mid, lobby / 2, Sign.INFORMATION);
+        // Signs: baggage claim over the claim halls' doors, the ways out (buses, trains, parking) by the curb
+        for (int a = a0 + 10; a + 4 <= a1; a += 20) {
+            signs(0, f, a + 1, lobby - 1, Sign.BAGGAGE, Sign.ARRIVALS);
+        }
+        Sign[] out = {Sign.BUS, Sign.TRAIN, Sign.PARKING};
+        for (int a = a0 + 8, k = 0; a + 2 < a1; a += 48, k++) {
+            signs(0, f, a, 3, out[k % 3], k % 2 == 0 ? Sign.RIGHT : Sign.LEFT);
         }
         for (int a = a0 + 6; a < a1 - 6; a += 18) {
             for (int da = 0; da < 8; da++) {
@@ -971,6 +1045,10 @@ final class TerminalBuilder {
         units(1, f, 1, L - 1, s0, s1, 1, Zone.SHOPS);
         int lounge = s1 + 3;
         zone(1, f, 1, s1, L - 1, lounge, Zone.CORRIDOR);
+        for (int a = 20; a + 2 < L - 1; a += 50) {
+            signs(1, f, a, s1 + 1, Sign.GATES, a < L / 2 ? Sign.LEFT : Sign.RIGHT);
+            boards(1, f, a - 20, a + 20, lounge);
+        }
         zone(1, f, 1, lounge, L - 1, D - 1, Zone.GATE_LOUNGE);
         seats(1, f, 2, L - 2, lounge, D - 2);
     }
@@ -991,6 +1069,10 @@ final class TerminalBuilder {
             units(lev, f, u0 + 1, u1 - 1, mid + 2, D - 1, -1, z);
             zone(lev, f, u0, v, u1, v + 4, Zone.CORRIDOR);
             zone(lev, f, u0, mid - 2, u1, mid + 2, Zone.CORRIDOR);
+            for (int a = u0 + 20; a + 1 < u1; a += 40) {
+                signs(lev, f, a, mid, z == Zone.OFFICES ? Sign.INFORMATION : z == Zone.SHOPS ? Sign.SHOPPING
+                        : Sign.RESTAURANT);
+            }
             voids(w, lev);
             if (lev + 1 < w.levels()) {
                 escalators(f, u0 + 6 + 12 * ((lev - from) % 2), v + 1, lev, lev + 1);
@@ -1043,6 +1125,7 @@ final class TerminalBuilder {
         counters(0, f, 4, split - 4, band - 7, a -> false);
         wallA(0, f, 1, split, band, 0, 0, p.partition());
         kiosks(0, f, 8, split - 8, band - 14);
+        boards(0, f, 4, split - 4, band - 10);
         wallB(0, f, split, band, D - 1, 0, 0, p.partition());
         arrivals(w, split, L - 1, band, Math.max(band + 16, D - 12));
         // Level 1: the lobby before security, the checkpoints, airside
@@ -1076,6 +1159,7 @@ final class TerminalBuilder {
         int groups = Math.max(1, (int) Math.round(L / 100.0));
         counters(1, f, 4, L - 4, check - 7, a -> securityAt(L, groups, a, 8));
         kiosks(1, f, 8, L - 8, check - 14);
+        boards(1, f, 4, L - 4, check - 10);
         securityBand(w, check, check + 12);
         airside(w, check + 12);
         if (w.levels() > 2) {
@@ -1110,6 +1194,7 @@ final class TerminalBuilder {
         zone(2, f, 1, 1, L - 1, band, Zone.CHECK_IN);
         counters(2, f, 4, L - 4, band - 7, a -> Math.floorMod(a - 4, 60) < 6);
         kiosks(2, f, 8, L - 8, band - 14);
+        boards(2, f, 4, L - 4, band - 10);
         units(2, f, 2, L * 2 / 5 - 1, band + 2, D - 1, -1, Zone.RESTAURANTS);
         units(2, f, L * 3 / 5 + 1, L - 2, band + 2, D - 1, -1, Zone.RESTAURANTS);
         voids(w, 2);
@@ -1156,6 +1241,7 @@ final class TerminalBuilder {
             }
             zone(1, f, a0, b0, a1, b1, Zone.SECURITY);
             security(1, f, a0 + 1, (a1 - a0 - 1) / 3, b0, b1);
+            signs(1, f, c - 1, b0 - 1, Sign.DEPARTURES, Sign.GATES, Sign.UP);
             wallB(1, f, a0 - 1, b0, b1, 0, 0, p.partition());
             wallB(1, f, a1, b0, b1, 0, 0, p.partition());
         }
@@ -1244,6 +1330,11 @@ final class TerminalBuilder {
             c1 = s;
         }
         zone(1, f, e0, c0, e1, c1, Zone.CORRIDOR);
+        // Signs to the gates over the corridor, facing along it
+        for (int a = e0 + 25; a < e1 - 5; a += 60) {
+            hang(1, f, a, (c0 + c1) / 2, 3, Sign.GATES.state(f.dir(1, 0)));
+            hang(1, f, a, (c0 + c1) / 2 + 1, 3, Sign.UP.state(f.dir(1, 0)));
+        }
         // Escalators down to the bus lounges and, with a third level, up to the arrivals corridor
         int am = A / 2 - 4;
         int bm = (c0 + c1) / 2 - 2;
@@ -1258,7 +1349,7 @@ final class TerminalBuilder {
             for (int a = e0 + 10; a + 40 < e1 - 10; a += 60) {
                 for (int k = 0; k < 50 && a + k < e1 - 10; k++) {
                     for (int b = bm - 4; b < bm - 2; b++) {
-                        furn(1, f, a + k, b, 0, p.belt() + "[type=bottom]");
+                        furn(1, f, a + k, b, 0, belt(f, 'a', false));
                     }
                     furn(1, f, a + k, bm - 5, 0, "minecraft:glass_pane");
                     furn(1, f, a + k, bm - 2, 0, "minecraft:glass_pane");
@@ -1324,6 +1415,57 @@ final class TerminalBuilder {
             }
             if (w.role() == Wing.Role.CONCOURSE) {
                 lift(f, A / 2 + 20, B / 2 - 6, 0, y - 1);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ lights
+
+    /**
+     * Ceiling lights every 6 m under each floor's ceiling; where the ceiling is more than 9 m up (the check-in hall, an
+     * atrium) every 12 m a pendant hangs on a chain 7 m above the floor instead, so the floor is lit.
+     */
+    private void lights() {
+        for (int x = bx0; x < bx0 + bw; x++) {
+            for (int z = bz0; z < bz0 + bd; z++) {
+                int c = idx(x, z);
+                if (owner[c] < 0) {
+                    continue;
+                }
+                Wing w = wings.get(owner[c]);
+                int i = x - w.x();
+                int k = z - w.z();
+                if (Math.floorMod(i - 3, 6) != 0 || Math.floorMod(k - 3, 6) != 0) {
+                    continue;
+                }
+                boolean pendant = Math.floorMod(i - 3, 12) == 0 && Math.floorMod(k - 3, 12) == 0;
+                for (int lev = 0; lev < w.levels(); lev++) {
+                    if (!hasSlab(lev, x, z)) {
+                        continue;
+                    }
+                    int floorY = lv[lev] + 1;
+                    int top = top(lev, x, z);
+                    if (top - floorY < 2) {
+                        continue;
+                    }
+                    if (top - floorY > 9 && pendant) {
+                        int ly = floorY + 7;
+                        boolean free = true;
+                        for (int y = ly; y <= top && free; y++) {
+                            free = get(x, y, z) == null;
+                        }
+                        if (free) {
+                            for (int y = ly + 1; y <= top; y++) {
+                                set(x, y, z, "minecraft:chain[axis=y,waterlogged=false]");
+                            }
+                            set(x, ly, z, LIGHT);
+                            continue;
+                        }
+                    }
+                    if (get(x, top, z) == null) {
+                        set(x, top, z, LIGHT);
+                    }
+                }
             }
         }
     }
