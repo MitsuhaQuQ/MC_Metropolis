@@ -36,6 +36,11 @@ final class Parts {
 
     /** The stone platform (基壇), from the ground up to {@code height - 1}, with steps down on the south side. */
     static void platform(Model m, TemplePalette p, Rect r, int height) {
+        platform(m, p, r, height, false);
+    }
+
+    /** The stone platform, with steps on the south side and, for a gate, on the north side too. */
+    static void platform(Model m, TemplePalette p, Rect r, int height, boolean north) {
         for (int x = r.x0(); x < r.x1(); x++) {
             for (int z = r.z0(); z < r.z1(); z++) {
                 for (int y = 0; y < height; y++) {
@@ -47,6 +52,9 @@ final class Parts {
         for (int i = 0; i < height; i++) {
             for (int x = mid - half; x <= mid + half; x++) {
                 m.set(x, height - 1 - i, r.z1() + i, p.stoneStairs() + "[facing=north,half=bottom]");
+                if (north) {
+                    m.set(x, height - 1 - i, r.z0() - 1 - i, p.stoneStairs() + "[facing=south,half=bottom]");
+                }
             }
         }
     }
@@ -124,6 +132,28 @@ final class Parts {
                         String facing = z == ring.z0() ? "south" : z == ring.z1() - 1 ? "north" : x == ring.x0() ? "east" : "west";
                         m.set(x, y, z, p.woodStairs() + "[facing=" + facing + ",half=top]");
                     }
+                }
+            }
+        }
+    }
+
+    /** Columns only, about {@code bay} apart round a rectangle, with a head beam round the top: an open pavilion. */
+    static void columns(Model m, TemplePalette p, Rect r, int bottom, int top, double bay) {
+        for (int x = r.x0(); x < r.x1(); x++) {
+            for (int z = r.z0(); z < r.z1(); z++) {
+                boolean edgeX = x == r.x0() || x == r.x1() - 1, edgeZ = z == r.z0() || z == r.z1() - 1;
+                if (!edgeX && !edgeZ) {
+                    continue;
+                }
+                boolean col = edgeX && edgeZ || edgeZ && column(x - r.x0(), r.width(), bay)
+                        || edgeX && column(z - r.z0(), r.depth(), bay);
+                if (col) {
+                    for (int y = bottom; y <= top; y++) {
+                        m.set(x, y, z, upright(p.column()));
+                    }
+                } else {
+                    m.set(x, top, z, p.wood());
+                    m.set(x, top - 1, z, p.wood());
                 }
             }
         }

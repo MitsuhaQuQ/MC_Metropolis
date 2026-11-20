@@ -79,6 +79,8 @@ LANDMARKS = [
     ("bldg_b1b5e06c-47c2-4e90-91f5-d921b3875401", "aquarium", "京都水族館", None),
     ("bldg_d118eb3a-f9be-49e8-b223-e53f755ac502", "railway_museum", "京都鉄道博物館", None),
     ("bldg_34c21757-8a98-4dc8-b7d0-ea85209a07f1", "umekoji_depot", "梅小路の大型倉庫", None),
+    ("bldg_ce127903-06cf-494d-aeaa-12a932fcb11f", "higashi_honganji_goeidomon", "東本願寺 御影堂門", "temple"),
+    ("bldg_8ff4cd35-4d98-4664-8b70-8265b187f269", "nishi_honganji_goeidomon", "西本願寺 御影堂門", "temple"),
 ]
 
 # Buildings whose LOD2 shape is too coarse to voxelize (a pagoda is a box with a hip roof, halls lose their eaves
@@ -97,10 +99,26 @@ TEMPLES = {
     # LOD2: eaves 45.6 x 26.1 m at 6.9 m, irimoya ridge 17.7 m, gable walls 4.8 m in.
     "toji_kodo": dict(kind="hall", role="KODO", width=45, depth=27, eave=6.9, ridge=17.7, roof="IRIMOYA", gableInset=4.8,
                       overhang=4, platform=2, bay=4.5),
+    # LOD2: a two-storey gate (三門); lower roof eaves 25.5 x 33.3 m at 11.8 m, upper eaves 23.3 x 30.9 m at
+    # 21.3 m, irimoya ridge 29.2 m along the long side, gable walls 3.8 m in. Five bays, three ways through.
+    # (Generated with the way through along z, so turned a quarter from the real one, which faces east.)
+    "higashi_honganji_goeidomon": dict(kind="gate", role="TEMPLE_GATE", width=31, depth=23, eave=21.3, ridge=29.2,
+                                       roof="IRIMOYA", gableInset=3.8, overhang=4, bays=5, passages=3,
+                                       lowerWidth=33, lowerDepth=25, lowerEave=11.8, lowerOverhang=3, platform=2),
+    # LOD2: 13.9 x 13.6 m, eaves 9.0 m, gable ridge 14.2 m: a single-storey gate (四脚門).
+    "nishi_honganji_goeidomon": dict(kind="gate", role="TEMPLE_GATE", width=13, depth=13, eave=9.0, ridge=14.2,
+                                     roof="GABLE", overhang=3, bays=3, passages=1, platform=1),
     # Not from PLATEAU: the same generators in the painted styles (Senso-ji's vermilion pagoda, a shrine hall
     # under a copper roof), to check the palettes.
     "demo_pagoda_vermilion": dict(kind="pagoda", role="PAGODA", storeys=5, span=19, topSpan=15, body=9, topBody=7, firstEave=10.5,
                                   topEave=35.6, apex=40.2, height=55, platform=2, pitch=0.42, palette="VERMILION"),
+    "demo_gate_vermilion": dict(kind="gate", role="TEMPLE_GATE", width=25, depth=15, eave=16.0, ridge=22.7,
+                                roof="IRIMOYA", gableInset=3, overhang=4, bays=3, passages=1, lowerWidth=25,
+                                lowerDepth=15, lowerEave=9.0, lowerOverhang=3, platform=1, palette="VERMILION"),
+    "demo_belfry_open": dict(kind="belfry", role="BELFRY", width=11, depth=9, eave=7.5, ridge=11.5, roof="IRIMOYA",
+                             gableInset=2, overhang=2, platform=2),
+    "demo_belfry_hakamagoshi": dict(kind="belfry", role="BELFRY", width=11, depth=11, eave=12.0, ridge=16.0,
+                                    roof="IRIMOYA", gableInset=2, overhang=2, skirt=True, platform=1),
     "demo_hall_copper": dict(kind="hall", role="HAIDEN", width=29, depth=21, eave=8.0, ridge=17.0, roof="IRIMOYA", gableInset=4,
                              overhang=4, platform=2, bay=4.0, palette="COPPER"),
 }
@@ -121,9 +139,14 @@ LABELS = {
     "takashimaya": ("store",), "daimaru": ("store",), "aeon_mall": ("store",),
     "hotel_okura": ("hotel",), "westin_miyako": ("hotel",),
     "aquarium": ("museum",), "railway_museum": ("museum",), "umekoji_depot": ("warehouse",),
+    "higashi_honganji_goeidomon": ("sacred", TEMPLE, "TEMPLE_GATE"),
+    "nishi_honganji_goeidomon": ("sacred", TEMPLE, "TEMPLE_GATE"),
+    "demo_gate_vermilion": ("sacred", TEMPLE, "TEMPLE_GATE"), "demo_belfry_open": ("sacred", TEMPLE, "BELFRY"),
+    "demo_belfry_hakamagoshi": ("sacred", TEMPLE, "BELFRY"),
     "demo_pagoda_vermilion": ("sacred", TEMPLE, "PAGODA"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
 }
-DEMO_NAMES = {"demo_pagoda_vermilion": "五重塔（朱塗り、浅草寺風）", "demo_hall_copper": "拝殿（銅板葺、神社）"}
+DEMO_NAMES = {"demo_gate_vermilion": "二重門（朱塗り、宝蔵門風）", "demo_belfry_open": "鐘楼（吹放し）",
+              "demo_belfry_hakamagoshi": "鐘楼（袴腰）","demo_pagoda_vermilion": "五重塔（朱塗り、浅草寺風）", "demo_hall_copper": "拝殿（銅板葺、神社）"}
 
 
 def label(slug):
@@ -887,7 +910,8 @@ COLOURS = {
 }
 
 
-PREVIEW_ALIAS = {"dark_oak_fence": "dark_oak_planks", "mangrove_fence": "mangrove_planks",
+PREVIEW_ALIAS = {"waxed_weathered_copper": "weathered_cut_copper", "chain": "polished_blackstone",
+                 "stripped_spruce_log": "spruce_planks", "dark_oak_fence": "dark_oak_planks", "mangrove_fence": "mangrove_planks",
                  "polished_blackstone_wall": "polished_blackstone", "iron_trapdoor": "iron_block",
                  "dark_oak_trapdoor": "dark_oak_planks", "iron_bars": "iron_block", "lightning_rod": "cut_copper",
                  "bell": "gold_block", "gilded_blackstone": "gold_block", "waxed_oxidized_cut_copper": "oxidized_cut_copper",

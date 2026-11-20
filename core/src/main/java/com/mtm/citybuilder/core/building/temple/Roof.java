@@ -245,7 +245,9 @@ final class Roof {
             int y = yOf(en.getValue());
             if (top) {
                 m.set(x, y, z, p.ridge());
-                m.set(x, y + 1, z, p.ridge());
+                if (half >= 5) { // a ridge two blocks high on large roofs, one on small ones
+                    m.set(x, y + 1, z, p.ridge());
+                }
                 int along = alongX ? x : z;
                 first = Math.min(first, along);
                 last = Math.max(last, along);
@@ -260,13 +262,13 @@ final class Roof {
                 }
             }
         }
-        // Ridge-end tiles (鬼瓦): one higher at both ends.
-        if (first <= last) {
+        // Ridge-end tiles (鬼瓦): one higher at both ends (not on a pyramid's point, where a finial stands).
+        if (first < last) {
             for (Map.Entry<Long, Double> en : h.entrySet()) {
                 int x = (int) (en.getKey() >> 32), z = en.getKey().intValue();
                 int along = alongX ? x : z;
                 if ((along == first || along == last) && side(x, z) >= half - 0.5) {
-                    m.set(x, yOf(en.getValue()) + 2, z, p.ridge());
+                    m.set(x, yOf(en.getValue()) + (half >= 5 ? 2 : 1), z, p.ridge());
                 }
             }
         }

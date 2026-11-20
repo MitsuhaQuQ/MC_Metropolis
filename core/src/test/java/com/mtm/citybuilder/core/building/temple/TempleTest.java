@@ -98,4 +98,72 @@ class TempleTest {
         assertEquals("minecraft:red_concrete", m.get(4, 3, 4));
         assertTrue(m.get(3, 3, 3) == null, "nothing under the eaves outside the walls at wall height");
     }
+
+    /** Higashi Hongan-ji's Goeidō-mon as measured on LOD2: a two-storey gate, five bays, three ways through. */
+    private static final Gate SANMON = new Gate(31, 23, 21.3, 29.2, RoofType.IRIMOYA, 3.8, 4, 5, 3, 33, 25, 11.8, 3, 2,
+            TemplePalette.NATURAL);
+
+    @Test
+    void gateLetsYouThrough() {
+        // Along the middle of the gate, from the steps on one side to the other, the way is clear at head height.
+        Model m = SANMON.build();
+        int cx = (m.minX() + m.maxX()) / 2;
+        for (int z = 3 + 1; z < 3 + 19 - 1; z++) { // the lower walls' rows, inside the platform
+            for (int y = 2; y < 2 + 3; y++) {
+                assertTrue(!m.has(cx, y, z), "blocked at " + cx + "," + y + "," + z + ": " + m.get(cx, y, z));
+            }
+        }
+        // The side bays are closed by lattice at the front, the ends by plaster.
+        int[] fence = {0}, plaster = {0};
+        m.forEach((x, y, z, s) -> {
+            if (y < 10 && s.endsWith("_fence")) {
+                fence[0]++;
+            }
+            if (y < 10 && s.equals(TemplePalette.NATURAL.plaster())) {
+                plaster[0]++;
+            }
+        });
+        assertTrue(fence[0] > 0 && plaster[0] > 0, fence[0] + " lattice, " + plaster[0] + " plaster");
+    }
+
+    @Test
+    void twoStoreyGateHasItsUpperStoreyOverTheLowerRoof() {
+        Model m = SANMON.build();
+        // The upper floor's railing stands above the lower eaves and below the upper ones.
+        int[] railLow = {Integer.MAX_VALUE};
+        m.forEach((x, y, z, s) -> {
+            if (s.endsWith("_fence") && y > 10) {
+                railLow[0] = Math.min(railLow[0], y);
+            }
+        });
+        assertTrue(railLow[0] > 11.8 && railLow[0] < 21.3, "railing at " + railLow[0]);
+        assertEquals(29, m.maxY() - 2, 1, "ridge near the measured 29.2 m (plus the ridge tiles)");
+    }
+
+    @Test
+    void belfryHangsItsBell() {
+        for (boolean skirt : new boolean[]{false, true}) {
+            Belfry b = new Belfry(11, 11, skirt ? 12 : 7.5, skirt ? 16 : 11.5, RoofType.IRIMOYA, 2, 2, skirt, 1,
+                    TemplePalette.NATURAL);
+            Model m = b.build();
+            int[] bronze = {0}, chain = {0}, striker = {0};
+            int[] bellLow = {Integer.MAX_VALUE};
+            m.forEach((x, y, z, s) -> {
+                if (s.equals(Belfry.BRONZE)) {
+                    bronze[0]++;
+                    bellLow[0] = Math.min(bellLow[0], y);
+                }
+                if (s.equals(Belfry.CHAIN)) {
+                    chain[0]++;
+                }
+                if (s.equals(Belfry.STRIKER)) {
+                    striker[0]++;
+                }
+            });
+            assertEquals(2, bronze[0], "the bell, two blocks");
+            assertTrue(chain[0] >= 3 && striker[0] == 2, chain[0] + " chain, " + striker[0] + " striker");
+            // Hung clear of the floor: open to the platform, or above the gallery on a raised base.
+            assertTrue(bellLow[0] >= (skirt ? 5 : 2), "bell at " + bellLow[0]);
+        }
+    }
 }

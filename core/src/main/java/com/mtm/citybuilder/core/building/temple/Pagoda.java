@@ -91,7 +91,10 @@ public record Pagoda(int storeys, int span, int topSpan, int body, int topBody, 
         return m;
     }
 
-    /** The finial (相輪): a base (露盤), the nine rings (九輪) round the mast, the flame (水煙) and a spire. */
+    /**
+     * The finial (相輪), slender and about a quarter of the height: the base box (露盤), the nine rings (九輪) round
+     * the mast, thin plates with gaps between them, then the flame (水煙) and the jewel (宝珠) at the tip.
+     */
     private void finial(Model m, TemplePalette p, int c) {
         int y0 = m.maxY() + 1;
         for (int y = m.maxY(); y >= 0; y--) {
@@ -100,21 +103,20 @@ public record Pagoda(int storeys, int span, int topSpan, int body, int topBody, 
                 break;
             }
         }
-        int tip = Math.max(y0 + 6, height - 1);
+        int tip = Math.max(y0 + 8, height - 1);
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
                 m.set(c + dx, y0, c + dz, p.ridge());
             }
         }
-        int rings = 9, ringStart = y0 + 2;
-        int room = tip - 3 - ringStart; // levels for the rings, leaving the flame and the spire
-        int every = room >= 2 * rings - 1 ? 2 : 1;
         for (int y = y0 + 1; y < tip; y++) {
             m.set(c, y, c, p.pole());
         }
-        for (int k = 0; k < rings; k++) {
+        int ringStart = y0 + 1, room = tip - 2 - ringStart;
+        int every = room >= 17 ? 2 : 1;
+        for (int k = 0; k < 9; k++) {
             int y = ringStart + k * every;
-            if (y >= tip - 3) {
+            if (y >= tip - 2) {
                 break;
             }
             for (int dx = -1; dx <= 1; dx++) {
@@ -125,8 +127,10 @@ public record Pagoda(int storeys, int span, int topSpan, int body, int topBody, 
                 }
             }
         }
-        for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) { // the flame
-            m.set(c + d[0], tip - 2, c + d[1], "minecraft:iron_bars");
+        for (int y = tip - 2; y < tip; y++) { // the flame: open work round the mast
+            for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                m.set(c + d[0], y, c + d[1], "minecraft:iron_bars");
+            }
         }
         m.set(c, tip, c, "minecraft:lightning_rod[facing=up]");
     }
