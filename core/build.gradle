@@ -109,3 +109,18 @@ tasks.register("templeModels", JavaExec) {
         args([file(input.get()).absolutePath, file(output.get()).absolutePath])
     }
 }
+
+// gradlew :core:terminalModels -Pin=<specs.json> -Pout=<dir>: airport terminals built from specs (presets measured on
+// PLATEAU, or units drawn by TerminalComposer), as JSON for tools/assets/plateau_terminals.py
+tasks.register("terminalModels", JavaExec) {
+    group = "citybuilder"
+    description = "Builds airport terminal models from a list of specs"
+    classpath = sourceSets.tools.runtimeClasspath
+    mainClass = "com.mtm.citybuilder.tools.TerminalModels"
+    maxHeapSize = "6g"
+    def input = providers.gradleProperty("in")
+    def output = providers.gradleProperty("out")
+    if (input.isPresent() && output.isPresent()) {
+        args([file(input.get()).absolutePath, file(output.get()).absolutePath])
+    }
+}
