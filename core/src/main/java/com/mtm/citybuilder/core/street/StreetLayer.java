@@ -456,6 +456,16 @@ public final class StreetLayer {
     /** Seeds of the arterials: the anchors, round the open grounds, and along the old roads a spacing apart. */
     private ArrayDeque<double[]> arterialSeeds(List<Anchor> anchors, List<double[]> oldRoad, Window window, double spacing) {
         ArrayDeque<double[]> seeds = new ArrayDeque<>();
+        // A capital's avenues start from its edges a spacing apart, so the grid squares with them
+        if (window.capital != null) {
+            double[] c = window.capital;
+            for (double x = c[0] + spacing; x < c[2] - 0.5 * spacing; x += spacing) {
+                seeds.add(new double[]{x, c[1] + config.step, 1});
+            }
+            for (double z = c[1] + spacing; z < c[3] - 0.5 * spacing; z += spacing) {
+                seeds.add(new double[]{c[0] + config.step, z, 0});
+            }
+        }
         for (Anchor anchor : anchors) {
             seeds.add(new double[]{anchor.x(), anchor.z(), 0});
             seeds.add(new double[]{anchor.x(), anchor.z(), 1});
@@ -480,10 +490,53 @@ public final class StreetLayer {
     }
 
     /**
+     * Streets that run right beside a line laid before them, the same way, doubling it: runs of three or more pieces
+     * within 20 blocks of a parallel piece of a wall are taken out.
+     */
+    private void undouble(List<StreetSegment> segments, int from, Walls walls) {
+        int n = segments.size();
+        boolean[] beside = new boolean[n];
+        for (int k = from; k < n; k++) {
+            StreetSegment g = segments.get(k);
+            if (g.streetClass() != StreetClass.STREET || g.length() < 1e-6) {
+                continue;
+            }
+            double ux = (g.x2() - g.x1()) / g.length();
+            double uz = (g.z2() - g.z1()) / g.length();
+            beside[k] = walls.pieces.parallel(0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2()), 20.0, ux, uz);
+        }
+        boolean[] drop = new boolean[n];
+        for (int start = from; start < n; ) {
+            if (!beside[start]) {
+                start++;
+                continue;
+            }
+            int end = start;
+            while (end < n && beside[end]) {
+                end++;
+            }
+            if (end - start >= 3) {
+                for (int k = start; k < end; k++) {
+                    drop[k] = true;
+                }
+            }
+            start = end;
+        }
+        List<StreetSegment> kept = new ArrayList<>(segments.subList(0, from));
+        for (int k = from; k < n; k++) {
+            if (!drop[k]) {
+                kept.add(segments.get(k));
+            }
+        }
+        segments.clear();
+        segments.addAll(kept);
+    }
+
+    /**
      * Seeds of the streets: along every line laid so far, a street spacing apart, a street across it starting there
      * and one along it a spacing to either side, in the family the field gives each direction.
      */
-    private ArrayDeque<double[]> streetSeeds(List<StreetSegment> laid, Field field, double spacing, boolean oneSided) {
+    private ArrayDeque<double[]> streetSeeds(List<StreetSegment> laid, Field field, Window window, double spacing) {
         ArrayDeque<double[]> seeds = new ArrayDeque<>();
         double run = 0.0;
         for (StreetSegment segment : laid) {
@@ -496,6 +549,8 @@ public final class StreetLayer {
             double major = field.angle(segment.x2(), segment.z2());
             // The segment's own family: the one whose direction it runs closer to
             int along = Math.abs(Math.cos(angle - major)) >= Math.abs(Math.sin(angle - major)) ? 0 : 1;
+            // One way off a line, except within a capital's grid, whose streets run on across
+            boolean oneSided = !window.inCapital(segment.x2(), segment.z2());
             double sense = oneSided ? (Hash.unit(Hash.of(0x51DEL, Math.round(segment.x2()), Math.round(segment.z2()))) < 0.5 ? 1.0 : -1.0) : 0.0;
             seeds.add(new double[]{segment.x2(), segment.z2(), 1 - along, sense});
             for (double side : new double[]{1.0, -1.0}) {
@@ -511,7 +566,8 @@ public final class StreetLayer {
      * (densest in a capital, as Kyoto's roji and zushi), a dead-end lane square into the block, to {@code laneDepth} of
      * the street spacing or until it meets another street.
      */
-    private void lanes(Settlement settlement, Formation formation, Window window, List<StreetSegment> segments) {
+    private void lanes(Settlement settlement, Formation formation, Window window, Districts districts,
+                       List<StreetSegment> segments) {
         double chance = switch (formation) {
             case JORI -> config.laneChanceJori;
             case CASTLE_TOWN -> config.laneChanceCastle;
@@ -535,7 +591,8 @@ public final class StreetLayer {
             run = 0.0;
             double x = segment.x2();
             double z = segment.z2();
-            if (window.intensity(x, z) <= config.oldTownIntensity) {
+            // In the old town's houses, not downtown, whose blocks are built over whole
+            if (!window.old(x, z) || districts.at(x, z) == District.CENTRAL) {
                 continue;
             }
             long hash = Hash.of(settlement.id(), Math.round(x), Math.round(z));
@@ -543,9 +600,9 @@ public final class StreetLayer {
                 continue;
             }
             double angle = Math.atan2(segment.z2() - segment.z1(), segment.x2() - segment.x1());
-            // Into one side, by the hash; in a capital into both, as Kyoto's roji reach in from every street
-            double[] sides = formation == Formation.JORI ? new double[]{1.0, -1.0}
-                    : new double[]{Hash.unit(Hash.mix(hash)) < 0.5 ? 1.0 : -1.0};
+            // Into one side, by the hash: lanes reached in from both sides at one point would make a crossing of dead
+            // ends, which Kyoto's roji do not
+            double[] sides = {Hash.unit(Hash.mix(hash)) < 0.5 ? 1.0 : -1.0};
             double depth = config.laneDepth * streetSpacing(formation);
             for (double side : sides) {
                 double nx = -Math.sin(angle) * side;
@@ -680,6 +737,9 @@ public final class StreetLayer {
                 castleMoats(settlement, anchor, window, moats);
             }
         }
+        if (formation == Formation.JORI) {
+            window.capital = capital(settlement, anchors);
+        }
         List<CityRailway> railways = new ArrayList<>();
         List<Embankment> embankments = new ArrayList<>();
         if (formation != Formation.VILLAGE) {
@@ -700,6 +760,7 @@ public final class StreetLayer {
                     moatSide(ground, window, segments);
                 }
             }
+            List<StreetSegment> capitalEdges = capitalAvenues(window, segments);
             List<StreetSegment> banks = riverside(window, segments, embankments);
             // Roads along the intercity lines at grade, laid before the arterials, which cross the lines at level
             Pieces rails = new Pieces();
@@ -720,6 +781,7 @@ public final class StreetLayer {
             }
             arterials.banks = bankPieces;
             arterials.rails = rails;
+            arterials.claim(capitalEdges, field);
             arterials.run(arterialSeeds(anchors, oldRoad, window, spacing), segments);
             linkPatches(window, arterials, segments, spacing);
             demoteDeadEnds(window, segments, anchors, banks);
@@ -749,11 +811,11 @@ public final class StreetLayer {
                 Walls walls = new Walls(segments);
                 // A capital's grid is even, its blocks one size (Kyoto's 120-block cho); elsewhere streets thin out
                 Tracer streets = new Tracer(window, field, StreetClass.STREET, config.streetWidth, streetSpacing,
-                        formation != Formation.JORI, walls, formation == Formation.JORI);
-                streets.teeChance = formation == Formation.JORI ? config.teeChanceJori : config.teeChance;
+                        true, walls, false);
+                streets.teeChance = config.teeChance;
                 // A grid keeps its lines a full spacing apart: seeds from lines not on its lattice would squeeze in
                 // between and halve blocks
-                streets.clearance = formation == Formation.JORI ? 0.95 : 0.7;
+                streets.clearance = 0.7;
                 streets.climbing = true;
                 streets.bridging = true;
                 streets.bridgeMax = config.streetBridge;
@@ -769,9 +831,16 @@ public final class StreetLayer {
                     }
                 }
                 streets.oneSided = formation != Formation.JORI;
+                if (formation == Formation.JORI) {
+                    // The grid's rules within the planned city, a castle town's beyond it
+                    streets.capitalRules = true;
+                    streets.oneSided = true;
+                }
                 streets.teeSeed = Hash.mix(settlement.id() ^ 0x7EEL);
-                streets.run(streetSeeds(segments, field, streetSpacing, formation != Formation.JORI), segments);
-                lanes(settlement, formation, window, segments);
+                int before = segments.size();
+                streets.run(streetSeeds(segments, field, window, streetSpacing), segments);
+                undouble(segments, before, walls);
+                lanes(settlement, formation, window, districts, segments);
             }
             // Whatever was laid before the railway was known (old roads, arterials before the town's own lines) and
             // crosses it at grade crosses at a level crossing
@@ -787,7 +856,8 @@ public final class StreetLayer {
                 }
             }
         }
-        return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments, urban);
+        return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments, urban,
+                window.capital == null ? null : window.capital.clone());
     }
 
     /** Points every {@code spacing} blocks along a line, its two ends included, as {x, z}. */
@@ -1606,7 +1676,7 @@ public final class StreetLayer {
                     if (!window.built(ax, az) || !window.built(bx, bz)) {
                         continue;
                     }
-                    Era era = window.intensity(0.5 * (ax + bx), 0.5 * (az + bz)) > config.oldTownIntensity ? Era.TOWN : Era.MODERN;
+                    Era era = window.old(0.5 * (ax + bx), 0.5 * (az + bz)) ? Era.TOWN : Era.MODERN;
                     StreetSegment piece = sloped(window, ax, az, bx, bz, StreetClass.STREET, era, config.streetWidth);
                     if (piece != null) {
                         segments.add(piece);
@@ -1652,7 +1722,7 @@ public final class StreetLayer {
             double az = z + (best[1] - z) * q / pieces;
             double bx = x + (best[0] - x) * (q + 1) / pieces;
             double bz = z + (best[1] - z) * (q + 1) / pieces;
-            Era era = window.intensity(0.5 * (ax + bx), 0.5 * (az + bz)) > config.oldTownIntensity ? Era.TOWN : Era.MODERN;
+            Era era = window.old(0.5 * (ax + bx), 0.5 * (az + bz)) ? Era.TOWN : Era.MODERN;
             StreetSegment piece = sloped(window, ax, az, bx, bz, StreetClass.ARTERIAL, era, config.arterialWidth);
             if (piece != null) {
                 segments.add(piece);
@@ -1883,7 +1953,7 @@ public final class StreetLayer {
                     double[] b = run.get(q);
                     double mx = 0.5 * (a[0] + b[0]);
                     double mz = 0.5 * (a[1] + b[1]);
-                    Era era = window.intensity(mx, mz) > config.oldTownIntensity ? Era.TOWN : Era.MODERN;
+                    Era era = window.old(mx, mz) ? Era.TOWN : Era.MODERN;
                     boolean over = window.water(a[0], a[1]) || window.water(b[0], b[1]) || window.water(mx, mz);
                     StreetSegment piece = over
                             ? new StreetSegment(a[0], a[1], b[0], b[1], arterial ? StreetClass.ARTERIAL : StreetClass.STREET,
@@ -2498,6 +2568,59 @@ public final class StreetLayer {
 
 
     /**
+     * A capital's planned city: a rectangle due north-south the size of Heian-kyo (half that for a city), its width and
+     * height whole avenue spacings, the palace at the middle of its north side, its north edge at the palace grounds'.
+     */
+    private double[] capital(Settlement settlement, List<Anchor> anchors) {
+        Anchor palace = null;
+        for (Anchor anchor : anchors) {
+            if (anchor.kind() == Anchor.Kind.PALACE) {
+                palace = anchor;
+            }
+        }
+        if (palace == null) {
+            return null;
+        }
+        double scale = settlement.tier() == SettlementTier.METROPOLIS ? 1.0 : 0.5;
+        double spacing = config.joriSpacing;
+        double width = Math.max(2, Math.round(config.capitalWidth * scale / spacing)) * spacing;
+        double height = Math.max(2, Math.round(config.capitalHeight * scale / spacing)) * spacing;
+        double north = palace.z() - grounds(settlement.tier());
+        return new double[]{palace.x() - 0.5 * width, north, palace.x() + 0.5 * width, north + height};
+    }
+
+    /** The avenues round a capital's planned city, along its four edges over built land. */
+    private List<StreetSegment> capitalAvenues(Window window, List<StreetSegment> segments) {
+        List<StreetSegment> laid = new ArrayList<>();
+        if (window.capital == null) {
+            return laid;
+        }
+        double[] c = window.capital;
+        double[][] corners = {{c[0], c[1]}, {c[2], c[1]}, {c[2], c[3]}, {c[0], c[3]}};
+        for (int e = 0; e < 4; e++) {
+            double[] a = corners[e];
+            double[] b = corners[(e + 1) % 4];
+            double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+            int pieces = (int) Math.ceil(length / config.step);
+            for (int q = 0; q < pieces; q++) {
+                double ax = a[0] + (b[0] - a[0]) * q / pieces;
+                double az = a[1] + (b[1] - a[1]) * q / pieces;
+                double bx = a[0] + (b[0] - a[0]) * (q + 1) / pieces;
+                double bz = a[1] + (b[1] - a[1]) * (q + 1) / pieces;
+                if (!window.built(ax, az) || !window.built(bx, bz)) {
+                    continue;
+                }
+                StreetSegment piece = sloped(window, ax, az, bx, bz, StreetClass.ARTERIAL, Era.TOWN, config.arterialWidth);
+                if (piece != null) {
+                    segments.add(piece);
+                    laid.add(piece);
+                }
+            }
+        }
+        return laid;
+    }
+
+    /**
      * The districts of a town, node by node over its window. Downtown is the share of the built land nearest the
      * heart, by intensity; the old town the rest of the land intense enough to be old; the port the flat land along the
      * sea; the industrial districts the flat modern land scoring best on nearness to water and to the edge of town,
@@ -2525,7 +2648,7 @@ public final class StreetLayer {
                 }
                 built[k] = true;
                 builtCount++;
-                kinds[k] = (byte) (window.intensity[k] > config.oldTownIntensity ? District.OLD_TOWN : District.RESIDENTIAL).ordinal();
+                kinds[k] = (byte) (window.old(x, z) ? District.OLD_TOWN : District.RESIDENTIAL).ordinal();
                 double steepest = 0.0;
                 for (int[] d : NEIGHBOURS) {
                     int ni = i + d[0];
@@ -2580,7 +2703,7 @@ public final class StreetLayer {
         boolean[] candidate = new boolean[n];
         int modern = 0;
         for (int k = 0; k < n; k++) {
-            if (!built[k] || window.intensity[k] > config.oldTownIntensity) {
+            if (!built[k] || window.old((double) (window.originX + k / size) * grid, (double) (window.originZ + k % size) * grid)) {
                 continue;
             }
             modern++;
@@ -2836,6 +2959,27 @@ public final class StreetLayer {
          */
         final int fineSize;
         final float[] edge;
+        /** A capital's planned city, {min x, min z, max x, max z}, or null. */
+        double[] capital;
+
+        boolean inCapital(double x, double z) {
+            return capital != null && x >= capital[0] && x <= capital[2] && z >= capital[1] && z <= capital[3];
+        }
+
+        /** How far a position lies outside the capital's rectangle; 0 inside, infinite without one. */
+        double outsideCapital(double x, double z) {
+            if (capital == null) {
+                return Double.POSITIVE_INFINITY;
+            }
+            double dx = Math.max(0.0, Math.max(capital[0] - x, x - capital[2]));
+            double dz = Math.max(0.0, Math.max(capital[1] - z, z - capital[3]));
+            return Math.hypot(dx, dz);
+        }
+
+        /** Whether a position is in the old town: a capital's planned city, elsewhere the land intense enough. */
+        boolean old(double x, double z) {
+            return capital != null ? inCapital(x, z) : intensity(x, z) > config.oldTownIntensity;
+        }
 
         Window(CityExtent extent) {
             this.extent = extent;
@@ -3323,19 +3467,17 @@ public final class StreetLayer {
             sin2 = new float[n * n];
             double gridAngle = 0.0;
             double gridWeight = switch (formation) {
-                case JORI -> 3.0;
-                case CASTLE_TOWN -> 0.5;
+                case JORI, CASTLE_TOWN -> 0.5;
                 case PORT_TOWN -> 0.4;
                 case TEMPLE_TOWN -> 0.3;
                 case RESORT, VILLAGE -> 0.1;
             };
             double radialWeight = formation == Formation.CASTLE_TOWN ? 1.0 : formation == Formation.TEMPLE_TOWN ? 0.6 : 0.0;
             double roadWeight = switch (formation) {
-                case JORI -> 0.0;
                 case TEMPLE_TOWN -> 2.0;
                 default -> 1.0;
             };
-            double contourWeight = formation == Formation.JORI ? 0.3 : formation == Formation.RESORT ? 1.5 : 1.0;
+            double contourWeight = formation == Formation.RESORT ? 1.5 : 1.0;
             Anchor focus = null;
             for (Anchor anchor : anchors) {
                 if (anchor.kind() == Anchor.Kind.CASTLE || anchor.kind() == Anchor.Kind.TEMPLE) {
@@ -3352,10 +3494,14 @@ public final class StreetLayer {
                 for (int j = 0; j < n; j++) {
                     double x = (double) (window.originX + i) * grid;
                     double z = (double) (window.originZ + j) * grid;
-                    // A capital is one grid; every other town a patchwork of grids, each patch turned its own way
-                    double angle = formation == Formation.JORI ? gridAngle : patchAngle(settlement, x, z);
-                    double c = gridWeight * Math.cos(2 * angle);
-                    double s = gridWeight * Math.sin(2 * angle);
+                    // A capital's planned city is one grid, fading over capitalBlend beyond its edges into the terrain-led
+                    // field every other town has: a patchwork of grids, each patch turned its own way
+                    double inside = formation != Formation.JORI ? 0.0
+                            : Math.max(0.0, 1.0 - window.outsideCapital(x, z) / config.capitalBlend);
+                    double outside = 1.0 - inside;
+                    double angle = patchAngle(settlement, x, z);
+                    double c = inside * 3.0 * Math.cos(2 * gridAngle) + outside * gridWeight * Math.cos(2 * angle);
+                    double s = inside * 3.0 * Math.sin(2 * gridAngle) + outside * gridWeight * Math.sin(2 * angle);
                     if (focus != null && radialWeight > 0) {
                         double d = Math.hypot(x - focus.x(), z - focus.z());
                         if (d > 1.0) {
@@ -3369,7 +3515,7 @@ public final class StreetLayer {
                         double[] nearest = nearest(buckets, x, z, reach);
                         if (nearest != null) {
                             double d = Math.hypot(nearest[0] - x, nearest[1] - z);
-                            double w = roadWeight * (1.0 - d / reach);
+                            double w = outside * roadWeight * (1.0 - d / reach);
                             c += w * Math.cos(2 * nearest[2]);
                             s += w * Math.sin(2 * nearest[2]);
                         }
@@ -3389,7 +3535,7 @@ public final class StreetLayer {
                     double gz = (window.height(x, z + grid) - window.height(x, z - grid)) / (2.0 * grid);
                     double slope = Math.hypot(gx, gz);
                     if (slope > 0.01) {
-                        double w = contourWeight * Math.min(1.0, slope / config.maxGrade);
+                        double w = (0.3 * inside + contourWeight * outside) * Math.min(1.0, slope / config.maxGrade);
                         double a = Math.atan2(gz, gx) + Math.PI / 2;
                         c += w * Math.cos(2 * a);
                         s += w * Math.sin(2 * a);
@@ -3487,6 +3633,35 @@ public final class StreetLayer {
         final List<double[]> crossings = new ArrayList<>();
         /** Steps left in which the line, having just crossed water or a railway, runs on past the roads beyond. */
         int grace;
+        /**
+         * A capital's streets: within the planned city they cross what was laid before, keep a full spacing, end at
+         * crossings only {@code teeChanceJori} of the time, grow both ways and do not thin out; beyond it, as a town's.
+         */
+        boolean capitalRules;
+
+        private boolean grid(double x, double z) {
+            return capitalRules && window.inCapital(x, z);
+        }
+
+        private boolean crossWallsAt(double x, double z) {
+            return capitalRules ? grid(x, z) : crossWalls;
+        }
+
+        private double teeAt(double x, double z) {
+            return grid(x, z) ? config.teeChanceJori : teeChance;
+        }
+
+        /** Lines laid before, claimed as this tracer's own so it neither doubles nor crosses them as strangers. */
+        void claim(List<StreetSegment> laid, Field field) {
+            for (StreetSegment g : laid) {
+                double angle = Math.atan2(g.z2() - g.z1(), g.x2() - g.x1());
+                double major = field.angle(0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2()));
+                int family = Math.abs(Math.cos(angle - major)) >= Math.abs(Math.sin(angle - major)) ? 0 : 1;
+                points.get(family).computeIfAbsent(bucket(g.x2(), g.z2()), key -> new ArrayList<>())
+                        .add(new double[]{g.x2(), g.z2(), -2});
+                pieces.get(family).add(g.x1(), g.z1(), g.x2(), g.z2());
+            }
+        }
         /** Whether lines may climb past {@code maxGrade} as ramps and stairs (streets may, arterials not). */
         boolean climbing;
         /** Share of crossings with a street of the other family where a street ends instead, and their hash's seed. */
@@ -3512,12 +3687,12 @@ public final class StreetLayer {
             this.thinning = thinning;
             this.walls = walls;
             this.crossWalls = crossWalls;
-            this.cell = thinning ? base * config.thinSpacing : base;
+            this.cell = base * config.thinSpacing;
         }
 
         /** The spacing at a position: the base, or for streets wider where the town is less intense. */
         double spacing(double x, double z) {
-            if (!thinning) {
+            if (!thinning || grid(x, z)) {
                 return base;
             }
             double t = Math.max(0.0, Math.min(1.0, window.intensity(x, z)));
@@ -3563,7 +3738,7 @@ public final class StreetLayer {
                 double[] seed = seeds.poll();
                 int family = (int) seed[2];
                 double spacing = spacing(seed[0], seed[1]);
-                if (!window.built(seed[0], seed[1]) || near(family, seed[0], seed[1], clearance * spacing, -1) != null) {
+                if (!window.built(seed[0], seed[1]) || near(family, seed[0], seed[1], (grid(seed[0], seed[1]) ? 0.95 : clearance) * spacing, -1) != null) {
                     continue;
                 }
                 int line = lines++;
@@ -3601,7 +3776,7 @@ public final class StreetLayer {
                     length += Math.hypot(b[0] - a[0], b[1] - a[1]);
                     double mx = 0.5 * (a[0] + b[0]);
                     double mz = 0.5 * (a[1] + b[1]);
-                    Era era = window.intensity(mx, mz) > config.oldTownIntensity ? Era.TOWN : Era.MODERN;
+                    Era era = window.old(mx, mz) ? Era.TOWN : Era.MODERN;
                     StreetStructure structure = structures.get(k - 1);
                     if (structure == StreetStructure.GROUND && overStream(a[0], a[1], b[0], b[1])) {
                         structure = StreetStructure.CULVERT;
@@ -3638,7 +3813,7 @@ public final class StreetLayer {
                     if (length >= here) {
                         length = 0.0;
                         double angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
-                        double sense = !oneSided ? 0.0
+                        double sense = !oneSided || grid(b[0], b[1]) ? 0.0
                                 : Hash.unit(Hash.of(teeSeed ^ 0x51DEL, Math.round(b[0]), Math.round(b[1]))) < 0.5 ? 1.0 : -1.0;
                         seeds.add(new double[]{b[0], b[1], 1 - family, sense});
                         for (double side : new double[]{1.0, -1.0}) {
@@ -3686,15 +3861,16 @@ public final class StreetLayer {
                 double[] wall = walls.pieces.hit(x, z, tx, tz);
                 // A capital's grid crosses the lines before it, but at some crossings a street ends, as Kyoto's minor
                 // streets do at the avenues
-                if (wall != null && (!crossWalls || join
-                        || Hash.unit(Hash.of(teeSeed ^ 0x3A11L, Math.round(wall[0]), Math.round(wall[1]))) < teeChance)) {
+                if (wall != null && (!crossWallsAt(wall[0], wall[1]) || join
+                        || Hash.unit(Hash.of(teeSeed ^ 0x3A11L, Math.round(wall[0]), Math.round(wall[1]))) < teeAt(wall[0], wall[1]))) {
                     best = earlier(best, wall);
                 }
             }
             best = earlier(best, pieces.get(family).hit(x, z, tx, tz));
             if (teeChance > 0) {
                 double[] across = pieces.get(1 - family).hit(x, z, tx, tz);
-                if (across != null && (join || Hash.unit(Hash.of(teeSeed, Math.round(across[0]), Math.round(across[1]))) < teeChance)) {
+                if (across != null && (join || Hash.unit(Hash.of(teeSeed, Math.round(across[0]), Math.round(across[1])))
+                        < teeAt(across[0], across[1]))) {
                     best = earlier(best, across);
                 }
             }
@@ -3945,6 +4121,39 @@ public final class StreetLayer {
 
         private static long key(double x, double z) {
             return ((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL);
+        }
+
+        /**
+         * Whether a piece more than 3 blocks from a point and within a distance of it runs within about 25 degrees of a
+         * direction.
+         */
+        boolean parallel(double x, double z, double distance, double dx, double dz) {
+            long bx = (long) Math.floor(x / CELL);
+            long bz = (long) Math.floor(z / CELL);
+            int reach = 1 + (int) Math.ceil(distance / CELL);
+            for (long ix = -reach; ix <= reach; ix++) {
+                for (long iz = -reach; iz <= reach; iz++) {
+                    List<double[]> list = buckets.get(((bx + ix) << 32) ^ ((bz + iz) & 0xFFFFFFFFL));
+                    if (list == null) {
+                        continue;
+                    }
+                    for (double[] p : list) {
+                        double ex = p[2] - p[0];
+                        double ez = p[3] - p[1];
+                        double length = Math.hypot(ex, ez);
+                        if (length < 1e-9) {
+                            continue;
+                        }
+                        double t = Math.max(0, Math.min(1, ((x - p[0]) * ex + (z - p[1]) * ez) / (length * length)));
+                        double d = Math.hypot(p[0] + ex * t - x, p[1] + ez * t - z);
+                        // A piece meeting the wall (at a crossing) is no double of it
+                        if (d > 3.0 && d < distance && Math.abs(ex * dx + ez * dz) / length > 0.9) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
         }
 
         /**

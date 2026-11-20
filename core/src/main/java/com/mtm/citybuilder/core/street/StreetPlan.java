@@ -6,11 +6,12 @@ import java.util.List;
 
 /**
  * The streets of one settlement as far as they are laid out: its formation, its anchors, its street pieces, a castle
- * town's moats, the districts the town is zoned into, the intercity lines' stretches to its main station, the embankments along its water, and its own railway lines.
+ * town's moats, the districts the town is zoned into, the intercity lines' stretches to its main station, the embankments along its water, its own railway lines, and a capital's planned city {min x, min z, max x, max z} (null
+ * for every other town).
  */
 public record StreetPlan(Settlement settlement, Formation formation, List<Anchor> anchors, List<StreetSegment> segments,
                          List<Moat> moats, Districts districts, List<CityRailway> railways, List<Embankment> embankments,
-                         List<UrbanLine> urbanLines) {
+                         List<UrbanLine> urbanLines, double[] capital) {
     public StreetPlan {
         urbanLines = List.copyOf(urbanLines);
         embankments = List.copyOf(embankments);

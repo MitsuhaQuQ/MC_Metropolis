@@ -460,7 +460,15 @@ public final class CitySettings {
         /** A town this high above the sea, or on a plateau, is a resort. */
         public double resortHeight = 500.0;
         /** Distance between arterials, by formation. */
-        public double joriSpacing = 480.0;
+        public double joriSpacing = 532.0;
+        /**
+         * A capital's planned city, the grid: a rectangle due north-south, as Heian-kyo was 4.5 km east to west and
+         * 5.3 km north to south, the palace at the middle of its north side (half that for a city); the grid within, the
+         * town beyond laid out by the terrain, the grid's directions fading over {@code capitalBlend}.
+         */
+        public double capitalWidth = 4500.0;
+        public double capitalHeight = 5300.0;
+        public double capitalBlend = 600.0;
         public double castleSpacing = 420.0;
         public double templeSpacing = 360.0;
         public double portSpacing = 360.0;
@@ -522,7 +530,7 @@ public final class CitySettings {
          * Streets between the arterials, the spacing by formation (Kyoto's blocks are about 120 blocks square), from
          * {@code denseSpacing} of it in the heart of town to {@code thinSpacing} of it at the edge.
          */
-        public double streetSpacingJori = 120.0;
+        public double streetSpacingJori = 133.0;
         public double streetSpacingCastle = 110.0;
         public double streetSpacingTown = 80.0;
         public double streetSpacingResort = 160.0;
@@ -543,7 +551,7 @@ public final class CitySettings {
          * Lanes into the old town's blocks (Kyoto's roji and zushi): one every {@code laneSpacing} along its streets at
          * these chances by formation, as deep as {@code laneDepth} of the street spacing.
          */
-        public double laneChanceJori = 0.45;
+        public double laneChanceJori = 0.85;
         public double laneChanceCastle = 0.8;
         public double laneChanceTown = 0.4;
         public double laneSpacing = 30.0;

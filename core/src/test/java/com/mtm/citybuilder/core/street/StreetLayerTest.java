@@ -26,6 +26,15 @@ class StreetLayerTest {
         return null;
     }
 
+    /** The pieces whose middles lie in a rectangle {min x, min z, max x, max z}. */
+    private static List<StreetSegment> inside(List<StreetSegment> segments, double[] c) {
+        return segments.stream().filter(g -> {
+            double x = 0.5 * (g.x1() + g.x2());
+            double z = 0.5 * (g.z1() + g.z2());
+            return x >= c[0] && x <= c[2] && z >= c[1] && z <= c[3];
+        }).toList();
+    }
+
     private static List<StreetSegment> arterials(StreetPlan plan) {
         return plan.segments().stream().filter(s -> s.streetClass() == StreetClass.ARTERIAL).toList();
     }
@@ -35,7 +44,14 @@ class StreetLayerTest {
         CityLogic logic = new CityLogic(3L, SETTINGS, SyntheticTerrain.flatPlains());
         Settlement city = metropolis(logic);
         assertNotNull(city);
-        double jori = StreetMetrics.orientationOrder(arterials(logic.streetPlan(city, Formation.JORI)));
+        StreetPlan capital = logic.streetPlan(city, Formation.JORI);
+        double[] c = capital.capital();
+        assertNotNull(c, "a capital's planned city");
+        // Heian-kyo's size, in whole avenue spacings
+        assertTrue(Math.abs(c[2] - c[0] - SETTINGS.streets.capitalWidth) <= SETTINGS.streets.joriSpacing, "width " + (c[2] - c[0]));
+        assertTrue(Math.abs(c[3] - c[1] - SETTINGS.streets.capitalHeight) <= SETTINGS.streets.joriSpacing, "height " + (c[3] - c[1]));
+        // The grid within the planned city; beyond it the town is laid out by the terrain
+        double jori = StreetMetrics.orientationOrder(inside(arterials(capital), c));
         double castle = StreetMetrics.orientationOrder(arterials(logic.streetPlan(city, Formation.CASTLE_TOWN)));
         assertTrue(jori >= 0.7, "capital grid order " + jori);
         assertTrue(castle < jori - 0.2, "castle town order " + castle + " against the capital's " + jori);
@@ -101,11 +117,15 @@ class StreetLayerTest {
         assertTrue(StreetMetrics.orientationOrder(nonLanes(castle)) <= 0.4, report);
 
         StreetPlan capital = logic.streetPlan(city, Formation.JORI);
-        StreetMetrics.Network grid = StreetMetrics.network(capital.segments(), area);
+        // Measured within the planned city, the grid
+        double[] c = capital.capital();
+        List<StreetSegment> within = inside(capital.segments(), c);
+        double rect = (c[2] - c[0]) * (c[3] - c[1]) / 1e6;
+        StreetMetrics.Network grid = StreetMetrics.network(within, rect);
+        double order = StreetMetrics.orientationOrder(within.stream().filter(g -> g.streetClass() != StreetClass.LANE).toList());
         String gridReport = String.format("capital: density %.1f, four %.2f, block %.2f ha, lanes %.1f, order %.2f",
-                grid.density(), grid.fourWay(), grid.meanBlockHa(), grid.laneDensity(),
-                StreetMetrics.orientationOrder(nonLanes(capital)));
-        assertTrue(StreetMetrics.orientationOrder(nonLanes(capital)) >= 0.6, gridReport);
+                grid.density(), grid.fourWay(), grid.meanBlockHa(), grid.laneDensity(), order);
+        assertTrue(order >= 0.6, gridReport);
         assertTrue(grid.fourWay() >= 0.30, gridReport);
         assertTrue(grid.meanBlockHa() >= 0.8 && grid.meanBlockHa() <= 3.0, gridReport);
         assertTrue(grid.laneDensity() > town.laneDensity(), gridReport + "; " + report);
