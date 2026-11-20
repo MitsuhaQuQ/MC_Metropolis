@@ -7,6 +7,7 @@ import com.mtm.citybuilder.core.settlement.SettlementTier;
 import com.mtm.citybuilder.core.terrain.Landform;
 import com.mtm.citybuilder.core.terrain.TerrainView;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -23,6 +24,10 @@ import java.util.stream.IntStream;
  * but only so far. Urban intensity
  * falls from 1 at the centre to 0 at the cost the flood stopped at, and fades on slopes and with height above the
  * basin floor: the foothill gradient of the design document.
+ * <p>
+ * A centre may lie in a lake (L2 judges the big tiers without lakes): the flood then crosses that lake at no more than
+ * its length, so the city grows along the shores all round, its target area {@code lakeAreaFactor} times larger, and
+ * the cheapest land node, on the shore, is its actual centre. Other water costs bridges as usual.
  * <p>
  * An extent depends only on its settlement and the terrain, so it comes out the same whichever region asks. Where
  * extents overlap, the more intense one owns the land. Within the culture border's farmland belt nothing is built.
@@ -76,21 +81,28 @@ public final class ExtentLayer {
     /** The furthest an extent of a tier reaches from its centre. */
     public double maxReach(SettlementTier tier) {
         return tier.of(settings.settlements).radius * settings.extent.sizeMax * settings.extent.reach * tail(tier)
-                + 2.0 * grid;
+                * Math.sqrt(settings.extent.lakeAreaFactor) + 2.0 * grid;
     }
 
     public CityExtent extent(Settlement settlement) {
         CitySettings.Extent config = settings.extent;
         double radius = targetRadius(settlement);
         double tail = tail(settlement.tier());
+        int centreX = (int) Math.round(settlement.x() / grid);
+        int centreZ = (int) Math.round(settlement.z() / grid);
+        // A centre in a lake: the city rings the lake, and takes more land
+        double centreLake = terrain.lakeLevel((double) centreX * grid, (double) centreZ * grid);
+        boolean onLake = !Double.isNaN(centreLake)
+                && centreLake > terrain.smoothHeight((double) centreX * grid, (double) centreZ * grid);
+        if (onLake) {
+            radius *= Math.sqrt(config.lakeAreaFactor);
+        }
         // The target area is taken within reach target radii; suburbs may reach further by the tail
         double coreDistance = radius * config.reach;
         double maxDistance = coreDistance * tail;
         double targetNodes = Math.PI * radius * radius / ((double) grid * grid);
         int half = (int) Math.ceil(maxDistance / grid) + 1;
         int size = 2 * half + 1;
-        int centreX = (int) Math.round(settlement.x() / grid);
-        int centreZ = (int) Math.round(settlement.z() / grid);
         int originX = centreX - half;
         int originZ = centreZ - half;
 
@@ -125,11 +137,31 @@ public final class ExtentLayer {
         boolean[] done = new boolean[size * size];
         PriorityQueue<double[]> queue = new PriorityQueue<>((a, b) -> Double.compare(a[0], b[0]) != 0
                 ? Double.compare(a[0], b[0]) : Double.compare(a[1], b[1]));
-        int start = half * size + half;
+        int start = startNode(kind, size, half);
+        // The lake the centre lies in, which the flood crosses at its length
+        boolean[] home = new boolean[size * size];
+        if (start >= 0 && kind[start] == WATER) {
+            ArrayDeque<Integer> lake = new ArrayDeque<>();
+            lake.add(start);
+            home[start] = true;
+            while (!lake.isEmpty()) {
+                int k = lake.poll();
+                for (int[] step : STEPS) {
+                    int ni = k / size + step[0];
+                    int nj = k % size + step[1];
+                    if (ni >= 0 && nj >= 0 && ni < size && nj < size && kind[ni * size + nj] == WATER
+                            && !home[ni * size + nj]) {
+                        home[ni * size + nj] = true;
+                        lake.add(ni * size + nj);
+                    }
+                }
+            }
+        }
         double stop = 0.0;
         boolean stopped = false;
         int taken = 0;
-        if (kind[start] == LAND) {
+        int core = -1;
+        if (start >= 0) {
             cost[start] = 0f;
             queue.add(new double[]{0.0, start});
         }
@@ -145,6 +177,10 @@ public final class ExtentLayer {
             done[k] = true;
             int ki = k / size;
             int kj = k % size;
+            if (core < 0 && kind[k] == LAND) {
+                // The cheapest land: the actual centre, on the shore when the centre lies in a lake
+                core = k;
+            }
             if (!stopped && kind[k] == LAND && Math.hypot(ki - half, kj - half) * grid <= coreDistance) {
                 taken++;
                 stop = head[0];
@@ -176,7 +212,7 @@ public final class ExtentLayer {
                         next += config.climbCost * Math.abs(height[n] - height[k]);
                     }
                 } else {
-                    next += length * (1.0 + config.bridgeCost);
+                    next += length * (home[n] ? 1.0 : 1.0 + config.bridgeCost);
                 }
                 if (next < cost[n]) {
                     cost[n] = (float) next;
@@ -197,24 +233,54 @@ public final class ExtentLayer {
                     }
                     double t = cost[k] / (tail * stop);
                     // Towns and villages end at their target; metropolises and cities tail off into suburbs
-                    double core = tail <= 1.0 ? 1.0 - t * t : Math.pow(1.0 - t * t, 2.0);
+                    double fall = tail <= 1.0 ? 1.0 - t * t : Math.pow(1.0 - t * t, 2.0);
                     double rise = Math.max(0.0, height[k] - floor[k]);
                     double riseFade = clamp(1.0 - rise / config.riseFade);
                     double grade = grade(kind, height, size, i, j);
                     double gradeFade = clamp(1.0 - (grade - config.flatGrade) / (config.steepGrade - config.flatGrade));
-                    float value = (float) (core * riseFade * gradeFade);
+                    float value = (float) (fall * riseFade * gradeFade);
                     if (value > 0f) {
                         intensity[k] = value;
                         built++;
                     }
                 }
             }
-        } else if (kind[start] == LAND) {
+        } else if (core >= 0) {
             // A flood that took one node only, as a village squeezed between water
-            intensity[start] = 1f;
+            intensity[core] = 1f;
             built = 1;
         }
-        return new CityExtent(settlement, originX, originZ, size, cost, intensity, stop, built);
+        double coreX = core < 0 ? settlement.x() : (double) (originX + core / size) * grid;
+        double coreZ = core < 0 ? settlement.z() : (double) (originZ + core % size) * grid;
+        return new CityExtent(settlement, originX, originZ, size, cost, intensity, stop, built, coreX, coreZ, onLake);
+    }
+
+    /**
+     * Where the flood starts: the centre's node, unless it lies at sea or in a merged-in map, then the nearest node
+     * within a few that does not; -1 when there is none.
+     */
+    private static int startNode(byte[] kind, int size, int half) {
+        for (int r = 0; r <= 8; r++) {
+            int best = -1;
+            double bestDistance = Double.POSITIVE_INFINITY;
+            for (int i = half - r; i <= half + r; i++) {
+                for (int j = half - r; j <= half + r; j++) {
+                    if (Math.max(Math.abs(i - half), Math.abs(j - half)) != r || i < 0 || j < 0 || i >= size || j >= size
+                            || kind[i * size + j] == BLOCKED) {
+                        continue;
+                    }
+                    double distance = Math.hypot(i - half, j - half);
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        best = i * size + j;
+                    }
+                }
+            }
+            if (best >= 0) {
+                return best;
+            }
+        }
+        return -1;
     }
 
     /** The lowest land within {@code floorRadius} of each node, as separable minimum filters along rows and columns. */

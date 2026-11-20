@@ -63,7 +63,13 @@ public final class CityLogic {
     private final SettlementLayer settlements;
     private final ExtentLayer extentLayer;
     /** Extents per tier, keyed by the settlement's cell. */
-    private final List<RegionCache<CityExtent>> extents = new ArrayList<>();
+    /** Extents by settlement id, computed outside the lock: two threads may both compute one, and get the same. */
+    private final Map<Long, CityExtent> extents = new java.util.LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Long, CityExtent> eldest) {
+            return size() > EXTENT_CACHE;
+        }
+    };
     private final RegionCache<UrbanRegion> urban;
     private final RoadLayer roads;
 
@@ -131,10 +137,6 @@ public final class CityLogic {
                 return CityLogic.this.extent(settlement);
             }
         });
-        for (SettlementTier tier : SettlementTier.values()) {
-            extents.add(new RegionCache<>(EXTENT_CACHE,
-                    (cellX, cellZ) -> extentLayer.extent(settlements.settlement(tier, cellX, cellZ))));
-        }
         this.urban = new RegionCache<>(REGION_CACHE, extentLayer::region);
         this.roads = new RoadLayer(settings, terrain, new RoadLayer.Below() {
             @Override
@@ -313,7 +315,17 @@ public final class CityLogic {
 
     /** L3: the built-up extent of a settlement. */
     public CityExtent extent(Settlement settlement) {
-        return extents.get(settlement.tier().ordinal()).get(settlement.cellX(), settlement.cellZ());
+        synchronized (extents) {
+            CityExtent extent = extents.get(settlement.id());
+            if (extent != null) {
+                return extent;
+            }
+        }
+        CityExtent extent = extentLayer.extent(settlement);
+        synchronized (extents) {
+            extents.put(settlement.id(), extent);
+        }
+        return extent;
     }
 
     /** L3's target radius of a settlement, from its tier and hinterland. */

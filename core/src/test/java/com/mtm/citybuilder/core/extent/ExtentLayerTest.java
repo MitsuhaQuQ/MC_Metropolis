@@ -2,9 +2,11 @@ package com.mtm.citybuilder.core.extent;
 
 import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.CitySettings;
+import com.mtm.citybuilder.core.culture.Style;
 import com.mtm.citybuilder.core.settlement.Settlement;
 import com.mtm.citybuilder.core.settlement.SettlementTier;
 import com.mtm.citybuilder.core.terrain.ForeignMask;
+import com.mtm.citybuilder.core.terrain.LakeTerrain;
 import com.mtm.citybuilder.core.terrain.SyntheticTerrain;
 import com.mtm.citybuilder.core.terrain.WithForeign;
 import org.junit.jupiter.api.Test;
@@ -58,6 +60,42 @@ class ExtentLayerTest {
             previous = value;
         }
         assertEquals(0.0, extent.intensity(cx, cz + extent.size() / 2), "nothing at the window's edge");
+    }
+
+    @Test
+    void aCityCentredInALakeRingsItWithMoreLand() {
+        double lakeX = 20000;
+        double lakeZ = 0;
+        double lakeRadius = 1500;
+        CityLogic logic = new CityLogic(3L, SETTINGS, new LakeTerrain(lakeX, lakeZ, lakeRadius));
+        Settlement city = new Settlement(77L, SettlementTier.CITY, 0, 0, lakeX, lakeZ, Style.ASIA, 0.6);
+        CityExtent extent = logic.extent(city);
+        assertTrue(extent.onLake(), "centre in the lake");
+        double shore = Math.hypot(extent.coreX() - lakeX, extent.coreZ() - lakeZ);
+        assertTrue(shore > lakeRadius - 1 && shore < lakeRadius + 128, "actual centre on the shore: " + shore);
+        // Built up on every side of the lake
+        int cx = (int) Math.round(lakeX / 64);
+        int cz = (int) Math.round(lakeZ / 64);
+        int out = (int) Math.round((lakeRadius + 300) / 64);
+        for (int[] side : new int[][]{{out, 0}, {-out, 0}, {0, out}, {0, -out}}) {
+            assertTrue(extent.intensity(cx + side[0], cz + side[1]) > 0.3, "built up at " + side[0] + " " + side[1]);
+        }
+        // Its land within the target cost covers the larger target area
+        int land = 0;
+        for (int i = 0; i < extent.size(); i++) {
+            for (int j = 0; j < extent.size(); j++) {
+                int nodeX = extent.originX() + i;
+                int nodeZ = extent.originZ() + j;
+                if (extent.cost(nodeX, nodeZ) <= extent.radius()
+                        && Math.hypot(nodeX * 64.0 - lakeX, nodeZ * 64.0 - lakeZ) >= lakeRadius) {
+                    land++;
+                }
+            }
+        }
+        double radius = logic.targetRadius(city);
+        double target = Math.PI * radius * radius * SETTINGS.extent.lakeAreaFactor;
+        double area = land * 64.0 * 64.0;
+        assertTrue(area > 0.8 * target && area < 1.2 * target, "land " + area + " against " + target);
     }
 
     @Test

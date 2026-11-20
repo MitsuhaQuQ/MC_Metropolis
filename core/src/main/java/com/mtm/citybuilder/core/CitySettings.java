@@ -183,6 +183,11 @@ public final class CitySettings {
          * out of the suburbs, which grow thinner instead of gathering round town centres.
          */
         public double suburbTail = 1.6;
+        /**
+         * A city whose centre lies in a lake grows round it, and gets this many times the target area: lakeside
+         * cities spread along their shores.
+         */
+        public double lakeAreaFactor = 1.5;
         /** Grades from which urban intensity starts fading, and at which it is gone. */
         public double flatGrade = 0.05;
         public double steepGrade = 0.35;
@@ -314,7 +319,7 @@ public final class CitySettings {
             problems.add("settlements.broadGrid must divide general.regionSize");
         }
         if (extent.sizeMin <= 0 || extent.sizeMax < extent.sizeMin || extent.reach < 1 || extent.suburbTail < 1 || extent.floorRadius <= 0
-                || extent.riseFade <= 0 || extent.steepGrade <= extent.flatGrade) {
+                || extent.riseFade <= 0 || extent.steepGrade <= extent.flatGrade || extent.lakeAreaFactor < 1) {
             problems.add("extent needs 0 < sizeMin <= sizeMax, reach and suburbTail >= 1, positive floorRadius and riseFade, steepGrade above flatGrade");
         }
         if (rural.beltHalfWidth > settlements.borderBuffer) {

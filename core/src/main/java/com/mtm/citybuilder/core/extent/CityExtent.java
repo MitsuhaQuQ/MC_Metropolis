@@ -16,9 +16,15 @@ public final class CityExtent {
     private final float[] intensity;
     private final double radius;
     private final int nodes;
+    private final double coreX;
+    private final double coreZ;
+    private final boolean onLake;
 
     CityExtent(Settlement settlement, int originX, int originZ, int size, float[] cost, float[] intensity, double radius,
-               int nodes) {
+               int nodes, double coreX, double coreZ, boolean onLake) {
+        this.coreX = coreX;
+        this.coreZ = coreZ;
+        this.onLake = onLake;
         this.settlement = settlement;
         this.originX = originX;
         this.originZ = originZ;
@@ -31,6 +37,23 @@ public final class CityExtent {
 
     public Settlement settlement() {
         return settlement;
+    }
+
+    /**
+     * The actual centre, on land: the cheapest land node of the flood. The settlement's own centre where the flood
+     * took no land. Downtown, stations and the roads into town start from here.
+     */
+    public double coreX() {
+        return coreX;
+    }
+
+    public double coreZ() {
+        return coreZ;
+    }
+
+    /** Whether the settlement's centre lies in a lake, which the city rings. */
+    public boolean onLake() {
+        return onLake;
     }
 
     /** The cost the flood stopped at: nodes cheaper than this are built up. */
