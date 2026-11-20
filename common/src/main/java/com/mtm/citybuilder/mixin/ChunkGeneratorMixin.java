@@ -1,5 +1,6 @@
 package com.mtm.citybuilder.mixin;
 
+import com.mtm.citybuilder.world.CityBuildings;
 import com.mtm.citybuilder.world.CityChunks;
 import net.minecraft.world.level.StructureManager;
 import net.minecraft.world.level.WorldGenLevel;
@@ -12,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Lays the towns' streets into each chunk: paved before the chunk is decorated, so trees and plants keep off them,
- * and cleared above after, of what grew over them from beside.
+ * and cleared above after, of what grew over them from beside; then the buildings laid over the decorated chunk.
  */
 @Mixin(ChunkGenerator.class)
 abstract class ChunkGeneratorMixin {
@@ -24,5 +25,6 @@ abstract class ChunkGeneratorMixin {
     @Inject(method = "applyBiomeDecoration", at = @At("TAIL"))
     private void citybuilder$clear(WorldGenLevel level, ChunkAccess chunk, StructureManager structures, CallbackInfo ci) {
         CityChunks.clear(level, chunk);
+        CityBuildings.build(level, chunk);
     }
 }

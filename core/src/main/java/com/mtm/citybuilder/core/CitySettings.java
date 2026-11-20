@@ -30,6 +30,7 @@ public final class CitySettings {
     public Streets streets = new Streets();
     public Transit transit = new Transit();
     public Plots plots = new Plots();
+    public com.mtm.citybuilder.core.building.BuildingSettings buildings = new com.mtm.citybuilder.core.building.BuildingSettings();
 
     public static final class General {
         /** Edge of a logic region in blocks: the unit results are cached in, never a boundary of any rule. */
