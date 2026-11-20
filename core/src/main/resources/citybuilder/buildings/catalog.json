@@ -159,6 +159,32 @@
    "palette",
    "spruce",
    "mangrove"
+  ],
+  "FASCIA": [
+   "plain",
+   "sign",
+   "lit"
+  ],
+  "ROOF_SIGN": [
+   "none",
+   "billboard"
+  ],
+  "UPPER_STREET": [
+   "windows",
+   "balcony",
+   "bay"
+  ],
+  "WINDOW_AC": [
+   "none",
+   "units"
+  ],
+  "STREET_DISPLAY": [
+   "none",
+   "stand"
+  ],
+  "DISPLAY": [
+   "none",
+   "goods"
   ]
  },
  "palettes": {
@@ -642,6 +668,81 @@
    "parapet": "minecraft:white_terracotta",
    "foundation": "minecraft:polished_andesite"
   },
+  "shop.6": {
+   "wall": "minecraft:pink_terracotta",
+   "accent": "minecraft:pink_terracotta",
+   "trim": "minecraft:white_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:pink_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.7": {
+   "wall": "minecraft:black_concrete",
+   "accent": "minecraft:black_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:black_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.8": {
+   "wall": "minecraft:orange_terracotta",
+   "accent": "minecraft:orange_terracotta",
+   "trim": "minecraft:white_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:orange_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.9": {
+   "wall": "minecraft:spruce_planks",
+   "accent": "minecraft:spruce_planks",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:spruce_planks",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.10": {
+   "wall": "minecraft:light_blue_terracotta",
+   "accent": "minecraft:light_blue_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_blue_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
   "apartment.1": {
    "wall": "minecraft:white_concrete",
    "accent": "minecraft:white_concrete",
@@ -1060,6 +1161,27 @@
   ],
   "spike": [
    "minecraft:spruce_fence"
+  ],
+  "fasciaLit": [
+   "minecraft:sea_lantern",
+   "minecraft:ochre_froglight",
+   "minecraft:pearlescent_froglight",
+   "minecraft:verdant_froglight"
+  ],
+  "display": [
+   "minecraft:chiseled_bookshelf",
+   "minecraft:barrel",
+   "minecraft:bookshelf",
+   "minecraft:decorated_pot",
+   "minecraft:potted_azalea_bush"
+  ],
+  "stand": [
+   "minecraft:oak_sign",
+   "minecraft:barrel",
+   "minecraft:decorated_pot",
+   "minecraft:composter",
+   "minecraft:potted_bamboo",
+   "minecraft:potted_fern"
   ]
  },
  "styles": {
@@ -1496,7 +1618,12 @@
     "shop.2": 1.0,
     "shop.3": 1.0,
     "shop.4": 1.0,
-    "shop.5": 1.0
+    "shop.5": 1.0,
+    "shop.6": 1.0,
+    "shop.7": 1.0,
+    "shop.8": 1.0,
+    "shop.9": 1.0,
+    "shop.10": 1.0
    },
    "options": {
     "ROOF": {
@@ -1537,6 +1664,32 @@
     "CURTAIN": {
      "none": 0.3,
      "plain": 0.7
+    },
+    "FASCIA": {
+     "plain": 0.3,
+     "sign": 0.45,
+     "lit": 0.25
+    },
+    "ROOF_SIGN": {
+     "none": 0.75,
+     "billboard": 0.25
+    },
+    "UPPER_STREET": {
+     "windows": 0.5,
+     "balcony": 0.3,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.5,
+     "stand": 0.5
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
     },
     "LANTERN": {
      "none": 0.8,

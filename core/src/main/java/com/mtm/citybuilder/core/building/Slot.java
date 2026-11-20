@@ -67,7 +67,19 @@ public enum Slot {
     /** Which end of the side walls the downpipes run down. */
     DOWNPIPE("front", "back"),
     /** A machiya's lattice wood: the palette's, spruce, the red-brown of new wood. */
-    LATTICE_WOOD("palette", "spruce", "mangrove");
+    LATTICE_WOOD("palette", "spruce", "mangrove"),
+    /** The fascia over a shop front: plain, a coloured sign board, a lit one. */
+    FASCIA("plain", "sign", "lit"),
+    /** A billboard along the front of a low shop's flat roof (屋上看板). */
+    ROOF_SIGN("none", "billboard"),
+    /** A shop's upper storeys over the street: windows, balconies out over the pavement (rooms above), bay windows (出窓). */
+    UPPER_STREET("windows", "balcony", "bay"),
+    /** Outdoor units hung on a shop's front upstairs. */
+    WINDOW_AC("none", "units"),
+    /** What a shop puts out on the pavement by its door: a standing sign, barrels, pots. */
+    STREET_DISPLAY("none", "stand"),
+    /** Goods on show behind a shop's glass. */
+    DISPLAY("none", "goods");
 
     private final List<String> options;
 

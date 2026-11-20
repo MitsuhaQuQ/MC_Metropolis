@@ -87,6 +87,9 @@ public record Palette(String wall, String accent, String trim, String window, St
             case BOARD -> c.material("board", variant);
             case PLASTER -> c.material("plaster", variant);
             case SPIKE -> c.material("spike", variant);
+            case FASCIA_LIT -> c.material("fasciaLit", variant ^ 0xBB);
+            case DISPLAY -> c.material("display", position);
+            case STAND -> c.material("stand", position);
         };
     }
 

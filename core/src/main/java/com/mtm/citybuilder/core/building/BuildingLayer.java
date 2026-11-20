@@ -129,6 +129,12 @@ public final class BuildingLayer {
         PLASTER,
         /** The spiked rail along the top of an estate's wall (忍び返し). */
         SPIKE,
+        /** A shop's lit fascia. */
+        FASCIA_LIT,
+        /** Goods on show behind a shop's glass. */
+        DISPLAY,
+        /** What a shop puts out on the pavement: a standing sign, a barrel, a pot. */
+        STAND,
         /** A light inside, so nothing spawns there. */
         LIGHT
     }
@@ -871,6 +877,12 @@ public final class BuildingLayer {
         return Slot.YARD.options().indexOf(b.composition().get(Slot.YARD));
     }
 
+    /** Whether a column carries a low shop's rooftop billboard: along its front wall, short of the corners. */
+    private static boolean billboard(Building b, Column c) {
+        return b.type() == Building.Type.SHOP && b.composition().is(Slot.ROOF_SIGN, "billboard") && b.step() == b.storeys()
+                && c.face() == Face.FRONT && c.u() >= 1.0 && c.u() < b.width() - 1.0;
+    }
+
     /** Whether a column lies on the terrace in front of set-back upper storeys. */
     private static boolean terrace(Building b, Column c) {
         return b.step() < b.storeys() && c.v() - b.front() < b.stepBack();
@@ -929,6 +941,9 @@ public final class BuildingLayer {
             double[] housing = housing(b);
             if (inHousing(housing, c)) {
                 return wallTop + 4;
+            }
+            if (billboard(b, c)) {
+                return wallTop + 2;
             }
             return wallTop + (c.edge() || detail(b, c, 3) < 0.04 ? 1 : 0);
         }
@@ -1020,6 +1035,9 @@ public final class BuildingLayer {
             }
             if (above == 0) {
                 return c.edge() ? Part.PARAPET : Part.FLAT;
+            }
+            if ((above == 1 || above == 2) && billboard(b, c)) {
+                return Part.SIGN;
             }
             if (above == 1) {
                 if (c.edge()) {
@@ -1273,8 +1291,12 @@ public final class BuildingLayer {
                         return Part.VENDING;
                     }
                     if (top) {
-                        // The fascia over the shop front, where the shop's name would be
-                        return Part.ACCENT;
+                        // The fascia over the shop front, where the shop's name would be: plain, a sign board, lit
+                        return switch (b.composition().get(Slot.FASCIA)) {
+                            case "sign" -> Part.SIGN;
+                            case "lit" -> Part.FASCIA_LIT;
+                            default -> Part.ACCENT;
+                        };
                     }
                     if (c.door()) {
                         if (style == 3) {
@@ -1288,6 +1310,11 @@ public final class BuildingLayer {
                         case 3 -> Math.floorMod((long) Math.floor(u), 4) == 0 ? Part.TRIM : Part.AIR;
                         default -> Part.SHOPFRONT;
                     };
+                }
+                if (behind && style != 2 && style != 3 && row == 1 && !c.door() && b.composition().is(Slot.DISPLAY, "goods")
+                        && detail(b, c, 23) < 0.6) {
+                    // Goods on show behind the glass
+                    return Part.DISPLAY;
                 }
                 if (behind && style == 3 && !top) {
                     if (c.door()) {
@@ -1555,9 +1582,47 @@ public final class BuildingLayer {
                 if (signColumn && dy >= b.ground() && dy < b.wallHeight()) {
                     return Part.SIGN;
                 }
-                // An awning over the shop front
-                if (dy == b.ground() - 1 && b.composition().is(Slot.AWNING, "awning")) {
+                // An awning over the shop front; a shutter's box where the shutter is down
+                boolean awning = b.composition().is(Slot.AWNING, "awning");
+                if (dy == b.ground() - 1 && awning) {
                     return Part.AWNING;
+                }
+                if (dy == b.ground() - 1 && groundStyle(b) == 2) {
+                    return Part.HOOD;
+                }
+                // The upper storeys over the street: balconies out over the pavement, bay windows, outdoor units
+                String upperStreet = b.composition().get(Slot.UPPER_STREET);
+                long bay = (long) Math.floor(along);
+                boolean windowBay = Math.floorMod(bay, 3) != 0;
+                for (int k = 1; k < b.step(); k++) {
+                    int f = b.floorOf(k);
+                    if (upperStreet.equals("balcony") && !signColumn && along >= 1 && along < w - 1) {
+                        if (dy == f) {
+                            return Part.ACCENT;
+                        }
+                        if (dy == f + 1) {
+                            return Part.RAIL;
+                        }
+                    }
+                    if (upperStreet.equals("bay") && windowBay && !signColumn && along >= 1 && along < w - 1) {
+                        if (dy == f) {
+                            return Part.ACCENT;
+                        }
+                        if (dy > f && dy < f + b.upper()) {
+                            return Part.WINDOW;
+                        }
+                        if (dy == f + b.upper() && k == b.step() - 1) {
+                            return Part.HOOD;
+                        }
+                    }
+                    if (b.composition().is(Slot.WINDOW_AC, "units") && !windowBay && dy == f + 1 && detail(b, c, 24 + k) < 0.35) {
+                        return Part.EQUIPMENT;
+                    }
+                }
+                // Out on the pavement by the door: a standing sign, a barrel or pot
+                if (dy == 1 && b.composition().is(Slot.STREET_DISPLAY, "stand")
+                        && (Math.abs(along - b.door() - 2.0) < 0.5 || Math.abs(along - b.door()) >= 1.5 && detail(b, c, 25) < 0.15)) {
+                    return Part.STAND;
                 }
             }
             if (against == Face.FRONT && b.type() == Building.Type.OFFICE && b.composition().is(Slot.SIGN, "tall")

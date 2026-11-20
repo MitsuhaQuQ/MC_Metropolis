@@ -145,7 +145,7 @@ public final class Catalog {
     static final List<String> MATERIALS = List.of("awning", "sign", "vending", "fence", "plant", "log", "leaves", "shrub",
             "shed", "rail", "curtain", "curtainRed", "latticeSpruce", "latticeMangrove", "equipment", "shutter", "hedge",
             "bamboo", "post", "carport", "guard", "downpipe", "lantern", "sudare", "komayose", "engawa", "toro", "toroLight",
-            "toroCap", "gravel", "board", "plaster", "spike");
+            "toroCap", "gravel", "board", "plaster", "spike", "fasciaLit", "display", "stand");
 
     /** Gson is used here only. */
     private static final class Json {
