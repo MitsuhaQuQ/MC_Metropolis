@@ -24,25 +24,84 @@ import java.util.Set;
  * is level, at the higher of the ground at its two ends plus a block.
  */
 public final class ChunkLayer {
-    /** What a column carries. */
+    /** What a column carries: the class of the street over it, the widest winning where streets meet. */
     public enum Surface {
         NONE,
         LANE,
         STREET,
         OLD_ROAD,
-        ARTERIAL,
-        /** A bridge deck over water, at {@link Column#deck}. */
-        BRIDGE
+        ARTERIAL
     }
 
     /**
      * One column of a chunk.
      *
      * @param surface what it carries
+     * @param bridge  whether it is a bridge deck over water, at {@code deck}
      * @param deck    a bridge deck's height, the block the deck is laid at; NaN on the ground
+     * @param across  how far the column's middle lies from the street's centre line, positive to its left
+     * @param heading the street's direction there, in radians
+     * @param along   the column's middle measured along the street's direction from the world's origin, for dashes
+     * @param width   the street's width
      */
-    public record Column(Surface surface, double deck) {
-        public static final Column EMPTY = new Column(Surface.NONE, Double.NaN);
+    public record Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
+                         double width) {
+        public static final Column EMPTY = new Column(Surface.NONE, false, Double.NaN, 0.0, 0.0, 0.0, 0.0);
+    }
+
+    /** How a column is paved. */
+    public enum Paving {
+        NONE,
+        ASPHALT,
+        /** A white line along the street: a lane line (dashed) or the carriageway's edge. */
+        WHITE_LINE,
+        /** The yellow centre line of a wide street. */
+        YELLOW_LINE,
+        /** Paving slabs: a pavement beside a wide street, or a lane. */
+        SIDEWALK
+    }
+
+    /**
+     * How a column is paved, as Japanese streets are: a wide street (an arterial, 14 or more wide) has pavements of 3
+     * (4 from 20 wide) either side, a yellow centre line, white edge lines and, on a carriageway of two lanes a way,
+     * dashed white lane lines (5 painted, 5 not); a street or an old road is plain asphalt, as narrow Japanese streets
+     * have no centre line; a lane is paving slabs.
+     */
+    public static Paving paving(Column column) {
+        switch (column.surface) {
+            case NONE:
+                return Paving.NONE;
+            case LANE:
+                return Paving.SIDEWALK;
+            case STREET:
+            case OLD_ROAD:
+                return Paving.ASPHALT;
+            default:
+                break;
+        }
+        double width = column.width;
+        double a = Math.abs(column.across);
+        double half = 0.5 * width;
+        double walk = width >= 20 ? 4.0 : width >= 14 ? 3.0 : 0.0;
+        double carriage = half - walk;
+        if (a > carriage) {
+            return Paving.SIDEWALK;
+        }
+        if (width >= 14 && a <= 0.5) {
+            return Paving.YELLOW_LINE;
+        }
+        if (walk > 0 && a > carriage - 1.0) {
+            return Paving.WHITE_LINE;
+        }
+        if (carriage >= 5.0 && Math.abs(a - 0.5 * carriage) <= 0.5 && Math.floorMod((long) Math.floor(column.along), 10) < 5) {
+            return Paving.WHITE_LINE;
+        }
+        return Paving.ASPHALT;
+    }
+
+    /** Whether a line in a column runs nearer the x axis than the z axis. */
+    public static boolean alongX(Column column) {
+        return Math.abs(Math.cos(column.heading)) >= Math.abs(Math.sin(column.heading));
     }
 
     /** A town's street pieces bucketed by chunk, and its bridges' deck heights by piece. */
@@ -78,22 +137,30 @@ public final class ChunkLayer {
             for (int p : pieces) {
                 StreetSegment g = index.segments.get(p);
                 Surface surface = surface(g);
+                boolean bridge = g.structure() == StreetStructure.BRIDGE;
                 double half = 0.5 * Math.max(1.0, g.width());
+                double length = Math.max(1e-9, g.length());
+                double ux = (g.x2() - g.x1()) / length;
+                double uz = (g.z2() - g.z1()) / length;
+                double heading = Math.atan2(uz, ux);
                 for (int x = 0; x < 16; x++) {
                     for (int z = 0; z < 16; z++) {
                         double cx = minX + x + 0.5;
                         double cz = minZ + z + 0.5;
-                        if (distance(g, cx, cz) > half) {
+                        double d = distance(g, cx, cz);
+                        if (d > half) {
                             continue;
                         }
                         Column old = columns[x * 16 + z];
-                        if (surface == Surface.BRIDGE) {
-                            double deck = index.deck[p];
-                            if (old.surface != Surface.BRIDGE || deck > old.deck) {
-                                columns[x * 16 + z] = new Column(Surface.BRIDGE, deck);
-                            }
-                        } else if (old.surface != Surface.BRIDGE && surface.ordinal() > old.surface.ordinal()) {
-                            columns[x * 16 + z] = new Column(surface, Double.NaN);
+                        // A bridge over the ground's streets; else the wider class; on a tie the nearer centre line
+                        boolean wins = bridge && !old.bridge
+                                || bridge == old.bridge && (surface.ordinal() > old.surface.ordinal()
+                                || surface == old.surface && d < Math.abs(old.across));
+                        if (old.surface == Surface.NONE || wins) {
+                            double across = (cx - g.x1()) * -uz + (cz - g.z1()) * ux;
+                            double along = cx * ux + cz * uz;
+                            double deck = bridge ? Math.max(index.deck[p], old.bridge ? old.deck : Double.NEGATIVE_INFINITY) : Double.NaN;
+                            columns[x * 16 + z] = new Column(surface, bridge, deck, across, heading, along, g.width());
                         }
                     }
                 }
@@ -202,9 +269,6 @@ public final class ChunkLayer {
     }
 
     private static Surface surface(StreetSegment g) {
-        if (g.structure() == StreetStructure.BRIDGE) {
-            return Surface.BRIDGE;
-        }
         return switch (g.streetClass()) {
             case ARTERIAL, COLLECTOR -> Surface.ARTERIAL;
             case OLD_ROAD -> Surface.OLD_ROAD;

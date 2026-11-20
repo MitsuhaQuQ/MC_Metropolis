@@ -59,7 +59,8 @@ class ChunkLayerTest {
         int cz = Math.floorDiv((int) Math.floor(mz), 16);
         ChunkLayer.Column[] columns = layer.columns(cx, cz);
         ChunkLayer.Column at = columns[((int) Math.floor(mx) - cx * 16) * 16 + (int) Math.floor(mz) - cz * 16];
-        assertTrue(at.surface() == ChunkLayer.Surface.ARTERIAL || at.surface() == ChunkLayer.Surface.BRIDGE, "column " + at);
+        assertTrue(at.surface() == ChunkLayer.Surface.ARTERIAL, "column " + at);
+        assertTrue(Math.abs(at.across()) <= 0.5 * arterial.width() + 1e-9, "offset " + at.across());
         // The same chunk asked again gives the same columns
         assertArrayEquals(columns, layer.columns(cx, cz));
         // A bridge's columns carry a deck above the sea level
@@ -70,7 +71,7 @@ class ChunkLayerTest {
             int bcx = Math.floorDiv((int) Math.floor(bx), 16);
             int bcz = Math.floorDiv((int) Math.floor(bz), 16);
             ChunkLayer.Column column = layer.columns(bcx, bcz)[((int) Math.floor(bx) - bcx * 16) * 16 + (int) Math.floor(bz) - bcz * 16];
-            if (column.surface() == ChunkLayer.Surface.BRIDGE) {
+            if (column.bridge()) {
                 assertTrue(column.deck() > SyntheticTerrain.SEA, "deck " + column.deck());
             }
         }
@@ -79,5 +80,30 @@ class ChunkLayerTest {
         for (ChunkLayer.Column column : empty) {
             assertEquals(ChunkLayer.Surface.NONE, column.surface());
         }
+    }
+
+    private static ChunkLayer.Paving paving(ChunkLayer.Surface surface, double across, double along, double width) {
+        return ChunkLayer.paving(new ChunkLayer.Column(surface, false, Double.NaN, across, 0.0, along, width));
+    }
+
+    @Test
+    void wideStreetsAreMarkedAsJapaneseStreetsAre() {
+        // An arterial 16 wide: pavements 3 either side, white edge lines, a yellow centre line
+        assertEquals(ChunkLayer.Paving.SIDEWALK, paving(ChunkLayer.Surface.ARTERIAL, 7.5, 0.0, 16.0));
+        assertEquals(ChunkLayer.Paving.SIDEWALK, paving(ChunkLayer.Surface.ARTERIAL, -5.5, 0.0, 16.0));
+        assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.ARTERIAL, 4.5, 0.0, 16.0));
+        assertEquals(ChunkLayer.Paving.YELLOW_LINE, paving(ChunkLayer.Surface.ARTERIAL, 0.5, 0.0, 16.0));
+        assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.ARTERIAL, 1.5, 0.0, 16.0));
+        // A street: plain asphalt; a lane: paving slabs
+        assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.STREET, 0.5, 0.0, 6.0));
+        assertEquals(ChunkLayer.Paving.SIDEWALK, paving(ChunkLayer.Surface.LANE, 0.5, 0.0, 2.5));
+        // A station avenue 24 wide: lane lines dashed, 5 painted and 5 not
+        int painted = 0;
+        for (int along = 0; along < 10; along++) {
+            if (paving(ChunkLayer.Surface.ARTERIAL, 4.0, along + 0.5, 24.0) == ChunkLayer.Paving.WHITE_LINE) {
+                painted++;
+            }
+        }
+        assertEquals(5, painted);
     }
 }

@@ -1,0 +1,14 @@
+{
+  "variants": {
+    "axis=z": {
+      "model": "citybuilder:block/asphalt_line_white"
+    },
+    "axis=y": {
+      "model": "citybuilder:block/asphalt_line_white"
+    },
+    "axis=x": {
+      "model": "citybuilder:block/asphalt_line_white",
+      "y": 90
+    }
+  }
+}

@@ -1,0 +1,4 @@
+City Builder assets and where they come from.
+
+textures/block/asphalt.png, asphalt_line_white.png, asphalt_line_yellow.png, sidewalk.png
+  Drawn for this mod by tools/textures/road_textures.py (no outside sources); the mod's own licence.

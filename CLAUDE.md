@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 本项目是 **MTM_worldgen**（`F:\MC\MTM_worldgen`，真实地貌地形生成）与 **MTR Advanced**（`P:\Minecraft-Transit-Railway-391ce5d1800fbc70b7f565571c692287828867fa`，MTR 3.2.2 的运营模拟分支）的共同配套 mod：在大地形尺度上自然地生成城市，并让城市按规则逐步扩展。建筑模型素材取自网络上 MIT、CC 等开放协议授权的作品。
 
-> 当前状态（2026-11-20）：实现顺序的第 1–4、7 步，第 5、6 步的规划部分，以及第 8 步的 8a（城市路网骨架）、8b（支路和小巷，按 OSM 指标校准）、8c（桥、暗渠、坡道、台阶、参道）已完成（L2 已改为按规划块规划、存盘）：`CityLogic`、`CitySettings`、L1 适宜度场、L1.5 文化区、外来区域的排除、L2 聚落选址与分级、L3 城市范围和强度、L3.5 土地用途、L4 城际道路、L4b 城际铁路走廊，以及它们的调试图（`cityMap`）。还没有接进游戏。下文标 **【待决定】** 的是尚未确定的事项，括号内为建议默认值；确定后删除标记。
+> 当前状态（2026-11-20）：实现顺序的第 1–4、7 步，第 5、6 步的规划部分，以及第 8 步的 8a（城市路网骨架）、8b（支路和小巷，按 OSM 指标校准）、8c（桥、暗渠、坡道、台阶、参道）以及第 8 步其余的规划（功能分区、主站、城内铁路、车站用地、公交站、高速线改线）已完成（L2 已改为按规划块规划、存盘）：`CityLogic`、`CitySettings`、L1 适宜度场、L1.5 文化区、外来区域的排除、L2 聚落选址与分级、L3 城市范围和强度、L3.5 土地用途、L4 城际道路、L4b 城际铁路走廊，以及它们的调试图（`cityMap`）。区块层第一版已接进游戏（铺路面、标线、人行道、桥面），但还没有在游戏里实际跑过。下文标 **【待决定】** 的是尚未确定的事项，括号内为建议默认值；确定后删除标记。
 
 ## 常用命令
 
@@ -64,7 +64,10 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
   - 唯一引用 MTR 类的是 `compat.mtr.MtrTransit`（经 `RailwayData.getInstance(level)`），只能经 `transit.Transits.of(level)` 加载；MTR 的数据由服务端线程修改，`stations()` 要在服务端线程调用
   - 依赖的 MTR 签名：`RailwayData.getInstance(Level)`、`RailwayData.stations`、`Station.getRectangles()`、`Station.getHeight(int[])`、`NameColorDataBase` 的 `id`/`name`/`color` 字段
 - 开发运行（`runClient`/`runServer`）带上两个兄弟 mod 和 Architectury API 的配置能解析，但还没实际启动验证过
-- 还没有 Mixin 和 access widener。加 Mixin 时注意 MTM_worldgen CLAUDE.md "开发约定"里关于 1.20.1 refmap 的坑（Fabric jar 的 mixin 配置要由 `shadowJar` 补上 `refmap`，否则开发环境正常、正式游戏启动即崩），可照搬它的 `remapJar` 检查
+- **区块层（第一版，2026-11-20）**：`mixin.ChunkGeneratorMixin` 挂在原版 `ChunkGenerator.applyBiomeDecoration`：开头调 `world.CityChunks.pave`（装饰前铺路，树和草就不会长在路上），结尾调 `clear`（清掉从路边长到路面上方的东西，只清找得到路面方块的列）。每列铺什么由 core 的 `chunk.ChunkLayer` 给出（纯 Java、有测试）：`columns(chunkX, chunkZ)` 按区块中心和四角的 L3 归属找城镇、读它的 `StreetPlan`（按区块分桶的索引缓存 16 个城），每列给出道路等级、是否桥面和桥面高度（每座桥取两岸较高的地面 +1，整座桥水平）、离中心线的偏移、方向、沿线位置、路宽；`paving(column)` 按日本道路给出铺装（干道 14 格以上：两侧人行道 3 格、20 格以上 4 格，中央黄线，边缘白实线，两车道时白色虚线 5 格画 5 格空；支路和古道只铺沥青；小巷人行道砖）。每个 `ServerLevel` 一份 `CityLogic`（`world.CityWorlds`，规划存在 `<维度目录>/citybuilder/plan`）；城市逻辑出错时记一次日志、本次会话不再建城，不影响世界生成。同一座城多线程同时请求只规划一次（`StreetLayer.plan` 用 future）。
+- **本 mod 的方块**（`block.CityBlocks`，经 `Platform.registerBlock` 注册：Fabric 直接注册，Forge 用 `DeferredRegister`，在 mod 构造时挂到事件总线）：`asphalt`、`asphalt_line_white`/`asphalt_line_yellow`（`RotatedPillarBlock`，axis x/z 对应标线方向）、`sidewalk`。贴图由 `tools/textures/road_textures.py` 生成（自制，`assets/citybuilder/ATTRIBUTION` 记录），改贴图改脚本后重跑。
+- Mixin 配置 `citybuilder.mixins.json`：照搬 MTM_worldgen 的 1.20.1 refmap 处理（Fabric 的 `shadowJar` 给 jar 里的配置补上 `refmap`，源码里不写；Forge 用 `loom.forge.mixinConfig`），两个加载器的 `remapJar` 都检查 jar 里的配置写了 refmap 且 refmap 在 jar 里
+- 开发服务器冒烟测试要先在 `fabric/run/eula.txt` 接受 Minecraft EULA，须由用户本人同意；服务器用 `level-type=mtm_worldgen:realistic`
 
 ## 语言
 

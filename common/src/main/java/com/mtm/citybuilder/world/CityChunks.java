@@ -1,21 +1,23 @@
 package com.mtm.citybuilder.world;
 
 import com.mtm.citybuilder.CityBuilder;
+import com.mtm.citybuilder.block.CityBlocks;
 import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.chunk.ChunkLayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.Heightmap;
 
-import java.util.Set;
-
 /**
  * The chunk layer's blocks: the streets the city logic plans, laid into each chunk as it is decorated. First version:
- * paving by class on the ground, level bridge decks over water; vanilla blocks only.
+ * asphalt with its markings, pavements and lanes in paving slabs (this mod's blocks), on the ground and on level bridge
+ * decks over water.
  */
 public final class CityChunks {
     /** Clear headroom over a street, in blocks. */
@@ -23,23 +25,27 @@ public final class CityChunks {
     /** How far above a street {@link #clear} looks for what grew over it. */
     private static final int CLEAR_REACH = 24;
 
-    private static final Set<Block> PAVING = Set.of(Blocks.GRAY_CONCRETE, Blocks.POLISHED_ANDESITE, Blocks.STONE_BRICKS,
-            Blocks.PACKED_MUD, Blocks.SMOOTH_STONE);
 
     private static volatile boolean failed;
 
     private CityChunks() {
     }
 
-    private static BlockState paving(ChunkLayer.Surface surface) {
-        return switch (surface) {
-            case ARTERIAL -> Blocks.GRAY_CONCRETE.defaultBlockState();
-            case STREET -> Blocks.POLISHED_ANDESITE.defaultBlockState();
-            case LANE -> Blocks.STONE_BRICKS.defaultBlockState();
-            case OLD_ROAD -> Blocks.PACKED_MUD.defaultBlockState();
-            case BRIDGE -> Blocks.SMOOTH_STONE.defaultBlockState();
+    private static BlockState paving(ChunkLayer.Column column) {
+        Direction.Axis axis = ChunkLayer.alongX(column) ? Direction.Axis.X : Direction.Axis.Z;
+        return switch (ChunkLayer.paving(column)) {
+            case ASPHALT -> CityBlocks.ASPHALT.get().defaultBlockState();
+            case WHITE_LINE -> CityBlocks.ASPHALT_LINE_WHITE.get().defaultBlockState().setValue(RotatedPillarBlock.AXIS, axis);
+            case YELLOW_LINE -> CityBlocks.ASPHALT_LINE_YELLOW.get().defaultBlockState().setValue(RotatedPillarBlock.AXIS, axis);
+            case SIDEWALK -> CityBlocks.SIDEWALK.get().defaultBlockState();
             case NONE -> null;
         };
+    }
+
+    private static boolean paving(BlockState state) {
+        Block block = state.getBlock();
+        return block == CityBlocks.ASPHALT.get() || block == CityBlocks.ASPHALT_LINE_WHITE.get()
+                || block == CityBlocks.ASPHALT_LINE_YELLOW.get() || block == CityBlocks.SIDEWALK.get();
     }
 
     private static ChunkLayer.Column[] columns(WorldGenLevel level, ChunkAccess chunk) {
@@ -73,12 +79,12 @@ public final class CityChunks {
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 ChunkLayer.Column column = columns[x * 16 + z];
-                BlockState block = paving(column.surface());
+                BlockState block = paving(column);
                 if (block == null) {
                     continue;
                 }
                 int y;
-                if (column.surface() == ChunkLayer.Surface.BRIDGE) {
+                if (column.bridge()) {
                     y = (int) column.deck();
                 } else {
                     // The ground, or the water's surface where a street crosses a stream (a heightmap holds the
@@ -120,7 +126,7 @@ public final class CityChunks {
                 int top = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) - 1;
                 int paved = Integer.MIN_VALUE;
                 for (int y = top; y > top - CLEAR_REACH && y > chunk.getMinBuildHeight(); y--) {
-                    if (PAVING.contains(chunk.getBlockState(pos.set(baseX + x, y, baseZ + z)).getBlock())) {
+                    if (paving(chunk.getBlockState(pos.set(baseX + x, y, baseZ + z)))) {
                         paved = y;
                         break;
                     }
