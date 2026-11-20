@@ -1006,7 +1006,7 @@ COLOURS = {
 }
 
 
-PREVIEW_ALIAS = {"grass_block": "lime_terracotta", "dirt": "brown_terracotta", "cobblestone": "andesite",
+PREVIEW_ALIAS = {"end_rod": "white_concrete", "brown_stained_glass": "brown_stained_glass", "grass_block": "lime_terracotta", "dirt": "brown_terracotta", "cobblestone": "andesite",
                  "mossy_cobblestone": "mossy_stone_bricks", "spruce_log": "spruce_planks", "dark_oak_log": "dark_oak_planks",
                  "oak_log": "oak_planks", "spruce_leaves": "green_terracotta", "jungle_leaves": "green_concrete",
                  "dark_oak_leaves": "green_terracotta", "oak_leaves": "lime_terracotta", "acacia_leaves": "orange_terracotta",
@@ -1171,6 +1171,93 @@ def build_temple(out, gid, slug, name, row, bc):
             "block_counts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
 
 
+# ---------------------------------------------------------------- landmark fixes
+#
+# Where LOD2 and its photographs fall short of a landmark everyone knows, its upper parts are rebuilt by hand after
+# photographs, keeping LOD2's heights and axis; the rest stays as voxelized and coloured from the textures.
+
+def _ring(blocks, cx, cz, y, r_out, r_in, state, keep=None):
+    """A ring (or a disc with r_in < 0) of `state` at height y round the axis (cx, cz), voxel centres."""
+    R = int(r_out) + 1
+    for x in range(int(cx) - R - 1, int(cx) + R + 2):
+        for z in range(int(cz) - R - 1, int(cz) + R + 2):
+            d = ((x + 0.5 - cx) ** 2 + (z + 0.5 - cz) ** 2) ** 0.5
+            if r_in < d <= r_out and (keep is None or keep(x, z, d)):
+                blocks[(x, y, z)] = state
+
+
+def kyoto_tower(blocks):
+    """Kyoto Tower above its building's roof, after a photograph: a golden glass bowl on the roof with light mullions,
+    the white shaft narrowing upwards from a flared foot, the observation deck (an orange-red cone under it, a band of
+    windows between white rims) inside a cage of red ribs bulging outwards, a white drum, the orange-and-white
+    antenna and a red-and-white mast. Heights and axis from LOD2 (shaft 48-98, deck 99-104, drum 105-110, antenna
+    111-122, mast to 130)."""
+    shaft = [(x, z) for (x, y, z) in blocks if 60 <= y <= 90]
+    cx = sum(x for x, _ in shaft) / len(shaft) + 0.5
+    cz = sum(z for _, z in shaft) / len(shaft) + 0.5
+    for v in [v for v in blocks if v[1] >= 36 and ((v[0] + 0.5 - cx) ** 2 + (v[2] + 0.5 - cz) ** 2) ** 0.5 <= 13.5]:
+        del blocks[v]
+    white, orange, glass = ("white_concrete", None), ("orange_concrete", None), ("brown_stained_glass", None)
+    mullion, deckglass = ("smooth_sandstone", None), ("gray_stained_glass", None)
+    # The bowl: narrow at the roof, opening upwards, glass with a light mullion every few degrees, a white lip and top.
+    import math
+    for y in range(36, 47):
+        t = (y - 36) / 10
+        r = 5.5 + 6.5 * t ** 0.8
+
+        def stripe(x, z, d):
+            return int(round(math.degrees(math.atan2(z + 0.5 - cz, x + 0.5 - cx)) / 15)) % 2 == 0
+        _ring(blocks, cx, cz, y, r, r - 1.2, glass if y < 46 else white)
+        if y < 46:
+            _ring(blocks, cx, cz, y, r, r - 1.2, mullion, keep=lambda x, z, d: abs(math.degrees(math.atan2(z + 0.5 - cz, x + 0.5 - cx))) % 20 < 3)
+    _ring(blocks, cx, cz, 46, 12.0, -1, white)
+    _ring(blocks, cx, cz, 35, 5.5, -1, white)
+    # The shaft, white, from a flared foot to 6.6 m under the deck.
+    for y in range(47, 99):
+        r = 3.3 + 1.2 * max(0.0, (75 - y) / 28) ** 1.5 + (1.2 if y < 49 else 0.5 if y < 51 else 0)
+        _ring(blocks, cx, cz, y, r, r - 1.1, white)
+    # The deck: the orange-red cone under it, white rims, a band of windows, the floor and roof.
+    for y, r in ((95, 4.2), (96, 5.2), (97, 6.3), (98, 7.4), (99, 8.5)):
+        _ring(blocks, cx, cz, y, r, -1, orange)
+    _ring(blocks, cx, cz, 100, 9.3, -1, white)
+    for y in (101, 102):
+        _ring(blocks, cx, cz, y, 9.3, 8.2, deckglass)
+    _ring(blocks, cx, cz, 103, 9.0, -1, white)
+    _ring(blocks, cx, cz, 104, 6.0, -1, white)
+    # The cage of red ribs round the deck, bulging out at its middle, every 30 degrees.
+    for k in range(12):
+        a = math.radians(k * 30 + 15)
+        for y, r in ((99, 9.6), (100, 10.4), (101, 10.8), (102, 10.8), (103, 10.4), (104, 9.6), (105, 8.2)):
+            x, z = int(math.floor(cx + r * math.cos(a))), int(math.floor(cz + r * math.sin(a)))
+            blocks[(x, y, z)] = ("mangrove_fence", None)
+    _ring(blocks, cx, cz, 105, 8.6, 7.6, ("mangrove_fence", None))
+    # The drum, the antenna (orange, then white), the mast (red and white).
+    for y in range(105, 111):
+        _ring(blocks, cx, cz, y, 3.4, -1, white)
+    for y in range(111, 123):
+        _ring(blocks, cx, cz, y, 1.6, -1, orange if y < 115 else white)
+    for y in range(123, 131):
+        blocks[(int(cx), y, int(cz))] = ("lightning_rod", {"facing": "up"}) if y % 3 == 0 else ("end_rod", {"facing": "up"})
+    # The Kyoto Tower Building under it: white floor bands and window strips with white mullions, as in the photograph,
+    # in place of the shaded, speckled colours from the aerial textures; the ground floor glazed.
+    for (x, y, z), b in list(blocks.items()):
+        if y > 31 or b[1] is not None:
+            continue
+        sides = [d for d in ((1, 0), (-1, 0), (0, 1), (0, -1)) if (x + d[0], y, z + d[1]) not in blocks]
+        if not sides or (x, y + 1, z) not in blocks:
+            continue  # inside, or a roof
+        along = z if sides[0][0] else x
+        if y < 4:
+            blocks[(x, y, z)] = ("light_gray_stained_glass", None) if y > 0 and along % 4 else white
+        elif y % 3 == 0:
+            blocks[(x, y, z)] = white
+        else:
+            blocks[(x, y, z)] = white if along % 3 == 0 else ("light_gray_stained_glass", None)
+
+
+LANDMARK_FIXES = {"kyoto_tower": kyoto_tower}
+
+
 def build_one(args):
     out, gid, slug, name, pal, row, bc, textured = args
     if slug in TEMPLES and os.path.exists(os.path.join(out, "models", slug + ".json")):
@@ -1186,6 +1273,8 @@ def build_one(args):
     sh = storey_height(row)
     blocks = assign_blocks(solid, cls, height, pal, sh)
     recoloured = recolour(blocks, solid, colours, pal, bc)
+    if slug in LANDMARK_FIXES:
+        LANDMARK_FIXES[slug](blocks)
     size = tuple(max(v[i] for v in blocks) + 1 for i in range(3))
     write_nbt(os.path.join(out, slug + ".nbt"), blocks, size)
     render(blocks, size, os.path.join(out, slug + ".png"), bc)
