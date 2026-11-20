@@ -1006,7 +1006,7 @@ COLOURS = {
 }
 
 
-PREVIEW_ALIAS = {"end_rod": "white_concrete", "brown_stained_glass": "brown_stained_glass", "grass_block": "lime_terracotta", "dirt": "brown_terracotta", "cobblestone": "andesite",
+PREVIEW_ALIAS = {"cyan_stained_glass": "cyan_stained_glass", "end_rod": "white_concrete", "brown_stained_glass": "brown_stained_glass", "grass_block": "lime_terracotta", "dirt": "brown_terracotta", "cobblestone": "andesite",
                  "mossy_cobblestone": "mossy_stone_bricks", "spruce_log": "spruce_planks", "dark_oak_log": "dark_oak_planks",
                  "oak_log": "oak_planks", "spruce_leaves": "green_terracotta", "jungle_leaves": "green_concrete",
                  "dark_oak_leaves": "green_terracotta", "oak_leaves": "lime_terracotta", "acacia_leaves": "orange_terracotta",
@@ -1238,8 +1238,9 @@ def kyoto_tower(blocks):
         _ring(blocks, cx, cz, y, 1.6, -1, orange if y < 115 else white)
     for y in range(123, 131):
         blocks[(int(cx), y, int(cz))] = ("lightning_rod", {"facing": "up"}) if y % 3 == 0 else ("end_rod", {"facing": "up"})
-    # The Kyoto Tower Building under it: white floor bands and window strips with white mullions, as in the photograph,
-    # in place of the shaded, speckled colours from the aerial textures; the ground floor glazed.
+    # The Kyoto Tower Building under it, as in the photographs: continuous ribbon windows of teal glass floor by floor,
+    # thin dark spandrel bands between, shopfronts at the street and a light parapet on top; in place of the shaded,
+    # speckled colours from the aerial textures.
     for (x, y, z), b in list(blocks.items()):
         if y > 31 or b[1] is not None:
             continue
@@ -1247,12 +1248,15 @@ def kyoto_tower(blocks):
         if not sides or (x, y + 1, z) not in blocks:
             continue  # inside, or a roof
         along = z if sides[0][0] else x
+        top = (x, y + 1, z) in blocks and (x, y + 2, z) not in blocks
         if y < 4:
-            blocks[(x, y, z)] = ("light_gray_stained_glass", None) if y > 0 and along % 4 else white
-        elif y % 3 == 0:
-            blocks[(x, y, z)] = white
+            blocks[(x, y, z)] = ("glass", None) if 0 < y < 3 and along % 5 else ("gray_terracotta", None)
+        elif top:
+            blocks[(x, y, z)] = white  # the parapet
+        elif y % 3 == 1:
+            blocks[(x, y, z)] = ("gray_terracotta", None)  # spandrel
         else:
-            blocks[(x, y, z)] = white if along % 3 == 0 else ("light_gray_stained_glass", None)
+            blocks[(x, y, z)] = ("cyan_stained_glass", None)
 
 
 LANDMARK_FIXES = {"kyoto_tower": kyoto_tower}
