@@ -96,6 +96,20 @@ tasks.register("osmStats", JavaExec) {
     }
 }
 
+// gradlew :core:railModels -Pin=<specs.json> -Pout=<dir>: bridges, viaducts and stations built from specs, as JSON for
+// tools/assets/plateau_bridges.py build (structure templates and previews)
+tasks.register("railModels", JavaExec) {
+    group = "citybuilder"
+    description = "Builds bridges, viaducts and stations from a list of specs"
+    classpath = sourceSets.tools.runtimeClasspath
+    mainClass = "com.mtm.citybuilder.tools.RailModels"
+    def input = providers.gradleProperty("in")
+    def output = providers.gradleProperty("out")
+    if (input.isPresent() && output.isPresent()) {
+        args([file(input.get()).absolutePath, file(output.get()).absolutePath])
+    }
+}
+
 // gradlew :core:templeModels -Pin=<specs.json> -Pout=<dir>: temple halls and pagodas built from specs, as JSON for
 // tools/assets/plateau_voxel.py (structure templates and previews)
 tasks.register("templeModels", JavaExec) {

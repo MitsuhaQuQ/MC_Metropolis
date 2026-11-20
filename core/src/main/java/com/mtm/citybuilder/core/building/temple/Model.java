@@ -42,6 +42,11 @@ public final class Model {
         }
     }
 
+    /** Removes a block (the bounds stay as they were). */
+    public void remove(int x, int y, int z) {
+        blocks.remove(key(x, y, z));
+    }
+
     public boolean has(int x, int y, int z) {
         return blocks.containsKey(key(x, y, z));
     }
