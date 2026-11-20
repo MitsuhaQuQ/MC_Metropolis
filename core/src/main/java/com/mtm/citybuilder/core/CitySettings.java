@@ -434,8 +434,35 @@ public final class CitySettings {
         public double stationAvenueWidth = 24.0;
         /** A station avenue is laid only up to this long. */
         public double stationAvenueMax = 4000.0;
+        /**
+         * Streets between the arterials, the spacing by formation (Kyoto's blocks are about 120 blocks square), from
+         * {@code denseSpacing} of it in the heart of town to {@code thinSpacing} of it at the edge.
+         */
+        public double streetSpacingJori = 120.0;
+        public double streetSpacingCastle = 110.0;
+        public double streetSpacingTown = 80.0;
+        public double streetSpacingResort = 160.0;
+        public double denseSpacing = 0.8;
+        public double thinSpacing = 1.5;
+        public double streetWidth = 6.0;
+        /**
+         * Outside a capital, the share of crossings of two streets where one of them ends instead, by the crossing's
+         * hash: old towns have far more T junctions than crossroads (OpenStreetMap: 54-67% three-way).
+         */
+        public double teeChance = 0.85;
+        /**
+         * Lanes into the old town's blocks (Kyoto's roji and zushi): one every {@code laneSpacing} along its streets at
+         * these chances by formation, as deep as {@code laneDepth} of the street spacing.
+         */
+        public double laneChanceJori = 0.9;
+        public double laneChanceCastle = 0.8;
+        public double laneChanceTown = 0.4;
+        public double laneSpacing = 30.0;
+        public double laneDepth = 0.4;
+        public double laneStep = 4.0;
+        public double laneWidth = 2.5;
         /** Most streamlines traced for one town. */
-        public int maxLines = 3000;
+        public int maxLines = 20000;
     }
 
     /** One tier of settlements. */

@@ -423,6 +423,11 @@ public final class CityLogic {
         return streets.plan(settlement);
     }
 
+    /** L5: a town's built land in km², what its street statistics are measured over. */
+    public double builtArea(Settlement settlement) {
+        return streets.builtArea(settlement);
+    }
+
     /** L5: the skeleton of a settlement's streets as a given formation, whatever it would be formed as. */
     public StreetPlan streetPlan(Settlement settlement, Formation formation) {
         return streets.plan(settlement, formation);

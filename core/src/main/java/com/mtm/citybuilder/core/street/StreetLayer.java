@@ -87,6 +87,20 @@ public final class StreetLayer {
         return plan;
     }
 
+    /** A town's built land in km²: its extent's nodes above the built intensity. */
+    public double builtArea(Settlement settlement) {
+        CityExtent extent = logic.extent(settlement);
+        int built = 0;
+        for (int i = 0; i < extent.size(); i++) {
+            for (int j = 0; j < extent.size(); j++) {
+                if (extent.intensity(extent.originX() + i, extent.originZ() + j) > config.builtIntensity) {
+                    built++;
+                }
+            }
+        }
+        return built * (double) grid * grid / 1e6;
+    }
+
     /** What a settlement was formed as. */
     public Formation formation(Settlement settlement) {
         CityExtent extent = logic.extent(settlement);
@@ -427,6 +441,130 @@ public final class StreetLayer {
         }
     }
 
+    /** Seeds of the arterials: the anchors, round the open grounds, and along the old roads a spacing apart. */
+    private ArrayDeque<double[]> arterialSeeds(List<Anchor> anchors, List<double[]> oldRoad, Window window, double spacing) {
+        ArrayDeque<double[]> seeds = new ArrayDeque<>();
+        for (Anchor anchor : anchors) {
+            seeds.add(new double[]{anchor.x(), anchor.z(), 0});
+            seeds.add(new double[]{anchor.x(), anchor.z(), 1});
+        }
+        for (Ground ground : window.grounds) {
+            for (double[] p : ground.rim(2.0 * config.step, 12)) {
+                for (int family = 0; family < 2; family++) {
+                    seeds.add(new double[]{p[0], p[1], family});
+                }
+            }
+        }
+        double run = 0.0;
+        for (int k = 1; k < oldRoad.size(); k++) {
+            run += Math.hypot(oldRoad.get(k)[0] - oldRoad.get(k - 1)[0], oldRoad.get(k)[1] - oldRoad.get(k - 1)[1]);
+            if (run >= spacing) {
+                run = 0.0;
+                seeds.add(new double[]{oldRoad.get(k)[0], oldRoad.get(k)[1], 0});
+                seeds.add(new double[]{oldRoad.get(k)[0], oldRoad.get(k)[1], 1});
+            }
+        }
+        return seeds;
+    }
+
+    /**
+     * Seeds of the streets: along every line laid so far, a street spacing apart, a street across it starting there
+     * and one along it a spacing to either side, in the family the field gives each direction.
+     */
+    private ArrayDeque<double[]> streetSeeds(List<StreetSegment> laid, Field field, double spacing, boolean oneSided) {
+        ArrayDeque<double[]> seeds = new ArrayDeque<>();
+        double run = 0.0;
+        for (StreetSegment segment : laid) {
+            run += segment.length();
+            if (run < spacing) {
+                continue;
+            }
+            run = 0.0;
+            double angle = Math.atan2(segment.z2() - segment.z1(), segment.x2() - segment.x1());
+            double major = field.angle(segment.x2(), segment.z2());
+            // The segment's own family: the one whose direction it runs closer to
+            int along = Math.abs(Math.cos(angle - major)) >= Math.abs(Math.sin(angle - major)) ? 0 : 1;
+            double sense = oneSided ? (Hash.unit(Hash.of(0x51DEL, Math.round(segment.x2()), Math.round(segment.z2()))) < 0.5 ? 1.0 : -1.0) : 0.0;
+            seeds.add(new double[]{segment.x2(), segment.z2(), 1 - along, sense});
+            for (double side : new double[]{1.0, -1.0}) {
+                seeds.add(new double[]{segment.x2() - side * Math.sin(angle) * spacing,
+                        segment.z2() + side * Math.cos(angle) * spacing, along});
+            }
+        }
+        return seeds;
+    }
+
+    /**
+     * Lanes into the blocks of the old town: from its streets, every {@code laneSpacing} where the town's hash allows
+     * (densest in a capital, as Kyoto's roji and zushi), a dead-end lane square into the block, to {@code laneDepth} of
+     * the street spacing or until it meets another street.
+     */
+    private void lanes(Settlement settlement, Formation formation, Window window, List<StreetSegment> segments) {
+        double chance = switch (formation) {
+            case JORI -> config.laneChanceJori;
+            case CASTLE_TOWN -> config.laneChanceCastle;
+            case TEMPLE_TOWN, PORT_TOWN -> config.laneChanceTown;
+            case RESORT, VILLAGE -> 0.0;
+        };
+        if (chance <= 0) {
+            return;
+        }
+        Walls walls = new Walls(segments);
+        List<StreetSegment> lanes = new ArrayList<>();
+        double run = 0.0;
+        for (StreetSegment segment : List.copyOf(segments)) {
+            if (segment.streetClass() != StreetClass.STREET) {
+                continue;
+            }
+            run += segment.length();
+            if (run < config.laneSpacing) {
+                continue;
+            }
+            run = 0.0;
+            double x = segment.x2();
+            double z = segment.z2();
+            if (window.intensity(x, z) <= config.oldTownIntensity) {
+                continue;
+            }
+            long hash = Hash.of(settlement.id(), Math.round(x), Math.round(z));
+            if (Hash.unit(hash) >= chance) {
+                continue;
+            }
+            double angle = Math.atan2(segment.z2() - segment.z1(), segment.x2() - segment.x1());
+            // Into one side, by the hash; in a capital into both, as Kyoto's roji reach in from every street
+            double[] sides = formation == Formation.JORI ? new double[]{1.0, -1.0}
+                    : new double[]{Hash.unit(Hash.mix(hash)) < 0.5 ? 1.0 : -1.0};
+            double depth = config.laneDepth * streetSpacing(formation);
+            for (double side : sides) {
+                double nx = -Math.sin(angle) * side;
+                double nz = Math.cos(angle) * side;
+                double px = x;
+                double pz = z;
+                for (double t = config.laneStep; t <= depth; t += config.laneStep) {
+                    double qx = x + nx * t;
+                    double qz = z + nz * t;
+                    if (!window.built(qx, qz) || walls.near(qx, qz, 0.6 * config.laneStep) != null) {
+                        break;
+                    }
+                    lanes.add(new StreetSegment(px, pz, qx, qz, StreetClass.LANE, Era.TOWN, config.laneWidth));
+                    px = qx;
+                    pz = qz;
+                }
+            }
+        }
+        segments.addAll(lanes);
+    }
+
+    private double streetSpacing(Formation formation) {
+        return switch (formation) {
+            case JORI -> config.streetSpacingJori;
+            case CASTLE_TOWN -> config.streetSpacingCastle;
+            case TEMPLE_TOWN, PORT_TOWN -> config.streetSpacingTown;
+            case RESORT -> config.streetSpacingResort;
+            case VILLAGE -> 0.0;
+        };
+    }
+
     /** Radius of the grounds kept open round a castle, palace or temple, by tier. */
     private double grounds(SettlementTier tier) {
         return switch (tier) {
@@ -468,7 +606,9 @@ public final class StreetLayer {
                 }
             }
             Field field = new Field(window, formation, settlement, anchors, oldRoad);
-            new Tracer(window, field, spacing(formation)).trace(anchors, oldRoad, segments);
+            double spacing = spacing(formation);
+            new Tracer(window, field, StreetClass.ARTERIAL, config.arterialWidth, spacing, false, null, false)
+                    .run(arterialSeeds(anchors, oldRoad, window, spacing), segments);
             for (Anchor anchor : anchors) {
                 if (anchor.kind() == Anchor.Kind.STATION) {
                     avenue(anchor, extent, window, segments);
@@ -478,6 +618,21 @@ public final class StreetLayer {
                 if (anchor.kind() == Anchor.Kind.CASTLE) {
                     castleGates(settlement, anchor, window, anchors, segments, moats);
                 }
+            }
+            // Streets between the arterials, ending at them (a capital's grid crosses them), then lanes
+            double streetSpacing = streetSpacing(formation);
+            if (streetSpacing > 0) {
+                Walls walls = new Walls(segments);
+                // A capital's grid is even, its blocks one size (Kyoto's 120-block cho); elsewhere streets thin out
+                Tracer streets = new Tracer(window, field, StreetClass.STREET, config.streetWidth, streetSpacing,
+                        formation != Formation.JORI, walls, formation == Formation.JORI);
+                streets.teeChance = formation == Formation.JORI ? 0.0 : config.teeChance;
+                // A grid keeps its lines a full spacing apart: seeds from lines not on its lattice would squeeze in
+                // between and halve blocks
+                streets.clearance = formation == Formation.JORI ? 0.95 : 0.7;
+                streets.teeSeed = Hash.mix(settlement.id() ^ 0x7EEL);
+                streets.run(streetSeeds(segments, field, streetSpacing, formation != Formation.JORI), segments);
+                lanes(settlement, formation, window, segments);
             }
         }
         return new StreetPlan(settlement, formation, anchors, segments, moats);
@@ -910,32 +1065,63 @@ public final class StreetLayer {
     }
 
     /**
-     * Traces streamlines of the field in its two families, along it and across it, from seeds in a fixed order: the
-     * anchors and old roads first, then points along every line traced. A line ends at the edge of the built land, at
-     * water, on a slope steeper than {@code maxGrade}, or near a line of its own family, which it joins.
+     * Traces streamlines of the field in its two families, along it and across it, from seeds in a fixed order, a
+     * spacing apart (which may grow where the town thins out). A line ends at the edge of the built land, at water, on
+     * a slope steeper than {@code maxGrade}, near a line of its own family (which it joins), or coming back round to
+     * itself; streets also end at the lines laid before them, the walls, unless they cross them, as a capital's grid
+     * does.
      */
     private final class Tracer {
         final Window window;
         final Field field;
-        final double spacing;
-        /** Points of traced lines by family, bucketed by the spacing. */
+        final StreetClass streetClass;
+        final double width;
+        final double base;
+        final boolean thinning;
+        final Walls walls;
+        final boolean crossWalls;
+        final double cell;
+        /** A seed is taken only this many spacings from every line of its family. */
+        double clearance = 0.7;
+        /** Share of crossings with a street of the other family where a street ends instead, and their hash's seed. */
+        double teeChance;
+        long teeSeed;
+        /** Points of traced lines by family, bucketed. */
         final List<Map<Long, List<double[]>>> points = List.of(new HashMap<>(), new HashMap<>());
+        /** Pieces of traced lines by family, {x1, z1, x2, z2}, bucketed by their middles. */
+        final List<Pieces> pieces = List.of(new Pieces(), new Pieces());
 
-        Tracer(Window window, Field field, double spacing) {
+        Tracer(Window window, Field field, StreetClass streetClass, double width, double base, boolean thinning,
+               Walls walls, boolean crossWalls) {
             this.window = window;
             this.field = field;
-            this.spacing = spacing;
+            this.streetClass = streetClass;
+            this.width = width;
+            this.base = base;
+            this.thinning = thinning;
+            this.walls = walls;
+            this.crossWalls = crossWalls;
+            this.cell = thinning ? base * config.thinSpacing : base;
+        }
+
+        /** The spacing at a position: the base, or for streets wider where the town is less intense. */
+        double spacing(double x, double z) {
+            if (!thinning) {
+                return base;
+            }
+            double t = Math.max(0.0, Math.min(1.0, window.intensity(x, z)));
+            return base * (config.thinSpacing - (config.thinSpacing - config.denseSpacing) * t);
         }
 
         private long bucket(double x, double z) {
-            return ((long) Math.floor(x / spacing) << 32) ^ ((long) Math.floor(z / spacing) & 0xFFFFFFFFL);
+            return ((long) Math.floor(x / cell) << 32) ^ ((long) Math.floor(z / cell) & 0xFFFFFFFFL);
         }
 
         /** The nearest traced point of a family within a distance, or null. */
         private double[] near(int family, double x, double z, double distance, int ignoreLine) {
             Map<Long, List<double[]>> map = points.get(family);
-            long bx = (long) Math.floor(x / spacing);
-            long bz = (long) Math.floor(z / spacing);
+            long bx = (long) Math.floor(x / cell);
+            long bz = (long) Math.floor(z / cell);
             double[] best = null;
             double bestDistance = distance;
             for (long dx = -1; dx <= 1; dx++) {
@@ -959,39 +1145,24 @@ public final class StreetLayer {
             return best;
         }
 
-        void trace(List<Anchor> anchors, List<double[]> oldRoad, List<StreetSegment> segments) {
-            ArrayDeque<double[]> seeds = new ArrayDeque<>();
-            for (Anchor anchor : anchors) {
-                seeds.add(new double[]{anchor.x(), anchor.z(), 0});
-                seeds.add(new double[]{anchor.x(), anchor.z(), 1});
-            }
-            // Round the open grounds, where streets meet the castle's or temple's edge
-            for (Ground ground : window.grounds) {
-                for (double[] p : ground.rim(2.0 * config.step, 12)) {
-                    for (int family = 0; family < 2; family++) {
-                        seeds.add(new double[]{p[0], p[1], family});
-                    }
-                }
-            }
-            double run = 0.0;
-            for (int k = 1; k < oldRoad.size(); k++) {
-                run += Math.hypot(oldRoad.get(k)[0] - oldRoad.get(k - 1)[0], oldRoad.get(k)[1] - oldRoad.get(k - 1)[1]);
-                if (run >= spacing) {
-                    run = 0.0;
-                    seeds.add(new double[]{oldRoad.get(k)[0], oldRoad.get(k)[1], 0});
-                    seeds.add(new double[]{oldRoad.get(k)[0], oldRoad.get(k)[1], 1});
-                }
-            }
+        /** Traces lines from the seeds, and from points along every line traced, until none is left. */
+        void run(ArrayDeque<double[]> seeds, List<StreetSegment> segments) {
             int lines = 0;
             while (!seeds.isEmpty() && lines < config.maxLines) {
                 double[] seed = seeds.poll();
                 int family = (int) seed[2];
-                if (!window.built(seed[0], seed[1]) || near(family, seed[0], seed[1], 0.7 * spacing, -1) != null) {
+                double spacing = spacing(seed[0], seed[1]);
+                if (!window.built(seed[0], seed[1]) || near(family, seed[0], seed[1], clearance * spacing, -1) != null) {
                     continue;
                 }
                 int line = lines++;
-                List<double[]> forward = follow(seed[0], seed[1], family, 1.0, line);
-                List<double[]> backward = follow(seed[0], seed[1], family, -1.0, line);
+                // A seed may run one way only ({x, z, family, sense}): a street from a wall goes off to one side,
+                // so the streets either side of it meet it at different places, as T junctions
+                double only = seed.length > 3 ? seed[3] : 0.0;
+                List<double[]> forward = only < 0 ? List.of(new double[]{seed[0], seed[1]})
+                        : follow(seed[0], seed[1], family, 1.0, line);
+                List<double[]> backward = only > 0 ? List.of(new double[]{seed[0], seed[1]})
+                        : follow(seed[0], seed[1], family, -1.0, line);
                 List<double[]> polyline = new ArrayList<>();
                 for (int k = backward.size() - 1; k >= 1; k--) {
                     polyline.add(backward.get(k));
@@ -1009,17 +1180,19 @@ public final class StreetLayer {
                     double mx = 0.5 * (a[0] + b[0]);
                     double mz = 0.5 * (a[1] + b[1]);
                     Era era = window.intensity(mx, mz) > config.oldTownIntensity ? Era.TOWN : Era.MODERN;
-                    segments.add(new StreetSegment(a[0], a[1], b[0], b[1], StreetClass.ARTERIAL, era, config.arterialWidth));
+                    segments.add(new StreetSegment(a[0], a[1], b[0], b[1], streetClass, era, width));
                     points.get(family).computeIfAbsent(bucket(b[0], b[1]), key -> new ArrayList<>())
                             .add(new double[]{b[0], b[1], line});
+                    pieces.get(family).add(a[0], a[1], b[0], b[1]);
                     // Seeds for the crossing family along this line, and for this family a spacing to either side
-                    if (length >= spacing) {
+                    double here = spacing(b[0], b[1]);
+                    if (length >= here) {
                         length = 0.0;
                         double angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
                         seeds.add(new double[]{b[0], b[1], 1 - family});
                         for (double side : new double[]{1.0, -1.0}) {
-                            seeds.add(new double[]{b[0] - side * Math.sin(angle) * spacing,
-                                    b[1] + side * Math.cos(angle) * spacing, family});
+                            seeds.add(new double[]{b[0] - side * Math.sin(angle) * here,
+                                    b[1] + side * Math.cos(angle) * here, family});
                         }
                     }
                 }
@@ -1054,10 +1227,28 @@ public final class StreetLayer {
                 if (Math.abs(nh - h) > config.maxGrade * config.step) {
                     break;
                 }
+                double spacing = spacing(nx, nz);
                 double[] joined = near(family, nx, nz, 0.5 * spacing, line);
                 if (joined != null && travelled > 0.5 * spacing) {
                     path.add(new double[]{joined[0], joined[1]});
                     break;
+                }
+                // A wall: a street meets the line laid before it there, and ends on it unless it crosses
+                if (walls != null && !crossWalls && travelled >= config.step) {
+                    double[] wall = walls.pieces.hit(x, z, nx, nz);
+                    if (wall != null) {
+                        path.add(wall);
+                        break;
+                    }
+                }
+                // A street crossing one of the other family ends there at some crossings: T junctions, as old towns
+                // have more than crossroads; whether it does is the crossing's own hash
+                if (teeChance > 0 && travelled >= config.step) {
+                    double[] across = pieces.get(1 - family).hit(x, z, nx, nz);
+                    if (across != null && Hash.unit(Hash.of(teeSeed, Math.round(across[0]), Math.round(across[1]))) < teeChance) {
+                        path.add(across);
+                        break;
+                    }
                 }
                 // Come round to where this line has been, as round a castle: it closes on itself and ends
                 int behind = path.size() - (int) Math.ceil(3.0 * spacing / config.step);
@@ -1079,6 +1270,104 @@ public final class StreetLayer {
                 path.add(new double[]{x, z});
             }
             return path;
+        }
+    }
+
+    /**
+     * Straight pieces of lines, bucketed, for telling exactly where a step crosses one: the step then ends on the
+     * nearer end of the piece it crosses, so the two lines share that point, a junction of the network.
+     */
+    private static final class Pieces {
+        private static final double CELL = 32.0;
+        private final Map<Long, List<double[]>> buckets = new HashMap<>();
+
+        void add(double x1, double z1, double x2, double z2) {
+            long key = key(0.5 * (x1 + x2), 0.5 * (z1 + z2));
+            buckets.computeIfAbsent(key, k -> new ArrayList<>()).add(new double[]{x1, z1, x2, z2});
+        }
+
+        private static long key(double x, double z) {
+            return ((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL);
+        }
+
+        /** The nearer end of the first piece the step from (x, z) to (nx, nz) crosses or touches, or null. */
+        double[] hit(double x, double z, double nx, double nz) {
+            long bx = (long) Math.floor(0.5 * (x + nx) / CELL);
+            long bz = (long) Math.floor(0.5 * (z + nz) / CELL);
+            double[] best = null;
+            double bestT = Double.POSITIVE_INFINITY;
+            for (long dx = -1; dx <= 1; dx++) {
+                for (long dz = -1; dz <= 1; dz++) {
+                    List<double[]> list = buckets.get(((bx + dx) << 32) ^ ((bz + dz) & 0xFFFFFFFFL));
+                    if (list == null) {
+                        continue;
+                    }
+                    for (double[] p : list) {
+                        double ex = p[2] - p[0];
+                        double ez = p[3] - p[1];
+                        double sx = nx - x;
+                        double sz = nz - z;
+                        double denominator = sx * ez - sz * ex;
+                        if (Math.abs(denominator) < 1e-9) {
+                            continue;
+                        }
+                        double t = ((p[0] - x) * ez - (p[1] - z) * ex) / denominator;
+                        double u = ((p[0] - x) * sz - (p[1] - z) * sx) / denominator;
+                        if (t > 1e-6 && t <= 1.0 && u >= 0.0 && u <= 1.0 && t < bestT) {
+                            bestT = t;
+                            best = u < 0.5 ? new double[]{p[0], p[1]} : new double[]{p[2], p[3]};
+                        }
+                    }
+                }
+            }
+            return best;
+        }
+    }
+
+    /** The points of the lines laid so far, which later streets meet: arterials, old roads, the moat-side street. */
+    private static final class Walls {
+        private static final double CELL = 32.0;
+        private final Map<Long, List<double[]>> points = new HashMap<>();
+        final Pieces pieces = new Pieces();
+
+        Walls(List<StreetSegment> segments) {
+            for (StreetSegment segment : segments) {
+                add(segment.x1(), segment.z1());
+                add(segment.x2(), segment.z2());
+                pieces.add(segment.x1(), segment.z1(), segment.x2(), segment.z2());
+            }
+        }
+
+        private void add(double x, double z) {
+            points.computeIfAbsent(key(x, z), k -> new ArrayList<>()).add(new double[]{x, z});
+        }
+
+        private static long key(double x, double z) {
+            return ((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL);
+        }
+
+        /** The nearest wall point within a distance, or null. */
+        double[] near(double x, double z, double distance) {
+            long bx = (long) Math.floor(x / CELL);
+            long bz = (long) Math.floor(z / CELL);
+            double[] best = null;
+            double bestDistance = distance;
+            for (long dx = -1; dx <= 1; dx++) {
+                for (long dz = -1; dz <= 1; dz++) {
+                    List<double[]> list = points.get(((bx + dx) << 32) ^ ((bz + dz) & 0xFFFFFFFFL));
+                    if (list == null) {
+                        continue;
+                    }
+                    for (double[] p : list) {
+                        double d = Math.hypot(p[0] - x, p[1] - z);
+                        if (d < bestDistance) {
+                            bestDistance = d;
+                            best = p;
+                        }
+                    }
+                }
+            }
+            return best;
         }
     }
 }

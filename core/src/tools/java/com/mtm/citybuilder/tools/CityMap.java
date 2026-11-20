@@ -398,6 +398,15 @@ public final class CityMap {
                 System.out.printf("  %-9s %6.1f km%n", streetClass, length / 1000);
             }
         }
+        StreetMetrics.Network network = StreetMetrics.network(plan.segments(), logic.builtArea(nearest));
+        System.out.printf("  built %.1f km2; street density %.1f km/km2 (OSM: Kyoto 16.9, Kanazawa 20.4, Takayama 12.1)%n",
+                logic.builtArea(nearest), network.density());
+        System.out.printf("  junctions: dead ends %.0f%%, three-way %.0f%%, four-way %.0f%% (OSM: 9-26%%, 54-67%%, 12-35%%); %.0f per km2%n",
+                100 * network.deadEnds(), 100 * network.threeWay(), 100 * network.fourWay(), network.junctions());
+        System.out.printf("  mean block %.2f ha (OSM: Kyoto 1.4, Kanazawa 1.0, Takayama 2.6); lanes %.1f km/km2 (Kyoto 22.6, Kanazawa 7.9)%n",
+                network.meanBlockHa(), network.laneDensity());
+        System.out.printf("  street orientation order %.2f%n", StreetMetrics.orientationOrder(plan.segments().stream()
+                .filter(s -> s.streetClass() != StreetClass.LANE).toList()));
         System.out.printf("  arterial orientation order %.2f (OSM: Kyoto 0.81, Kanazawa 0.06, Takayama 0.17)%n",
                 StreetMetrics.orientationOrder(plan.segments().stream()
                         .filter(s -> s.streetClass() == StreetClass.ARTERIAL).toList()));
