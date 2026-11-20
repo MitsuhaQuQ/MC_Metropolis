@@ -41,10 +41,19 @@ public enum SacredBuilding {
     /** 鳥居: the gateway at a shrine's approaches. */
     TORII(Religion.SHRINE, "鳥居"),
     /** 社務所: the shrine office. */
-    SHAMUSHO(Religion.SHRINE, "社務所");
+    SHAMUSHO(Religion.SHRINE, "社務所"),
+    /** 狛犬 (or Inari's foxes, 狐): the pair of guardians at the approach. */
+    KOMAINU(Religion.SHRINE, "狛犬・狐"),
+    // Both
+    /** 回廊: the roofed corridor round the inner precinct. */
+    KAIRO(Religion.BOTH, "回廊"),
+    /** 手水舎: the pavilion over the water basin for purification. */
+    TEMIZUYA(Religion.BOTH, "手水舎"),
+    /** 石灯籠: a stone lantern. */
+    TORO(Religion.BOTH, "石灯籠");
 
-    /** Buddhist temple or Shinto shrine. */
-    public enum Religion { TEMPLE, SHRINE }
+    /** Buddhist temple, Shinto shrine, or found in both. */
+    public enum Religion { TEMPLE, SHRINE, BOTH }
 
     private final Religion religion;
     private final String japanese;

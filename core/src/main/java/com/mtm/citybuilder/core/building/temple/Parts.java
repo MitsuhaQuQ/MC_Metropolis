@@ -159,6 +159,64 @@ final class Parts {
         }
     }
 
+    /**
+     * A lean-to roof (片流れ) over a rectangle, high at its north edge ({@code high}) and falling towards the south
+     * at {@code slope} per block: stairs where steep, slabs and blocks where shallow, the outer edge one piece thick.
+     */
+    static void leanTo(Model m, TemplePalette p, Rect r, double high, double slope) {
+        for (int z = r.z0(); z < r.z1(); z++) {
+            double h = high - slope * (z - r.z0() + 0.5);
+            int y = (int) Math.floor(h - 1e-6);
+            String piece = slope >= 0.7 ? p.roofStairs() + "[facing=north,half=bottom]"
+                    : h - y < 0.5 ? p.roofSlab() + "[type=bottom]" : p.roof();
+            for (int x = r.x0(); x < r.x1(); x++) {
+                m.set(x, y, z, piece);
+                if (z == r.z1() - 1) {
+                    m.setIfEmpty(x, y - 1, z, ((x + z) & 1) == 0 ? p.rafterEnd() : p.wood());
+                }
+            }
+        }
+    }
+
+    /**
+     * Crossed rafters (千木) rising past the ridge at both ends and billets (鰹木) laid across the ridge between them.
+     * The ridge runs along x ({@code alongX}) or z, from {@code a0} to {@code a1}, across at {@code c}; {@code top} is
+     * the ridge's highest block.
+     */
+    static void chigi(Model m, TemplePalette p, boolean alongX, int a0, int a1, int c, int top) {
+        for (int a : new int[]{a0, a1}) {
+            put(m, alongX, a, top + 1, c, p.wood());
+            put(m, alongX, a, top + 2, c - 1, p.wood());
+            put(m, alongX, a, top + 2, c + 1, p.wood());
+            put(m, alongX, a, top + 3, c - 1, p.woodStairs() + "[facing=" + (alongX ? "south" : "east") + ",half=bottom]");
+            put(m, alongX, a, top + 3, c + 1, p.woodStairs() + "[facing=" + (alongX ? "north" : "west") + ",half=bottom]");
+            put(m, alongX, a, top + 4, c - 1, p.fitting());
+            put(m, alongX, a, top + 4, c + 1, p.fitting());
+        }
+        String log = p.column().endsWith("_log") ? p.column() + "[axis=" + (alongX ? "z" : "x") + "]" : p.wood();
+        for (int a = a0 + 2; a <= a1 - 2; a += 2) {
+            put(m, alongX, a, top + 1, c, log);
+        }
+    }
+
+    private static void put(Model m, boolean alongX, int a, int y, int c, String s) {
+        if (alongX) {
+            m.set(a, y, c, s);
+        } else {
+            m.set(c, y, a, s);
+        }
+    }
+
+    /** The highest block at a column, or -1. */
+    static int topAt(Model m, int x, int z) {
+        for (int y = m.maxY(); y >= m.minY(); y--) {
+            if (m.has(x, y, z)) {
+                return y;
+            }
+        }
+        return -1;
+    }
+
     /** Columns only, about {@code bay} apart round a rectangle, with a head beam round the top: an open pavilion. */
     static void columns(Model m, TemplePalette p, Rect r, int bottom, int top, double bay) {
         for (int x = r.x0(); x < r.x1(); x++) {

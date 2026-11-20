@@ -282,4 +282,60 @@ class TempleTest {
         });
         assertEquals(20 * 2, feet[0], "twenty torii, two black feet each");
     }
+
+    private static int count(Model m, String prefix) {
+        int[] n = {0};
+        m.forEach((x, y, z, s) -> {
+            if (s.startsWith(prefix)) {
+                n[0]++;
+            }
+        });
+        return n[0];
+    }
+
+    @Test
+    void sanctuaryStylesHaveTheirRoofs() {
+        // Kasuga: entered at the gable end, the ridge running front to back; crossed rafters with gilded tips.
+        Model kasuga = new Sanctuary(Sanctuary.Style.KASUGA, 5, 5, 2, 5.0, 8.0, 2, TemplePalette.VERMILION).build();
+        assertTrue(kasuga.maxZ() - kasuga.minZ() > kasuga.maxX() - kasuga.minX(), "deeper than wide, with its porch");
+        assertTrue(count(kasuga, TemplePalette.VERMILION.fitting()) >= 4, "chigi");
+        // Hachiman: two ridges, front and rear, at the same height.
+        Model hachiman = new Sanctuary(Sanctuary.Style.HACHIMAN, 15, 11, 2, 6.0, 10.0, 2, TemplePalette.HIWADA).build();
+        int x = (hachiman.minX() + hachiman.maxX()) / 2;
+        List<Integer> peaks = new ArrayList<>();
+        for (int z = hachiman.minZ() + 1; z < hachiman.maxZ(); z++) {
+            int t = Parts.topAt(hachiman, x, z);
+            if (t > Parts.topAt(hachiman, x, z - 1) && t >= Parts.topAt(hachiman, x, z + 1)) {
+                peaks.add(z);
+            }
+        }
+        assertEquals(2, peaks.size(), "two ridges: " + peaks);
+        // Shinmei: free posts holding the ridge at both gable ends, from the ground.
+        Model shinmei = new Sanctuary(Sanctuary.Style.SHINMEI, 9, 5, 2, 5.0, 10.0, 3, TemplePalette.SHINMEI).build();
+        int cz = (0 + 9 - 1) / 2;
+        for (int px : new int[]{0, 12}) {
+            assertTrue(shinmei.get(px, 0, cz) != null && shinmei.get(px, 0, cz).contains("stripped_oak_log"),
+                    "ridge post at " + px + ": " + shinmei.get(px, 0, cz));
+        }
+    }
+
+    @Test
+    void corridorTurnsItsCorner() {
+        Model m = new Corridor(25, 17, 5, 5.5, 8.0, TemplePalette.INARI).build();
+        assertEquals(25 + 2, m.maxX() - m.minX() + 1, "the run along x, its eaves one out each side");
+        assertTrue(m.maxZ() - m.minZ() + 1 >= 17, "the run along z");
+        assertTrue(count(m, TemplePalette.INARI.rail()) > 10, "lattice windows on the outer side");
+        // The inner side is open between its columns: on run A's inner row, wall height, a gap.
+        assertTrue(!m.has(1, 2, 4), "open on the inner side");
+    }
+
+    @Test
+    void precinctFurnishings() {
+        assertEquals(1, count(Furnishing.lantern(7), "minecraft:lantern"));
+        assertEquals(1, count(Furnishing.lantern(4), "minecraft:lantern"));
+        Model pair = Furnishing.guardians(6, false);
+        assertEquals(pair.get(0, 2, 0), pair.get(6, 2, 0));
+        Model temizuya = Furnishing.temizuya(9, 7, 4.5, 7.5, RoofType.IRIMOYA, TemplePalette.COPPER);
+        assertTrue(count(temizuya, "minecraft:water_cauldron") >= 3, "a basin of water");
+    }
 }

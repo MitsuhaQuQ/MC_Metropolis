@@ -164,6 +164,20 @@ TEMPLES = {
                               eave=5.0, ridge=9.0, floor=2, chigi=True, palette="WEATHERED"),
     "demo_torii": dict(kind="torii", role="TORII", span=6, height=8, palette="VERMILION"),
     "demo_otorii": dict(kind="torii", role="TORII", span=12, height=15, palette="VERMILION"),
+    "demo_kasuga": dict(kind="sanctuary", role="HONDEN", style="KASUGA", bodyWidth=5, bodyDepth=5, overhang=2,
+                        eave=5.0, ridge=8.0, floor=2, palette="VERMILION"),
+    "demo_hachiman": dict(kind="sanctuary", role="HONDEN", style="HACHIMAN", bodyWidth=15, bodyDepth=11, overhang=2,
+                          eave=6.0, ridge=10.0, floor=2, palette="HIWADA"),
+    "demo_shinmei": dict(kind="sanctuary", role="HONDEN", style="SHINMEI", bodyWidth=9, bodyDepth=5, overhang=2,
+                         eave=5.0, ridge=10.0, floor=3, palette="SHINMEI"),
+    "demo_kairo": dict(kind="corridor", role="KAIRO", lengthA=25, lengthB=17, depth=5, eave=5.5, ridge=8.0,
+                       palette="INARI"),
+    "demo_toro_kasuga": dict(kind="lantern", role="TORO", height=7, palette="NATURAL"),
+    "demo_toro_small": dict(kind="lantern", role="TORO", height=4, palette="NATURAL"),
+    "demo_komainu": dict(kind="guardians", role="KOMAINU", spacing=6, palette="NATURAL"),
+    "demo_kitsune": dict(kind="guardians", role="KOMAINU", spacing=6, fox=True, palette="INARI"),
+    "demo_temizuya": dict(kind="temizuya", role="TEMIZUYA", width=9, depth=7, eave=4.5, ridge=7.5, roof="IRIMOYA",
+                          palette="COPPER"),
     "demo_hall_copper": dict(kind="hall", role="HAIDEN", width=29, depth=21, eave=8.0, ridge=17.0, roof="IRIMOYA", gableInset=4,
                              overhang=4, platform=2, bay=4.0, palette="COPPER"),
 }
@@ -171,7 +185,7 @@ TEMPLES = {
 # What each library entry is, for reuse: a category for every building; for sacred buildings also temple (寺院) or
 # shrine (神社) and the role (core.building.temple.SacredBuilding; None where the entry is several buildings or the
 # role is not known).
-TEMPLE, SHRINE = "TEMPLE", "SHRINE"
+TEMPLE, SHRINE, BOTH = "TEMPLE", "SHRINE", "BOTH"
 LABELS = {
     "kyoto_station": ("station",), "kyoto_tower": ("tower",),
     "toji_pagoda": ("sacred", TEMPLE, "PAGODA"), "toji_kondo": ("sacred", TEMPLE, "KONDO"),
@@ -195,9 +209,16 @@ LABELS = {
     "demo_torii": ("sacred", SHRINE, "TORII"), "demo_otorii": ("sacred", SHRINE, "TORII"),
     "demo_gate_vermilion": ("sacred", TEMPLE, "TEMPLE_GATE"), "demo_belfry_open": ("sacred", TEMPLE, "BELFRY"),
     "demo_belfry_hakamagoshi": ("sacred", TEMPLE, "BELFRY"),
-    "demo_pagoda_vermilion": ("sacred", TEMPLE, "PAGODA"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
+    "demo_pagoda_vermilion": ("sacred", TEMPLE, "PAGODA"),
+    "demo_kasuga": ("sacred", SHRINE, "HONDEN"), "demo_hachiman": ("sacred", SHRINE, "HONDEN"),
+    "demo_shinmei": ("sacred", SHRINE, "HONDEN"), "demo_kairo": ("sacred", BOTH, "KAIRO"),
+    "demo_toro_kasuga": ("sacred", BOTH, "TORO"), "demo_toro_small": ("sacred", BOTH, "TORO"),
+    "demo_komainu": ("sacred", SHRINE, "KOMAINU"), "demo_kitsune": ("sacred", SHRINE, "KOMAINU"),
+    "demo_temizuya": ("sacred", BOTH, "TEMIZUYA"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
 }
-DEMO_NAMES = {"inari_otorii": "伏見稲荷大社 大鳥居", "inari_senbon_torii": "伏見稲荷大社 千本鳥居", "demo_honden_nagare": "本殿（流造、檜皮葺）", "demo_honden_chigi": "本殿（千木・鰹木）",
+DEMO_NAMES = {"demo_kasuga": "本殿（春日造）", "demo_hachiman": "本殿（八幡造）", "demo_shinmei": "本殿（神明造）",
+              "demo_kairo": "回廊（L 字、角）", "demo_toro_kasuga": "石灯籠（春日灯籠）", "demo_toro_small": "石灯籠（小）",
+              "demo_komainu": "狛犬", "demo_kitsune": "狐（稲荷）", "demo_temizuya": "手水舎", "inari_otorii": "伏見稲荷大社 大鳥居", "inari_senbon_torii": "伏見稲荷大社 千本鳥居", "demo_honden_nagare": "本殿（流造、檜皮葺）", "demo_honden_chigi": "本殿（千木・鰹木）",
               "demo_torii": "鳥居（明神鳥居）", "demo_otorii": "大鳥居", "demo_gate_vermilion": "二重門（朱塗り、宝蔵門風）", "demo_belfry_open": "鐘楼（吹放し）",
               "demo_belfry_hakamagoshi": "鐘楼（袴腰）","demo_pagoda_vermilion": "五重塔（朱塗り、浅草寺風）", "demo_hall_copper": "拝殿（銅板葺、神社）"}
 
@@ -963,7 +984,10 @@ COLOURS = {
 }
 
 
-PREVIEW_ALIAS = {"acacia_stairs": "acacia_planks", "green_terracotta": "green_terracotta", "lantern": "gold_block", "spruce_slab": "spruce_planks", "dark_oak_slab": "dark_oak_planks",
+PREVIEW_ALIAS = {"andesite_wall": "andesite", "andesite_stairs": "andesite", "andesite_slab": "andesite",
+                 "water_cauldron": "light_blue_concrete", "mud_brick_stairs": "mud_bricks", "mud_brick_slab": "mud_bricks",
+                 "oak_fence": "oak_planks", "oak_stairs": "oak_planks", "spruce_stairs": "spruce_planks",
+                 "chiseled_stone_bricks": "stone_bricks", "acacia_stairs": "acacia_planks", "green_terracotta": "green_terracotta", "lantern": "gold_block", "spruce_slab": "spruce_planks", "dark_oak_slab": "dark_oak_planks",
                  "yellow_terracotta": "yellow_terracotta", "waxed_weathered_copper": "weathered_cut_copper", "chain": "polished_blackstone",
                  "stripped_spruce_log": "spruce_planks", "dark_oak_fence": "dark_oak_planks", "mangrove_fence": "mangrove_planks",
                  "polished_blackstone_wall": "polished_blackstone", "iron_trapdoor": "iron_block",

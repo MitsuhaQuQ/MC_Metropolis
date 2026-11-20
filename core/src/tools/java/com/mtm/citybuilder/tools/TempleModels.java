@@ -6,6 +6,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mtm.citybuilder.core.building.temple.Belfry;
+import com.mtm.citybuilder.core.building.temple.Corridor;
+import com.mtm.citybuilder.core.building.temple.Furnishing;
 import com.mtm.citybuilder.core.building.temple.Gate;
 import com.mtm.citybuilder.core.building.temple.GateStyle;
 import com.mtm.citybuilder.core.building.temple.Hall;
@@ -17,6 +19,7 @@ import com.mtm.citybuilder.core.building.temple.Model;
 import com.mtm.citybuilder.core.building.temple.Pagoda;
 import com.mtm.citybuilder.core.building.temple.RoofType;
 import com.mtm.citybuilder.core.building.temple.SacredBuilding;
+import com.mtm.citybuilder.core.building.temple.Sanctuary;
 import com.mtm.citybuilder.core.building.temple.TemplePalette;
 
 import java.io.IOException;
@@ -31,7 +34,8 @@ import java.util.List;
  * Builds temple models (halls, pagodas) from a list of specs and writes each as JSON for
  * {@code tools/assets/plateau_voxel.py}, which turns them into structure templates and previews.
  *
- * <p>Input: a JSON array of objects with {@code slug}, {@code kind} ({@code hall}, {@code pagoda}, {@code gate}, {@code belfry}, {@code honden}, {@code pavilion}, {@code torii} or {@code torii_tunnel}), {@code role} (a
+ * <p>Input: a JSON array of objects with {@code slug}, {@code kind} ({@code hall}, {@code pagoda}, {@code gate}, {@code belfry}, {@code honden}, {@code pavilion}, {@code torii}, {@code torii_tunnel}, {@code sanctuary}, {@code corridor},
+ * {@code lantern}, {@code guardians} or {@code temizuya}), {@code role} (a
  * {@link SacredBuilding}: temple or shrine and the building's role, written into the output), {@code palette}
  * ({@code NATURAL}, {@code VERMILION}, {@code COPPER}, {@code WEATHERED}, {@code HIWADA}, {@code DARK} or {@code INARI}) and the fields of {@link Hall}, {@link Pagoda}, {@link Gate}, {@link Belfry}, {@link Honden}, {@link Pavilion} or {@link Torii}. Output:
  * {@code <out>/<slug>.json} with {@code role}, {@code religion}, {@code size} and {@code blocks} ([x, y, z, state], from 0).
@@ -88,6 +92,15 @@ public final class TempleModels {
             case "torii" -> new Torii(i(o, "span"), i(o, "height"), palette).build();
             case "torii_tunnel" -> new ToriiTunnel(i(o, "length"), i(o, "span"), i(o, "height"), i(o, "spacing", 2),
                     palette).build();
+            case "sanctuary" -> new Sanctuary(Sanctuary.Style.valueOf(str(o, "style", "KASUGA")), i(o, "bodyWidth"),
+                    i(o, "bodyDepth"), i(o, "overhang", 2), d(o, "eave"), d(o, "ridge"), i(o, "floor", 2), palette)
+                    .build();
+            case "corridor" -> new Corridor(i(o, "lengthA"), i(o, "lengthB", 0), i(o, "depth", 4), d(o, "eave"),
+                    d(o, "ridge"), palette).build();
+            case "lantern" -> Furnishing.lantern(i(o, "height"));
+            case "guardians" -> Furnishing.guardians(i(o, "spacing"), bool(o, "fox"));
+            case "temizuya" -> Furnishing.temizuya(i(o, "width"), i(o, "depth"), d(o, "eave"), d(o, "ridge"),
+                    RoofType.valueOf(str(o, "roof", "IRIMOYA")), palette);
             default -> throw new IllegalArgumentException("unknown kind: " + o.get("kind"));
         };
     }

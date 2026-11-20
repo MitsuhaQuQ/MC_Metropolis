@@ -101,15 +101,26 @@ public record TemplePalette(String roof, String roofStairs, String roofSlab, Str
             m("dark_oak_trapdoor"), m("polished_blackstone_wall"), m("yellow_terracotta"), m("gold_block"),
             null, m("gold_block"));
 
+    /**
+     * Plain unpainted cypress, thatch (萱葺) and gilded fittings on the ridge ornaments: Shinmei-zukuri (Ise's style
+     * and its kin).
+     */
+    public static final TemplePalette SHINMEI = new TemplePalette(m("mud_bricks"), m("mud_brick_stairs"),
+            m("mud_brick_slab"), m("spruce_planks"), m("spruce_stairs"), m("stripped_oak_log"), m("oak_planks"),
+            m("oak_stairs"), m("oak_planks"), m("spruce_planks"), m("stone_bricks"), m("stone_brick_stairs"),
+            m("oak_fence"), m("dark_oak_trapdoor"), m("polished_blackstone_wall"), m("oak_planks"), m("gold_block"),
+            null, m("gold_block"));
+
     /** How concave the roof is: bark and copper roofs sweep up steeply to the ridge, tiled ones less. */
     public double roofCurve() {
-        return roof.contains("planks") || roof.contains("copper") ? 0.5 : 0.35;
+        return roof.contains("mud_bricks") ? 0 : roof.contains("planks") || roof.contains("copper") ? 0.5 : 0.35;
     }
 
-    /** By name: NATURAL, VERMILION, COPPER, WEATHERED, HIWADA, DARK or INARI. */
+    /** By name: NATURAL, VERMILION, COPPER, WEATHERED, HIWADA, DARK, INARI or SHINMEI. */
     public static TemplePalette named(String name) {
         return switch (name) {
             case "INARI" -> INARI;
+            case "SHINMEI" -> SHINMEI;
             case "HIWADA" -> HIWADA;
             case "DARK" -> DARK;
             case "WEATHERED" -> WEATHERED;
