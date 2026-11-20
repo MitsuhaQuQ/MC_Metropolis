@@ -385,6 +385,7 @@ public final class CitySettings {
         public double areaPerLine = 12.0;
         public double minArea = 6.0;
         public int maxLines = 4;
+        public int maxLinesMetropolis = 8;
         /** Least curve radius of a town's lines, the search's turn cost, the widest curve fitted. */
         public double minRadius = 160.0;
         public double turnCost = 800.0;
@@ -422,13 +423,18 @@ public final class CitySettings {
         /** Cost per block of running a town's line over water: lines go round a lake or along a shore, bridging only short gaps. */
         public double waterCost = 25.0;
         /**
-         * Which way a stretch is built: a town's own lines run underground through downtown, the old town and the
-         * station front, elevated through the rest of the built land, at grade where its intensity is below
+         * Which way a stretch is built: a town's own lines run underground through downtown, the station front and the
+         * heart of the old town ({@code undergroundIntensity}), elevated through the rest of the built land, at grade where its intensity is below
          * {@code groundIntensity}; an intercity line elevated where the intensity is at least {@code elevatedIntensity}
          * or the district is downtown, old town or station front, at grade elsewhere. A run of one way shorter than
          * {@code minModeRun} takes the way of the run before it.
          */
         public double groundIntensity = 0.3;
+        /**
+         * Tunnelling is dear: a town's own line runs underground only through downtown, the station front and the old
+         * town where its intensity is at least this; through the rest of the old town and the suburbs it is elevated.
+         */
+        public double undergroundIntensity = 0.75;
         public double elevatedIntensity = 0.45;
         public double minModeRun = 400.0;
         /** Roads along a line at grade run this far from its centre; a street crosses it only this far from any other crossing. */
@@ -529,10 +535,15 @@ public final class CitySettings {
          */
         public double teeChance = 0.85;
         /**
+         * In a capital's grid, the share of crossings of two streets where one ends: Kyoto's minor streets are often
+         * offset or broken at a crossing (OpenStreetMap: about 35% crossroads, not every crossing).
+         */
+        public double teeChanceJori = 0.3;
+        /**
          * Lanes into the old town's blocks (Kyoto's roji and zushi): one every {@code laneSpacing} along its streets at
          * these chances by formation, as deep as {@code laneDepth} of the street spacing.
          */
-        public double laneChanceJori = 0.9;
+        public double laneChanceJori = 0.45;
         public double laneChanceCastle = 0.8;
         public double laneChanceTown = 0.4;
         public double laneSpacing = 30.0;

@@ -750,7 +750,7 @@ public final class StreetLayer {
                 // A capital's grid is even, its blocks one size (Kyoto's 120-block cho); elsewhere streets thin out
                 Tracer streets = new Tracer(window, field, StreetClass.STREET, config.streetWidth, streetSpacing,
                         formation != Formation.JORI, walls, formation == Formation.JORI);
-                streets.teeChance = formation == Formation.JORI ? 0.0 : config.teeChance;
+                streets.teeChance = formation == Formation.JORI ? config.teeChanceJori : config.teeChance;
                 // A grid keeps its lines a full spacing apart: seeds from lines not on its lattice would squeeze in
                 // between and halve blocks
                 streets.clearance = formation == Formation.JORI ? 0.95 : 0.7;
@@ -836,7 +836,10 @@ public final class StreetLayer {
             double intensity = window.intensity(x, z);
             TransitMode mode;
             if (urban) {
-                mode = dense ? TransitMode.UNDERGROUND
+                boolean core = district == District.CENTRAL || district == District.STATION_FRONT
+                        || district == District.GROUNDS
+                        || district == District.OLD_TOWN && intensity >= transit.undergroundIntensity;
+                mode = core ? TransitMode.UNDERGROUND
                         : intensity >= transit.groundIntensity ? TransitMode.ELEVATED : TransitMode.GROUND;
             } else {
                 mode = dense || intensity >= transit.elevatedIntensity ? TransitMode.ELEVATED : TransitMode.GROUND;
@@ -908,7 +911,8 @@ public final class StreetLayer {
         if (area < transit.minArea) {
             return lines;
         }
-        int count = Math.max(1, Math.min(transit.maxLines, (int) Math.round(area / transit.areaPerLine)));
+        int most = settlement.tier() == SettlementTier.METROPOLIS ? transit.maxLinesMetropolis : transit.maxLines;
+        int count = Math.max(1, Math.min(most, (int) Math.round(area / transit.areaPerLine)));
         // Zones: each a square's total demand, placed at its heaviest node
         int perZone = Math.max(1, (int) Math.round(transit.zoneSize / grid));
         Map<Long, double[]> zones = new LinkedHashMap<>();
@@ -2849,7 +2853,8 @@ public final class StreetLayer {
                     double z = (double) (originZ + j) * grid;
                     height[k] = (float) terrain.smoothHeight(x, z);
                     intensity[k] = (float) extent.intensity(originX + i, originZ + j);
-                    if (intensity[k] > 0.0 || !Double.isNaN(logic.suitabilityNode(originX + i, originZ + j))) {
+                    // Water whatever the town's intensity there: L3 floods across small lakes and gives them intensity
+                    if (!Double.isNaN(logic.suitabilityNode(originX + i, originZ + j))) {
                         continue;
                     }
                     // Water: a stream narrow enough is culverted, what is wider stops streets
@@ -3677,8 +3682,14 @@ public final class StreetLayer {
          */
         private double[] stop(double x, double z, double tx, double tz, int family, boolean join) {
             double[] best = null;
-            if (walls != null && !crossWalls && grace == 0) {
-                best = earlier(best, walls.pieces.hit(x, z, tx, tz));
+            if (walls != null && grace == 0) {
+                double[] wall = walls.pieces.hit(x, z, tx, tz);
+                // A capital's grid crosses the lines before it, but at some crossings a street ends, as Kyoto's minor
+                // streets do at the avenues
+                if (wall != null && (!crossWalls || join
+                        || Hash.unit(Hash.of(teeSeed ^ 0x3A11L, Math.round(wall[0]), Math.round(wall[1]))) < teeChance)) {
+                    best = earlier(best, wall);
+                }
             }
             best = earlier(best, pieces.get(family).hit(x, z, tx, tz));
             if (teeChance > 0) {
