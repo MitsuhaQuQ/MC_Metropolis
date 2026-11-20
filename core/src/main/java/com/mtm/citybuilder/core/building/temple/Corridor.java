@@ -51,6 +51,62 @@ public record Corridor(int lengthA, int lengthB, int depth, double eave, double 
     }
 
     /**
+     * A corridor all round a court {@code width} by {@code depth} (outer size), closed on its outer sides: straight
+     * runs between pavilions with pyramid roofs at the corners, and a gap {@code gate} wide in the middle of the south
+     * side where the gate stands. Lowest corner at (0, 0, 0).
+     */
+    public static Model ring(int width, int depth, int corridor, double eave, double ridge, int gate, TemplePalette p) {
+        Model m = new Model();
+        int d = corridor;
+        int runX = width - 2 * d, runZ = depth - 2 * d;
+        // A straight run is built along x with its outer side to the north; turned for the other sides.
+        Model back = new Corridor(runX, 0, d, eave, ridge, p).build();
+        m.place(back, d - 1, 0, -1, true);
+        Model east = new Corridor(runZ, 0, d, eave, ridge, p).build().rotated(1);
+        m.place(east, width - d - 1, 0, d - 1, true);
+        Model west = new Corridor(runZ, 0, d, eave, ridge, p).build().rotated(3);
+        m.place(west, -1, 0, d - 1, true);
+        int half = (runX - gate) / 2;
+        if (half > 2) { // the south side, either side of the gate
+            Model south = new Corridor(half, 0, d, eave, ridge, p).build().rotated(2);
+            m.place(south, d - 1, 0, depth - d - 1, true);
+            m.place(south, width - d - half - 1, 0, depth - d - 1, true);
+        }
+        for (int cx : new int[]{0, width - d}) {
+            for (int cz : new int[]{0, depth - d}) {
+                Model c = corner(d, eave, ridge, p, cx == 0, cz == 0);
+                m.place(c, cx - 1, 0, cz - 1, true);
+            }
+        }
+        return m;
+    }
+
+    /** A corner pavilion: columns at its corners, its two outer sides closed, under a pyramid roof. */
+    private static Model corner(int d, double eave, double ridge, TemplePalette p, boolean west, boolean north) {
+        Model m = new Model();
+        int top = (int) Math.floor(eave - 1e-6) - 1;
+        for (int x = 0; x < d; x++) {
+            for (int z = 0; z < d; z++) {
+                m.set(x, 0, z, p.stone());
+                boolean outerX = west ? x == 0 : x == d - 1, outerZ = north ? z == 0 : z == d - 1;
+                boolean edge = x == 0 || x == d - 1 || z == 0 || z == d - 1;
+                boolean col = (x == 0 || x == d - 1) && (z == 0 || z == d - 1);
+                for (int y = 1; y <= top && edge; y++) {
+                    if (col) {
+                        m.set(x, y, z, Parts.upright(p.column()));
+                    } else if (y == top) {
+                        m.set(x, y, z, p.wood());
+                    } else if (outerX || outerZ) {
+                        m.set(x, y, z, y == top - 2 ? p.rail() : y == 1 ? p.wood() : p.plaster());
+                    }
+                }
+            }
+        }
+        new Roof(p, -1, -1, d + 2, d + 2, eave, ridge, RoofType.HIP, p.roofCurve(), 0.6, 0).walls(0, 0, d, d).build(m);
+        return m;
+    }
+
+    /**
      * One run: columns along both sides about 2.5 apart; the outer side closed (a sill, plaster, lattice windows,
      * plaster), the inner side open; head beams along both sides at the top.
      */

@@ -13,6 +13,7 @@ import com.mtm.citybuilder.core.building.temple.GateStyle;
 import com.mtm.citybuilder.core.building.temple.Hall;
 import com.mtm.citybuilder.core.building.temple.Honden;
 import com.mtm.citybuilder.core.building.temple.Pavilion;
+import com.mtm.citybuilder.core.building.temple.Precinct;
 import com.mtm.citybuilder.core.building.temple.Torii;
 import com.mtm.citybuilder.core.building.temple.ToriiTunnel;
 import com.mtm.citybuilder.core.building.temple.Model;
@@ -35,7 +36,7 @@ import java.util.List;
  * {@code tools/assets/plateau_voxel.py}, which turns them into structure templates and previews.
  *
  * <p>Input: a JSON array of objects with {@code slug}, {@code kind} ({@code hall}, {@code pagoda}, {@code gate}, {@code belfry}, {@code honden}, {@code pavilion}, {@code torii}, {@code torii_tunnel}, {@code sanctuary}, {@code corridor},
- * {@code lantern}, {@code guardians} or {@code temizuya}), {@code role} (a
+ * {@code lantern}, {@code guardians}, {@code temizuya} or {@code precinct}), {@code role} (a
  * {@link SacredBuilding}: temple or shrine and the building's role, written into the output), {@code palette}
  * ({@code NATURAL}, {@code VERMILION}, {@code COPPER}, {@code WEATHERED}, {@code HIWADA}, {@code DARK} or {@code INARI}) and the fields of {@link Hall}, {@link Pagoda}, {@link Gate}, {@link Belfry}, {@link Honden}, {@link Pavilion} or {@link Torii}. Output:
  * {@code <out>/<slug>.json} with {@code role}, {@code religion}, {@code size} and {@code blocks} ([x, y, z, state], from 0).
@@ -98,6 +99,8 @@ public final class TempleModels {
             case "corridor" -> new Corridor(i(o, "lengthA"), i(o, "lengthB", 0), i(o, "depth", 4), d(o, "eave"),
                     d(o, "ridge"), palette).build();
             case "lantern" -> Furnishing.lantern(i(o, "height"));
+            case "precinct" -> new Precinct(Precinct.Kind.valueOf(str(o, "precinct", "SHRINE")), i(o, "approach", 36),
+                    palette).build();
             case "guardians" -> Furnishing.guardians(i(o, "spacing"), bool(o, "fox"));
             case "temizuya" -> Furnishing.temizuya(i(o, "width"), i(o, "depth"), d(o, "eave"), d(o, "ridge"),
                     RoofType.valueOf(str(o, "roof", "IRIMOYA")), palette);

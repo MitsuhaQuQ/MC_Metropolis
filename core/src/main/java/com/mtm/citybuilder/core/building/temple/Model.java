@@ -79,6 +79,75 @@ public final class Model {
         return maxZ;
     }
 
+    /**
+     * Copies another model in, its lowest corner (min x, y, z) at (x, y, z), over what is here. {@code fill}
+     * false keeps what is here where both have a block.
+     */
+    public void place(Model other, int x, int y, int z, boolean fill) {
+        int dx = x - other.minX, dy = y - other.minY, dz = z - other.minZ;
+        other.forEach((ox, oy, oz, s) -> {
+            if (fill) {
+                set(ox + dx, oy + dy, oz + dz, s);
+            } else {
+                setIfEmpty(ox + dx, oy + dy, oz + dz, s);
+            }
+        });
+    }
+
+    public int width() {
+        return maxX - minX + 1;
+    }
+
+    public int depth() {
+        return maxZ - minZ + 1;
+    }
+
+    /**
+     * This model turned clockwise (seen from above) by quarter turns: what faced north faces east after one. Facings
+     * and axes in the block states turn with it.
+     */
+    public Model rotated(int quarterTurns) {
+        int q = Math.floorMod(quarterTurns, 4);
+        Model out = new Model();
+        forEach((x, y, z, s) -> {
+            int nx = x, nz = z;
+            for (int i = 0; i < q; i++) { // (x, z) -> (-z, x): north (0, -1) to east (1, 0)
+                int t = nx;
+                nx = -nz;
+                nz = t;
+            }
+            out.set(nx, y, nz, turnState(s, q));
+        });
+        return out;
+    }
+
+    private static final String[] FACINGS = {"north", "east", "south", "west"};
+
+    static String turnState(String s, int q) {
+        if (q == 0 || s.indexOf('[') < 0) {
+            return s;
+        }
+        int i = s.indexOf('[');
+        String[] props = s.substring(i + 1, s.length() - 1).split(",");
+        StringBuilder b = new StringBuilder(s.substring(0, i + 1));
+        for (int k = 0; k < props.length; k++) {
+            String[] kv = props[k].split("=", 2);
+            String v = kv[1];
+            if (kv[0].equals("facing")) {
+                for (int f = 0; f < 4; f++) {
+                    if (FACINGS[f].equals(v)) {
+                        v = FACINGS[(f + q) % 4];
+                        break;
+                    }
+                }
+            } else if (kv[0].equals("axis") && q % 2 == 1 && !v.equals("y")) {
+                v = v.equals("x") ? "z" : "x";
+            }
+            b.append(k > 0 ? "," : "").append(kv[0]).append('=').append(v);
+        }
+        return b.append(']').toString();
+    }
+
     public void forEach(Visitor visitor) {
         for (Map.Entry<Long, String> e : blocks.entrySet()) {
             long k = e.getKey();

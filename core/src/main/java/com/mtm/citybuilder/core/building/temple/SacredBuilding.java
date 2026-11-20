@@ -50,7 +50,12 @@ public enum SacredBuilding {
     /** 手水舎: the pavilion over the water basin for purification. */
     TEMIZUYA(Religion.BOTH, "手水舎"),
     /** 石灯籠: a stone lantern. */
-    TORO(Religion.BOTH, "石灯籠");
+    TORO(Religion.BOTH, "石灯籠"),
+    // Whole precincts
+    /** 伽藍: a temple's buildings together, gate, halls, pagoda and corridor. */
+    GARAN(Religion.TEMPLE, "伽藍"),
+    /** 境内: a shrine's precinct, torii, approach, gate, halls and corridor. */
+    KEIDAI(Religion.SHRINE, "境内");
 
     /** Buddhist temple, Shinto shrine, or found in both. */
     public enum Religion { TEMPLE, SHRINE, BOTH }

@@ -178,6 +178,8 @@ TEMPLES = {
     "demo_kitsune": dict(kind="guardians", role="KOMAINU", spacing=6, fox=True, palette="INARI"),
     "demo_temizuya": dict(kind="temizuya", role="TEMIZUYA", width=9, depth=7, eave=6.0, ridge=9.0, roof="IRIMOYA",
                           palette="COPPER"),
+    "demo_precinct_shrine": dict(kind="precinct", role="KEIDAI", precinct="SHRINE", approach=40, palette="INARI"),
+    "demo_precinct_temple": dict(kind="precinct", role="GARAN", precinct="TEMPLE", approach=30, palette="NATURAL"),
     "demo_hall_copper": dict(kind="hall", role="HAIDEN", width=29, depth=21, eave=8.0, ridge=17.0, roof="IRIMOYA", gableInset=4,
                              overhang=4, platform=2, bay=4.0, palette="COPPER"),
 }
@@ -214,9 +216,10 @@ LABELS = {
     "demo_shinmei": ("sacred", SHRINE, "HONDEN"), "demo_kairo": ("sacred", BOTH, "KAIRO"),
     "demo_toro_kasuga": ("sacred", BOTH, "TORO"), "demo_toro_small": ("sacred", BOTH, "TORO"),
     "demo_komainu": ("sacred", SHRINE, "KOMAINU"), "demo_kitsune": ("sacred", SHRINE, "KOMAINU"),
-    "demo_temizuya": ("sacred", BOTH, "TEMIZUYA"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
+    "demo_temizuya": ("sacred", BOTH, "TEMIZUYA"),
+    "demo_precinct_shrine": ("sacred", SHRINE, "KEIDAI"), "demo_precinct_temple": ("sacred", TEMPLE, "GARAN"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
 }
-DEMO_NAMES = {"demo_kasuga": "本殿（春日造）", "demo_hachiman": "本殿（八幡造）", "demo_shinmei": "本殿（神明造）",
+DEMO_NAMES = {"demo_precinct_shrine": "神社の境内（稲荷風）", "demo_precinct_temple": "寺院の伽藍", "demo_kasuga": "本殿（春日造）", "demo_hachiman": "本殿（八幡造）", "demo_shinmei": "本殿（神明造）",
               "demo_kairo": "回廊（L 字、角）", "demo_toro_kasuga": "石灯籠（春日灯籠）", "demo_toro_small": "石灯籠（小）",
               "demo_komainu": "狛犬", "demo_kitsune": "狐（稲荷）", "demo_temizuya": "手水舎", "inari_otorii": "伏見稲荷大社 大鳥居", "inari_senbon_torii": "伏見稲荷大社 千本鳥居", "demo_honden_nagare": "本殿（流造、檜皮葺）", "demo_honden_chigi": "本殿（千木・鰹木）",
               "demo_torii": "鳥居（明神鳥居）", "demo_otorii": "大鳥居", "demo_gate_vermilion": "二重門（朱塗り、宝蔵門風）", "demo_belfry_open": "鐘楼（吹放し）",
@@ -984,7 +987,7 @@ COLOURS = {
 }
 
 
-PREVIEW_ALIAS = {"andesite_wall": "andesite", "andesite_stairs": "andesite", "andesite_slab": "andesite",
+PREVIEW_ALIAS = {"white_concrete_powder": "white_concrete", "andesite_wall": "andesite", "andesite_stairs": "andesite", "andesite_slab": "andesite",
                  "water_cauldron": "light_blue_concrete", "mud_brick_stairs": "mud_bricks", "mud_brick_slab": "mud_bricks",
                  "oak_fence": "oak_planks", "oak_stairs": "oak_planks", "spruce_stairs": "spruce_planks",
                  "chiseled_stone_bricks": "stone_bricks", "acacia_stairs": "acacia_planks", "green_terracotta": "green_terracotta", "lantern": "gold_block", "spruce_slab": "spruce_planks", "dark_oak_slab": "dark_oak_planks",

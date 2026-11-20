@@ -338,6 +338,41 @@ class TempleTest {
     }
 
     @Test
+    void precinctsCanBeWalkedFromTheStreetToTheHalls() {
+        for (Precinct.Kind kind : Precinct.Kind.values()) {
+            Precinct pr = new Precinct(kind, 36, kind == Precinct.Kind.SHRINE ? TemplePalette.INARI : TemplePalette.NATURAL);
+            Model m = pr.build();
+            int width = kind == Precinct.Kind.SHRINE ? 51 : 71, depth = kind == Precinct.Kind.SHRINE ? 45 : 63;
+            int cx = width / 2;
+            // From the end of the approach, through the gate, into the court: at most one step up (a platform and its
+            // stairs), and three blocks clear above it.
+            for (int z = depth - 6; z < depth + 36; z++) {
+                int floor = m.has(cx, 0, z) ? 1 : 0;
+                for (int y = floor; y < floor + 3; y++) {
+                    assertTrue(!m.has(cx, y, z), kind + ": blocked at " + cx + "," + y + "," + z + ": " + m.get(cx, y, z));
+                }
+            }
+            // Paved underfoot all the way.
+            for (int z = depth; z < depth + 36; z++) {
+                assertEquals(Precinct.PAVING, m.get(cx, -1, z), kind + " paving at z " + z);
+            }
+            assertTrue(count(m, "minecraft:lantern") >= 6, kind + ": lanterns along the approach");
+            assertTrue(count(m, "minecraft:water_cauldron") >= 3, kind + ": a purification pavilion");
+        }
+    }
+
+    @Test
+    void modelsTurnWithTheirFacings() {
+        Model m = new Model();
+        m.set(0, 0, -1, "minecraft:oak_stairs[facing=north,half=bottom]");
+        m.set(1, 0, 0, "minecraft:oak_log[axis=x]");
+        Model r = m.rotated(1);
+        assertEquals("minecraft:oak_stairs[facing=east,half=bottom]", r.get(1, 0, 0));
+        assertEquals("minecraft:oak_log[axis=z]", r.get(0, 0, 1));
+        assertEquals(m.get(0, 0, -1), m.rotated(4).get(0, 0, -1));
+    }
+
+    @Test
     void precinctFurnishings() {
         assertEquals(1, count(Furnishing.lantern(7), "minecraft:lantern"));
         assertEquals(1, count(Furnishing.lantern(4), "minecraft:lantern"));
