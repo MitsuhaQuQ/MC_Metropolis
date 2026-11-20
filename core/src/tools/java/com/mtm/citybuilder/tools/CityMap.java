@@ -406,6 +406,22 @@ public final class CityMap {
                     railway.edge().a().id() == nearest.id() ? railway.edge().b().tier() : railway.edge().a().tier(),
                     railway.length(), railway.entry());
         }
+        for (com.mtm.citybuilder.core.street.CityRailway railway : plan.railways()) {
+            double ground = 0.0;
+            for (int k = 1; k < railway.line().size(); k++) {
+                if ((int) railway.line().get(k)[2] == com.mtm.citybuilder.core.street.TransitMode.GROUND.ordinal()) {
+                    ground += Math.hypot(railway.line().get(k)[0] - railway.line().get(k - 1)[0],
+                            railway.line().get(k)[1] - railway.line().get(k - 1)[1]);
+                }
+            }
+            System.out.printf("    of it at grade %.0f%n", ground);
+        }
+        for (com.mtm.citybuilder.core.street.UrbanLine line : plan.urbanLines()) {
+            System.out.printf("  town line %.1f km: underground %.1f, elevated %.1f, at grade %.1f; %d stations%n",
+                    line.length() / 1000, line.length(com.mtm.citybuilder.core.street.TransitMode.UNDERGROUND) / 1000,
+                    line.length(com.mtm.citybuilder.core.street.TransitMode.ELEVATED) / 1000,
+                    line.length(com.mtm.citybuilder.core.street.TransitMode.GROUND) / 1000, line.stations().size());
+        }
         for (StreetClass streetClass : StreetClass.values()) {
             double length = plan.length(streetClass);
             if (length > 0) {

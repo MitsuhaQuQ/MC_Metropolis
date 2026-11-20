@@ -99,6 +99,7 @@ public final class StreetMap {
                 case CULVERT -> g.setColor(new Color(0, 200, 220));
                 case RAMP -> g.setColor(new Color(240, 220, 40));
                 case STAIRS -> g.setColor(new Color(220, 40, 200));
+                case LEVEL_CROSSING -> g.setColor(new Color(255, 255, 255));
                 default -> {
                 }
             }
@@ -107,18 +108,49 @@ public final class StreetMap {
             g.draw(new Line2D.Double((segment.x1() - left) / scale, (segment.z1() - top) / scale,
                     (segment.x2() - left) / scale, (segment.z2() - top) / scale));
         }
-        // The intercity lines' stretches to the main station: black with white ties
+        // Railways: the intercity lines' stretches black, the town's own lines purple; at grade solid with white
+        // ties, elevated with a white core, underground dashed
+        java.util.List<java.util.List<double[]>> lines = new java.util.ArrayList<>();
+        java.util.List<Color> colours = new java.util.ArrayList<>();
         for (com.mtm.citybuilder.core.street.CityRailway railway : plan.railways()) {
-            for (int pass = 0; pass < 2; pass++) {
-                g.setColor(pass == 0 ? Color.BLACK : Color.WHITE);
-                g.setStroke(pass == 0 ? new BasicStroke(5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-                        : new BasicStroke(2f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 1f, new float[]{4f, 4f}, 0f));
-                for (int k = 1; k < railway.line().size(); k++) {
-                    double[] a = railway.line().get(k - 1);
-                    double[] b = railway.line().get(k);
-                    g.draw(new Line2D.Double((a[0] - left) / scale, (a[1] - top) / scale, (b[0] - left) / scale,
-                            (b[1] - top) / scale));
+            lines.add(railway.line());
+            colours.add(Color.BLACK);
+        }
+        for (com.mtm.citybuilder.core.street.UrbanLine line : plan.urbanLines()) {
+            lines.add(line.points());
+            colours.add(new Color(150, 40, 190));
+        }
+        for (int l = 0; l < lines.size(); l++) {
+            java.util.List<double[]> line = lines.get(l);
+            for (int k = 1; k < line.size(); k++) {
+                double[] a = line.get(k - 1);
+                double[] b = line.get(k);
+                int mode = (int) (a.length > 2 ? a[2] : 2);
+                Line2D piece = new Line2D.Double((a[0] - left) / scale, (a[1] - top) / scale, (b[0] - left) / scale,
+                        (b[1] - top) / scale);
+                g.setColor(colours.get(l));
+                if (mode == com.mtm.citybuilder.core.street.TransitMode.UNDERGROUND.ordinal()) {
+                    g.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 1f, new float[]{6f, 4f}, 0f));
+                    g.draw(piece);
+                } else {
+                    g.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    g.draw(piece);
+                    g.setColor(Color.WHITE);
+                    g.setStroke(mode == com.mtm.citybuilder.core.street.TransitMode.ELEVATED.ordinal()
+                            ? new BasicStroke(1f) : new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 1f, new float[]{3f, 3f}, 0f));
+                    g.draw(piece);
                 }
+            }
+        }
+        g.setStroke(new BasicStroke(1.5f));
+        for (com.mtm.citybuilder.core.street.UrbanLine line : plan.urbanLines()) {
+            for (double[] station : line.stations()) {
+                int px = (int) Math.round((station[0] - left) / scale);
+                int py = (int) Math.round((station[1] - top) / scale);
+                g.setColor(Color.WHITE);
+                g.fillOval(px - 5, py - 5, 10, 10);
+                g.setColor(new Color(150, 40, 190));
+                g.drawOval(px - 5, py - 5, 10, 10);
             }
         }
         g.setStroke(new BasicStroke(1.2f));

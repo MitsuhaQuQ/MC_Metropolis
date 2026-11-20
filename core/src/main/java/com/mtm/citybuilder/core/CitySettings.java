@@ -28,6 +28,7 @@ public final class CitySettings {
     public Rail rail = new Rail();
     public HighSpeed highSpeed = new HighSpeed();
     public Streets streets = new Streets();
+    public Transit transit = new Transit();
 
     public static final class General {
         /** Edge of a logic region in blocks: the unit results are cached in, never a boundary of any rule. */
@@ -364,6 +365,58 @@ public final class CitySettings {
      * as streamlines of a direction field blending a grid, a radial field round the town's anchor, the old roads and
      * the contours, weighted by formation.
      */
+    /**
+     * A town's railways (L5): its own lines, subway and elevated, and the intercity lines' stretches through it. The
+     * plan is the same whatever {@code build} says; {@code build} only tells the chunk layer how much of it to build.
+     */
+    public static final class Transit {
+        /** What the chunk layer builds of the planned railways. */
+        public enum Build {
+            /** Nothing: the corridors, station sites and squares are only kept clear. */
+            RESERVE,
+            /** The lines above ground, elevated and at grade, with their platforms; subways and station buildings kept clear. */
+            LINES,
+            /** Everything: also the subways, the concourses, the entrances and the station buildings. */
+            ALL
+        }
+
+        public Build build = Build.LINES;
+        /** A city or metropolis has a line for every {@code areaPerLine} km2 of built land, at least one, at most {@code maxLines}; none below {@code minArea}. */
+        public double areaPerLine = 12.0;
+        public double minArea = 6.0;
+        public int maxLines = 4;
+        /** Least curve radius of a town's lines, the search's turn cost, the widest curve fitted. */
+        public double minRadius = 160.0;
+        public double turnCost = 200.0;
+        public double maxRadius = 1200.0;
+        /** Stations about this far apart along a line. */
+        public double stationSpacing = 1000.0;
+        /** Demand is summed over squares this wide; a line's ends are chosen among them, no further than {@code reach} from the centre. */
+        public double zoneSize = 1024.0;
+        public double reach = 8000.0;
+        /** Cost per block of running a line: along an arterial, and elsewhere by district; a cell already used by a line costs this many times more. */
+        public double alongCost = 1.0;
+        public double centralCost = 6.0;
+        public double oldTownCost = 4.0;
+        public double housesCost = 3.0;
+        public double worksCost = 1.5;
+        public double openCost = 2.0;
+        public double reuseFactor = 3.0;
+        /**
+         * Which way a stretch is built: a town's own lines run underground through downtown, the old town and the
+         * station front, elevated through the rest of the built land, at grade where its intensity is below
+         * {@code groundIntensity}; an intercity line elevated where the intensity is at least {@code elevatedIntensity}
+         * or the district is downtown, old town or station front, at grade elsewhere. A run of one way shorter than
+         * {@code minModeRun} takes the way of the run before it.
+         */
+        public double groundIntensity = 0.3;
+        public double elevatedIntensity = 0.45;
+        public double minModeRun = 400.0;
+        /** Roads along a line at grade run this far from its centre; a street crosses it only this far from any other crossing. */
+        public double sideOffset = 14.0;
+        public double crossingSpacing = 300.0;
+    }
+
     public static final class Streets {
         /** A metropolis is a planned capital where this share of its built land is flat, and its hash below the chance. */
         public double joriFlatShare = 0.7;

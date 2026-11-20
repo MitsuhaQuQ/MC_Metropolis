@@ -11,5 +11,7 @@ public enum StreetStructure {
     /** Steeper than an arterial may be, still a street a car can climb. */
     RAMP,
     /** Too steep for cars: stone steps, as on hillside streets, lanes and temple approaches. */
-    STAIRS
+    STAIRS,
+    /** Across a railway at grade: a level crossing (fumikiri). */
+    LEVEL_CROSSING
 }

@@ -686,6 +686,12 @@ public final class StreetLayer {
             mainStation(settlement, window, anchors, railways);
         }
         Districts districts = districts(window, anchors);
+        // The intercity stretches, each point given the way it is built
+        for (int r = 0; r < railways.size(); r++) {
+            CityRailway railway = railways.get(r);
+            railways.set(r, new CityRailway(railway.edge(), railway.entry(), moded(window, districts, railway.line(), false)));
+        }
+        List<UrbanLine> urban = new ArrayList<>();
         List<StreetSegment> segments = new ArrayList<>();
         List<double[]> oldRoad = oldRoads(settlement, window, segments);
         if (formation != Formation.VILLAGE) {
@@ -695,6 +701,14 @@ public final class StreetLayer {
                 }
             }
             List<StreetSegment> banks = riverside(window, segments, embankments);
+            // Roads along the intercity lines at grade, laid before the arterials, which cross the lines at level
+            Pieces rails = new Pieces();
+            Pieces sides = new Pieces();
+            List<List<double[]>> grounded = new ArrayList<>();
+            for (CityRailway railway : railways) {
+                grounded.add(railway.line());
+            }
+            railSides(window, grounded, segments, rails, sides);
             Field field = new Field(window, formation, settlement, anchors, oldRoad);
             double spacing = spacing(formation);
             Tracer arterials = new Tracer(window, field, StreetClass.ARTERIAL, config.arterialWidth, spacing, false,
@@ -705,6 +719,7 @@ public final class StreetLayer {
                 bankPieces.add(bank.x1(), bank.z1(), bank.x2(), bank.z2());
             }
             arterials.banks = bankPieces;
+            arterials.rails = rails;
             arterials.run(arterialSeeds(anchors, oldRoad, window, spacing), segments);
             linkPatches(window, arterials, segments, spacing);
             demoteDeadEnds(window, segments, anchors, banks);
@@ -721,6 +736,13 @@ public final class StreetLayer {
                     avenue(anchor, anchors, extent, window, segments);
                 }
             }
+            // The town's own railway along the arterials, and roads along its stretches at grade
+            urban.addAll(urbanLines(settlement, window, anchors, districts, segments));
+            List<List<double[]>> urbanGround = new ArrayList<>();
+            for (UrbanLine line : urban) {
+                urbanGround.add(line.points());
+            }
+            railSides(window, urbanGround, segments, rails, sides);
             // Streets between the arterials, ending at them (a capital's grid crosses them), then lanes
             double streetSpacing = streetSpacing(formation);
             if (streetSpacing > 0) {
@@ -737,13 +759,407 @@ public final class StreetLayer {
                 streets.bridgeMax = config.streetBridge;
                 streets.bridgeKeep = config.streetBridgeSpacing;
                 streets.banks = bankPieces;
+                streets.rails = rails;
+                streets.sides = sides;
+                streets.crossingKeep = logic.settings().transit.crossingSpacing;
+                // The arterials' level crossings count: streets keep their spacing from them too
+                for (StreetSegment segment : segments) {
+                    if (segment.structure() == StreetStructure.LEVEL_CROSSING) {
+                        streets.crossings.add(new double[]{0.5 * (segment.x1() + segment.x2()), 0.5 * (segment.z1() + segment.z2())});
+                    }
+                }
                 streets.oneSided = formation != Formation.JORI;
                 streets.teeSeed = Hash.mix(settlement.id() ^ 0x7EEL);
                 streets.run(streetSeeds(segments, field, streetSpacing, formation != Formation.JORI), segments);
                 lanes(settlement, formation, window, segments);
             }
+            // Whatever was laid before the railway was known (old roads, arterials before the town's own lines) and
+            // crosses it at grade crosses at a level crossing
+            for (int k = 0; k < segments.size(); k++) {
+                StreetSegment g = segments.get(k);
+                if (g.streetClass() == StreetClass.LANE || g.structure() == StreetStructure.BRIDGE
+                        || g.structure() == StreetStructure.LEVEL_CROSSING) {
+                    continue;
+                }
+                if (rails.hit(g.x1(), g.z1(), g.x2(), g.z2()) != null) {
+                    segments.set(k, new StreetSegment(g.x1(), g.z1(), g.x2(), g.z2(), g.streetClass(), g.era(), g.width(),
+                            StreetStructure.LEVEL_CROSSING));
+                }
+            }
         }
-        return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments);
+        return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments, urban);
+    }
+
+    /** Points every {@code spacing} blocks along a line, its two ends included, as {x, z}. */
+    private static List<double[]> resampleLine(List<double[]> line, double spacing) {
+        List<double[]> points = new ArrayList<>();
+        points.add(new double[]{line.get(0)[0], line.get(0)[1]});
+        double carry = 0.0;
+        for (int k = 1; k < line.size(); k++) {
+            double[] a = line.get(k - 1);
+            double[] b = line.get(k);
+            double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+            if (length < 1e-9) {
+                continue;
+            }
+            double at = spacing - carry;
+            while (at <= length) {
+                points.add(new double[]{a[0] + (b[0] - a[0]) * at / length, a[1] + (b[1] - a[1]) * at / length});
+                at += spacing;
+            }
+            carry = length - (at - spacing);
+        }
+        double[] last = line.get(line.size() - 1);
+        double[] sampled = points.get(points.size() - 1);
+        if (Math.hypot(last[0] - sampled[0], last[1] - sampled[1]) > 1e-6) {
+            points.add(new double[]{last[0], last[1]});
+        }
+        return points;
+    }
+
+    /**
+     * A railway's line through a town resampled at the step, each point given the way it is built: a town's own line
+     * underground through downtown, the old town and the station front, elevated through the rest of the built land,
+     * at grade where the town thins out; an intercity line elevated through the dense town, at grade elsewhere. Runs
+     * shorter than {@code minModeRun} take the way of the run before them.
+     */
+    private List<double[]> moded(Window window, Districts districts, List<double[]> line, boolean urban) {
+        CitySettings.Transit transit = logic.settings().transit;
+        List<double[]> points = resampleLine(line, config.step);
+        int[] modes = new int[points.size()];
+        for (int k = 0; k < points.size(); k++) {
+            double x = points.get(k)[0];
+            double z = points.get(k)[1];
+            District district = districts.at(x, z);
+            boolean dense = district == District.CENTRAL || district == District.OLD_TOWN
+                    || district == District.STATION_FRONT || district == District.GROUNDS;
+            double intensity = window.intensity(x, z);
+            TransitMode mode;
+            if (urban) {
+                mode = dense ? TransitMode.UNDERGROUND
+                        : intensity >= transit.groundIntensity ? TransitMode.ELEVATED : TransitMode.GROUND;
+            } else {
+                mode = dense || intensity >= transit.elevatedIntensity ? TransitMode.ELEVATED : TransitMode.GROUND;
+            }
+            // Over water a line is never at grade
+            if (mode == TransitMode.GROUND && window.water(x, z)) {
+                mode = TransitMode.ELEVATED;
+            }
+            modes[k] = mode.ordinal();
+        }
+        int shortest = (int) Math.ceil(transit.minModeRun / config.step);
+        for (int start = 0; start < modes.length; ) {
+            int end = start;
+            while (end < modes.length && modes[end] == modes[start]) {
+                end++;
+            }
+            if (end - start < shortest && start > 0 && !(window.water(points.get(start)[0], points.get(start)[1])
+                    && modes[start - 1] == TransitMode.GROUND.ordinal())) {
+                for (int k = start; k < end; k++) {
+                    modes[k] = modes[start - 1];
+                }
+            }
+            start = end;
+        }
+        List<double[]> out = new ArrayList<>();
+        for (int k = 0; k < points.size(); k++) {
+            out.add(new double[]{points.get(k)[0], points.get(k)[1], modes[k]});
+        }
+        return out;
+    }
+
+    /**
+     * A town's own railway: lines through its centre, one from the main station, the others turned evenly round it,
+     * each out to the place of most demand on either side, routed by the heading search along the arterials (dear
+     * across blocks, dearer through the old town and downtown, never through grounds, dearer where a line already
+     * runs) with curves no tighter than {@code minRadius}, and given stations about {@code stationSpacing} apart, one at
+     * the centre and one at the main station where the line passes it. Demand is the districts' weights times the
+     * town's intensity, summed over squares of {@code zoneSize}.
+     */
+    private List<UrbanLine> urbanLines(Settlement settlement, Window window, List<Anchor> anchors, Districts districts,
+                                       List<StreetSegment> segments) {
+        CitySettings.Transit transit = logic.settings().transit;
+        List<UrbanLine> lines = new ArrayList<>();
+        if (settlement.tier() != SettlementTier.CITY && settlement.tier() != SettlementTier.METROPOLIS) {
+            return lines;
+        }
+        int size = window.size;
+        double[] weight = new double[size * size];
+        int built = 0;
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                District district = districts.node(i, j);
+                double w = switch (district) {
+                    case CENTRAL -> 6.0;
+                    case STATION_FRONT -> 5.0;
+                    case OLD_TOWN -> 2.0;
+                    case RESIDENTIAL -> 1.5;
+                    case INDUSTRIAL -> 0.8;
+                    case PORT -> 0.5;
+                    default -> 0.0;
+                };
+                if (w > 0) {
+                    built++;
+                }
+                weight[i * size + j] = w * window.intensity[i * size + j];
+            }
+        }
+        double area = built * (double) grid * grid / 1e6;
+        if (area < transit.minArea) {
+            return lines;
+        }
+        int count = Math.max(1, Math.min(transit.maxLines, (int) Math.round(area / transit.areaPerLine)));
+        // Zones: each a square's total demand, placed at its heaviest node
+        int perZone = Math.max(1, (int) Math.round(transit.zoneSize / grid));
+        Map<Long, double[]> zones = new LinkedHashMap<>();
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                double w = weight[i * size + j];
+                if (w <= 0) {
+                    continue;
+                }
+                long key = ((long) (i / perZone) << 32) ^ (j / perZone);
+                double[] zone = zones.computeIfAbsent(key, k -> new double[]{0, 0, 0, -1});
+                zone[0] += w;
+                if (w > zone[3]) {
+                    zone[3] = w;
+                    zone[1] = (double) (window.originX + i) * grid;
+                    zone[2] = (double) (window.originZ + j) * grid;
+                }
+            }
+        }
+        double cx = window.extent.coreX();
+        double cz = window.extent.coreZ();
+        Anchor station = null;
+        for (Anchor anchor : anchors) {
+            if (anchor.kind() == Anchor.Kind.STATION && (station == null
+                    || Math.hypot(anchor.x() - cx, anchor.z() - cz) < Math.hypot(station.x() - cx, station.z() - cz))) {
+                station = anchor;
+            }
+        }
+        double first;
+        if (station != null && Math.hypot(station.x() - cx, station.z() - cz) > 1.0) {
+            first = Math.atan2(station.z() - cz, station.x() - cx);
+        } else {
+            double[] heaviest = null;
+            for (double[] zone : zones.values()) {
+                if (Math.hypot(zone[1] - cx, zone[2] - cz) > 1500 && (heaviest == null || zone[0] > heaviest[0])) {
+                    heaviest = zone;
+                }
+            }
+            first = heaviest == null ? 0.0 : Math.atan2(heaviest[2] - cz, heaviest[1] - cx);
+        }
+        // Along the arterials and old roads
+        boolean[] along = new boolean[size * size];
+        for (StreetSegment segment : segments) {
+            if (segment.streetClass() != StreetClass.ARTERIAL && segment.streetClass() != StreetClass.OLD_ROAD) {
+                continue;
+            }
+            for (double[] p : new double[][]{{segment.x1(), segment.z1()}, {segment.x2(), segment.z2()}}) {
+                int i = (int) Math.round(p[0] / grid) - window.originX;
+                int j = (int) Math.round(p[1] / grid) - window.originZ;
+                if (i >= 0 && j >= 0 && i < size && j < size) {
+                    along[i * size + j] = true;
+                }
+            }
+        }
+        boolean[] used = new boolean[size * size];
+        CitySettings.Rail rail = logic.settings().rail;
+        Approach.CellCost cost = (i, j) -> {
+            int k = i * size + j;
+            District district = districts.node(i, j);
+            if (district == District.GROUNDS) {
+                return Double.POSITIVE_INFINITY;
+            }
+            double c;
+            if (window.water[k]) {
+                c = 1.0 + rail.bridgeCost;
+            } else if (along[k]) {
+                c = transit.alongCost;
+            } else {
+                c = switch (district) {
+                    case CENTRAL -> transit.centralCost;
+                    case OLD_TOWN, STATION_FRONT -> transit.oldTownCost;
+                    case RESIDENTIAL, PORT -> transit.housesCost;
+                    case INDUSTRIAL -> transit.worksCost;
+                    default -> transit.openCost;
+                };
+            }
+            return used[k] ? c * transit.reuseFactor : c;
+        };
+        for (int l = 0; l < count; l++) {
+            double angle = first + Math.PI * l / count;
+            double[][] ends = new double[2][];
+            for (int side = 0; side < 2; side++) {
+                double vx = Math.cos(angle) * (side == 0 ? 1 : -1);
+                double vz = Math.sin(angle) * (side == 0 ? 1 : -1);
+                if (l == 0 && side == 0 && station != null) {
+                    ends[side] = new double[]{station.x(), station.z()};
+                    continue;
+                }
+                double best = 0.0;
+                for (double[] zone : zones.values()) {
+                    double px = zone[1] - cx;
+                    double pz = zone[2] - cz;
+                    double projection = px * vx + pz * vz;
+                    double across = Math.abs(-px * vz + pz * vx);
+                    if (projection < 1500 || across > projection * Math.tan(Math.toRadians(35))
+                            || Math.hypot(px, pz) > transit.reach) {
+                        continue;
+                    }
+                    // Far out more than heavy: a line serves the suburbs on its way in, not only the old town's edge
+                    double score = zone[0] * projection * projection;
+                    if (score > best) {
+                        best = score;
+                        ends[side] = new double[]{zone[1], zone[2]};
+                    }
+                }
+            }
+            if (ends[0] == null && ends[1] == null) {
+                continue;
+            }
+            List<double[]> route = new ArrayList<>();
+            double arrival = angle;
+            if (ends[0] != null) {
+                Approach.Route leg = Approach.route(window.originX, window.originZ, size, size, grid, ends[0][0], ends[0][1],
+                        Math.atan2(cz - ends[0][1], cx - ends[0][0]), cx, cz, Double.NaN, transit.minRadius,
+                        transit.turnCost, transit.maxRadius, cost);
+                if (leg != null) {
+                    route.addAll(leg.line());
+                    arrival = leg.arrival();
+                }
+            }
+            if (ends[1] != null) {
+                double heading = route.isEmpty() ? Math.atan2(ends[1][1] - cz, ends[1][0] - cx) : arrival;
+                Approach.Route leg = Approach.route(window.originX, window.originZ, size, size, grid, cx, cz, heading,
+                        ends[1][0], ends[1][1], Double.NaN, transit.minRadius, transit.turnCost, transit.maxRadius, cost);
+                if (leg != null) {
+                    List<double[]> out = leg.line();
+                    route.addAll(route.isEmpty() ? out : out.subList(1, out.size()));
+                }
+            }
+            if (route.size() < 2) {
+                continue;
+            }
+            List<double[]> points = moded(window, districts, route, true);
+            for (double[] p : points) {
+                int i = (int) Math.round(p[0] / grid) - window.originX;
+                int j = (int) Math.round(p[1] / grid) - window.originZ;
+                if (i >= 0 && j >= 0 && i < size && j < size) {
+                    used[i * size + j] = true;
+                }
+            }
+            lines.add(new UrbanLine(points, stations(points, cx, cz, station, transit.stationSpacing)));
+        }
+        return lines;
+    }
+
+    /**
+     * Stations along a line: at both ends, at the point nearest the centre, at the main station where the line passes
+     * within 300 blocks of it, and between these evenly, about {@code spacing} apart.
+     */
+    private static List<double[]> stations(List<double[]> points, double cx, double cz, Anchor station, double spacing) {
+        int n = points.size();
+        double[] run = new double[n];
+        for (int k = 1; k < n; k++) {
+            run[k] = run[k - 1] + Math.hypot(points.get(k)[0] - points.get(k - 1)[0], points.get(k)[1] - points.get(k - 1)[1]);
+        }
+        java.util.TreeSet<Integer> fixed = new java.util.TreeSet<>(List.of(0, n - 1));
+        fixed.add(nearestIndex(points, cx, cz));
+        if (station != null) {
+            int at = nearestIndex(points, station.x(), station.z());
+            if (Math.hypot(points.get(at)[0] - station.x(), points.get(at)[1] - station.z()) < 300) {
+                fixed.add(at);
+            }
+        }
+        java.util.TreeSet<Integer> chosen = new java.util.TreeSet<>(fixed);
+        Integer previous = null;
+        for (int at : fixed) {
+            if (previous != null) {
+                double length = run[at] - run[previous];
+                int between = Math.max(0, (int) Math.round(length / spacing) - 1);
+                for (int q = 1; q <= between; q++) {
+                    double target = run[previous] + length * q / (between + 1);
+                    int k = previous;
+                    while (k < at && run[k] < target) {
+                        k++;
+                    }
+                    chosen.add(k);
+                }
+            }
+            previous = at;
+        }
+        List<double[]> out = new ArrayList<>();
+        for (int k : chosen) {
+            out.add(points.get(k).clone());
+        }
+        return out;
+    }
+
+    private static int nearestIndex(List<double[]> points, double x, double z) {
+        int best = 0;
+        double bestDistance = Double.POSITIVE_INFINITY;
+        for (int k = 0; k < points.size(); k++) {
+            double d = Math.hypot(points.get(k)[0] - x, points.get(k)[1] - z);
+            if (d < bestDistance) {
+                bestDistance = d;
+                best = k;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Roads along the stretches of railway at grade, one either side {@code sideOffset} from the line, over built land:
+     * a line at grade parts the town, and the streets beside it run along it. Each piece of line at grade goes into
+     * {@code rails}, each side road's into {@code sides}.
+     */
+    private void railSides(Window window, List<List<double[]>> lines, List<StreetSegment> segments, Pieces rails,
+                           Pieces sides) {
+        double offset = logic.settings().transit.sideOffset;
+        for (List<double[]> line : lines) {
+            for (int k = 1; k < line.size(); k++) {
+                double[] a = line.get(k - 1);
+                double[] b = line.get(k);
+                if ((int) a[2] == TransitMode.GROUND.ordinal() && (int) b[2] == TransitMode.GROUND.ordinal()) {
+                    rails.add(a[0], a[1], b[0], b[1]);
+                }
+            }
+            // Each point's normal, the mean of the pieces either side, so the side roads join up round bends
+            int n = line.size();
+            double[][] normals = new double[n][2];
+            for (int k = 0; k < n; k++) {
+                double[] p = line.get(Math.max(0, k - 1));
+                double[] q = line.get(Math.min(n - 1, k + 1));
+                double length = Math.hypot(q[0] - p[0], q[1] - p[1]);
+                if (length > 1e-9) {
+                    normals[k][0] = -(q[1] - p[1]) / length;
+                    normals[k][1] = (q[0] - p[0]) / length;
+                }
+            }
+            for (double side : new double[]{1.0, -1.0}) {
+                for (int k = 1; k < n; k++) {
+                    double[] a = line.get(k - 1);
+                    double[] b = line.get(k);
+                    if ((int) a[2] != TransitMode.GROUND.ordinal() || (int) b[2] != TransitMode.GROUND.ordinal()) {
+                        continue;
+                    }
+                    double ax = a[0] + normals[k - 1][0] * offset * side;
+                    double az = a[1] + normals[k - 1][1] * offset * side;
+                    double bx = b[0] + normals[k][0] * offset * side;
+                    double bz = b[1] + normals[k][1] * offset * side;
+                    if (!window.built(ax, az) || !window.built(bx, bz)) {
+                        continue;
+                    }
+                    Era era = window.intensity(0.5 * (ax + bx), 0.5 * (az + bz)) > config.oldTownIntensity ? Era.TOWN : Era.MODERN;
+                    StreetSegment piece = sloped(window, ax, az, bx, bz, StreetClass.STREET, era, config.streetWidth);
+                    if (piece != null) {
+                        segments.add(piece);
+                        sides.add(ax, az, bx, bz);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -1933,6 +2349,9 @@ public final class StreetLayer {
     }
 
     /** A town's window: its extent's nodes, with heights and water, and whether each is built land. */
+    /** Half the length of a level crossing where a long piece is split round it. */
+    private static final double LEVEL_CROSSING_HALF = 8.0;
+
     /** Edge of the cells of the fine water grid, in blocks. */
     private static final int FINE = 16;
 
@@ -2595,6 +3014,17 @@ public final class StreetLayer {
         double bridgeKeep = config.bridgeSpacing;
         /** The bank roads, where a line reaching the water bridges it or ends. */
         Pieces banks;
+        /**
+         * Railway at grade, and the roads along it: a street reaching a side road with the railway just past it
+         * crosses at a level crossing only {@code crossingKeep} from any other crossing, and ends on the side road
+         * otherwise; arterials always cross (no {@code sides} given). Pieces crossing the railway are level crossings.
+         */
+        Pieces rails;
+        Pieces sides;
+        double crossingKeep;
+        final List<double[]> crossings = new ArrayList<>();
+        /** Steps left in which the line, having just crossed water or a railway, runs on past the roads beyond. */
+        int grace;
         /** Whether lines may climb past {@code maxGrade} as ramps and stairs (streets may, arterials not). */
         boolean climbing;
         /** Share of crossings with a street of the other family where a street ends instead, and their hash's seed. */
@@ -2714,7 +3144,30 @@ public final class StreetLayer {
                     if (structure == StreetStructure.GROUND && overStream(a[0], a[1], b[0], b[1])) {
                         structure = StreetStructure.CULVERT;
                     }
-                    segments.add(new StreetSegment(a[0], a[1], b[0], b[1], streetClass, era, width, structure));
+                    double[] railHit = structure != StreetStructure.BRIDGE && rails != null
+                            ? rails.hit(a[0], a[1], b[0], b[1]) : null;
+                    double pieceLength = Math.hypot(b[0] - a[0], b[1] - a[1]);
+                    if (railHit != null && pieceLength > 4 * LEVEL_CROSSING_HALF) {
+                        // A long piece over the railway: only its middle over the track is the level crossing
+                        double t = railHit[2];
+                        double t1 = Math.max(0.0, t - LEVEL_CROSSING_HALF / pieceLength);
+                        double t2 = Math.min(1.0, t + LEVEL_CROSSING_HALF / pieceLength);
+                        double[] p1 = {a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1};
+                        double[] p2 = {a[0] + (b[0] - a[0]) * t2, a[1] + (b[1] - a[1]) * t2};
+                        if (t1 > 0) {
+                            segments.add(new StreetSegment(a[0], a[1], p1[0], p1[1], streetClass, era, width, structure));
+                        }
+                        segments.add(new StreetSegment(p1[0], p1[1], p2[0], p2[1], streetClass, era, width,
+                                StreetStructure.LEVEL_CROSSING));
+                        if (t2 < 1) {
+                            segments.add(new StreetSegment(p2[0], p2[1], b[0], b[1], streetClass, era, width, structure));
+                        }
+                    } else {
+                        if (railHit != null) {
+                            structure = StreetStructure.LEVEL_CROSSING;
+                        }
+                        segments.add(new StreetSegment(a[0], a[1], b[0], b[1], streetClass, era, width, structure));
+                    }
                     points.get(family).computeIfAbsent(bucket(b[0], b[1]), key -> new ArrayList<>())
                             .add(new double[]{b[0], b[1], line});
                     pieces.get(family).add(a[0], a[1], b[0], b[1]);
@@ -2767,7 +3220,7 @@ public final class StreetLayer {
          */
         private double[] stop(double x, double z, double tx, double tz, int family, boolean join) {
             double[] best = null;
-            if (walls != null && !crossWalls) {
+            if (walls != null && !crossWalls && grace == 0) {
                 best = earlier(best, walls.pieces.hit(x, z, tx, tz));
             }
             best = earlier(best, pieces.get(family).hit(x, z, tx, tz));
@@ -2840,6 +3293,19 @@ public final class StreetLayer {
             return -1;
         }
 
+        /** Steps ahead to the one that crosses the railway at grade, within reach of a side road just crossed; -1 if none. */
+        private int railAhead(double x, double z, double dx, double dz) {
+            int reach = (int) Math.ceil((logic.settings().transit.sideOffset + 2.0 * config.step) / config.step) + 1;
+            for (int q = 1; q <= reach; q++) {
+                double ax = x + dx * config.step * (q - 1);
+                double az = z + dz * config.step * (q - 1);
+                if (rails.hit(ax, az, ax + dx * config.step, az + dz * config.step) != null) {
+                    return q;
+                }
+            }
+            return -1;
+        }
+
         /** The spacing a bridge of a length keeps from others: wider for a longer, costlier one. */
         private double bridgeSpacing(double length) {
             return bridgeKeep * Math.max(1.0, length / config.bridgeLength);
@@ -2849,6 +3315,7 @@ public final class StreetLayer {
         private List<double[]> follow(double x, double z, int family, double sense, int line) {
             List<double[]> path = new ArrayList<>();
             path.add(new double[]{x, z});
+            grace = 0;
             double previousAngle = Double.NaN;
             double h = window.height(x, z);
             double maxLength = 20000.0;
@@ -2867,6 +3334,34 @@ public final class StreetLayer {
                 double nx = x + dx * config.step;
                 double nz = z + dz * config.step;
                 StreetStructure structure = StreetStructure.GROUND;
+                if (grace > 0) {
+                    grace--;
+                }
+                // A side road with the railway just past it: across at a level crossing if none is near, else the
+                // line ends on the side road
+                if (sides != null && rails != null && grace == 0 && travelled >= config.step) {
+                    double[] side = sides.hit(x, z, nx, nz);
+                    int ahead = side == null ? -1 : railAhead(x, z, dx, dz);
+                    if (ahead > 0) {
+                        double cx = x + dx * config.step * ahead;
+                        double cz = z + dz * config.step * ahead;
+                        boolean free = true;
+                        for (double[] crossing : crossings) {
+                            if (Math.hypot(crossing[0] - cx, crossing[1] - cz) < crossingKeep) {
+                                free = false;
+                                break;
+                            }
+                        }
+                        if (!free) {
+                            if (passable(x, z, side[0], side[1])) {
+                                path.add(new double[]{side[0], side[1]});
+                            }
+                            break;
+                        }
+                        crossings.add(new double[]{cx, cz});
+                        grace = ahead + 3;
+                    }
+                }
                 // A bank road with water just past it: over the water if a bridge may stand here, else the line turns
                 // along the bank, ending on the bank road
                 if (banks != null && travelled >= config.step) {
@@ -2886,6 +3381,7 @@ public final class StreetLayer {
                             path.add(new double[]{x + dx * config.step * q, z + dz * config.step * q});
                         }
                         path.addAll(span);
+                        grace = 3;
                         double[] far = span.get(span.size() - 1);
                         travelled += config.step * (ahead - 1 + span.size() - 1);
                         x = far[0];

@@ -11,7 +11,8 @@ import java.util.List;
  *
  * @param edge  the line
  * @param entry the sample of the line's route where the stretch leaves it
- * @param line  points along the stretch, from the entry to the station
+ * @param line  points along the stretch every {@code step} blocks, from the entry to the station, each
+ *              {x, z, {@link TransitMode} ordinal}: elevated through the dense town, at grade elsewhere
  */
 public record CityRailway(RailEdge edge, int entry, List<double[]> line) {
     public CityRailway {

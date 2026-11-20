@@ -1,0 +1,125 @@
+package com.mtm.citybuilder.core.street;
+
+import com.mtm.citybuilder.core.CityLogic;
+import com.mtm.citybuilder.core.CitySettings;
+import com.mtm.citybuilder.core.settlement.Settlement;
+import com.mtm.citybuilder.core.settlement.SettlementTier;
+import com.mtm.citybuilder.core.terrain.SyntheticTerrain;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** A town's railways (L5): its own lines and stations, and the roads along lines at grade. */
+class TransitTest {
+    private static final CitySettings SETTINGS = CitySettings.DEFAULT;
+    private static CityLogic logic;
+    private static Settlement city;
+    private static StreetPlan plan;
+
+    @BeforeAll
+    static void plan() {
+        logic = new CityLogic(3L, SETTINGS, SyntheticTerrain.flatPlains());
+        for (Settlement settlement : logic.settlements(6000, -20000, 42000, 20000)) {
+            if (settlement.tier() == SettlementTier.METROPOLIS) {
+                city = settlement;
+                break;
+            }
+        }
+        plan = logic.streetPlan(city, Formation.CASTLE_TOWN);
+    }
+
+    @Test
+    void linesRunThroughTheCentreWithStationsAKilometreApart() {
+        assertTrue(!plan.urbanLines().isEmpty(), "a metropolis has lines of its own");
+        double cx = logic.extent(city).coreX();
+        double cz = logic.extent(city).coreZ();
+        for (UrbanLine line : plan.urbanLines()) {
+            double nearest = line.points().stream().mapToDouble(p -> Math.hypot(p[0] - cx, p[1] - cz)).min().orElseThrow();
+            assertTrue(nearest < 300, "a line misses the centre by " + nearest);
+            List<double[]> stations = line.stations();
+            assertTrue(stations.size() >= 2);
+            for (int k = 1; k < stations.size(); k++) {
+                double gap = Math.hypot(stations.get(k)[0] - stations.get(k - 1)[0], stations.get(k)[1] - stations.get(k - 1)[1]);
+                assertTrue(gap > 0.3 * SETTINGS.transit.stationSpacing && gap < 1.8 * SETTINGS.transit.stationSpacing,
+                        "stations " + gap + " apart");
+            }
+            // Under the centre the line runs underground
+            double[] middle = line.points().stream().min(java.util.Comparator.comparingDouble(p -> Math.hypot(p[0] - cx, p[1] - cz))).orElseThrow();
+            assertTrue((int) middle[2] == TransitMode.UNDERGROUND.ordinal(), "at the centre the line is " + TransitMode.values()[(int) middle[2]]);
+        }
+        Anchor station = plan.anchors().stream().filter(a -> a.kind() == Anchor.Kind.STATION).findFirst().orElse(null);
+        if (station != null) {
+            boolean interchange = plan.urbanLines().stream().flatMap(l -> l.stations().stream())
+                    .anyMatch(s -> Math.hypot(s[0] - station.x(), s[1] - station.z()) < 300);
+            assertTrue(interchange, "a line stops at the main station");
+        }
+    }
+
+    @Test
+    void roadsRunAlongLinesAtGradeAndStreetsCrossThemOnlyAtLevelCrossings() {
+        List<double[][]> ground = new ArrayList<>();
+        List<List<double[]>> lines = new ArrayList<>();
+        plan.railways().forEach(r -> lines.add(r.line()));
+        plan.urbanLines().forEach(l -> lines.add(l.points()));
+        for (List<double[]> line : lines) {
+            for (int k = 1; k < line.size(); k++) {
+                if ((int) line.get(k - 1)[2] == TransitMode.GROUND.ordinal() && (int) line.get(k)[2] == TransitMode.GROUND.ordinal()) {
+                    ground.add(new double[][]{line.get(k - 1), line.get(k)});
+                }
+            }
+        }
+        if (ground.isEmpty()) {
+            return;
+        }
+        double alongside = 0.0;
+        List<double[]> crossings = new ArrayList<>();
+        for (StreetSegment segment : plan.segments()) {
+            if (segment.streetClass() == StreetClass.LANE) {
+                continue;
+            }
+            double mx = 0.5 * (segment.x1() + segment.x2());
+            double mz = 0.5 * (segment.z1() + segment.z2());
+            boolean crosses = false;
+            for (double[][] piece : ground) {
+                if (cross(segment, piece)) {
+                    crosses = true;
+                }
+                double d = distance(piece, mx, mz);
+                if (segment.streetClass() == StreetClass.STREET && Math.abs(d - SETTINGS.transit.sideOffset) < 2.0) {
+                    alongside += segment.length() / 2;
+                }
+            }
+            if (crosses) {
+                assertTrue(segment.structure() == StreetStructure.LEVEL_CROSSING || segment.structure() == StreetStructure.BRIDGE,
+                        "crosses the railway not at a level crossing: " + segment);
+                if (segment.streetClass() == StreetClass.STREET) {
+                    crossings.add(new double[]{mx, mz});
+                }
+            }
+        }
+        assertTrue(alongside > 200, "roads along the railway at grade: " + alongside);
+    }
+
+    private static boolean cross(StreetSegment s, double[][] p) {
+        double d1 = side(p, s.x1(), s.z1());
+        double d2 = side(p, s.x2(), s.z2());
+        double d3 = (s.x2() - s.x1()) * (p[0][1] - s.z1()) - (s.z2() - s.z1()) * (p[0][0] - s.x1());
+        double d4 = (s.x2() - s.x1()) * (p[1][1] - s.z1()) - (s.z2() - s.z1()) * (p[1][0] - s.x1());
+        return d1 * d2 < 0 && d3 * d4 < 0;
+    }
+
+    private static double side(double[][] p, double x, double z) {
+        return (p[1][0] - p[0][0]) * (z - p[0][1]) - (p[1][1] - p[0][1]) * (x - p[0][0]);
+    }
+
+    private static double distance(double[][] p, double x, double z) {
+        double dx = p[1][0] - p[0][0];
+        double dz = p[1][1] - p[0][1];
+        double t = Math.max(0, Math.min(1, ((x - p[0][0]) * dx + (z - p[0][1]) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+        return Math.hypot(p[0][0] + dx * t - x, p[0][1] + dz * t - z);
+    }
+}
