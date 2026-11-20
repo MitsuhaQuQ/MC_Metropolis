@@ -2677,8 +2677,14 @@ public final class StreetLayer {
         };
         double axis = Double.NaN;
         for (int e = 0; e < entries.size(); e++) {
-            double[] entry = entries.get(e);
             RailRoute route = entering.get(e);
+            // Where to leave the corridor for the station: walking in from the far end over the land of the window,
+            // the point with the least corridor run plus the way on to the station, so a line whose corridor heads
+            // for the far side of the town leaves it early rather than running round to the station
+            double[] entry = cut(route, settlement, window, site);
+            if (entry == null) {
+                entry = entries.get(e);
+            }
             double minRadius = route.edge().railClass() == RailClass.TRUNK ? rail.trunkMinRadius : rail.branchMinRadius;
             Approach.Route stretch = Approach.route(window.originX, window.originZ, window.size, window.size, grid,
                     entry[1], entry[2], entry[3], site[0], site[1], axis, minRadius, rail.turnCost, rail.maxRadius, cost);
@@ -2744,6 +2750,38 @@ public final class StreetLayer {
             }
         }
         return laid;
+    }
+
+    /** {sample, x, z, heading} of the best point to leave a line's corridor for a station, or null. */
+    private double[] cut(RailRoute route, Settlement settlement, Window window, double[] site) {
+        boolean here = route.edge().a().id() == settlement.id();
+        int n = route.samples();
+        int step = here ? -1 : 1;
+        int previous = here ? n - 1 : 0;
+        double run = 0.0;
+        boolean entered = false;
+        double[] best = null;
+        double bestCost = Double.POSITIVE_INFINITY;
+        for (int k = previous + step; k >= 0 && k < n; k += step) {
+            double x = route.x(k);
+            double z = route.z(k);
+            double length = Math.hypot(x - route.x(previous), z - route.z(previous));
+            if (window.inside(x, z)) {
+                entered = true;
+                run += length;
+                if (!window.water(x, z) && !window.inGrounds(x, z)) {
+                    double cost = run + 1.3 * Math.hypot(site[0] - x, site[1] - z);
+                    if (cost < bestCost) {
+                        bestCost = cost;
+                        best = new double[]{k, x, z, Math.atan2(z - route.z(previous), x - route.x(previous))};
+                    }
+                }
+            } else if (entered) {
+                break;
+            }
+            previous = k;
+        }
+        return best;
     }
 
     /**
