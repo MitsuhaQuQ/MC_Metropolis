@@ -128,11 +128,14 @@ final class Arena {
     }
 
     /**
-     * Stepped stands round a field: a barrier {@code base} high next to the field, then rows two blocks deep rising
-     * one block each (about 27°, real stands are 25–35°) with a seat (back turned away from the field) on
-     * the front block of each row, an aisle every {@code 16} along, and a parapet at the back; a glass screen on the
-     * barrier. The stand is solid concrete below; its back is the outer wall, white pilasters every 8 blocks and a
-     * gate (iron bars under a lintel) every 24.
+     * Stepped stands round a field: a barrier {@code base} high next to the field with a glass screen on it, then rows
+     * two blocks deep rising one block each (about 27°, real stands are 25–35°) with a seat (back turned away from the
+     * field) on the front block of each row, an aisle every 16 along, and a parapet at the back.
+     * <p>
+     * Under the rows, where they are high enough, a concourse (コンコース) three blocks high on paving, with pillars
+     * and ceiling lights; the back is the outer wall, white pilasters every 8 blocks and an open gate under a lintel
+     * every 24, into the concourse. Every 32 along, on an aisle, a vomitory (出入口) three wide: from the concourse a
+     * stair climbs towards the field inside the stand to a tunnel that comes out half way up the rows, under a hood.
      *
      * @param depth the stands' depth from the field's edge
      * @param seats the seats ({@link #seat}) from the front rows to the back, in as many tiers as given
@@ -140,41 +143,91 @@ final class Arena {
      */
     static int stands(Model m, Field f, Zone zone, int depth, int base, String... seats) {
         int rows = (int) ((depth - 1.5) / 2);
+        int mid = rows / 2, tunnel = base + mid; // the vomitory comes out on row mid's floor
         f.around(depth + 0.5, (x, z, dist, nx, nz) -> {
             if (!zone.accept(x, z, nx, nz)) {
                 return;
             }
-            m.set(x, 0, z, CONCRETE);
+            int along = nx + nz;
+            boolean outside = dist > depth - 0.5;
+            int vom = Math.floorMod(along + 1, 32); // 0..2 across a vomitory, centred on an aisle
+            boolean vomitory = vom <= 2;
+            String toField = Shapes.toward(x - nx, z - nz);
             int top;
-            String cap = CONCRETE;
-            String above = null;
+            String cap = CONCRETE, above = null, seat = null;
+            int row = -1;
+            double s = dist - 1.5;
             if (dist < 1.5) {
                 top = base;
                 above = "minecraft:glass_pane";
             } else {
-                double s = dist - 1.5;
-                int row = (int) (s / 2);
+                row = (int) (s / 2);
                 if (row >= rows) {
                     top = base + rows + 1;
                     cap = "minecraft:white_concrete";
                 } else {
                     top = base + row;
-                    boolean aisle = Math.floorMod(nx + nz, 16) == 0;
+                    boolean aisle = Math.floorMod(along, 16) == 0;
                     if (s - 2 * row < 1 && !aisle) {
-                        String seat = seats[Math.min(seats.length - 1, row * seats.length / rows)];
-                        m.set(x, top + 1, z, seat(seat, Shapes.away(x - nx, z - nz)));
+                        seat = seats[Math.min(seats.length - 1, row * seats.length / rows)];
                     }
                 }
             }
-            boolean outside = dist > depth - 0.5;
-            int along = Math.floorMod(nx + nz, 24);
-            boolean gate = outside && along >= 10 && along <= 12;
-            String wall = outside && Math.floorMod(nx + nz, 8) == 0 ? "minecraft:white_concrete" : CONCRETE;
+            // What is open in this column: low down (y 1..3) the concourse or a gate; higher up the vomitory's tunnel
+            // or its stair.
+            int openFrom = Integer.MAX_VALUE, openTo = Integer.MIN_VALUE;
+            String step = null;
+            int stepY = -1;
+            boolean concourse = !outside && dist > 3 && top >= 6;
+            boolean gate = outside && Math.floorMod(along, 24) >= 10 && Math.floorMod(along, 24) <= 12;
+            boolean low = concourse || gate;
+            if (vomitory && row > mid && row <= mid + 2 && row < rows) {
+                // The tunnel under the hood: floor at the row's level, open three high, the hood over it.
+                openFrom = tunnel + 1;
+                openTo = tunnel + 3;
+                top = tunnel + 4;
+                cap = CONCRETE;
+                seat = null;
+            } else if (vomitory && row > mid + 2) {
+                // The stair down from the tunnel to the concourse, one block per block away from the field.
+                int c = (int) Math.floor(s - 2 * (mid + 3));
+                int floor = tunnel - 1 - c;
+                if (floor >= 1) {
+                    stepY = floor;
+                    openFrom = floor + 1;
+                    openTo = floor + 3;
+                    step = "minecraft:stone_brick_stairs[facing=" + toField
+                            + ",half=bottom,shape=straight,waterlogged=false]";
+                } else if (!outside) {
+                    low = true; // at the foot of the stair, the concourse
+                }
+            }
+            m.set(x, 0, z, low ? PAVING : CONCRETE);
+            String wall = outside && Math.floorMod(along, 8) == 0 ? "minecraft:white_concrete" : CONCRETE;
+            boolean pillar = concourse && Math.floorMod(along, 8) == 4 && Math.floorMod((int) dist, 6) == 3;
             for (int y = 1; y < top; y++) {
-                m.set(x, y, z, gate && y <= 3 ? "minecraft:iron_bars" : gate && y == 4 ? "minecraft:gray_concrete"
-                        : wall);
+                if (y == stepY) {
+                    m.set(x, y, z, step);
+                    continue;
+                }
+                boolean open = low && y <= 3 && !pillar || y >= openFrom && y <= openTo;
+                if (open) {
+                    continue;
+                }
+                String b = gate && y == 4 ? "minecraft:gray_concrete" : wall;
+                if (y == 4 && concourse && openFrom > 4 && Math.floorMod(along, 8) == 0
+                        && Math.floorMod((int) dist, 6) == 0) {
+                    b = "minecraft:sea_lantern"; // the concourse's ceiling lights
+                }
+                m.set(x, y, z, b);
+            }
+            if (top >= openFrom && top <= openTo) {
+                return; // the stair's head comes out through the floor of a row: leave it open
             }
             m.set(x, top, z, cap);
+            if (seat != null) {
+                m.set(x, top + 1, z, seat(seat, Shapes.away(x - nx, z - nz)));
+            }
             if (above != null) {
                 m.set(x, top + 1, z, above);
             }
