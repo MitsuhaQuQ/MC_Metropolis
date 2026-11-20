@@ -1660,7 +1660,47 @@ def kyoto_tower(blocks):
             blocks[(x, y, z)] = ("cyan_stained_glass", None)
 
 
-LANDMARK_FIXES = {"kyoto_tower": kyoto_tower}
+def kyoto_station(blocks):
+    """Kyoto Station's front, the north side facing the city, after a photograph of its main entrance: above 12 m
+    every north wall is a curtain wall of blue reflecting glass on a grid of fine light grey mullions (every 3 blocks
+    both ways), a grey band every 12. In the middle stretch of the tall front (the central concourse, x 240-335 in
+    the model, where the front stands back at z 27 and rises to 51 m) the bottom 24 m is the great gate: grey stone
+    piers at its ends, a band of white steel truss (chords and crossing diagonals) from 18 to 23 m, the atrium open
+    and dark under it, glass doors at the street. Elsewhere below 12 m the colours stay as read off the photographs."""
+    gx0, gx1, gate_top, truss0 = 240, 336, 24, 18
+    frame, band = ("light_gray_concrete", None), ("gray_concrete", None)
+    stone, white = ("polished_andesite", None), ("white_concrete", None)
+    ew = {"east": "true", "west": "true"}
+    for (x, y, z), b in list(blocks.items()):
+        if y < 1 or (x, y, z - 1) in blocks:
+            continue  # not facing north
+        if (b[1] is not None and not b[0].endswith("_pane")) or (x, y + 1, z) not in blocks:
+            continue  # stairs, slabs, roofs
+        if gx0 <= x < gx1 and y < gate_top:
+            if x < gx0 + 8 or x >= gx1 - 8:
+                blocks[(x, y, z)] = stone  # the piers
+            elif y in (truss0, gate_top - 1):
+                blocks[(x, y, z)] = white  # the truss's chords
+            elif y > truss0:
+                k = (x - gx0 - 8) % 10
+                diag = k == (y - truss0) * 2 - 1 or k == 10 - (y - truss0) * 2 + 1 or k == 0
+                blocks[(x, y, z)] = white if diag else ("iron_bars", None)
+            elif y < 4:
+                blocks[(x, y, z)] = frame if x % 4 == 0 else ("light_gray_stained_glass_pane", dict(ew))
+            else:
+                blocks[(x, y, z)] = ("black_stained_glass_pane", dict(ew))  # the atrium, open and in shade
+        elif y >= 12:
+            if y % 12 == 0:
+                blocks[(x, y, z)] = band
+            elif x % 3 == 0 or y % 3 == 0:
+                blocks[(x, y, z)] = frame
+            else:
+                blocks[(x, y, z)] = ("light_blue_stained_glass_pane", dict(ew))
+
+
+LANDMARK_FIXES = {"kyoto_tower": kyoto_tower, "kyoto_station": kyoto_station}
+# Previews seen from another side: quarter turns of the model before drawing (the station's front faces north).
+PREVIEW_TURN = {"kyoto_station": 2}
 
 
 def build_one(args):
@@ -1686,7 +1726,11 @@ def build_one(args):
         LANDMARK_FIXES[slug](blocks)
     size = tuple(max(v[i] for v in blocks) + 1 for i in range(3))
     write_nbt(os.path.join(out, slug + ".nbt"), blocks, size)
-    render(blocks, size, os.path.join(out, slug + ".png"), bc)
+    view = blocks
+    for _ in range(PREVIEW_TURN.get(slug, 0)):  # quarter turns, clockwise seen from above, for the preview only
+        sz_ = max(v[2] for v in view) + 1
+        view = {(sz_ - 1 - z, y, x): b for (x, y, z), b in view.items()}
+    render(view, tuple(max(v[i] for v in view) + 1 for i in range(3)), os.path.join(out, slug + ".png"), bc)
     counts = {}
     for n, _ in blocks.values():
         counts[n] = counts.get(n, 0) + 1
