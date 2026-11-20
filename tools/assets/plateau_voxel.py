@@ -10,8 +10,9 @@ Two steps, both from the CityGML zip and the CSV written by plateau_buildings.py
             (isometric preview from the south-east), <out>/library.json and <out>/preview.html
 
 Voxelizing: the building is turned so its walls run along the axes (dominant wall direction,
-modulo 90 degrees), every surface polygon is sampled every 0.25 m by scanlines, columns inside
-the ground surface are filled up to their highest surface, and only the shell plus one floor per
+modulo 90 degrees), every surface polygon is sampled every 0.25 m by scanlines, columns are filled by
+parity (a vertical ray through each column centre crosses the closed LOD2 solid at every
+non-vertical face; filling each column to its top would fill under overhangs), and only the shell plus one floor per
 storey is kept (interior air is not stored). Surfaces outside the ground footprint stay one block
 thick, so eaves overhang. Pitched roofs get stairs facing uphill where the slope is steep enough
 and slabs where the surface sits in the lower half of a block.
@@ -284,18 +285,37 @@ def voxelize(rings):
                 col = (v[0], v[2])
                 if y > height.get(col, -1e9):
                     height[col] = y
-    if not columns:  # no ground surface: take every column under a roof
-        columns = set(height)
-    top = {}
-    for (x, y, z) in surf:
-        if y > top.get((x, z), -1):
-            top[(x, z)] = y
+    # Inside by parity: a vertical ray through each column centre crosses the closed LOD2 solid
+    # at every non-vertical face (ground, roofs, undersides of overhangs); fill between pairs.
+    # Filling each column up to its highest face would fill everything under an overhang.
+    hits = {}
+    for cls, ring, holes in rings:
+        r, hs = open_ring(ring), [open_ring(h) for h in holes]
+        if len(r) < 3:
+            continue
+        nx, ny, nz = newell(r)
+        if abs(ny) < 1e-3 * math.sqrt(nx * nx + ny * ny + nz * nz) + 1e-9:
+            continue  # vertical
+        d = nx * r[0][0] + ny * r[0][1] + nz * r[0][2]
+        for cx, cz in fill_columns([(p[0], p[2]) for p in r], [[(p[0], p[2]) for p in h] for h in hs if len(h) >= 3]):
+            hits.setdefault((cx, cz), []).append((d - nx * (cx + 0.5) - nz * (cz + 0.5)) / ny)
     solid = set(surf)
-    for col in columns:
-        t = top.get(col)
-        if t is not None:
-            for y in range(t + 1):
+    odd = 0
+    for col, ys in hits.items():
+        ys.sort()
+        merged = []
+        for y in ys:  # a centre on an edge shared by two faces counts once
+            if merged and y - merged[-1] < 0.05:
+                continue
+            merged.append(y)
+        if len(merged) % 2:  # not closed here (a seam or a tangent face): keep only the surfaces
+            odd += 1
+            continue
+        for lo, hi in zip(merged[::2], merged[1::2]):
+            for y in range(max(0, math.floor(lo + 0.5)), max(0, math.floor(hi - 0.01)) + 1):
                 solid.add((col[0], y, col[1]))
+    if odd:
+        print(f"  {odd} of {len(hits)} columns cross the surface an odd number of times", flush=True)
     return solid, surf, height
 
 
