@@ -133,9 +133,11 @@ final class Arena {
      * field) on the front block of each row, an aisle every 16 along, and a parapet at the back.
      * <p>
      * Under the rows, where they are high enough, a concourse (コンコース) three blocks high on paving, with pillars
-     * and ceiling lights; the back is the outer wall, white pilasters every 8 blocks and an open gate under a lintel
-     * every 24, into the concourse. Every 32 along, on an aisle, a vomitory (出入口) three wide: from the concourse a
-     * stair climbs towards the field inside the stand to a tunnel that comes out half way up the rows, under a hood.
+     * and ceiling lights, a kiosk and toilets' wash basins along its back every 48; closed at the stands' ends; the
+     * back is the outer wall, white pilasters every 8 blocks and an open gate under a lintel every 24, into the
+     * concourse. Every 32 along, on an aisle, a vomitory (出入口) three wide: from the concourse a
+     * stair climbs towards the field inside the stand to a tunnel that comes out half way up the rows, under a hood
+     * with a railing.
      *
      * @param depth the stands' depth from the field's edge
      * @param seats the seats ({@link #seat}) from the front rows to the back, in as many tiers as given
@@ -178,7 +180,11 @@ final class Arena {
             int openFrom = Integer.MAX_VALUE, openTo = Integer.MIN_VALUE;
             String step = null;
             int stepY = -1;
-            boolean concourse = !outside && dist > 3 && top >= 6;
+            // The concourse stays inside: a column at an end of the stands (beside neither field nor stand) is the
+            // end wall.
+            boolean end = !standAt(f, zone, depth, x + 1, z) || !standAt(f, zone, depth, x - 1, z)
+                    || !standAt(f, zone, depth, x, z + 1) || !standAt(f, zone, depth, x, z - 1);
+            boolean concourse = !outside && !end && dist > 3 && top >= 6;
             boolean gate = outside && Math.floorMod(along, 24) >= 10 && Math.floorMod(along, 24) <= 12;
             boolean low = concourse || gate;
             if (vomitory && row > mid && row <= mid + 2 && row < rows) {
@@ -188,6 +194,9 @@ final class Arena {
                 top = tunnel + 4;
                 cap = CONCRETE;
                 seat = null;
+                if (row == mid + 1 && s - 2 * row < 1) {
+                    above = "minecraft:glass_pane"; // a railing along the hood's front edge
+                }
             } else if (vomitory && row > mid + 2) {
                 // The stair down from the tunnel to the concourse, one block per block away from the field.
                 int c = (int) Math.floor(s - 2 * (mid + 3));
@@ -221,6 +230,18 @@ final class Arena {
                 }
                 m.set(x, y, z, b);
             }
+            // Along the back wall of the concourse, a kiosk (売店: a counter, its signboard over it) every 48 and the
+            // wash basins outside the toilets (marked blue and red) beside it.
+            if (concourse && dist > depth - 1.5) {
+                int k = Math.floorMod(along, 48);
+                if (k >= 28 && k <= 33) {
+                    m.set(x, 1, z, "minecraft:smooth_quartz");
+                    m.set(x, 3, z, "minecraft:orange_terracotta");
+                } else if (k >= 38 && k <= 43) {
+                    m.set(x, 1, z, "minecraft:cauldron");
+                    m.set(x, 3, z, k <= 40 ? "minecraft:light_blue_terracotta" : "minecraft:pink_terracotta");
+                }
+            }
             if (top >= openFrom && top <= openTo) {
                 return; // the stair's head comes out through the floor of a row: leave it open
             }
@@ -233,6 +254,15 @@ final class Arena {
             }
         });
         return base + rows + 1;
+    }
+
+    /** Whether a column is part of the field or of these stands. */
+    private static boolean standAt(Field f, Zone zone, int depth, int x, int z) {
+        double d = f.dist(x, z);
+        if (d == 0) {
+            return true;
+        }
+        return d <= depth + 0.5 && zone.accept(x, z, f.nearX(x, z), f.nearZ(x, z));
     }
 
     /**
