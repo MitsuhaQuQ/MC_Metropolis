@@ -305,7 +305,7 @@ public final class TestKit implements DedicatedServerModInitializer {
     /**
      * The nearest piece of a class of street ({@code class}, e.g. BOULEVARD) to (x, z) in the plan of the town owning
      * that point, as this world planned it (the settlements are planned in the order they are needed, so a town here
-     * may differ a little from one the tools plan), well inside a run of it (with end=1, at an end of a run): its middle and heading in degrees, or found
+     * may differ a little from one the tools plan), well inside a run of it (with end=1, at an end of a run): its middle, the ground there once loaded, and heading in degrees, or found
      * false.
      */
     private Object street(Map<String, String> query, String body) {
@@ -339,8 +339,21 @@ public final class TestKit implements DedicatedServerModInitializer {
         if (best == null) {
             return Map.of("found", false);
         }
-        return Map.of("found", true, "x", 0.5 * (best.x1() + best.x2()), "z", 0.5 * (best.z1() + best.z2()),
-                "heading", Math.toDegrees(Math.atan2(best.z2() - best.z1(), best.x2() - best.x1())), "width", best.width());
+        double mx = 0.5 * (best.x1() + best.x2());
+        double mz = 0.5 * (best.z1() + best.z2());
+        Map<String, Object> found = new java.util.LinkedHashMap<>();
+        found.put("found", true);
+        found.put("x", mx);
+        found.put("z", mz);
+        found.put("heading", Math.toDegrees(Math.atan2(best.z2() - best.z1(), best.x2() - best.x1())));
+        found.put("width", best.width());
+        // The ground there (the top of the surface, plants aside), once its chunk is loaded
+        int bx = (int) Math.floor(mx);
+        int bz = (int) Math.floor(mz);
+        if (overworld().hasChunk(bx >> 4, bz >> 4)) {
+            found.put("ground", overworld().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz));
+        }
+        return found;
     }
 
     private static boolean near(com.mtm.citybuilder.core.street.StreetSegment o, double x, double z) {

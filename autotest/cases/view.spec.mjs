@@ -63,4 +63,10 @@ test('the castle town seen from the test client', async ({}, testInfo) => {
   await server.generate(Math.round(e.x) - 48, Math.round(e.z) - 48, Math.round(e.x) + 47, Math.round(e.z) + 47);
   await view('boulevard-end', Math.round(e.x), 130, Math.round(e.z), 0, 90, testInfo);
   await view('boulevard-along', bx - 40 * Math.cos(h) - 6 * Math.sin(h), 74, bz - 40 * Math.sin(h) + 6 * Math.cos(h), yaw, 12, testInfo);
+  // At eye height on the pavement's edge, looking along it and a little across: the kerb down to the carriageway
+  const g = await server.street(TOWN.x, TOWN.z, 'BOULEVARD');
+  expect(Number.isFinite(g.ground)).toBe(true);
+  const across = 0.5 * g.width - 4 + 0.5;
+  await view('kerb', g.x - 20 * Math.cos(h) - across * Math.sin(h), g.ground, g.z - 20 * Math.sin(h) + across * Math.cos(h),
+    yaw - 25, 20, testInfo);
 });

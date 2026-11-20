@@ -97,6 +97,27 @@ def sidewalk():
     return rows
 
 
+def sidewalk_side():
+    """The pavement's side: a kerb stone along the top (the 3 pixels a lowered carriageway leaves showing, about 19 cm,
+    a lighter edge on its top), a joint under it, and the darker concrete of the kerb's body below."""
+    rows = []
+    for y in range(16):
+        row = []
+        for x in range(16):
+            n = noise(x, y, 5) * 5
+            if y == 0:
+                base = 196
+            elif y < 3:
+                base = 184 - (6 if x % 8 == 7 else 0)
+            elif y == 3:
+                base = 120
+            else:
+                base = 146
+            row.append((clamp(base + n), clamp(base - 1 + n), clamp(base - 4 + n)))
+        rows.append(row)
+    return rows
+
+
 def main():
     os.makedirs(os.path.join(OUT, 'line'), exist_ok=True)
     png(os.path.join(OUT, 'asphalt.png'), [[asphalt(x, y) for x in range(16)] for y in range(16)])
@@ -105,6 +126,7 @@ def main():
             for offset in range(OFFSETS):
                 png(os.path.join(OUT, 'line', f'{name}_{angle}_{offset}.png'), marking(colour, angle, offset))
     png(os.path.join(OUT, 'sidewalk.png'), sidewalk())
+    png(os.path.join(OUT, 'sidewalk_side.png'), sidewalk_side())
 
 
 if __name__ == '__main__':

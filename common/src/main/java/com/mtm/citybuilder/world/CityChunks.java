@@ -3,6 +3,7 @@ package com.mtm.citybuilder.world;
 import com.mtm.citybuilder.CityBuilder;
 import com.mtm.citybuilder.block.CityBlocks;
 import com.mtm.citybuilder.block.MarkingBlock;
+import com.mtm.citybuilder.block.PavingBlock;
 import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.chunk.ChunkLayer;
 import net.minecraft.core.BlockPos;
@@ -33,7 +34,7 @@ public final class CityChunks {
     private static BlockState paving(ChunkLayer.Column column) {
         ChunkLayer.Mark mark = ChunkLayer.mark(column);
         return switch (mark.paving()) {
-            case ASPHALT -> CityBlocks.ASPHALT.get().defaultBlockState();
+            case ASPHALT -> CityBlocks.ASPHALT.get().defaultBlockState().setValue(PavingBlock.LOW, mark.low());
             case WHITE_LINE -> line(CityBlocks.ASPHALT_LINE_WHITE.get(), mark);
             case YELLOW_LINE -> line(CityBlocks.ASPHALT_LINE_YELLOW.get(), mark);
             case SIDEWALK -> CityBlocks.SIDEWALK.get().defaultBlockState();
@@ -43,7 +44,8 @@ public final class CityChunks {
     }
 
     private static BlockState line(Block block, ChunkLayer.Mark mark) {
-        return block.defaultBlockState().setValue(MarkingBlock.ANGLE, mark.angle()).setValue(MarkingBlock.OFFSET, mark.offset());
+        return block.defaultBlockState().setValue(MarkingBlock.ANGLE, mark.angle()).setValue(MarkingBlock.OFFSET, mark.offset())
+                .setValue(PavingBlock.LOW, mark.low());
     }
 
     private static boolean paving(BlockState state) {

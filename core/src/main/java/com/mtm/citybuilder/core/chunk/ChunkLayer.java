@@ -90,9 +90,14 @@ public final class ChunkLayer {
     /**
      * A column's paving, and for a line where it crosses the block: its direction, {@code angle} times 180 /
      * {@link #ANGLES} degrees from +x towards +z, and its position across the block from 0 to {@link #OFFSETS} - 1,
-     * measured along the direction's normal (-sin, cos) over the block's span that way.
+     * measured along the direction's normal (-sin, cos) over the block's span that way; {@code low} for the
+     * carriageway of a street with pavements, laid lower than them by a kerb.
      */
-    public record Mark(Paving paving, int angle, int offset) {
+    public record Mark(Paving paving, int angle, int offset, boolean low) {
+        /** A mark at full height. */
+        public Mark(Paving paving, int angle, int offset) {
+            this(paving, angle, offset, false);
+        }
     }
 
     /** A line along a street: how far from the centre line, its colour, whether dashed. */
@@ -110,7 +115,9 @@ public final class ChunkLayer {
      * and white edge lines; a boulevard has pavements of 4, a planted median of {@link #MEDIAN} (paving slabs on a
      * bridge) with a white line along either side, white edge lines and dashed white lines between lanes of about 3;
      * a street or an old road is plain asphalt, as narrow Japanese streets have no centre line; a lane is paving
-     * slabs. Where marked streets meet, the junction is plain asphalt, the median and the lines broken off.
+     * slabs. Where marked streets meet, the junction is plain asphalt, the median and the lines broken off. The
+     * carriageway of a street with pavements (and a junction's) is laid low, a kerb below the pavements and the
+     * median; streets without pavements are level with the ground.
      * <p>
      * A line is drawn where its centre crosses the block, at the angle of the {@link #ANGLES} nearest the street's
      * heading and at the position it crosses at, so a line at an angle to the blocks, and round a bend, runs on
@@ -130,7 +137,7 @@ public final class ChunkLayer {
         }
         // Where arterials meet no line runs on across the junction, and no pavement cuts across a carriageway
         if (column.junction) {
-            return new Mark(column.carriageway ? Paving.ASPHALT : Paving.SIDEWALK, 0, 0);
+            return column.carriageway ? new Mark(Paving.ASPHALT, 0, 0, true) : new Mark(Paving.SIDEWALK, 0, 0);
         }
         double width = column.width;
         double half = 0.5 * width;
@@ -186,11 +193,13 @@ public final class ChunkLayer {
                 best = line;
             }
         }
+        // A carriageway with pavements beside it is laid low
+        boolean low = walk > 0;
         if (best == null) {
-            return new Mark(Paving.ASPHALT, angle, 0);
+            return new Mark(Paving.ASPHALT, angle, 0, low);
         }
         int offset = (int) Math.floor((bestShift + span) / (2.0 * span) * OFFSETS);
-        return new Mark(best.paving, angle, Math.max(0, Math.min(OFFSETS - 1, offset)));
+        return new Mark(best.paving, angle, Math.max(0, Math.min(OFFSETS - 1, offset)), low);
     }
 
     /** The direction of the {@link #ANGLES} nearest a heading, a line having no sense. */

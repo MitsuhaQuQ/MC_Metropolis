@@ -1,7 +1,10 @@
 {
   "variants": {
-    "": {
+    "low=false": {
       "model": "citybuilder:block/asphalt"
+    },
+    "low=true": {
+      "model": "citybuilder:block/asphalt_low"
     }
   }
 }

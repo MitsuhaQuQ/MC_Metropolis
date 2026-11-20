@@ -224,6 +224,29 @@ class ChunkLayerTest {
     }
 
     @Test
+    void carriagewaysWithPavementsAreLaidLow() {
+        java.util.function.BiFunction<ChunkLayer.Surface, double[], ChunkLayer.Mark> mark = (surface, at) ->
+                ChunkLayer.mark(new ChunkLayer.Column(surface, false, Double.NaN, at[0], 0.0, 7.0, at[1]));
+        // An arterial's and a collector's carriageway, lines included, a kerb below their pavements
+        assertTrue(mark.apply(ChunkLayer.Surface.ARTERIAL, new double[]{1.0, 16.0}).low());
+        assertTrue(mark.apply(ChunkLayer.Surface.ARTERIAL, new double[]{4.5, 16.0}).low());
+        assertTrue(!mark.apply(ChunkLayer.Surface.ARTERIAL, new double[]{6.5, 16.0}).low());
+        assertTrue(mark.apply(ChunkLayer.Surface.ARTERIAL, new double[]{0.0, 11.0}).low());
+        // A boulevard's median stands up with its pavements
+        assertTrue(mark.apply(ChunkLayer.Surface.BOULEVARD, new double[]{6.0, 30.0}).low());
+        assertTrue(!mark.apply(ChunkLayer.Surface.BOULEVARD, new double[]{0.5, 30.0}).low());
+        // Streets without pavements, old roads and lanes are level with the ground
+        assertTrue(!mark.apply(ChunkLayer.Surface.STREET, new double[]{0.0, 6.0}).low());
+        assertTrue(!mark.apply(ChunkLayer.Surface.OLD_ROAD, new double[]{0.0, 8.0}).low());
+        assertTrue(!mark.apply(ChunkLayer.Surface.LANE, new double[]{0.0, 2.5}).low());
+        // A junction's carriageway is low, its pavement corners not
+        assertTrue(ChunkLayer.mark(new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false, Double.NaN, 0.0, 0.0, 0.0,
+                16.0, true, true)).low());
+        assertTrue(!ChunkLayer.mark(new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false, Double.NaN, 7.0, 0.0, 0.0,
+                16.0, true, false)).low());
+    }
+
+    @Test
     void anglesStepEvery180OverTheirCount() {
         assertEquals(0, ChunkLayer.angle(0.0));
         assertEquals(0, ChunkLayer.angle(Math.PI));

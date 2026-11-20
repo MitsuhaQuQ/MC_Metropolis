@@ -12,13 +12,13 @@ import java.util.function.Supplier;
  * {@code assets/citybuilder/ATTRIBUTION}).
  */
 public final class CityBlocks {
-    /** Asphalt, the carriageway. */
+    /** Asphalt, the carriageway (see {@link PavingBlock}: lowered beside pavements). */
     public static Supplier<Block> ASPHALT;
     /** Asphalt with a white line across it (see {@link MarkingBlock}): lane and edge lines. */
     public static Supplier<Block> ASPHALT_LINE_WHITE;
     /** Asphalt with a yellow line across it: the centre line where no overtaking is allowed. */
     public static Supplier<Block> ASPHALT_LINE_YELLOW;
-    /** Paving slabs of a pavement and of a lane. */
+    /** Paving slabs of a pavement and of a lane, kerb stones on its sides. */
     public static Supplier<Block> SIDEWALK;
 
     private CityBlocks() {
@@ -27,7 +27,7 @@ public final class CityBlocks {
     /** Registers the blocks; called once from the mod's entry point. */
     public static void register() {
         Platform platform = Platform.get();
-        ASPHALT = platform.registerBlock("asphalt", () -> new Block(properties()));
+        ASPHALT = platform.registerBlock("asphalt", () -> new PavingBlock(properties()));
         ASPHALT_LINE_WHITE = platform.registerBlock("asphalt_line_white", () -> new MarkingBlock(properties()));
         ASPHALT_LINE_YELLOW = platform.registerBlock("asphalt_line_yellow", () -> new MarkingBlock(properties()));
         SIDEWALK = platform.registerBlock("sidewalk", () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE_BRICKS)));
