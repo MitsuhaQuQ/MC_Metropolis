@@ -6,6 +6,10 @@ import com.mtm.citybuilder.core.culture.CultureRegion;
 import com.mtm.citybuilder.core.debug.CultureMap;
 import com.mtm.citybuilder.core.debug.ExtentMap;
 import com.mtm.citybuilder.core.debug.HighSpeedMap;
+import com.mtm.citybuilder.core.debug.StreetMap;
+import com.mtm.citybuilder.core.street.StreetClass;
+import com.mtm.citybuilder.core.street.StreetMetrics;
+import com.mtm.citybuilder.core.street.StreetPlan;
 import com.mtm.citybuilder.core.debug.RailMap;
 import com.mtm.citybuilder.core.rail.HighSpeedLine;
 import com.mtm.citybuilder.core.debug.RoadMap;
@@ -56,7 +60,7 @@ public final class CityMap {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 5) {
-            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements|extent|roads|rail|highspeed]");
+            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements|extent|roads|rail|highspeed|streets]");
             System.exit(2);
         }
         long seed = Long.parseLong(args[0]);
@@ -106,6 +110,11 @@ public final class CityMap {
                 spawn(new CityLogic(seed, CitySettings.DEFAULT, counting), centerX, centerZ, counting);
                 return;
             }
+            case "streets" -> {
+                StreetPlan plan = streetStats(logic, centerX, centerZ);
+                start = System.nanoTime();
+                image = StreetMap.render(logic, plan, centerX, centerZ, scale, size);
+            }
             case "highspeed" -> {
                 List<HighSpeedLine> lines = highSpeedStats(logic, centerX, centerZ, half);
                 start = System.nanoTime();
@@ -121,7 +130,7 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = RoadMap.render(logic, edges, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail or highspeed");
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed or streets");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();
@@ -357,6 +366,42 @@ public final class CityMap {
         Runtime runtime = Runtime.getRuntime();
         System.out.printf("spawn heap in use after a collection: %.0f MB (everything cached: MTM_worldgen's and the city logic's)%n",
                 (runtime.totalMemory() - runtime.freeMemory()) / 1048576.0);
+    }
+
+    /**
+     * Lays out the streets of the town nearest to a position, timed, and reports its formation, anchors, street
+     * lengths by class and the orientation order of its arterials.
+     */
+    private static StreetPlan streetStats(CityLogic logic, double x, double z) {
+        long start = System.nanoTime();
+        Settlement nearest = null;
+        double best = Double.POSITIVE_INFINITY;
+        for (Settlement settlement : logic.settlements(x - 6000, z - 6000, x + 6000, z + 6000, SettlementTier.TOWN)) {
+            double d = Math.hypot(settlement.x() - x, settlement.z() - z);
+            if (d < best) {
+                best = d;
+                nearest = settlement;
+            }
+        }
+        if (nearest == null) {
+            throw new IllegalStateException("No town, city or metropolis within 6 km of " + x + " " + z);
+        }
+        System.out.printf("Nearest town: %s at %.0f %.0f (found in %.1f s)%n", nearest.tier(), nearest.x(), nearest.z(),
+                (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        StreetPlan plan = logic.streetPlan(nearest);
+        System.out.printf("L5 %s: laid out in %.1f s; anchors %s%n", plan.formation(), (System.nanoTime() - start) / 1e9,
+                plan.anchors().stream().map(a -> a.kind().toString()).toList());
+        for (StreetClass streetClass : StreetClass.values()) {
+            double length = plan.length(streetClass);
+            if (length > 0) {
+                System.out.printf("  %-9s %6.1f km%n", streetClass, length / 1000);
+            }
+        }
+        System.out.printf("  arterial orientation order %.2f (OSM: Kyoto 0.81, Kanazawa 0.06, Takayama 0.17)%n",
+                StreetMetrics.orientationOrder(plan.segments().stream()
+                        .filter(s -> s.streetClass() == StreetClass.ARTERIAL).toList()));
+        return plan;
     }
 
     /**

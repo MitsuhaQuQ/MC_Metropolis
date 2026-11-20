@@ -27,6 +27,7 @@ public final class CitySettings {
     public Roads roads = new Roads();
     public Rail rail = new Rail();
     public HighSpeed highSpeed = new HighSpeed();
+    public Streets streets = new Streets();
 
     public static final class General {
         /** Edge of a logic region in blocks: the unit results are cached in, never a boundary of any rule. */
@@ -356,6 +357,61 @@ public final class CitySettings {
         public double margin = 8.0;
         public double stationLength = 400.0;
         public double stationWidth = 60.0;
+    }
+
+    /**
+     * L5: the skeleton of a town's streets. The formation comes from the land and the tier; the arterials are traced
+     * as streamlines of a direction field blending a grid, a radial field round the town's anchor, the old roads and
+     * the contours, weighted by formation.
+     */
+    public static final class Streets {
+        /** A metropolis is a planned capital where this share of its built land is flat, and its hash below the chance. */
+        public double joriFlatShare = 0.7;
+        public double joriChance = 0.5;
+        /** Grade under which built land counts as flat. */
+        public double flatGrade = 0.03;
+        /** A town or city with the sea this close to its centre may be a port town; cities are, at this chance. */
+        public double portReach = 1500.0;
+        public double portChance = 0.4;
+        /** A town this high above the sea, or on a plateau, is a resort. */
+        public double resortHeight = 500.0;
+        /** Distance between arterials, by formation. */
+        public double joriSpacing = 480.0;
+        public double castleSpacing = 420.0;
+        public double templeSpacing = 360.0;
+        public double portSpacing = 360.0;
+        public double resortSpacing = 520.0;
+        /**
+         * Size of the patches of a town's grid outside a capital: each patch is turned its own way, as castle towns and
+         * suburbs grew a quarter at a time (one grid for the whole town measured as ordered as Kyoto).
+         */
+        public double patchSize = 1200.0;
+        /** Built land, where streets run: the town's own urban intensity above this. */
+        public double builtIntensity = 0.12;
+        /** Steepest grade a street climbs; steeper ground ends it. */
+        public double maxGrade = 0.10;
+        /** Tracing step along a streamline. */
+        public double step = 16.0;
+        /** How far the old roads and the anchor steer the direction field. */
+        public double oldRoadReach = 300.0;
+        public double radialReach = 1500.0;
+        /** Radius of the grounds kept open round a castle, palace or temple, by tier: no street crosses them. */
+        public double groundsMetropolis = 450.0;
+        public double groundsCity = 300.0;
+        public double groundsTown = 120.0;
+        /** Where a castle or a temple is looked for around the centre: the highest land within. */
+        public double castleReach = 1000.0;
+        public double templeReach = 1500.0;
+        /** Above this urban intensity, streets belong to the old town; below, to the modern town. */
+        public double oldTownIntensity = 0.55;
+        /** Widths: old roads, arterials, and the avenue from the station to the centre. */
+        public double oldRoadWidth = 8.0;
+        public double arterialWidth = 16.0;
+        public double stationAvenueWidth = 24.0;
+        /** A station avenue is laid only up to this long. */
+        public double stationAvenueMax = 4000.0;
+        /** Most streamlines traced for one town. */
+        public int maxLines = 3000;
     }
 
     /** One tier of settlements. */

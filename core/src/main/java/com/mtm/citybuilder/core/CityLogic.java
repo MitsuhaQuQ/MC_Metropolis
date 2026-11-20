@@ -20,6 +20,9 @@ import com.mtm.citybuilder.core.rail.SpineNode;
 import com.mtm.citybuilder.core.rail.RailLayer;
 import com.mtm.citybuilder.core.rail.RailRoute;
 import com.mtm.citybuilder.core.road.RoadEdge;
+import com.mtm.citybuilder.core.street.Formation;
+import com.mtm.citybuilder.core.street.StreetLayer;
+import com.mtm.citybuilder.core.street.StreetPlan;
 import com.mtm.citybuilder.core.road.RoadLayer;
 import com.mtm.citybuilder.core.road.RoadRoute;
 import com.mtm.citybuilder.core.plan.PlanStore;
@@ -80,6 +83,7 @@ public final class CityLogic {
     private final RoadLayer roads;
     private final RailLayer rail;
     private final HighSpeedLayer highSpeed;
+    private final StreetLayer streets;
 
     /** City logic whose plans are kept in memory only, as for tests and tools. */
     public CityLogic(long seed, CitySettings settings, TerrainView terrain) {
@@ -163,6 +167,7 @@ public final class CityLogic {
             }
         });
         this.highSpeed = new HighSpeedLayer(seed, settings, terrain, CityLogic.this::settlements);
+        this.streets = new StreetLayer(this);
         this.roads = new RoadLayer(settings, terrain, new RoadLayer.Below() {
             @Override
             public double broadSuitabilityNode(int nodeX, int nodeZ) {
@@ -411,6 +416,16 @@ public final class CityLogic {
     /** Whether a position lies in a reserved high-speed corridor or station zone, where nothing is to be built. */
     public boolean highSpeedReserved(double x, double z) {
         return highSpeed.reserved(x, z);
+    }
+
+    /** L5: the skeleton of a settlement's streets. */
+    public StreetPlan streetPlan(Settlement settlement) {
+        return streets.plan(settlement);
+    }
+
+    /** L5: the skeleton of a settlement's streets as a given formation, whatever it would be formed as. */
+    public StreetPlan streetPlan(Settlement settlement, Formation formation) {
+        return streets.plan(settlement, formation);
     }
 
     private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {
