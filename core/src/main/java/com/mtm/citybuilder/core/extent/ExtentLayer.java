@@ -27,7 +27,9 @@ import java.util.stream.IntStream;
  * <p>
  * A centre may lie in a lake (L2 judges the big tiers without lakes): the flood then crosses that lake at no more than
  * its length, so the city grows along the shores all round, its target area {@code lakeAreaFactor} times larger, and
- * the cheapest land node, on the shore, is its actual centre. Other water costs bridges as usual.
+ * the cheapest land node, on the shore, is its actual centre. Small lakes, no larger than {@code smallLakeShare} of
+ * the target area, are crossed the same way wherever they lie, so a town beside one grows round it, and the lake's
+ * area within the target is added to the land the city takes. Rivers, large lakes and other water cost bridges.
  * <p>
  * An extent depends only on its settlement and the terrain, so it comes out the same whichever region asks. Where
  * extents overlap, the more intense one owns the land. Within the culture border's farmland belt nothing is built.
@@ -107,6 +109,7 @@ public final class ExtentLayer {
         int originZ = centreZ - half;
 
         byte[] kind = new byte[size * size];
+        boolean[] lake = new boolean[size * size];
         float[] suit = new float[size * size];
         float[] height = new float[size * size];
         // Rows read the terrain independently: in parallel
@@ -127,6 +130,7 @@ public final class ExtentLayer {
                 } else {
                     kind[k] = WATER;
                     double level = terrain.lakeLevel(x, z);
+                    lake[k] = !Double.isNaN(level);
                     height[k] = (float) (Double.isNaN(level) ? terrain.smoothHeight(x, z) : level);
                 }
             }
@@ -138,28 +142,34 @@ public final class ExtentLayer {
         PriorityQueue<double[]> queue = new PriorityQueue<>((a, b) -> Double.compare(a[0], b[0]) != 0
                 ? Double.compare(a[0], b[0]) : Double.compare(a[1], b[1]));
         int start = startNode(kind, size, half);
-        // The lake the centre lies in, which the flood crosses at its length
+        // Lakes the flood crosses at their length, so the city grows round them: the one the centre lies in, and the
+        // small ones, no larger than smallLakeShare of the target area and wholly inside the window
         boolean[] home = new boolean[size * size];
-        if (start >= 0 && kind[start] == WATER) {
-            ArrayDeque<Integer> lake = new ArrayDeque<>();
-            lake.add(start);
-            home[start] = true;
-            while (!lake.isEmpty()) {
-                int k = lake.poll();
-                for (int[] step : STEPS) {
-                    int ni = k / size + step[0];
-                    int nj = k % size + step[1];
-                    if (ni >= 0 && nj >= 0 && ni < size && nj < size && kind[ni * size + nj] == WATER
-                            && !home[ni * size + nj]) {
-                        home[ni * size + nj] = true;
-                        lake.add(ni * size + nj);
-                    }
+        boolean[] small = new boolean[size * size];
+        if (start >= 0 && lake[start]) {
+            component(lake, size, start, home);
+        }
+        double smallLake = config.smallLakeShare * Math.PI * radius * radius / ((double) grid * grid);
+        boolean[] seen = home.clone();
+        boolean[] part = new boolean[size * size];
+        for (int k = 0; k < size * size; k++) {
+            if (!lake[k] || seen[k]) {
+                continue;
+            }
+            Arrays.fill(part, false);
+            int[] found = component(lake, size, k, part);
+            for (int m = 0; m < size * size; m++) {
+                if (part[m]) {
+                    seen[m] = true;
+                    small[m] = found[1] == 0 && found[0] <= smallLake;
                 }
             }
         }
         double stop = 0.0;
         boolean stopped = false;
         int taken = 0;
+        // Small lakes within the target take no land from the city: as much land again is added to its target
+        int lakeBonus = 0;
         int core = -1;
         if (start >= 0) {
             cost[start] = 0f;
@@ -181,10 +191,14 @@ public final class ExtentLayer {
                 // The cheapest land: the actual centre, on the shore when the centre lies in a lake
                 core = k;
             }
-            if (!stopped && kind[k] == LAND && Math.hypot(ki - half, kj - half) * grid <= coreDistance) {
+            boolean within = Math.hypot(ki - half, kj - half) * grid <= coreDistance;
+            if (!stopped && small[k] && within) {
+                lakeBonus++;
+            }
+            if (!stopped && kind[k] == LAND && within) {
                 taken++;
                 stop = head[0];
-                if (taken >= targetNodes) {
+                if (taken >= targetNodes + lakeBonus) {
                     stopped = true;
                     if (tail <= 1.0) {
                         break;
@@ -212,7 +226,7 @@ public final class ExtentLayer {
                         next += config.climbCost * Math.abs(height[n] - height[k]);
                     }
                 } else {
-                    next += length * (home[n] ? 1.0 : 1.0 + config.bridgeCost);
+                    next += length * (home[n] || small[n] ? 1.0 : 1.0 + config.bridgeCost);
                 }
                 if (next < cost[n]) {
                     cost[n] = (float) next;
@@ -253,6 +267,36 @@ public final class ExtentLayer {
         double coreX = core < 0 ? settlement.x() : (double) (originX + core / size) * grid;
         double coreZ = core < 0 ? settlement.z() : (double) (originZ + core % size) * grid;
         return new CityExtent(settlement, originX, originZ, size, cost, intensity, stop, built, coreX, coreZ, onLake);
+    }
+
+    /**
+     * Marks the lake nodes connected to one, and returns how many there are and whether any lies on the window's
+     * edge (1) or not (0): a lake reaching the edge may go on beyond it, so its size is not known.
+     */
+    private static int[] component(boolean[] lake, int size, int from, boolean[] mark) {
+        ArrayDeque<Integer> queue = new ArrayDeque<>();
+        queue.add(from);
+        mark[from] = true;
+        int count = 0;
+        int edge = 0;
+        while (!queue.isEmpty()) {
+            int k = queue.poll();
+            count++;
+            int i = k / size;
+            int j = k % size;
+            if (i == 0 || j == 0 || i == size - 1 || j == size - 1) {
+                edge = 1;
+            }
+            for (int[] step : STEPS) {
+                int ni = i + step[0];
+                int nj = j + step[1];
+                if (ni >= 0 && nj >= 0 && ni < size && nj < size && lake[ni * size + nj] && !mark[ni * size + nj]) {
+                    mark[ni * size + nj] = true;
+                    queue.add(ni * size + nj);
+                }
+            }
+        }
+        return new int[]{count, edge};
     }
 
     /**

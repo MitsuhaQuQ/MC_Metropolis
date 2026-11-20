@@ -99,6 +99,36 @@ class ExtentLayerTest {
     }
 
     @Test
+    void aCityBesideASmallLakeGrowsRoundIt() {
+        double lakeX = 20000;
+        double lakeRadius = 600;
+        CityLogic logic = new CityLogic(3L, SETTINGS, new LakeTerrain(lakeX, 0, lakeRadius));
+        // On land, 1200 blocks west of the lake's middle
+        Settlement city = new Settlement(78L, SettlementTier.CITY, 0, 0, lakeX - 1200, 0, Style.ASIA, 0.6);
+        CityExtent extent = logic.extent(city);
+        assertFalse(extent.onLake());
+        // Built up on the far side of the lake too, not only on the near shore
+        int farX = (int) Math.round((lakeX + lakeRadius + 200) / 64);
+        assertTrue(extent.intensity(farX, 0) > 0.3, "far shore " + extent.intensity(farX, 0));
+        // And the city takes as much more land as the lake covers
+        int land = 0;
+        for (int i = 0; i < extent.size(); i++) {
+            for (int j = 0; j < extent.size(); j++) {
+                int nodeX = extent.originX() + i;
+                int nodeZ = extent.originZ() + j;
+                if (extent.cost(nodeX, nodeZ) <= extent.radius()
+                        && Math.hypot(nodeX * 64.0 - lakeX, nodeZ * 64.0) >= lakeRadius) {
+                    land++;
+                }
+            }
+        }
+        double radius = logic.targetRadius(city);
+        double target = Math.PI * radius * radius + Math.PI * lakeRadius * lakeRadius;
+        double area = land * 64.0 * 64.0;
+        assertTrue(area > 0.85 * target && area < 1.15 * target, "land " + area + " against " + target);
+    }
+
+    @Test
     void regionsAgreeOnTheirSharedEdge() {
         CityLogic logic = new CityLogic(3L, SETTINGS, SyntheticTerrain.flatPlains());
         Settlement city = first(logic, SettlementTier.METROPOLIS, 6000, -20000, 42000, 20000);
