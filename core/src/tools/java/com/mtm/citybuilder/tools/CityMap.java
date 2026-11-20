@@ -124,6 +124,23 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = com.mtm.citybuilder.core.debug.PlotMap.render(plots, centerX, centerZ, scale, size);
             }
+            case "airports" -> {
+                long t0 = System.nanoTime();
+                List<com.mtm.citybuilder.core.airport.Airport> airports = logic.airports().airports(centerX - half, centerZ - half,
+                        centerX + half, centerZ + half);
+                List<Settlement> towns = logic.settlements(centerX - half, centerZ - half, centerX + half, centerZ + half,
+                        com.mtm.citybuilder.core.settlement.SettlementTier.CITY);
+                System.out.printf("Airports: %d in the area, sited in %.1f s; %d metropolises and cities%n", airports.size(),
+                        (System.nanoTime() - t0) / 1e9, towns.size());
+                for (com.mtm.citybuilder.core.airport.Airport a : airports) {
+                    Settlement served = towns.stream().filter(t -> t.id() == a.town()).findFirst().orElse(null);
+                    System.out.printf("  %-8s at %.0f %.0f heading %.0f deg, runway %.0f x %.0f, field at %.0f, levelling %.1f, %s%n",
+                            a.kind(), a.x(), a.z(), Math.toDegrees(a.heading()), a.length(), a.width(), a.elevation(), a.earthwork(),
+                            served == null ? "for a town outside the area" : String.format("%.1f km from its %s", Math.hypot(a.x() - served.x(), a.z() - served.z()) / 1000, served.tier()));
+                }
+                start = System.nanoTime();
+                image = com.mtm.citybuilder.core.debug.AirportMap.render(logic, airports, towns, centerX, centerZ, scale, size);
+            }
             case "highspeed" -> {
                 List<HighSpeedLine> lines = highSpeedStats(logic, centerX, centerZ, half);
                 start = System.nanoTime();
@@ -139,7 +156,7 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = RoadMap.render(logic, edges, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed, streets, districts or plots");
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed, streets, districts, plots or airports");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();

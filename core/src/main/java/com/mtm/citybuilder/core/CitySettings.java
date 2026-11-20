@@ -30,6 +30,7 @@ public final class CitySettings {
     public Streets streets = new Streets();
     public Transit transit = new Transit();
     public Plots plots = new Plots();
+    public Airports airports = new Airports();
 
     public static final class General {
         /** Edge of a logic region in blocks: the unit results are cached in, never a boundary of any rule. */
@@ -779,6 +780,48 @@ public final class CitySettings {
         public double priorityOldRoad = 4.0;
         public double priorityStreet = 0.0;
         public double priorityLane = -2.0;
+    }
+
+    /**
+     * Airports: every metropolis one, a city with the chance {@code cityChance} when no metropolis lies within
+     * {@code metropolisClear}. A runway {@code metropolisRunway} by {@code metropolisWidth} (a city's
+     * {@code cityRunway} by {@code cityWidth}), sited on a ring {@code metropolisMin} to {@code metropolisMax} from the
+     * town ({@code cityMin} to {@code cityMax}), every {@code ringStep} out at {@code angles} places round and
+     * {@code headings} directions. On flat land: relief over the field at most {@code landRelief}. On a hill: the
+     * field's ground {@code hillRise} to {@code hillRiseMax} above the lowest ground {@code hillRing} round it, its
+     * mean cut or fill at most {@code hillEarthwork}. At sea: the field and a {@code offshoreMargin} round it at sea,
+     * land within {@code offshoreReach}, filled to {@code offshoreLift} above the sea, its fill counted
+     * {@code offshoreFillWeight} as levelling. Chances among those found: at sea {@code offshoreChance}, on a hill
+     * (when flat land is found too) {@code hillChance}. Each km from the town counts {@code distanceWeight} of levelling.
+     */
+    public static final class Airports {
+        public double metropolisRunway = 3000.0;
+        public double metropolisWidth = 60.0;
+        public double cityRunway = 2000.0;
+        public double cityWidth = 45.0;
+        public double cityChance = 0.35;
+        public double metropolisClear = 40000.0;
+        public double metropolisMin = 4000.0;
+        public double metropolisMax = 20000.0;
+        public double cityMin = 3000.0;
+        public double cityMax = 12000.0;
+        public double ringStep = 1000.0;
+        public int angles = 24;
+        public int headings = 12;
+        public double landRelief = 15.0;
+        public double hillRise = 30.0;
+        public double hillRiseMax = 200.0;
+        public double hillRing = 2500.0;
+        public double hillEarthwork = 12.0;
+        public double offshoreMargin = 300.0;
+        public double offshoreReach = 6000.0;
+        public double offshoreLift = 6.0;
+        public double offshoreFillWeight = 0.3;
+        public double offshoreChance = 0.4;
+        public double hillChance = 0.3;
+        public double distanceWeight = 0.5;
+        /** An airport keeps this many times a town's target radius from its middle (villages aside). */
+        public double townClearance = 1.25;
     }
 
     /** One tier of settlements. */

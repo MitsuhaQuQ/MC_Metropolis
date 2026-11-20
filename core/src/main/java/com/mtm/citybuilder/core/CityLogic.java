@@ -462,6 +462,18 @@ public final class CityLogic {
 
     private com.mtm.citybuilder.core.plot.PlotLayer plots;
 
+    /** The airports. */
+    public com.mtm.citybuilder.core.airport.AirportLayer airports() {
+        synchronized (this) {
+            if (airports == null) {
+                airports = new com.mtm.citybuilder.core.airport.AirportLayer(this);
+            }
+            return airports;
+        }
+    }
+
+    private com.mtm.citybuilder.core.airport.AirportLayer airports;
+
     private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {
     }
 }
