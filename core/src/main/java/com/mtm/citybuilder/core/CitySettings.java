@@ -602,6 +602,20 @@ public final class CitySettings {
         public double streetSpacingResort = 160.0;
         public double denseSpacing = 0.8;
         public double thinSpacing = 1.5;
+        /**
+         * Quarters laid out apart: outside a capital's grid the street spacing is further multiplied by e to the power
+         * of {@code spacingVariation} times a smooth field from -1 to 1 of wavelength {@code spacingWavelength}.
+         */
+        public double spacingVariation = 0.7;
+        public double spacingWavelength = 600.0;
+        /**
+         * Large estates streets and lanes do not enter (temples, schools, mansions): one candidate every
+         * {@code estateCell} square, kept with chance {@code estateChance}, radius {@code estateRadius} to three times that
+         * (mostly near the least).
+         */
+        public double estateCell = 300.0;
+        public double estateChance = 0.9;
+        public double estateRadius = 70.0;
         public double streetWidth = 6.0;
         /**
          * Outside a capital, the share of crossings of two streets where one of them ends instead, by the crossing's

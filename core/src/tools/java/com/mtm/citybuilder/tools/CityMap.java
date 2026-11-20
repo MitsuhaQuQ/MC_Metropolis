@@ -538,6 +538,12 @@ public final class CityMap {
                 100 * StreetMetrics.squeezed(plan.segments(), main, 12.0),
                 100 * StreetMetrics.squeezed(plan.segments(), s -> s.streetClass() == StreetClass.STREET, 12.0));
         System.out.printf("  main roads 16+ wide %.1f km, narrower %.1f km%n", widths[0] / 1000, widths[1] / 1000);
+        {
+            double bx = logic.extent(nearest).coreX();
+            double bz = logic.extent(nearest).coreZ();
+            System.out.println("  blocks within 2 km of the heart: " + StreetMetrics.blockSpread(StreetMetrics.blockAreas(
+                    plan.segments(), bx - 2000, bz - 2000, bx + 2000, bz + 2000, 4.0)));
+        }
         System.out.printf("  lane dead ends %d, %.1f per lane km%n", StreetMetrics.laneDeadEnds(plan.segments()),
                 StreetMetrics.laneDeadEnds(plan.segments()) / Math.max(1e-9, plan.length(StreetClass.LANE) / 1000));
         System.out.printf("  street orientation order %.2f%n", StreetMetrics.orientationOrder(plan.segments().stream()

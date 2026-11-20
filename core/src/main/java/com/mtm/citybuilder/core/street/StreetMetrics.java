@@ -372,6 +372,85 @@ public final class StreetMetrics {
         return dead;
     }
 
+    /**
+     * The blocks inside a rectangle: the streets (not lanes) drawn to their widths on a grid of {@code cell}, the land
+     * left joined into pieces; the areas in square blocks of the pieces not touching the rectangle's edge.
+     */
+    public static double[] blockAreas(List<StreetSegment> segments, double minX, double minZ, double maxX, double maxZ, double cell) {
+        int nx = (int) Math.ceil((maxX - minX) / cell);
+        int nz = (int) Math.ceil((maxZ - minZ) / cell);
+        boolean[] road = new boolean[nx * nz];
+        for (StreetSegment s : segments) {
+            if (s.streetClass() == StreetClass.LANE) {
+                continue;
+            }
+            double half = 0.5 * s.width() + 0.5 * cell;
+            int i0 = Math.max(0, (int) Math.floor((Math.min(s.x1(), s.x2()) - half - minX) / cell));
+            int i1 = Math.min(nx - 1, (int) Math.floor((Math.max(s.x1(), s.x2()) + half - minX) / cell));
+            int j0 = Math.max(0, (int) Math.floor((Math.min(s.z1(), s.z2()) - half - minZ) / cell));
+            int j1 = Math.min(nz - 1, (int) Math.floor((Math.max(s.z1(), s.z2()) + half - minZ) / cell));
+            for (int i = i0; i <= i1; i++) {
+                for (int j = j0; j <= j1; j++) {
+                    if (!road[i * nz + j] && pointDistance(s, minX + (i + 0.5) * cell, minZ + (j + 0.5) * cell) <= half) {
+                        road[i * nz + j] = true;
+                    }
+                }
+            }
+        }
+        boolean[] seen = new boolean[nx * nz];
+        List<Double> areas = new java.util.ArrayList<>();
+        int[] stack = new int[nx * nz];
+        for (int start = 0; start < nx * nz; start++) {
+            if (road[start] || seen[start]) {
+                continue;
+            }
+            int top = 0;
+            stack[top++] = start;
+            seen[start] = true;
+            int count = 0;
+            boolean edge = false;
+            while (top > 0) {
+                int k = stack[--top];
+                count++;
+                int i = k / nz;
+                int j = k % nz;
+                if (i == 0 || j == 0 || i == nx - 1 || j == nz - 1) {
+                    edge = true;
+                }
+                int[] next = {i > 0 ? k - nz : -1, i < nx - 1 ? k + nz : -1, j > 0 ? k - 1 : -1, j < nz - 1 ? k + 1 : -1};
+                for (int n : next) {
+                    if (n >= 0 && !road[n] && !seen[n]) {
+                        seen[n] = true;
+                        stack[top++] = n;
+                    }
+                }
+            }
+            if (!edge) {
+                areas.add(count * cell * cell);
+            }
+        }
+        return areas.stream().mapToDouble(Double::doubleValue).toArray();
+    }
+
+    /**
+     * A line describing the spread of block sizes, of blocks 0.02 to 20 ha (smaller are slivers between streets, larger
+     * open land): how many, the median, 10th and 90th percentiles in ha, the coefficient of variation, and the shares
+     * under 0.25 ha and over 2 ha.
+     */
+    public static String blockSpread(double[] areas) {
+        double[] kept = java.util.Arrays.stream(areas).map(a -> a / 10000.0).filter(a -> a >= 0.02 && a <= 20).sorted().toArray();
+        if (kept.length == 0) {
+            return "no blocks";
+        }
+        double mean = java.util.Arrays.stream(kept).average().orElse(0);
+        double sd = Math.sqrt(java.util.Arrays.stream(kept).map(a -> (a - mean) * (a - mean)).average().orElse(0));
+        long small = java.util.Arrays.stream(kept).filter(a -> a < 0.25).count();
+        long large = java.util.Arrays.stream(kept).filter(a -> a > 2).count();
+        return String.format("%d blocks, median %.2f ha, p10 %.2f, p90 %.2f, cv %.2f, under 0.25 ha %.0f%%, over 2 ha %.0f%%",
+                kept.length, kept[kept.length / 2], kept[kept.length / 10], kept[kept.length * 9 / 10], sd / mean,
+                100.0 * small / kept.length, 100.0 * large / kept.length);
+    }
+
     /** Orientation order: 1 for a perfect grid, 0 for streets running every way alike. */
     public static double orientationOrder(List<StreetSegment> segments) {
         double grid = Math.log(4.0);

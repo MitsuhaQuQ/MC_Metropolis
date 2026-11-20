@@ -568,11 +568,13 @@ public final class StreetLayer {
      * Seeds of the streets: along every line laid so far, a street spacing apart, a street across it starting there
      * and one along it a spacing to either side, in the family the field gives each direction.
      */
-    private ArrayDeque<double[]> streetSeeds(List<StreetSegment> laid, Field field, Window window, double spacing) {
+    private ArrayDeque<double[]> streetSeeds(List<StreetSegment> laid, Field field, Window window, Tracer tracer) {
         ArrayDeque<double[]> seeds = new ArrayDeque<>();
         double run = 0.0;
         for (StreetSegment segment : laid) {
             run += segment.length();
+            // The spacing where the seed falls: thinner at the town's edge, wider or narrower by the quarter
+            double spacing = tracer.spacing(segment.x2(), segment.z2());
             if (run < spacing) {
                 continue;
             }
@@ -591,6 +593,53 @@ public final class StreetLayer {
             }
         }
         return seeds;
+    }
+
+    /**
+     * The large estates of a town, which streets and lanes do not enter, so its blocks come in all sizes as real towns'
+     * do (OpenStreetMap: a tenth of Kyoto's blocks over 2 ha): temples, schools, mansions. On a grid of
+     * {@code estateCell}, one candidate a cell by the town's hash, kept with the chance {@code estateChance} where it
+     * lies in houses, the old town or downtown, clear of the arterials and other estates; its radius from
+     * {@code estateRadius} to three times that, mostly near the least (by the cube of the hash). None in a capital's
+     * planned grid.
+     */
+    private void estates(Settlement settlement, Window window, Districts districts, List<StreetSegment> segments) {
+        Sounding laid = new Sounding(segments);
+        double minX = (double) window.originX * grid;
+        double minZ = (double) window.originZ * grid;
+        double maxX = minX + (window.size - 1) * grid;
+        double maxZ = minZ + (window.size - 1) * grid;
+        double cell = config.estateCell;
+        for (long i = (long) Math.floor(minX / cell); i <= (long) Math.floor(maxX / cell); i++) {
+            for (long j = (long) Math.floor(minZ / cell); j <= (long) Math.floor(maxZ / cell); j++) {
+                long hash = Hash.of(settlement.id() ^ 0xE57A7EL, i, j);
+                if (Hash.unit(hash) >= config.estateChance) {
+                    continue;
+                }
+                double x = (i + Hash.unit(Hash.mix(hash))) * cell;
+                double z = (j + Hash.unit(Hash.mix(hash + 1))) * cell;
+                // Mostly small, now and then large (a temple precinct, a college): a long tail, as real towns' blocks
+                double u = Hash.unit(Hash.mix(hash + 2));
+                double radius = config.estateRadius * (1.0 + 2.0 * u * u * u);
+                District district = districts.at(x, z);
+                if (!window.built(x, z) || window.inCapital(x, z) || window.inGrounds(x, z)
+                        || district != District.RESIDENTIAL && district != District.OLD_TOWN && district != District.CENTRAL) {
+                    continue;
+                }
+                // Whole on built land, clear of the streets laid so far and of other estates
+                boolean clear = !laid.near(x, z, radius + 6.0, Double.NaN, Double.NaN);
+                for (int k = 0; k < 8 && clear; k++) {
+                    double a = Math.PI * k / 4;
+                    clear = window.built(x + Math.cos(a) * radius, z + Math.sin(a) * radius);
+                }
+                for (double[] e : window.estates) {
+                    clear &= Math.hypot(x - e[0], z - e[1]) > radius + e[2] + 60.0;
+                }
+                if (clear) {
+                    window.estates.add(new double[]{x, z, radius});
+                }
+            }
+        }
     }
 
     /**
@@ -645,7 +694,7 @@ public final class StreetLayer {
                 for (double t = config.laneStep; t <= depth; t += config.laneStep) {
                     double qx = x + nx * t;
                     double qz = z + nz * t;
-                    if (!window.built(qx, qz) || walls.near(qx, qz, 0.6 * config.laneStep) != null) {
+                    if (!window.built(qx, qz) || window.estate(qx, qz) || walls.near(qx, qz, 0.6 * config.laneStep) != null) {
                         break;
                     }
                     lanes.add(new StreetSegment(px, pz, qx, qz, StreetClass.LANE, Era.TOWN, config.laneWidth));
@@ -844,7 +893,7 @@ public final class StreetLayer {
         double walked = 0.0;
         for (double[] b : path) {
             walked += Math.hypot(b[0] - ax, b[1] - az);
-            if (!window.built(b[0], b[1]) || walked > edge + config.laneStep
+            if (!window.built(b[0], b[1]) || window.estate(b[0], b[1]) || walked > edge + config.laneStep
                     && Math.hypot(last[0] - b[0], last[1] - b[1]) > clearEnd
                     && all.near(b[0], b[1], config.interiorClear, px, pz)) {
                 break;
@@ -1242,6 +1291,7 @@ public final class StreetLayer {
             }
             railSides(window, urbanGround, segments, rails, sides);
             boulevards(settlement, extent, anchors, segments, demote(settlement, segments));
+            estates(settlement, window, districts, segments);
             // Streets between the arterials, ending at them (a capital's grid crosses them), then lanes
             double streetSpacing = streetSpacing(formation);
             if (streetSpacing > 0) {
@@ -1275,7 +1325,7 @@ public final class StreetLayer {
                 }
                 streets.teeSeed = Hash.mix(settlement.id() ^ 0x7EEL);
                 int before = segments.size();
-                streets.run(streetSeeds(segments, field, window, streetSpacing), segments);
+                streets.run(streetSeeds(segments, field, window, streets), segments);
                 undouble(segments, before, walls);
                 dedupe(segments);
                 squareJoins(window, segments);
@@ -5198,6 +5248,17 @@ public final class StreetLayer {
         final float[] edge;
         /** A capital's planned city, {min x, min z, max x, max z}, or null. */
         double[] capital;
+        /** Large estates no street or lane enters (temples, schools, mansions), each {x, z, radius}. */
+        final List<double[]> estates = new ArrayList<>();
+
+        boolean estate(double x, double z) {
+            for (double[] e : estates) {
+                if (Math.hypot(x - e[0], z - e[1]) < e[2]) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
         boolean inCapital(double x, double z) {
             return capital != null && x >= capital[0] && x <= capital[2] && z >= capital[1] && z <= capital[3];
@@ -5933,7 +5994,10 @@ public final class StreetLayer {
                 return base;
             }
             double t = Math.max(0.0, Math.min(1.0, window.intensity(x, z)));
-            return base * (config.thinSpacing - (config.thinSpacing - config.denseSpacing) * t);
+            // Quarters laid out apart, each its own: a smooth field widens the spacing here and narrows it there
+            double quarter = 2.0 * ValueNoise.twoOctaves(teeSeed ^ 0x5BAC1L, x, z, config.spacingWavelength) - 1.0;
+            return base * (config.thinSpacing - (config.thinSpacing - config.denseSpacing) * t)
+                    * Math.exp(config.spacingVariation * quarter);
         }
 
         private long bucket(double x, double z) {
@@ -6069,6 +6133,10 @@ public final class StreetLayer {
         private boolean passable(double x, double z, double tx, double tz) {
             // Not onto a bridge's deck mid-water
             if (window.water(tx, tz)) {
+                return false;
+            }
+            // Streets keep out of the large estates; arterials may pass
+            if (streetClass != StreetClass.ARTERIAL && window.estate(tx, tz)) {
                 return false;
             }
             double length = Math.hypot(tx - x, tz - z);

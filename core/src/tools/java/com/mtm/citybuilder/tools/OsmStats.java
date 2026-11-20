@@ -266,8 +266,14 @@ public final class OsmStats {
                 double[] a = data.nodes.get(refs[i - 1]);
                 double[] b = data.nodes.get(refs[i]);
                 if (a != null && b != null) {
+                    double width = switch (kind) {
+                        case "trunk", "primary" -> 16.0;
+                        case "secondary" -> 12.0;
+                        case "tertiary" -> 10.0;
+                        default -> 6.0;
+                    };
                     pieces.add(new com.mtm.citybuilder.core.street.StreetSegment(a[0], a[1], b[0], b[1], streetClass,
-                            com.mtm.citybuilder.core.street.Era.MODERN, 6.0));
+                            com.mtm.citybuilder.core.street.Era.MODERN, width));
                 }
             }
         }
@@ -277,6 +283,20 @@ public final class OsmStats {
                 s -> s.streetClass() == com.mtm.citybuilder.core.street.StreetClass.STREET, 40.0));
         report.put("squeezed under 12 of land (widths 6): arterials", com.mtm.citybuilder.core.street.StreetMetrics.squeezed(pieces,
                 s -> s.streetClass() == com.mtm.citybuilder.core.street.StreetClass.ARTERIAL, 12.0));
+        {
+            double minX = Double.POSITIVE_INFINITY;
+            double minZ = Double.POSITIVE_INFINITY;
+            double maxX = Double.NEGATIVE_INFINITY;
+            double maxZ = Double.NEGATIVE_INFINITY;
+            for (double[] p : data.nodes.values()) {
+                minX = Math.min(minX, p[0]);
+                minZ = Math.min(minZ, p[1]);
+                maxX = Math.max(maxX, p[0]);
+                maxZ = Math.max(maxZ, p[1]);
+            }
+            System.out.println("blocks: " + com.mtm.citybuilder.core.street.StreetMetrics.blockSpread(
+                    com.mtm.citybuilder.core.street.StreetMetrics.blockAreas(pieces, minX, minZ, maxX, maxZ, 4.0)));
+        }
         report.put("junction corners under 30 deg", com.mtm.citybuilder.core.street.StreetMetrics.acute(pieces, 30.0));
         report.put("junction corners under 45 deg", com.mtm.citybuilder.core.street.StreetMetrics.acute(pieces, 45.0));
     }
