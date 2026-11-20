@@ -1163,6 +1163,117 @@ def windows(blocks, solid, owners, patterns, bc):
     return changed
 
 
+# ---------------------------------------------------------------- shaded lower floors
+
+def _block_lum(name, bc):
+    n = name[:-5] if name.endswith("_pane") else name
+    c = bc.get(FULL_OF.get(n, PREVIEW_ALIAS.get(n, n)))
+    return luminance(c) if c else None
+
+
+def lift_shaded_floors(blocks, solid, bc, storey):
+    """The aerial photographs see a facade's lower floors in the street's shadow, or hidden by the buildings across
+    it, so they come out dark. Facade by facade (outer wall blocks facing one way in one plane), the rows from the
+    ground up that are much darker than the lit upper half are given the upper floors' materials, column by column
+    (each column keeps the block it has most often above, so piers and window bands carry down); the ground floor,
+    where it was dark, becomes a shopfront: glass panes between piers of the facade's wall. Facades whose windows
+    were read already, or without lit floors above, are left alone."""
+    facades = {}
+    for v, (name, props) in blocks.items():
+        x, y, z = v
+        if (x, y + 1, z) not in solid or (props is not None and not name.endswith("_pane")):
+            continue
+        sides = [d for d in ((1, 0), (-1, 0), (0, 1), (0, -1)) if (x + d[0], y, z + d[1]) not in solid]
+        if len(sides) != 1:
+            continue
+        d = sides[0]
+        facades.setdefault((d, x if d[0] else z), {})[(z if d[0] else x, y)] = v
+    changed = 0
+    # The building's lit facades set how bright its walls really are: the upper quartile of facade medians.
+    fac_med = {}
+    for key, cells in facades.items():
+        ls = sorted(l for l in (_block_lum(blocks[v][0], bc) for v in cells.values()) if l is not None)
+        if len(ls) >= 20:
+            fac_med[key] = ls[len(ls) // 2]
+    meds = sorted(fac_med.values())
+    lit = meds[len(meds) * 3 // 4] if meds else None
+    # The lit facades' commonest wall block: what the building's walls are made of where the photograph saw them.
+    lit_count = {}
+    for key, cells in facades.items():
+        if lit and fac_med.get(key, 0) >= 0.85 * lit:
+            for v in cells.values():
+                n = blocks[v]
+                if n[1] is None and "glass" not in n[0]:
+                    lit_count[n] = lit_count.get(n, 0) + 1
+    lit_wall = max(lit_count, key=lit_count.get) if lit_count else None
+    for key, cells in list(facades.items()):
+        d = key[0]
+        props = {"east": "true", "west": "true"} if d[0] == 0 else {"north": "true", "south": "true"}
+        has_panes = any(blocks[v][0].endswith("_pane") for v in cells.values())
+        if lit_wall and key in fac_med and fac_med[key] < 0.6 * lit:
+            # In shade from top to foot: the lit facades' wall; where it was much darker than the rest of the
+            # facade, a window (unless the windows were read already).
+            for v in cells.values():
+                n, pr = blocks[v]
+                if pr is not None:
+                    continue
+                l = _block_lum(n, bc)
+                if not has_panes and l is not None and l < 0.6 * fac_med[key]:
+                    blocks[v] = ("gray_stained_glass_pane", dict(props))
+                else:
+                    blocks[v] = lit_wall
+                changed += 1
+            continue
+        if has_panes:
+            continue  # its windows were read: already in order
+        ys = sorted({y for _, y in cells})
+        y0, y1 = ys[0], ys[-1]
+        if y1 - y0 < 8 or len(cells) < 40:
+            continue
+        rows = {}
+        for (a, y), v in cells.items():
+            l = _block_lum(blocks[v][0], bc)
+            if l is not None:
+                rows.setdefault(y, []).append(l)
+        med = {y: sorted(ls)[len(ls) // 2] for y, ls in rows.items() if len(ls) >= 4}
+        upper = [med[y] for y in med if y >= y0 + (y1 - y0) // 2]
+        if not upper:
+            continue
+        ref = sorted(upper)[len(upper) // 2]
+        # The dark rows, contiguous from the ground up.
+        top_dark = None
+        for y in range(y0, y1 + 1):
+            if y in med and med[y] < 0.7 * ref:
+                top_dark = y
+            elif y in med:
+                break
+        if top_dark is None or top_dark >= y0 + (y1 - y0) * 2 // 3:
+            continue  # nothing dark at the foot, or the whole facade is dark: no lit floors to borrow from
+        # Each column's commonest block above the dark rows, and the facade's.
+        col_mode, all_count = {}, {}
+        for (a, y), v in cells.items():
+            if y > top_dark:
+                n = blocks[v]
+                col_mode.setdefault(a, {})
+                col_mode[a][n] = col_mode[a].get(n, 0) + 1
+                all_count[n] = all_count.get(n, 0) + 1
+        if not all_count:
+            continue
+        facade_mode = max(all_count, key=all_count.get)
+        wall = max((n for n in all_count if "glass" not in n[0]), key=all_count.get, default=facade_mode)
+        props = {"east": "true", "west": "true"} if d[0] == 0 else {"north": "true", "south": "true"}
+        for (a, y), v in cells.items():
+            if y > top_dark:
+                continue
+            if y <= y0 + min(3, storey):  # the ground floor: a shopfront
+                blocks[v] = wall if (a % 4 == 0 or y == y0) else ("light_gray_stained_glass_pane", dict(props))
+            else:
+                m = col_mode.get(a)
+                blocks[v] = max(m, key=m.get) if m else facade_mode
+            changed += 1
+    return changed
+
+
 # ---------------------------------------------------------------- NBT
 
 def nbt_string(s):
@@ -1497,6 +1608,7 @@ def build_one(args):
     blocks = assign_blocks(solid, cls, height, pal, sh)
     recoloured = recolour(blocks, solid, colours, pal, bc)
     glazed = windows(blocks, solid, owners, facade_patterns(rings, tex, os.path.join(out, "tex")), bc) if tex else 0
+    lifted = lift_shaded_floors(blocks, solid, bc, sh) if tex else 0
     if slug in LANDMARK_FIXES:
         LANDMARK_FIXES[slug](blocks)
     size = tuple(max(v[i] for v in blocks) + 1 for i in range(3))
@@ -1511,7 +1623,7 @@ def build_one(args):
             "roof_shape": row.get("roof_shape"), "roof_pitch": row.get("roof_pitch"),
             "palette": pal, "storey_height": sh, "rotation_deg": round(angle, 1),
             "size": list(size), "blocks": len(blocks), "surfaces": len(surf),
-            "textured_polygons": len(geom.get("tex", {})), "recoloured_blocks": recoloured, "window_blocks": glazed,
+            "textured_polygons": len(geom.get("tex", {})), "recoloured_blocks": recoloured, "window_blocks": glazed, "lifted_blocks": lifted,
             "block_counts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
 
 
@@ -1530,7 +1642,7 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
                 entries.append(e)
                 print(f"{e['slug']:24s} {e['name']:16s} {e['size'][0]:4d}x{e['size'][1]:3d}x{e['size'][2]:4d} "
                       f"{e['blocks']:7d} blocks  {e['palette']:6s} turned {e['rotation_deg']:+.1f}  "
-                      f"{e['recoloured_blocks']} from textures, {e.get('window_blocks', 0)} facade blocks redone", flush=True)
+                      f"{e['recoloured_blocks']} from textures, {e.get('window_blocks', 0)} facade blocks redone, {e.get('lifted_blocks', 0)} shaded lifted", flush=True)
     with open(os.path.join(out, "library.json"), "w", encoding="utf-8") as fh:
         json.dump({"source": "PLATEAU Kyoto City FY2025 LOD2", "attribution": "ATTRIBUTION",
                    "buildings": entries}, fh, ensure_ascii=False, indent=1)
