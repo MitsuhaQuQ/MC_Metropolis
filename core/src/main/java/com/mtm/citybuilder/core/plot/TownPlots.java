@@ -22,8 +22,9 @@ import java.util.Map;
  * lot runs, a position is in the block's interior.
  * <p>
  * Other streets take their share of a lot's land (at corners, between streets close together), so some lots come out
- * too small to build on: smaller than the least lot of their district (least frontage by least depth), or cut down to
- * under two fifths of the land they were cut with (a wedge at a corner). Such a lot joins
+ * too small to build on: smaller than the district's least frontage by the smallest house's depth, or holding
+ * under half its frontage at the street (a wedge at a corner; a lot only shallower than cut, in a narrow block, is
+ * built on). Such a lot joins
  * the larger of its neighbours on the street, if that one is big enough; failing that the land straight behind it:
  * a lot of the street behind (a strip between two streets close together becomes the back of the lots of the main
  * one, running through to both), or the block's interior. Only what can join nothing is a remnant, left open. A
@@ -53,8 +54,8 @@ public final class TownPlots {
     /** The canals' pieces by cell: {x1, z1, x2, z2, half width with the walls}. */
     private final Map<Long, List<double[]>> canalCells = new HashMap<>();
     private final double reach;
-    /** Each lot's actual area, by id, counted when first asked for. */
-    private final Map<Long, Double> areas = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Each lot's actual area and the share of its frontage it holds at the street, by id, counted when first asked for. */
+    private final Map<Long, double[]> areas = new java.util.concurrent.ConcurrentHashMap<>();
     /**
      * For a small lot without a neighbour on its street to join: what lies behind it, found when first asked for:
      * {chain, side, index} of the lot it joins, {-1} for the block's interior, {} for nothing (a remnant).
@@ -73,7 +74,7 @@ public final class TownPlots {
         double deepest = 0.0;
         for (double[] range : new double[][]{config.central, config.stationFront, config.oldTown, config.residential,
                 config.industrial, config.port, config.lane}) {
-            deepest = Math.max(deepest, range[3]);
+            deepest = Math.max(deepest, range[6]);
         }
         double widest = 0.0;
         for (StreetSegment g : pieces) {
@@ -235,7 +236,10 @@ public final class TownPlots {
         return new double[]{ax + (bx - ax) * t, az + (bz - az) * t, (bx - ax) / g.length(), (bz - az) / g.length()};
     }
 
-    /** The {frontage from, to, depth from, to} of lots in a district along a class of street. */
+    /**
+     * The lots of a district along a class of street: {frontage's 5th, 25th, 50th, 75th, 95th percentiles, depth from,
+     * depth to} (see {@link CitySettings.Plots}).
+     */
     private double[] range(District district, StreetClass street) {
         if (street == StreetClass.LANE) {
             return config.lane;
@@ -275,8 +279,8 @@ public final class TownPlots {
                     }
                     double[] range = range(district, first.streetClass());
                     long hash = Hash.of(seed, c, side, index);
-                    double frontage = range[0] + (range[1] - range[0]) * Hash.unit(hash);
-                    double lotDepth = range[2] + (range[3] - range[2]) * Hash.unit(Hash.mix(hash));
+                    double frontage = frontage(range, Hash.unit(hash));
+                    double lotDepth = range[5] + (range[6] - range[5]) * Hash.unit(Hash.mix(hash));
                     // The last lot takes what is left, if that is short
                     if (length - (position + frontage) < 0.5 * range[0]) {
                         frontage = length - position;
@@ -360,10 +364,13 @@ public final class TownPlots {
         double[] starts = cuts.get(position.chain())[s];
         double start = starts[target];
         double end = starts[target + 1];
-        if (target > 0 && absorber(nominal(position, target - 1)) == target) {
+        // A neighbour that joins it, holding some frontage at the street: a lot whose land the streets round it have
+        // taken nearly all of adds its points but no frontage
+        if (target > 0 && absorber(nominal(position, target - 1)) == target && area(nominal(position, target - 1))[1] >= 0.25) {
             start = starts[target - 1];
         }
-        if (target + 2 < starts.length && absorber(nominal(position, target + 1)) == target) {
+        if (target + 2 < starts.length && absorber(nominal(position, target + 1)) == target
+                && area(nominal(position, target + 1))[1] >= 0.25) {
             end = starts[target + 2];
         }
         Plot lot = nominal(position, target);
@@ -397,7 +404,7 @@ public final class TownPlots {
             }
             if (at.interior()) {
                 found = new int[]{-1};
-            } else if (area(at) >= least(at)) {
+            } else if (buildable(at)) {
                 found = new int[]{at.chain(), at.side(), at.index()};
             }
             break;
@@ -448,8 +455,7 @@ public final class TownPlots {
      * enough; else -1, a remnant.
      */
     private int absorber(Plot lot) {
-        double least = least(lot);
-        if (area(lot) >= least) {
+        if (buildable(lot)) {
             return lot.index();
         }
         int s = lot.side() > 0 ? 0 : 1;
@@ -462,8 +468,8 @@ public final class TownPlots {
             }
             // A neighbour big enough to be built on itself
             Plot neighbour = nominal(lot, index);
-            double area = area(neighbour);
-            if (area >= least(neighbour) && area > bestArea) {
+            double area = area(neighbour)[0];
+            if (buildable(neighbour) && area > bestArea) {
                 bestArea = area;
                 best = index;
             }
@@ -472,38 +478,68 @@ public final class TownPlots {
     }
 
     /**
-     * The least area a lot is built on: the least lot of its district (least frontage by least depth), and two fifths
-     * of the land it was cut with, so a lot the streets round it have cut down to a wedge joins its neighbour.
+     * Whether a lot is built on as it is: at least its district's least frontage by {@link #LEAST_DEPTH} (the
+     * smallest house: Kyoto's smallest machiya and detached houses are about 4.5 by 8), and
+     * holding at least half its frontage at the street, so a lot the streets round it have cut down to a wedge at a
+     * corner joins its neighbour. A lot only shallower than it was cut (a narrow block, the lots behind it meeting it
+     * half-way) is built on.
      */
-    private double least(Plot lot) {
+    /** The depth of the smallest house, with the district's least frontage the least area a lot is built on. */
+    private static final double LEAST_DEPTH = 8.0;
+
+    private boolean buildable(Plot lot) {
         double[] range = range(lot.district(), lot.street());
-        return Math.max(range[0] * range[2], 0.4 * (lot.end() - lot.start()) * lot.maxDepth());
+        double[] measured = area(lot);
+        return measured[0] >= range[0] * LEAST_DEPTH && measured[1] >= 0.5;
     }
 
-    /** A lot's actual area: its grid points over the land it would have that are its, by {@link #raw}. */
-    private double area(Plot lot) {
-        Double known = areas.get(lot.id());
+    /** A frontage drawn from a district's percentiles at {@code u} (0 to 1): straight between them, held beyond. */
+    static double frontage(double[] range, double u) {
+        double[] at = {0.05, 0.25, 0.5, 0.75, 0.95};
+        if (u <= at[0]) {
+            return range[0];
+        }
+        for (int k = 1; k < at.length; k++) {
+            if (u <= at[k]) {
+                return range[k - 1] + (range[k] - range[k - 1]) * (u - at[k - 1]) / (at[k] - at[k - 1]);
+            }
+        }
+        return range[4];
+    }
+
+    /**
+     * A lot's actual area and the share of its frontage it holds at the street: its grid points over the land it would
+     * have that are its (by {@link #raw}), and of those along the street's edge.
+     */
+    private double[] area(Plot lot) {
+        double[] known = areas.get(lot.id());
         if (known != null) {
             return known;
         }
         double nominal = (lot.end() - lot.start()) * lot.maxDepth();
         double step = Math.max(1.0, Math.sqrt(nominal / 100.0));
         int count = 0;
+        int front = 0;
+        int frontHeld = 0;
         for (double u = lot.start() + 0.5 * step; u < lot.end(); u += step) {
             double[] p = pointAt(lot.chain(), u);
             double nx = -p[3] * lot.side();
             double nz = p[2] * lot.side();
+            front++;
             for (double v = 0.5 * step; v < lot.maxDepth(); v += step) {
                 double back = 0.5 * lot.streetWidth() + v;
                 Plot at = raw(p[0] + nx * back, p[1] + nz * back);
                 if (at != null && !at.interior() && at.id() == lot.id()) {
                     count++;
+                    if (v < step) {
+                        frontHeld++;
+                    }
                 }
             }
         }
-        double area = count * step * step;
-        areas.put(lot.id(), area);
-        return area;
+        double[] measured = {count * step * step, front == 0 ? 0.0 : (double) frontHeld / front};
+        areas.put(lot.id(), measured);
+        return measured;
     }
 
     /** The lot at a position as cut, before small lots are joined to their neighbours. */
@@ -607,6 +643,34 @@ public final class TownPlots {
             }
         }
         return false;
+    }
+
+    /**
+     * Every lot built on, once each, as it stands after small lots are joined to their neighbours: {its district's
+     * ordinal, 1 if along a lane else 0, its frontage, its depth}. Counts every lot alike, as the lots measured from
+     * real towns are (a lot is found once, whatever its size); slow (each lot's area is counted), for the tools.
+     */
+    public List<double[]> builtLots() {
+        List<double[]> lots = new ArrayList<>();
+        for (int c = 0; c < chains.size(); c++) {
+            StreetSegment first = pieces.get(chains.get(c)[0]);
+            for (int s = 0; s < 2; s++) {
+                int side = s == 0 ? 1 : -1;
+                double[] starts = cuts.get(c)[s];
+                for (int index = 0; index < starts.length - 1; index++) {
+                    Plot probe = new Plot(0L, c, side, index, starts[index], starts[index + 1], starts[index], 0.0, 0.0,
+                            districts.get(c)[s][index], first.streetClass(), first.width(), 0.0, false, false);
+                    Plot lot = nominal(probe, index);
+                    if (absorber(lot) != index) {
+                        continue;
+                    }
+                    Plot built = joined(lot, index);
+                    lots.add(new double[]{built.district().ordinal(), first.streetClass() == StreetClass.LANE ? 1 : 0,
+                            built.frontage(), built.maxDepth()});
+                }
+            }
+        }
+        return lots;
     }
 
     /** How many lots the town has, both sides of every street. */

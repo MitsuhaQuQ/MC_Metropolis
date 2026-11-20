@@ -163,7 +163,7 @@ public final class CityMap {
         int lot = 0;
         int interior = 0;
         int remnant = 0;
-        java.util.Map<com.mtm.citybuilder.core.street.District, java.util.Map<Long, double[]>> lots = new java.util.TreeMap<>();
+        java.util.Map<String, java.util.Map<Long, double[]>> lots = new java.util.TreeMap<>();
         for (double x = cx - radius; x < cx + radius; x += 4) {
             for (double z = cz - radius; z < cz + radius; z += 4) {
                 com.mtm.citybuilder.core.plot.Plot plot = plots.at(x, z);
@@ -179,7 +179,7 @@ public final class CityMap {
                     remnant++;
                 } else {
                     lot++;
-                    lots.computeIfAbsent(plot.district(), k -> new java.util.HashMap<>())
+                    lots.computeIfAbsent(plot.district() + (plot.street() == StreetClass.LANE ? " lane" : ""), k -> new java.util.HashMap<>())
                             .putIfAbsent(plot.id(), new double[]{plot.frontage(), plot.maxDepth()});
                 }
             }
@@ -189,10 +189,17 @@ public final class CityMap {
         int all = Math.max(1, street + lot + interior + remnant);
         System.out.printf("  of the town's street and plotted land: streets %.0f%%, lots %.0f%%, remnants %.1f%%, block interiors %.0f%%%n",
                 100.0 * street / all, 100.0 * lot / all, 100.0 * remnant / all, 100.0 * interior / all);
-        for (var entry : lots.entrySet()) {
-            double frontage = entry.getValue().values().stream().mapToDouble(v -> v[0]).average().orElse(0);
-            double depth = entry.getValue().values().stream().mapToDouble(v -> v[1]).average().orElse(0);
-            System.out.printf("  %-14s %6d lots, frontage %.1f, depth %.1f%n", entry.getKey(), entry.getValue().size(), frontage, depth);
+        // Every lot once (sampling the land would find wide lots more often than narrow ones), as PLATEAU's are counted
+        java.util.Map<String, List<double[]>> built = new java.util.TreeMap<>();
+        for (double[] each : plots.builtLots()) {
+            built.computeIfAbsent(com.mtm.citybuilder.core.street.District.values()[(int) each[0]] + (each[1] > 0 ? " lane" : ""),
+                    k -> new java.util.ArrayList<>()).add(each);
+        }
+        for (var entry : built.entrySet()) {
+            double[] sorted = entry.getValue().stream().mapToDouble(v -> v[2]).sorted().toArray();
+            double depth = entry.getValue().stream().mapToDouble(v -> v[3]).average().orElse(0);
+            System.out.printf("  %-18s %6d lots, frontage p25/p50/p75 %.1f/%.1f/%.1f, depth %.1f%n", entry.getKey(),
+                    sorted.length, sorted[sorted.length / 4], sorted[sorted.length / 2], sorted[sorted.length * 3 / 4], depth);
         }
     }
 

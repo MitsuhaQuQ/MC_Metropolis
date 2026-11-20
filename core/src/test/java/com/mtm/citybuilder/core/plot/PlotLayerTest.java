@@ -113,13 +113,29 @@ class PlotLayerTest {
             };
             // A lot is cut to its district's range (the last on a street taking what is left, up to half again) and
             // may take in a small neighbour either side
-            assertTrue(plot.frontage() <= 3 * 1.5 * range[1] + 1e-6 && plot.frontage() > 0, "frontage " + plot + " " + range[1]);
+            assertTrue(plot.frontage() <= 3 * 1.5 * range[4] + 1e-6 && plot.frontage() > 0, "frontage " + plot + " " + range[4]);
         }
         // The old town's machiya are narrower than the houses of the modern town
         if (frontage.containsKey(District.OLD_TOWN) && frontage.containsKey(District.RESIDENTIAL)) {
             assertTrue(frontage.get(District.OLD_TOWN)[0] / frontage.get(District.OLD_TOWN)[1]
                     < frontage.get(District.RESIDENTIAL)[0] / frontage.get(District.RESIDENTIAL)[1], report);
         }
+    }
+
+    @Test
+    void frontagesFollowTheMeasuredPercentiles() {
+        // Drawn evenly, the frontages fall on the percentiles they were measured at (PLATEAU along OSM)
+        double[] houses = CitySettings.DEFAULT.plots.residential;
+        java.util.List<Double> drawn = new java.util.ArrayList<>();
+        for (int k = 0; k < 10000; k++) {
+            drawn.add(TownPlots.frontage(houses, (k + 0.5) / 10000));
+        }
+        java.util.Collections.sort(drawn);
+        assertEquals(houses[1], drawn.get(2500), 0.05);
+        assertEquals(houses[2], drawn.get(5000), 0.05);
+        assertEquals(houses[3], drawn.get(7500), 0.05);
+        assertEquals(houses[0], drawn.get(0), 1e-9);
+        assertEquals(houses[4], drawn.get(9999), 1e-9);
     }
 
     @Test
@@ -133,7 +149,7 @@ class PlotLayerTest {
             for (double z = extent.coreZ() - 300; z < extent.coreZ() + 300; z += 7) {
                 Plot plot = plots.at(x, z);
                 if (plot == null || plot.interior() || plot.depth() > 0.5 * plot.maxDepth()
-                        || plot.along() - plot.start() < 1.5 || plot.end() - plot.along() < 1.5) {
+                        || plot.along() - plot.start() < 3.0 || plot.end() - plot.along() < 3.0) {
                     continue;
                 }
                 // Straight back from the street, away from its edge, the same lot (or its interior, or a lot of a

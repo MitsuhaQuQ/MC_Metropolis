@@ -750,19 +750,25 @@ public final class CitySettings {
     }
 
     /**
-     * L7 plots: the land along each street cut into lots, each {frontage from, frontage to, depth from, depth to} by
-     * district (the lot's frontage along the street and how deep it runs back, drawn by its hash): downtown and the
-     * station front wide enough for offices, the old town's machiya narrow and deep (Kyoto's "eels' beds"), houses
-     * on 9-14, works and quays wide. Lots along a lane are its row houses (roji).
+     * L7 plots: the land along each street cut into lots, by district {frontage's 5th, 25th, 50th, 75th and 95th
+     * percentiles, depth from, depth to}: a lot's frontage along the street drawn by its hash from that distribution
+     * (between the percentiles, straight), its depth back from the street's edge evenly from the range. The
+     * frontages are measured from PLATEAU's buildings along OpenStreetMap's streets (tools/assets/plateau_lots.py, the
+     * pitch from one building to the next along a side of a street; design document L7): skewed, most lots narrow and a
+     * few wide. Houses after the castle towns Kanazawa and Himeji (9.5-11 in the middle, a quarter over 15-18); the
+     * old town's machiya narrower and deep (Kyoto's "eels' beds", Kyoto's and Kanazawa's middles 8-9.5); downtown and
+     * the station front after Tokyo's Chuo (12 in the middle, a quarter over 23); works and quays wide; the row houses
+     * along a lane (roji) as Kyoto's and Taito's lanes (7-8.5). The lots are drawn narrower than that (by 1.2-1.35)
+     * so they come out right as built: the lots too small to build on join their neighbours, widening them.
      */
     public static final class Plots {
-        public double[] central = {8, 20, 20, 30};
-        public double[] stationFront = {10, 24, 20, 30};
-        public double[] oldTown = {5, 8, 18, 30};
-        public double[] residential = {9, 14, 12, 20};
-        public double[] industrial = {30, 70, 30, 60};
-        public double[] port = {30, 60, 30, 50};
-        public double[] lane = {5, 8, 8, 12};
+        public double[] central = {4.1, 5.6, 9, 17.2, 29.9, 20, 30};
+        public double[] stationFront = {4.4, 6, 9.5, 17.5, 30, 20, 30};
+        public double[] oldTown = {4, 4.8, 6.6, 10.9, 18.6, 18, 30};
+        public double[] residential = {4.2, 5.9, 8.5, 13.1, 21.2, 12, 20};
+        public double[] industrial = {30, 40, 50, 60, 70, 30, 60};
+        public double[] port = {30, 38, 45, 52, 60, 30, 50};
+        public double[] lane = {3.5, 4.3, 5.8, 9.2, 13.8, 8, 12};
         /**
          * Land goes to the street whose edge is nearest, a wider street's edge counting this much nearer: its lots
          * run deeper, the front street (omotedori) taking the corners from the back streets.
