@@ -1080,8 +1080,25 @@ public final class StreetLayer {
             }
             return used[k] ? c * transit.reuseFactor : c;
         };
+        // Ends taken by lines so far: another line ends elsewhere, so lines fan out to the suburbs instead of bundling
+        List<double[]> taken = new ArrayList<>();
+        int alongCount = (count + 1) / 2;
+        int acrossCount = count / 2;
         for (int l = 0; l < count; l++) {
-            double angle = first + Math.PI * l / count;
+            // Lines two ways, the first along the main station's direction, the second across it; those one way set
+            // apart through downtown
+            boolean across = l % 2 == 1;
+            int rank = l / 2;
+            int ofWay = across ? acrossCount : alongCount;
+            double angle = first + (across ? 0.5 * Math.PI : 0.0);
+            double offset = (rank - 0.5 * (ofWay - 1)) * transit.lineOffset;
+            double px = downtown[0] - Math.sin(angle) * offset;
+            double pz = downtown[1] + Math.cos(angle) * offset;
+            // The line's own point through downtown, drawn back towards the middle until it is on built land
+            for (double t = 0.9; t >= 0 && !window.built(px, pz); t -= 0.1) {
+                px = downtown[0] - Math.sin(angle) * offset * t;
+                pz = downtown[1] + Math.cos(angle) * offset * t;
+            }
             double[][] ends = new double[2][];
             for (int side = 0; side < 2; side++) {
                 double vx = Math.cos(angle) * (side == 0 ? 1 : -1);
@@ -1092,12 +1109,19 @@ public final class StreetLayer {
                 }
                 double best = 0.0;
                 for (double[] zone : zones.values()) {
-                    double px = zone[1] - cx;
-                    double pz = zone[2] - cz;
-                    double projection = px * vx + pz * vz;
-                    double across = Math.abs(-px * vz + pz * vx);
-                    if (projection < 1500 || across > projection * Math.tan(Math.toRadians(35))
-                            || Math.hypot(px, pz) > transit.reach) {
+                    double qx = zone[1] - px;
+                    double qz = zone[2] - pz;
+                    double projection = qx * vx + qz * vz;
+                    double off = Math.abs(-qx * vz + qz * vx);
+                    if (projection < 1500 || off > projection * Math.tan(Math.toRadians(35))
+                            || Math.hypot(zone[1] - cx, zone[2] - cz) > transit.reach) {
+                        continue;
+                    }
+                    boolean near = false;
+                    for (double[] t : taken) {
+                        near |= Math.hypot(t[0] - zone[1], t[1] - zone[2]) < 1.5 * transit.lineOffset;
+                    }
+                    if (near) {
                         continue;
                     }
                     // Far out more than heavy: a line serves the suburbs on its way in, not only the old town's edge
@@ -1111,7 +1135,12 @@ public final class StreetLayer {
             if (ends[0] == null && ends[1] == null) {
                 continue;
             }
-            // First straight from end to end, as straight as the search allows: kept if it passes through downtown
+            for (double[] end : ends) {
+                if (end != null) {
+                    taken.add(end);
+                }
+            }
+            // First straight from end to end, as straight as the search allows: kept if it passes the line's point
             if (ends[0] != null && ends[1] != null) {
                 Approach.Route whole = Approach.route(window.originX, window.originZ, size, size, grid, ends[0][0], ends[0][1],
                         Math.atan2(ends[1][1] - ends[0][1], ends[1][0] - ends[0][0]), ends[1][0], ends[1][1], Double.NaN,
@@ -1119,31 +1148,29 @@ public final class StreetLayer {
                 if (whole != null) {
                     double nearest = Double.POSITIVE_INFINITY;
                     for (double[] p : whole.line()) {
-                        nearest = Math.min(nearest, Math.hypot(p[0] - downtown[0], p[1] - downtown[1]));
+                        nearest = Math.min(nearest, Math.hypot(p[0] - px, p[1] - pz));
                     }
                     if (nearest <= transit.downtownReach) {
-                        addLine(lines, window, districts, whole.line(), used, downtown[0], downtown[1], station, transit, segments, railways);
+                        addLine(lines, window, districts, whole.line(), used, station, transit, segments, railways);
                         continue;
                     }
                 }
             }
             List<double[]> route = new ArrayList<>();
-            double arrival = angle;
             if (ends[0] != null) {
                 Approach.Route leg = Approach.route(window.originX, window.originZ, size, size, grid, ends[0][0], ends[0][1],
-                        Math.atan2(cz - ends[0][1], cx - ends[0][0]), cx, cz, Double.NaN, transit.minRadius,
+                        Math.atan2(pz - ends[0][1], px - ends[0][0]), px, pz, Double.NaN, transit.minRadius,
                         transit.turnCost, transit.maxRadius, cost);
                 if (leg != null) {
                     route.addAll(leg.line());
-                    arrival = leg.arrival();
                 }
             }
             if (ends[1] != null) {
-                // The other half is searched from its far end in towards the centre too, each half free, and the two
-                // are joined at the centre by an arc: a line whose ends lie on one side of a centre on a shore turns
-                // there instead of looping round over the water to run straight through
+                // The other half is searched from its far end in towards the line's point too, each half free, and
+                // the two joined there by an arc: a line whose ends lie on one side of a point on a shore turns there
+                // instead of looping round over the water to run straight through
                 Approach.Route leg = Approach.route(window.originX, window.originZ, size, size, grid, ends[1][0], ends[1][1],
-                        Math.atan2(cz - ends[1][1], cx - ends[1][0]), cx, cz, Double.NaN, transit.minRadius,
+                        Math.atan2(pz - ends[1][1], px - ends[1][0]), px, pz, Double.NaN, transit.minRadius,
                         transit.turnCost, transit.maxRadius, cost);
                 if (leg != null) {
                     List<double[]> out = new ArrayList<>(leg.line());
@@ -1154,7 +1181,7 @@ public final class StreetLayer {
             if (route.size() < 2) {
                 continue;
             }
-            addLine(lines, window, districts, route, used, downtown[0], downtown[1], station, transit, segments, railways);
+            addLine(lines, window, districts, route, used, station, transit, segments, railways);
         }
         return lines;
     }
@@ -1166,7 +1193,7 @@ public final class StreetLayer {
      * marked used.
      */
     private void addLine(List<UrbanLine> lines, Window window, Districts districts, List<double[]> route, boolean[] used,
-                         double cx, double cz, Anchor station, CitySettings.Transit transit, List<StreetSegment> segments,
+                         Anchor station, CitySettings.Transit transit, List<StreetSegment> segments,
                          List<CityRailway> railways) {
         List<double[]> raw = resampleLine(route, config.step);
         int n = raw.size();
@@ -1174,14 +1201,25 @@ public final class StreetLayer {
         for (int k = 1; k < n; k++) {
             run[k] = run[k - 1] + Math.hypot(raw.get(k)[0] - raw.get(k - 1)[0], raw.get(k)[1] - raw.get(k - 1)[1]);
         }
-        int interchange = -1;
-        java.util.TreeSet<Integer> targets = stationIndices(raw, run, cx, cz, station, transit.stationSpacing);
+        // Stations fixed where they are: at the main station, and where the line passes another line's station
+        java.util.Set<Integer> fixed = new java.util.HashSet<>();
+        List<double[]> others = new ArrayList<>();
+        for (UrbanLine other : lines) {
+            others.addAll(other.stations());
+        }
         if (station != null) {
             int at = nearestIndex(raw, station.x(), station.z());
-            if (targets.contains(at)) {
-                interchange = at;
+            if (Math.hypot(raw.get(at)[0] - station.x(), raw.get(at)[1] - station.z()) < 300) {
+                fixed.add(at);
             }
         }
+        for (double[] other : others) {
+            int at = nearestIndex(raw, other[0], other[1]);
+            if (Math.hypot(raw.get(at)[0] - other[0], raw.get(at)[1] - other[1]) < transit.interchangeReach) {
+                fixed.add(at);
+            }
+        }
+        java.util.TreeSet<Integer> targets = stationIndices(raw, run, fixed, transit.stationSpacing);
         // Road pieces near the line: {line index, offset, |cos| with the line, x, z, ux, uz}
         List<double[]> candidates = new ArrayList<>();
         for (int index = 0; index < segments.size(); index++) {
@@ -1219,7 +1257,7 @@ public final class StreetLayer {
         for (int target : targets) {
             double[] t = tangent(raw, target);
             double[] chosen = null;
-            if (target != interchange) {
+            if (!fixed.contains(target)) {
                 for (double minCos : new double[]{Math.cos(Math.toRadians(35)), Math.cos(Math.toRadians(70)), 0.0}) {
                     double best = Double.POSITIVE_INFINITY;
                     for (double[] c : candidates) {
@@ -1241,6 +1279,24 @@ public final class StreetLayer {
             }
             if (chosen == null) {
                 chosen = new double[]{target, raw.get(target)[0], raw.get(target)[1], t[0], t[1], 0.0};
+            }
+            // Away from other lines' stations, except where the two share one
+            if (!fixed.contains(target) && crowded(others, chosen[1], chosen[2], transit.stationApart)) {
+                // Moved along the line, either way, to the nearest point clear of the others
+                chosen = null;
+                int reach = (int) Math.ceil(0.35 * transit.stationSpacing / config.step);
+                for (int q = 1; q <= reach && chosen == null; q++) {
+                    for (int k : new int[]{target - q, target + q}) {
+                        if (k > 0 && k < n - 1 && !crowded(others, raw.get(k)[0], raw.get(k)[1], transit.stationApart)) {
+                            double[] tk = tangent(raw, k);
+                            chosen = new double[]{k, raw.get(k)[0], raw.get(k)[1], tk[0], tk[1], 0.0};
+                            break;
+                        }
+                    }
+                }
+                if (chosen == null) {
+                    continue;
+                }
             }
             // In order along the line and apart; a station that would not be is left where the line put it
             if (!placed.isEmpty() && run[(int) chosen[0]] - run[(int) placed.get(placed.size() - 1)[0]] < 0.3 * transit.stationSpacing) {
@@ -1302,10 +1358,10 @@ public final class StreetLayer {
         }
         List<double[]> points = moded(window, districts, shaped, true);
         // Viaducts sharing a corridor with another line's viaduct: one two-level viaduct, this line on top
-        List<List<double[]>> others = new ArrayList<>();
-        railways.forEach(r -> others.add(r.line()));
-        lines.forEach(l -> others.add(l.points()));
-        stack(points, others, transit);
+        List<List<double[]>> viaducts = new ArrayList<>();
+        railways.forEach(r -> viaducts.add(r.line()));
+        lines.forEach(l -> viaducts.add(l.points()));
+        stack(points, viaducts, transit);
         int size = window.size;
         for (double[] p : points) {
             int i = (int) Math.round(p[0] / grid) - window.originX;
@@ -1467,6 +1523,15 @@ public final class StreetLayer {
         }
     }
 
+    private static boolean crowded(List<double[]> others, double x, double z, double apart) {
+        for (double[] o : others) {
+            if (Math.hypot(o[0] - x, o[1] - z) < apart) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The unit direction of a line at a point, from its neighbours. */
     private static double[] tangent(List<double[]> line, int k) {
         double[] a = line.get(Math.max(0, k - 2));
@@ -1591,17 +1656,15 @@ public final class StreetLayer {
      * Stations along a line: at both ends, at the point nearest the middle of downtown, at the main station where the line passes
      * within 300 blocks of it, and between these evenly, about {@code spacing} apart.
      */
-    private static java.util.TreeSet<Integer> stationIndices(List<double[]> points, double[] run, double cx, double cz,
-                                                          Anchor station, double spacing) {
+    /**
+     * Where along a line its stations go: at both ends and at the fixed points, and between these evenly, about
+     * {@code spacing} apart.
+     */
+    private static java.util.TreeSet<Integer> stationIndices(List<double[]> points, double[] run, java.util.Set<Integer> fixedPoints,
+                                                          double spacing) {
         int n = points.size();
         java.util.TreeSet<Integer> fixed = new java.util.TreeSet<>(List.of(0, n - 1));
-        fixed.add(nearestIndex(points, cx, cz));
-        if (station != null) {
-            int at = nearestIndex(points, station.x(), station.z());
-            if (Math.hypot(points.get(at)[0] - station.x(), points.get(at)[1] - station.z()) < 300) {
-                fixed.add(at);
-            }
-        }
+        fixed.addAll(fixedPoints);
         java.util.TreeSet<Integer> chosen = new java.util.TreeSet<>(fixed);
         Integer previous = null;
         for (int at : fixed) {

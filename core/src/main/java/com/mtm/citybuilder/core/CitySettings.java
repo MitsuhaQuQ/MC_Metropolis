@@ -393,6 +393,15 @@ public final class CitySettings {
         /** Stations about this far apart along a line. */
         public double stationSpacing = 1000.0;
         /**
+         * Lines run two ways, crossing, those running one way set this far apart through downtown, as a grid (Osaka's,
+         * Kyoto's Karasuma and Tozai), not all through one point. A line passing within {@code interchangeReach} of
+         * another's station stops there, the two sharing it; elsewhere a station keeps {@code stationApart} from
+         * every other line's.
+         */
+        public double lineOffset = 1200.0;
+        public double interchangeReach = 150.0;
+        public double stationApart = 400.0;
+        /**
          * A station is moved onto a road within {@code stationSnap} of the line running with it and turned along it,
          * its platform {@code platformLength} straight along the road.
          */

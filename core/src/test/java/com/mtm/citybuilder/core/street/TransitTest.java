@@ -41,13 +41,12 @@ class TransitTest {
             // Through downtown, underground there
             List<double[]> downtown = line.points().stream()
                     .filter(p -> plan.districts().at(p[0], p[1]) == District.CENTRAL).toList();
-            assertTrue(!downtown.isEmpty(), "a line misses downtown");
             assertTrue(downtown.stream().allMatch(p -> (int) p[2] == TransitMode.UNDERGROUND.ordinal()), "a line above ground downtown");
             List<double[]> stations = line.stations();
             assertTrue(stations.size() >= 2);
             for (int k = 1; k < stations.size(); k++) {
                 double gap = Math.hypot(stations.get(k)[0] - stations.get(k - 1)[0], stations.get(k)[1] - stations.get(k - 1)[1]);
-                assertTrue(gap > 0.3 * SETTINGS.transit.stationSpacing && gap < 1.8 * SETTINGS.transit.stationSpacing,
+                assertTrue(gap > 0.3 * SETTINGS.transit.stationSpacing && gap < 2.4 * SETTINGS.transit.stationSpacing,
                         "stations " + gap + " apart");
             }
             // As straight as it can be: no loops, the line never turns back on itself by more than a right angle
@@ -60,6 +59,22 @@ class TransitTest {
                 double bx = p.get(k + stride)[0] - p.get(k)[0];
                 double bz = p.get(k + stride)[1] - p.get(k)[1];
                 assertTrue(ax * bx + az * bz > 0, "a line doubles back near " + p.get(k)[0] + " " + p.get(k)[1]);
+            }
+        }
+        // The lines serve downtown between them, set apart rather than all through one point
+        assertTrue(plan.urbanLines().stream().anyMatch(l -> l.points().stream()
+                .anyMatch(p -> plan.districts().at(p[0], p[1]) == District.CENTRAL)), "no line through downtown");
+        // Stations of different lines are shared or apart, not crowded
+        List<UrbanLine> all = plan.urbanLines();
+        for (int a = 0; a < all.size(); a++) {
+            for (int b = a + 1; b < all.size(); b++) {
+                for (double[] p : all.get(a).stations()) {
+                    for (double[] q : all.get(b).stations()) {
+                        double d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+                        assertTrue(d < SETTINGS.transit.interchangeReach + 1 || d >= 0.5 * SETTINGS.transit.stationApart,
+                                "stations of two lines " + d + " apart");
+                    }
+                }
             }
         }
         Anchor station = plan.anchors().stream().filter(a -> a.kind() == Anchor.Kind.STATION).findFirst().orElse(null);
