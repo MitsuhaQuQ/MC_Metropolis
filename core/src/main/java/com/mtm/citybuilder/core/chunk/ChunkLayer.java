@@ -40,6 +40,24 @@ public final class ChunkLayer {
     /** A canal's wall: stone from the ground down, beside its water. */
     public static final int CANAL_WALL = 2;
 
+    /**
+     * Whether a street crosses a canal here on a stone slab: a street, an old road or a lane over the canal's water
+     * (a wider street crosses on its own paving, a little concrete bridge).
+     */
+    public static boolean slabDeck(Column column) {
+        return column.canal == CANAL_WATER && (column.surface == Surface.STREET || column.surface == Surface.OLD_ROAD
+                || column.surface == Surface.LANE);
+    }
+
+    /**
+     * Whether a bridge over a canal has its parapet here: the outermost block of a street at least 5 wide where it
+     * crosses the canal (its water or walls), not at a junction; a lane is too narrow to have one.
+     */
+    public static boolean parapet(Column column) {
+        return column.canal != 0 && column.surface != Surface.NONE && !column.junction && column.width >= 5.0
+                && Math.abs(column.across) > 0.5 * column.width - 1.0;
+    }
+
     /** Whether a surface is marked with lines: arterials, collectors and boulevards. */
     public static boolean marked(Surface surface) {
         return surface == Surface.ARTERIAL || surface == Surface.BOULEVARD;
@@ -58,11 +76,13 @@ public final class ChunkLayer {
      * @param heading the street's direction there, in radians
      * @param along   the column's middle measured along the street's direction from the world's origin, for dashes
      * @param width   the street's width
-     * @param junction    whether two marked streets (arterials) meet over it, not two pieces of one street: no lines
-     *                    run on across a junction
+     * @param junction    whether two streets meet over it, not two pieces of one street: two marked streets
+     *                    (arterials), whose lines do not run on across a junction, or two unmarked ones; a bridge has
+     *                    no parapet in a junction
      * @param carriageway whether it lies on the carriageway of any marked street over it, not only on a pavement
-     * @param canal   a canal under an unpaved column: {@link #CANAL_WATER} its water, {@link #CANAL_WALL} its stone
-     *                wall, 0 none (a street crossing a canal passes over it at ground level)
+     * @param canal   a canal under the column: {@link #CANAL_WATER} its water, {@link #CANAL_WALL} its stone wall, 0
+     *                none; under a street, a little bridge carries the street over it (see {@link #slabDeck},
+     *                {@link #parapet})
      */
     public record Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
                          double width, boolean junction, boolean carriageway, int canal) {
@@ -277,6 +297,12 @@ public final class ChunkLayer {
         Index[][] firstIndex = new Index[2][256];
         boolean[][] junction = new boolean[2][256];
         boolean[][] carriage = new boolean[2][256];
+        // The same over every piece, whatever its class: where unmarked streets meet (no parapet there)
+        int[][] firstAny = new int[2][256];
+        java.util.Arrays.fill(firstAny[0], -1);
+        java.util.Arrays.fill(firstAny[1], -1);
+        Index[][] firstAnyIndex = new Index[2][256];
+        boolean[][] meet = new boolean[2][256];
         double minX = chunkX * 16.0;
         double minZ = chunkZ * 16.0;
         List<double[]> canals = new ArrayList<>();
@@ -306,6 +332,12 @@ public final class ChunkLayer {
                         }
                         int c = x * 16 + z;
                         int level = bridge ? 1 : 0;
+                        if (firstAny[level][c] < 0) {
+                            firstAny[level][c] = p;
+                            firstAnyIndex[level][c] = index;
+                        } else if (firstAnyIndex[level][c] != index || !index.sameStreet(firstAny[level][c], p)) {
+                            meet[level][c] = true;
+                        }
                         if (marked(surface)) {
                             if (first[level][c] < 0) {
                                 first[level][c] = p;
@@ -344,16 +376,18 @@ public final class ChunkLayer {
             if (marked(column.surface) && junction[level][c]) {
                 columns[c] = new Column(column.surface, column.bridge, column.deck, column.across, column.heading,
                         column.along, column.width, true, carriage[level][c]);
+            } else if (!marked(column.surface) && column.surface != Surface.NONE && meet[level][c]) {
+                // Unmarked streets meeting: nothing to break off, but no parapet in a junction
+                columns[c] = new Column(column.surface, column.bridge, column.deck, column.across, column.heading,
+                        column.along, column.width, true, false);
             }
         }
-        // Canals under the unpaved columns: water within half its width of its middle line, a wall a block beyond
+        // Canals: water within half its width of its middle line, a wall a block beyond; under a street too, which
+        // crosses on a little bridge
         if (!canals.isEmpty()) {
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
                     int c = x * 16 + z;
-                    if (columns[c].surface != Surface.NONE) {
-                        continue;
-                    }
                     double cx = minX + x + 0.5;
                     double cz = minZ + z + 0.5;
                     int kind = 0;
@@ -370,8 +404,10 @@ public final class ChunkLayer {
                             kind = CANAL_WALL;
                         }
                     }
-                    if (kind != 0) {
-                        columns[c] = new Column(Surface.NONE, false, Double.NaN, 0.0, 0.0, 0.0, 0.0, false, false, kind);
+                    Column column = columns[c];
+                    if (kind != 0 && !column.bridge) {
+                        columns[c] = new Column(column.surface, false, column.deck, column.across, column.heading,
+                                column.along, column.width, column.junction, column.carriageway, kind);
                     }
                 }
             }

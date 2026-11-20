@@ -247,6 +247,28 @@ class ChunkLayerTest {
     }
 
     @Test
+    void streetsCrossCanalsOnLittleBridges() {
+        java.util.function.BiFunction<ChunkLayer.Surface, double[], ChunkLayer.Column> over = (surface, at) ->
+                new ChunkLayer.Column(surface, false, Double.NaN, at[0], 0.0, 0.0, at[1], false, false, (int) at[2]);
+        // A street on a stone slab over the water, its outermost blocks a parapet; over the walls no slab
+        assertTrue(ChunkLayer.slabDeck(over.apply(ChunkLayer.Surface.STREET, new double[]{0.5, 6.0, ChunkLayer.CANAL_WATER})));
+        assertTrue(!ChunkLayer.slabDeck(over.apply(ChunkLayer.Surface.STREET, new double[]{0.5, 6.0, ChunkLayer.CANAL_WALL})));
+        assertTrue(ChunkLayer.parapet(over.apply(ChunkLayer.Surface.STREET, new double[]{2.5, 6.0, ChunkLayer.CANAL_WATER})));
+        assertTrue(ChunkLayer.parapet(over.apply(ChunkLayer.Surface.STREET, new double[]{-2.5, 6.0, ChunkLayer.CANAL_WALL})));
+        assertTrue(!ChunkLayer.parapet(over.apply(ChunkLayer.Surface.STREET, new double[]{1.5, 6.0, ChunkLayer.CANAL_WATER})));
+        // An arterial on its own paving, with a parapet at its pavements' edge
+        assertTrue(!ChunkLayer.slabDeck(over.apply(ChunkLayer.Surface.ARTERIAL, new double[]{0.5, 16.0, ChunkLayer.CANAL_WATER})));
+        assertTrue(ChunkLayer.parapet(over.apply(ChunkLayer.Surface.ARTERIAL, new double[]{7.5, 16.0, ChunkLayer.CANAL_WATER})));
+        // A lane is too narrow for one; off the canal, none
+        assertTrue(ChunkLayer.slabDeck(over.apply(ChunkLayer.Surface.LANE, new double[]{0.5, 2.5, ChunkLayer.CANAL_WATER})));
+        assertTrue(!ChunkLayer.parapet(over.apply(ChunkLayer.Surface.LANE, new double[]{1.0, 2.5, ChunkLayer.CANAL_WATER})));
+        assertTrue(!ChunkLayer.parapet(over.apply(ChunkLayer.Surface.STREET, new double[]{2.5, 6.0, 0})));
+        // Where another street joins on the bridge, no parapet in its way
+        assertTrue(!ChunkLayer.parapet(new ChunkLayer.Column(ChunkLayer.Surface.STREET, false, Double.NaN, 2.5, 0.0, 0.0, 6.0,
+                true, false, ChunkLayer.CANAL_WATER)));
+    }
+
+    @Test
     void anglesStepEvery180OverTheirCount() {
         assertEquals(0, ChunkLayer.angle(0.0));
         assertEquals(0, ChunkLayer.angle(Math.PI));

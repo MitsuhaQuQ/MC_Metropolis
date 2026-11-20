@@ -131,9 +131,24 @@ public final class CityChunks {
                 if (y < chunk.getMinBuildHeight() || y + HEADROOM > top) {
                     continue;
                 }
+                if (column.canal() != 0 && !column.bridge() && y - 3 > chunk.getMinBuildHeight()) {
+                    // Over a canal: its water runs on under the street (a stone slab for a street, an old road or a
+                    // lane), its walls the bridge's abutments
+                    BlockState stone = Blocks.STONE_BRICKS.defaultBlockState();
+                    boolean water = column.canal() == ChunkLayer.CANAL_WATER;
+                    chunk.setBlockState(pos.set(baseX + x, y - 1, baseZ + z), water ? Blocks.WATER.defaultBlockState() : stone, false);
+                    chunk.setBlockState(pos.set(baseX + x, y - 2, baseZ + z), water ? Blocks.WATER.defaultBlockState() : stone, false);
+                    chunk.setBlockState(pos.set(baseX + x, y - 3, baseZ + z), stone, false);
+                    if (ChunkLayer.slabDeck(column)) {
+                        block = Blocks.SMOOTH_STONE.defaultBlockState();
+                    }
+                }
                 chunk.setBlockState(pos.set(baseX + x, y, baseZ + z), block, false);
                 for (int up = 1; up <= HEADROOM; up++) {
                     chunk.setBlockState(pos.set(baseX + x, y + up, baseZ + z), Blocks.AIR.defaultBlockState(), false);
+                }
+                if (ChunkLayer.parapet(column)) {
+                    chunk.setBlockState(pos.set(baseX + x, y + 1, baseZ + z), Blocks.STONE_BRICK_WALL.defaultBlockState(), false);
                 }
             }
         }
@@ -221,7 +236,8 @@ public final class CityChunks {
                 if (paved == Integer.MIN_VALUE) {
                     continue;
                 }
-                for (int y = paved + 1; y <= high; y++) {
+                // A bridge's parapet stands on the paving: kept
+                for (int y = paved + (ChunkLayer.parapet(column) ? 2 : 1); y <= high; y++) {
                     BlockState state = chunk.getBlockState(pos.set(baseX + x, y, baseZ + z));
                     if (!state.isAir() && state.getFluidState().isEmpty()) {
                         chunk.setBlockState(pos, Blocks.AIR.defaultBlockState(), false);
