@@ -73,10 +73,13 @@ class BuildingLayerTest {
                 // Within its lot: frontage, depth
                 assertTrue(b.from() >= plot.start() - 1e-9 && b.to() <= plot.end() + 1e-9, "frontage " + b + " " + plot);
                 assertTrue(b.front() >= 0 && b.back() <= plot.maxDepth() + 1e-9, "depth " + b + " " + plot);
+                // Set-back upper storeys only on flat-roofed blocks, behind a terrace that leaves room inside
+                assertTrue(b.step() == b.storeys() || b.roof() == Building.Roof.FLAT && b.depth() - b.stepBack() >= 6);
                 assertTrue(b.width() >= 4 && b.depth() >= 4, "size " + b);
                 // The road slant line, two storeys always allowed
                 double allowed = config.slant * (plot.streetWidth() + 2.0 * b.front());
-                assertTrue(b.storeys() <= 2 || b.wallHeight() <= allowed + 1e-9, "slant " + b + " on " + plot.streetWidth());
+                int belowLine = b.step();
+                assertTrue(belowLine <= 2 || b.floorOf(belowLine) <= allowed + 1e-9, "slant " + b + " on " + plot.streetWidth());
                 storeys.computeIfAbsent(plot.street(), k -> new int[40])[b.storeys()]++;
                 built++;
             }
@@ -110,7 +113,7 @@ class BuildingLayerTest {
                 for (int c = 0; c < 256; c++) {
                     assertEquals(columns[c], again[c]);
                     BuildingLayer.Column column = columns[c];
-                    if (column.building() == null) {
+                    if (column.building() == null || column.ring()) {
                         continue;
                     }
                     inBuildings++;
@@ -121,7 +124,7 @@ class BuildingLayerTest {
                     assertEquals(column.edge() ? BuildingLayer.Part.TRIM : BuildingLayer.Part.FLOOR,
                             BuildingLayer.part(column, b.base()));
                     int top = BuildingLayer.top(column);
-                    assertTrue(top >= b.base() + b.wallHeight());
+                    assertTrue(top >= b.base() + Math.min(b.wallHeight(), b.floorOf(b.step())));
                     assertEquals(BuildingLayer.Part.AIR, BuildingLayer.part(column, top + 1));
                     assertTrue(BuildingLayer.part(column, top) != BuildingLayer.Part.AIR, "top of " + column);
                 }
@@ -154,11 +157,11 @@ class BuildingLayerTest {
         for (int x = 1; x < 47; x++) {
             for (int z = 1; z < 47; z++) {
                 BuildingLayer.Column c = grid[x][z];
-                if (c.building() == null) {
+                if (c.building() == null || c.ring()) {
                     continue;
                 }
                 for (BuildingLayer.Column n : new BuildingLayer.Column[]{grid[x - 1][z], grid[x + 1][z], grid[x][z - 1], grid[x][z + 1]}) {
-                    if (n.building() == null || n.building().id() != c.building().id()) {
+                    if (n.building() == null || n.ring() || n.building().id() != c.building().id()) {
                         assertTrue(c.edge(), "open wall at " + x + ", " + z);
                     }
                 }

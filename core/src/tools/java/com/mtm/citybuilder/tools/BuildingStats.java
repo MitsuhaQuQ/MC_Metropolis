@@ -40,8 +40,7 @@ final class BuildingStats {
                 samples++;
                 Plot plot = plots.at(x, z);
                 Building b = layer.building(plots, plot);
-                if (b == null || plot.id() != b.id() || plot.along() < b.from() || plot.along() >= b.to()
-                        || plot.depth() < b.front() || plot.depth() >= b.back()) {
+                if (b == null || !BuildingLayer.inside(b, plot, x, z)) {
                     continue;
                 }
                 covered++;

@@ -132,6 +132,14 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = com.mtm.citybuilder.core.debug.BuildingMap.render(logic.buildings(), plots, centerX, centerZ, scale, size);
             }
+            case "preview", "preview1", "preview2", "preview3" -> {
+                // Isometric picture of the buildings: size is the area's edge in blocks, scale the pixels per block,
+                // preview1..3 turn it a quarter at a time
+                streetStats(logic, centerX, centerZ);
+                start = System.nanoTime();
+                int view = layer.length() > 7 ? layer.charAt(7) - '0' : 0;
+                image = BuildingPreview.render(logic, centerX, centerZ, size, scale, view);
+            }
             case "highspeed" -> {
                 List<HighSpeedLine> lines = highSpeedStats(logic, centerX, centerZ, half);
                 start = System.nanoTime();
@@ -147,7 +155,7 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = RoadMap.render(logic, edges, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed, streets, districts, plots or buildings");
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed, streets, districts, plots, buildings or preview");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();

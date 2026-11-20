@@ -87,7 +87,8 @@ public record Palette(String wall, String accent, String trim, String window, St
                 block("light_gray_concrete", "polished_andesite", "light_blue_stained_glass", "glass", "smooth_stone"),
                 block("polished_andesite", "smooth_stone", "gray_stained_glass", "glass", "smooth_stone"),
                 block("smooth_quartz", "polished_diorite", "light_gray_stained_glass", "glass", "smooth_stone"),
-                block("gray_concrete", "light_gray_concrete", "black_stained_glass", "glass", "smooth_stone"));
+                block("white_terracotta", "light_gray_terracotta", "light_gray_stained_glass", "glass", "smooth_stone"),
+                block("smooth_sandstone", "cut_sandstone", "light_blue_stained_glass", "glass", "smooth_stone"));
         // Works: steel and concrete
         add(Building.Type.WORKS,
                 new Palette(m("light_gray_concrete"), m("light_gray_concrete"), m("gray_concrete"), m("glass"), m("glass"),
@@ -99,6 +100,62 @@ public record Palette(String wall, String accent, String trim, String window, St
                 new Palette(m("iron_block"), m("iron_block"), m("gray_concrete"), m("glass"), m("glass"),
                         m("iron_bars"), m("iron_door"), m("smooth_stone"), m("smooth_stone_slab"), m("smooth_stone"),
                         m("smooth_stone"), m("iron_block"), m("polished_andesite")));
+    }
+
+    /** Outdoor units of air conditioners and water tanks, off-white on any building. */
+    public static final String EQUIPMENT = "minecraft:smooth_quartz";
+
+    private static final String[] AWNINGS = {m("red_wool"), m("green_wool"), m("blue_wool"), m("white_wool"),
+            m("orange_wool"), m("brown_wool"), m("cyan_wool")};
+    private static final String[] SIGNS = {m("white_concrete"), m("yellow_concrete"), m("red_concrete"),
+            m("light_blue_concrete"), m("orange_concrete"), m("lime_concrete"), m("sea_lantern")};
+    private static final String[] VENDING = {m("red_concrete"), m("blue_concrete"), m("white_concrete"), m("light_blue_concrete")};
+    private static final String[] FENCES = {m("stone_bricks"), m("polished_andesite"), m("bricks"), m("smooth_sandstone"),
+            m("light_gray_concrete"), m("mossy_stone_bricks"), m("cobblestone")};
+    private static final String[] PLANTS = {m("potted_azalea_bush"), m("potted_fern"), m("potted_red_tulip"),
+            m("potted_oak_sapling"), m("potted_flowering_azalea_bush"), m("potted_bamboo")};
+    /** A rolling shutter: the grey of galvanised steel. */
+    public static final String SHUTTER = m("smooth_stone");
+    public static final String HEDGE = m("azalea_leaves");
+    public static final String BAMBOO = m("bamboo_fence");
+
+    private static String pick(String[] options, long hash) {
+        return options[(int) Math.floorMod(com.mtm.citybuilder.core.noise.Hash.mix(hash), options.length)];
+    }
+
+    /**
+     * The block id of a part of a building with this palette; {@code variant} is the building's, {@code position} a
+     * hash of the block's column (for what varies from block to block, as pot plants). Null for a part that leaves the
+     * world as it is. Slabs, doors and leaves come back as their blocks' ids; the caller sets their states.
+     */
+    public String id(com.mtm.citybuilder.core.building.BuildingLayer.Part part, long variant, long position) {
+        return switch (part) {
+            case NONE -> null;
+            case AIR -> m("air");
+            case LIGHT -> m("light");
+            case FOUNDATION, PAVING -> foundation;
+            case FLOOR -> floor;
+            case WALL -> wall;
+            case ACCENT -> accent;
+            case TRIM -> trim;
+            case WINDOW -> window;
+            case SHOPFRONT -> shopfront;
+            case LATTICE -> lattice;
+            case DOOR_LOWER, DOOR_UPPER -> door;
+            case ROOF_LOW, ROOF_HIGH -> roofSlab;
+            case RIDGE -> roofBlock;
+            case FLAT -> flat;
+            case PARAPET -> parapet;
+            case EQUIPMENT -> EQUIPMENT;
+            case AWNING -> pick(AWNINGS, variant ^ 0x11);
+            case SIGN -> pick(SIGNS, variant ^ 0x22);
+            case SHUTTER -> SHUTTER;
+            case VENDING -> pick(VENDING, variant ^ 0x33);
+            case FENCE -> pick(FENCES, variant ^ 0x44);
+            case HEDGE -> HEDGE;
+            case BAMBOO -> BAMBOO;
+            case PLANT -> pick(PLANTS, position);
+        };
     }
 
     /** A palette by its index. */

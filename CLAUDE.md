@@ -24,6 +24,7 @@ gradlew :core:cityMap -Players=roads -Pseed=12345 -Px=-10600 -Pz=-10000 -Pscale=
 gradlew :core:cityMap -Players=streets -Pseed=12345 -Px=-10232 -Pz=-10272 -Pscale=8   # L5/L6 离该点最近的镇以上聚落的路网，打印各类长度、桥/暗渠/坡道/台阶、分区比例和 OSM 指标，约 50 秒；-Players=districts 同样的图，底色换成功能分区
 gradlew :core:cityMap -Players=plots -Pseed=12345 -Px=-10400 -Pz=-10150 -Pscale=1 -Psize=700   # L7 地块，打印面积比例和各片区面宽进深，约 70 秒
 gradlew :core:cityMap -Players=buildings -Pseed=12345 -Px=-10400 -Pz=-10150 -Pscale=1 -Psize=1000   # L8 建筑：按种类着色、层数越多越深，打印与京都实测同口径的统计，约 80 秒
+gradlew :core:cityMap -Players=preview -Pseed=12345 -Px=-10400 -Pz=-9450 -Pscale=12 -Psize=56   # L8 建筑的离线等轴测预览（按方块近似颜色），preview1–3 每次转 90°，约 1 分钟
 gradlew :core:osmStats -Pin=F:/MC/citybuilder/core/build/osm/kyoto.osm -Pbox="34.975 135.735 35.035 135.785"   # OSM 街道统计（路径要绝对路径，相对路径按 core 目录解析；数据从 Overpass 下载要先问用户）
 python -I tools/assets/plateau_buildings.py F:/MC/citybuilder/core/build/plateau/26100_kyoto-shi_city_2025_citygml_1_op.zip F:/MC/citybuilder/core/build/plateau/kyoto-buildings.csv   # PLATEAU 建筑属性和 LOD2 屋顶形式 → CSV，全京都约 1 分钟（多进程）
 python -I tools/assets/plateau_stats.py F:/MC/citybuilder/core/build/plateau/kyoto-buildings.csv [--box 34.975,135.735,35.035,135.785 --streets F:/MC/citybuilder/core/build/osm/kyoto.osm]   # 层高、占地、屋顶、圆环、按临街道路等级的层数（设计文档第 6 节"京都实测"）

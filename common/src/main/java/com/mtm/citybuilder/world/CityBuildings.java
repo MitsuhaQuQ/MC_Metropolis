@@ -5,6 +5,7 @@ import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.building.Building;
 import com.mtm.citybuilder.core.building.BuildingLayer;
 import com.mtm.citybuilder.core.building.Palette;
+import com.mtm.citybuilder.core.noise.Hash;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -13,6 +14,7 @@ import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
@@ -25,8 +27,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The chunk layer's buildings (L8): each column of a building laid from the ground (or its foundation) to its roof,
- * after the chunk is decorated, so they stand over whatever grew there. The city logic says which part of the
- * building each block is; here the parts become blocks of the building's palette.
+ * and what stands round it on its lot and over the pavement in front, after the chunk is decorated, so they stand over
+ * whatever grew there. The city logic says which part of the building each block is; the building's palette says which
+ * block; here the blocks get their states (slab halves, door halves and facing, leaves kept from decaying).
  */
 public final class CityBuildings {
     private static volatile boolean failed;
@@ -72,27 +75,34 @@ public final class CityBuildings {
                 if (b == null) {
                     continue;
                 }
+                int top = Math.min(max, BuildingLayer.top(column));
+                if (column.ring() && top < b.base()) {
+                    // A ring column carrying nothing: the garden is left as it is
+                    continue;
+                }
                 // The ground: the first solid block down from the surface, as the streets find it
                 int floor = Math.min(max, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
                 BlockState state = chunk.getBlockState(pos.set(baseX + x, floor, baseZ + z));
                 while (floor > min && !state.blocksMotion()) {
                     state = chunk.getBlockState(pos.set(baseX + x, --floor, baseZ + z));
                 }
-                int top = Math.min(max, BuildingLayer.top(column));
                 Palette palette = Palette.get(b.palette());
-                Direction facing = Direction.getNearest(Math.cos(b.facing()), 0.0, Math.sin(b.facing()));
+                // The door faces the street: out of the lot
+                Direction facing = Direction.getNearest(-b.nx(), 0.0, -b.nz());
+                long position = Hash.of(b.variant(), baseX + x, baseZ + z);
                 for (int y = Math.max(min, Math.min(floor + 1, b.base())); y <= top; y++) {
                     BuildingLayer.Part part = BuildingLayer.part(column, y);
-                    if (part == BuildingLayer.Part.NONE || part == BuildingLayer.Part.FOUNDATION && y <= floor) {
+                    if (part == BuildingLayer.Part.FOUNDATION && y <= floor) {
                         continue;
                     }
-                    BlockState block = state(part, palette, facing);
-                    if (block != null) {
-                        chunk.setBlockState(pos.set(baseX + x, y, baseZ + z), block, false);
+                    String id = palette.id(part, b.variant(), position);
+                    if (id != null) {
+                        chunk.setBlockState(pos.set(baseX + x, y, baseZ + z), state(block(id), part, facing), false);
                     }
                 }
-                // What stands over the roof from before (a tree's crown, a hill cut through) is cleared a little way up
-                for (int y = top + 1; y <= Math.min(max, top + 6); y++) {
+                // What stands over the roof from before (a tree's crown, a hill cut through) is cleared a little way up;
+                // round the walls only what overhangs is laid, the ground and what grows on it left
+                for (int y = top + 1; !column.ring() && y <= Math.min(max, top + 6); y++) {
                     BlockState over = chunk.getBlockState(pos.set(baseX + x, y, baseZ + z));
                     if (!over.isAir() && over.getFluidState().isEmpty()) {
                         chunk.setBlockState(pos, Blocks.AIR.defaultBlockState(), false);
@@ -102,40 +112,15 @@ public final class CityBuildings {
         }
     }
 
-    private static BlockState state(BuildingLayer.Part part, Palette p, Direction facing) {
-        return switch (part) {
-            case NONE -> null;
-            case AIR -> Blocks.AIR.defaultBlockState();
-            case FOUNDATION -> block(p.foundation()).defaultBlockState();
-            case FLOOR -> block(p.floor()).defaultBlockState();
-            case WALL -> block(p.wall()).defaultBlockState();
-            case ACCENT -> block(p.accent()).defaultBlockState();
-            case TRIM -> block(p.trim()).defaultBlockState();
-            case WINDOW -> block(p.window()).defaultBlockState();
-            case SHOPFRONT -> block(p.shopfront()).defaultBlockState();
-            case LATTICE -> block(p.lattice()).defaultBlockState();
-            case DOOR_LOWER, DOOR_UPPER -> door(block(p.door()), facing, part == BuildingLayer.Part.DOOR_UPPER);
-            case ROOF_LOW, ROOF_HIGH -> slab(block(p.roofSlab()), part == BuildingLayer.Part.ROOF_HIGH);
-            case RIDGE -> block(p.roofBlock()).defaultBlockState();
-            case FLAT -> block(p.flat()).defaultBlockState();
-            case PARAPET -> block(p.parapet()).defaultBlockState();
-            case LIGHT -> Blocks.LIGHT.defaultBlockState();
-        };
-    }
-
-    private static BlockState door(Block block, Direction facing, boolean upper) {
-        BlockState state = block.defaultBlockState();
-        if (block instanceof DoorBlock) {
-            state = state.setValue(DoorBlock.FACING, facing)
-                    .setValue(DoorBlock.HALF, upper ? DoubleBlockHalf.UPPER : DoubleBlockHalf.LOWER);
-        }
-        return state;
-    }
-
-    private static BlockState slab(Block block, boolean high) {
+    private static BlockState state(Block block, BuildingLayer.Part part, Direction facing) {
         BlockState state = block.defaultBlockState();
         if (block instanceof SlabBlock) {
-            state = state.setValue(SlabBlock.TYPE, high ? SlabType.TOP : SlabType.BOTTOM);
+            state = state.setValue(SlabBlock.TYPE, part == BuildingLayer.Part.ROOF_HIGH ? SlabType.TOP : SlabType.BOTTOM);
+        } else if (block instanceof DoorBlock) {
+            state = state.setValue(DoorBlock.FACING, facing)
+                    .setValue(DoorBlock.HALF, part == BuildingLayer.Part.DOOR_UPPER ? DoubleBlockHalf.UPPER : DoubleBlockHalf.LOWER);
+        } else if (block instanceof LeavesBlock) {
+            state = state.setValue(LeavesBlock.PERSISTENT, true);
         }
         return state;
     }
