@@ -51,7 +51,7 @@ public enum Slot {
     /** Windows flush with the walls or set back a block. */
     RECESS("flush", "recessed"),
     /** A sign: none, standing out from one end (袖看板), running down the front of a block. */
-    SIGN("none", "side", "tall"),
+    SIGN("none", "side", "tall", "stacked"),
     AWNING("none", "awning"),
     VENDING("none", "vending"),
     /** A cornice along a flat roof's walls. */
@@ -87,13 +87,15 @@ public enum Slot {
     /** An office tower on a podium: the lower storeys over the lot, the upper set in on every side. */
     PODIUM("none", "podium"),
     /** A house's windows: in pairs, wide, single. */
-    WINDOWS("pairs", "wide", "single"),
+    WINDOWS("pairs", "wide", "single", "slit"),
+    /** A house detached in its garden, or narrow, filling its lot's frontage, three storeys (狭小住宅). */
+    HOUSE_FORM("detached", "narrow"),
     /** Two materials on the walls: a base storey of brick or stone, or an upper storey in another siding. */
     TWO_TONE("none", "base", "upper"),
     /** A house's balcony along the front of its upper storey. */
     HOUSE_BALCONY("none", "front"),
     /** How the flats of a block are reached: inside, or along open corridors at the back with an outside stair (外廊下). */
-    ACCESS("interior", "corridor"),
+    ACCESS("interior", "corridor", "stairwell"),
     /** Balconies continuous or split flat by flat by screens. */
     BALCONY_SPLIT("none", "units"),
     /** A block's walls: punched windows, ribbon windows, a curtain wall, a framed grid. */

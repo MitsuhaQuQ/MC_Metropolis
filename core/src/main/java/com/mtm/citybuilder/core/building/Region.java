@@ -11,5 +11,10 @@ public enum Region {
      * Hokuriku (Kanazawa, Toyama): glazed black tiles (黒瓦), large two-storey houses under hip-and-gable roofs
      * (入母屋), siding walls.
      */
-    HOKURIKU
+    HOKURIKU,
+    /**
+     * Kanto (Tokyo): narrow three-storey houses on small lots under shed or flat roofs in metal siding (狭小住宅), tiled
+     * mansions, danchi, narrow mixed-tenant buildings stacked with signs (雑居ビル), glass offices.
+     */
+    KANTO
 }

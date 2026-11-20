@@ -36,6 +36,8 @@ public final class Catalog {
     private final Map<com.mtm.citybuilder.core.street.District, Map<Building.Type, Map<String, Double>>> districts =
             new EnumMap<>(com.mtm.citybuilder.core.street.District.class);
     private final Map<Program, String[]> programs = new EnumMap<>(Program.class);
+    private final Map<Region, Map<com.mtm.citybuilder.core.street.District, Map<Building.Type, Map<String, Double>>>> regionDistricts =
+            new EnumMap<>(Region.class);
 
     /** The catalogue the mod ships, read once. */
     public static Catalog get() {
@@ -95,12 +97,19 @@ public final class Catalog {
     }
 
     /**
-     * The style a kind of building is built in, drawn by {@code u}: its district's where the catalogue gives one (the
-     * busy downtown), else its region's, else the Kinki style.
+     * The style a kind of building is built in, drawn by {@code u}: the region's own for its district where the
+     * catalogue gives one (Tokyo's downtown), else the district's (the busy downtown), else the region's, else the
+     * Kinki style.
      */
     public Style forType(Building.Type type, Region region, com.mtm.citybuilder.core.street.District district, double u) {
-        Map<Building.Type, Map<String, Double>> byDistrict = districts.get(district);
+        Map<com.mtm.citybuilder.core.street.District, Map<Building.Type, Map<String, Double>>> own = regionDistricts.get(region);
+        Map<Building.Type, Map<String, Double>> byDistrict = own == null ? null : own.get(district);
         Map<String, Double> mix = byDistrict == null ? null : byDistrict.get(type);
+        if (mix != null) {
+            return style(draw(mix, u));
+        }
+        byDistrict = districts.get(district);
+        mix = byDistrict == null ? null : byDistrict.get(type);
         if (mix != null) {
             return style(draw(mix, u));
         }
@@ -167,7 +176,7 @@ public final class Catalog {
             "shed", "rail", "curtain", "curtainRed", "latticeSpruce", "latticeMangrove", "equipment", "shutter", "hedge",
             "bamboo", "post", "carport", "guard", "downpipe", "lantern", "sudare", "komayose", "engawa", "toro", "toroLight",
             "toroCap", "gravel", "board", "plaster", "spike", "fasciaLit", "display", "stand", "brandKonbini",
-            "brandFastfood", "brandPost", "postbox", "line", "pole", "ad", "baseWall", "upperWall", "step");
+            "brandFastfood", "brandPost", "postbox", "line", "pole", "ad", "baseWall", "upperWall", "step", "tenantSign");
 
     /** Gson is used here only. */
     private static final class Json {
@@ -210,6 +219,7 @@ public final class Catalog {
                 com.google.gson.JsonObject st = styles.getAsJsonObject(name);
                 Building.Type type = Building.Type.valueOf(st.get("type").getAsString());
                 Integer storeys = st.has("storeys") ? st.get("storeys").getAsInt() : null;
+                Integer minStoreys = st.has("minStoreys") ? st.get("minStoreys").getAsInt() : null;
                 Map<String, Double> pal = weights(st.getAsJsonObject("palettes"));
                 for (String p : pal.keySet()) {
                     if (!c.paletteIndex.containsKey(p)) {
@@ -230,7 +240,7 @@ public final class Catalog {
                         options.put(slot, w);
                     }
                 }
-                c.styles.put(name, new Style(name, type, storeys, pal, Collections.unmodifiableMap(options)));
+                c.styles.put(name, new Style(name, type, storeys, minStoreys, pal, Collections.unmodifiableMap(options)));
             }
             com.google.gson.JsonObject quarters = root.getAsJsonObject("quarters");
             for (String key : quarters.keySet()) {
@@ -268,6 +278,29 @@ public final class Catalog {
                         map.put(Building.Type.valueOf(type), mix);
                     }
                     c.districts.put(com.mtm.citybuilder.core.street.District.valueOf(key), map);
+                }
+            }
+            com.google.gson.JsonObject regionDistricts = root.getAsJsonObject("regionDistricts");
+            if (regionDistricts != null) {
+                for (String region : regionDistricts.keySet()) {
+                    com.google.gson.JsonObject byDistrict = regionDistricts.getAsJsonObject(region);
+                    Map<com.mtm.citybuilder.core.street.District, Map<Building.Type, Map<String, Double>>> map =
+                            new EnumMap<>(com.mtm.citybuilder.core.street.District.class);
+                    for (String district : byDistrict.keySet()) {
+                        com.google.gson.JsonObject byType = byDistrict.getAsJsonObject(district);
+                        Map<Building.Type, Map<String, Double>> types = new EnumMap<>(Building.Type.class);
+                        for (String type : byType.keySet()) {
+                            Map<String, Double> mix = weights(byType.getAsJsonObject(type));
+                            for (String s : mix.keySet()) {
+                                if (c.style(s).type() != Building.Type.valueOf(type)) {
+                                    throw new IllegalArgumentException(region + "/" + district + " builds " + type + " in " + s);
+                                }
+                            }
+                            types.put(Building.Type.valueOf(type), mix);
+                        }
+                        map.put(com.mtm.citybuilder.core.street.District.valueOf(district), types);
+                    }
+                    c.regionDistricts.put(Region.valueOf(region), map);
                 }
             }
             com.google.gson.JsonObject programs = root.getAsJsonObject("programs");

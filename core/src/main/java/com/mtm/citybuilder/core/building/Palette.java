@@ -99,6 +99,9 @@ public record Palette(String wall, String accent, String trim, String window, St
             case POLE -> c.material("pole", variant);
             case WALL_ALT -> c.material(composition.is(Slot.TWO_TONE, "base") ? "baseWall" : "upperWall", variant ^ 0xEE);
             case STEP -> c.material("step", variant);
+            case TENANT_A -> c.material("tenantSign", variant ^ 0x101);
+            case TENANT_B -> c.material("tenantSign", variant ^ 0x202);
+            case TENANT_C -> c.material("tenantSign", variant ^ 0x303);
         };
     }
 

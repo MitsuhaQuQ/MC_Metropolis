@@ -157,6 +157,19 @@ public final class CityMap {
                                     : r < 0.10 ? com.mtm.citybuilder.core.building.Program.POST_OFFICE : null;
                         }
                     });
+                } else if (quarter != null && quarter.equals("KANTO")) {
+                    // preview:KANTO shows the whole town built the Tokyo way
+                    logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
+                        @Override
+                        public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Quarter.ORDINARY;
+                        }
+
+                        @Override
+                        public com.mtm.citybuilder.core.building.Region region(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Region.KANTO;
+                        }
+                    });
                 } else if (quarter != null && quarter.equals("HOKURIKU")) {
                     logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
                         @Override

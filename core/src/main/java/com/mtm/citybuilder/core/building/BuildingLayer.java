@@ -149,6 +149,10 @@ public final class BuildingLayer {
         WALL_ALT,
         /** A step of an outside stair. */
         STEP,
+        /** A tenant's sign in a stack down a mixed-tenant building's front, one storey's; three so neighbours differ. */
+        TENANT_A,
+        TENANT_B,
+        TENANT_C,
         /** A light inside, so nothing spawns there. */
         LIGHT
     }
@@ -351,6 +355,9 @@ public final class BuildingLayer {
         if (style.storeys() != null) {
             storeys = style.storeys();
         }
+        if (style.minStoreys() != null) {
+            storeys = Math.max(storeys, style.minStoreys());
+        }
         if (type == Building.Type.MACHIYA || type == Building.Type.KURA) {
             storeys = Math.min(storeys, 2);
         }
@@ -397,6 +404,14 @@ public final class BuildingLayer {
                 // Hokuriku's houses and a merchant town's estates run larger
                 boolean large = region == Region.HOKURIKU || quarter == Quarter.JINAIMACHI;
                 depth = (large ? 8.0 : 7.0) + (large ? 5.0 : 4.0) * Hash.unit(Hash.of(seed, 4));
+                if (composition.is(Slot.HOUSE_FORM, "narrow")) {
+                    // A narrow house (狭小住宅): the lot's whole frontage, a step back from the street, three storeys
+                    front = 1.0;
+                    sideGap = 0.0;
+                    backGap = 1.0;
+                    depth = 9.0 + 4.0 * Hash.unit(Hash.of(seed, 4));
+                    storeys = Math.max(storeys, 3);
+                }
             }
             case MACHIYA -> {
                 // A block's strip in front, under the pent roof
@@ -457,7 +472,7 @@ public final class BuildingLayer {
         boolean parkLeft = false;
         if (type == Building.Type.HOUSE) {
             parkLeft = Hash.unit(Hash.of(seed, 41)) < 0.5;
-            String want = composition.get(Slot.LAYOUT);
+            String want = composition.is(Slot.HOUSE_FORM, "narrow") ? "standard" : composition.get(Slot.LAYOUT);
             if (want.equals("sidePark") && plot.frontage() >= 10.0) {
                 layout = 1;
                 double park = 3.5;
@@ -953,6 +968,22 @@ public final class BuildingLayer {
 
     private static int yardStyle(Building b) {
         return Slot.YARD.options().indexOf(b.composition().get(Slot.YARD));
+    }
+
+    /**
+     * A storey's tenant sign in a stack down the front (雑居ビル): each storey its own colour, a dark frame at each floor.
+     */
+    private static Part tenant(Building b, int dy) {
+        int storey = dy < b.ground() ? 0 : 1 + (dy - b.ground()) / b.upper();
+        int row = dy < b.ground() ? dy : (dy - b.ground()) % b.upper();
+        if (row == 0) {
+            return Part.POLE;
+        }
+        return switch (Math.floorMod(storey, 3)) {
+            case 0 -> Part.TENANT_A;
+            case 1 -> Part.TENANT_B;
+            default -> Part.TENANT_C;
+        };
     }
 
     /** Whether a column carries a low shop's rooftop billboard: along its front wall, short of the corners. */
@@ -1822,10 +1853,11 @@ public final class BuildingLayer {
             }
             if (against == Face.FRONT && b.type() == Building.Type.SHOP) {
                 // A sign standing out from one end of the front, from the first floor up
-                boolean signColumn = b.composition().is(Slot.SIGN, "side") && (chance(b, 15, 0.5) ? along >= 1 && along < 2
+                boolean signed = b.composition().is(Slot.SIGN, "side") || b.composition().is(Slot.SIGN, "stacked");
+                boolean signColumn = signed && (chance(b, 15, 0.5) ? along >= 1 && along < 2
                         : w - along >= 1 && w - along < 2);
                 if (signColumn && dy >= b.ground() && dy < b.wallHeight()) {
-                    return Part.SIGN;
+                    return b.composition().is(Slot.SIGN, "stacked") ? tenant(b, dy) : Part.SIGN;
                 }
                 // An awning over the shop front; a shutter's box where the shutter is down
                 boolean awning = b.composition().is(Slot.AWNING, "awning");
@@ -1870,10 +1902,11 @@ public final class BuildingLayer {
                     return Part.STAND;
                 }
             }
-            if (against == Face.FRONT && b.type() == Building.Type.OFFICE && b.composition().is(Slot.SIGN, "tall")
+            if (against == Face.FRONT && b.type() == Building.Type.OFFICE
+                    && (b.composition().is(Slot.SIGN, "tall") || b.composition().is(Slot.SIGN, "stacked"))
                     && along >= 1 && along < 2 && dy >= b.ground() && dy < b.wallHeight()) {
-                // The tall sign of a downtown block, down one end of its front
-                return Part.SIGN;
+                // The tall sign of a downtown block, down one end of its front; or its tenants' signs stacked
+                return b.composition().is(Slot.SIGN, "stacked") ? tenant(b, dy) : Part.SIGN;
             }
             if (against == Face.FRONT && b.type() == Building.Type.OFFICE && groundStyle(b) == 2
                     && Math.abs(along - b.door()) < 2.5 && dy == b.ground() - 1) {
@@ -2089,6 +2122,19 @@ public final class BuildingLayer {
             long m = (long) Math.floor(face == Face.SIDE ? c.v() - b.front() : c.u());
             return Math.floorMod(m, 3) == 0 ? Part.TRIM : row == 0 ? Part.ACCENT : Part.WINDOW;
         }
+        if (b.type() == Building.Type.APARTMENT && face == Face.BACK && b.composition().is(Slot.ACCESS, "stairwell")) {
+            // A danchi's stairwells (階段室型): every tenth bay open, a parapet at each landing
+            long bay = Math.floorMod((long) Math.floor(c.u()), 10);
+            if (bay == 4 || bay == 5) {
+                return row == 0 ? Part.ACCENT : row == 1 ? Part.PARAPET : Part.AIR;
+            }
+        }
+        if (b.type() == Building.Type.HOUSE && b.composition().is(Slot.WINDOWS, "slit") && row >= 1
+                && Math.floorMod((long) Math.floor(face == Face.SIDE ? c.v() - b.front() : c.u()), 4) == 2
+                && !(face == Face.FRONT && storey == 0 && c.door())) {
+            // A tall slit window, floor to ceiling
+            return Part.WINDOW;
+        }
         if (row == 0) {
             // The band between storeys
             return b.type() == Building.Type.APARTMENT || b.type() == Building.Type.OFFICE || b.type() == Building.Type.MACHIYA
@@ -2111,6 +2157,7 @@ public final class BuildingLayer {
         boolean ribbon = b.composition().is(Slot.FACADE, "ribbon");
         boolean window = switch (b.type()) {
             case HOUSE -> switch (b.composition().get(Slot.WINDOWS)) {
+                case "slit" -> Math.floorMod(s, 4) == 2;
                 case "wide" -> Math.floorMod(s, 5) >= 1 && Math.floorMod(s, 5) <= 3;
                 case "single" -> Math.floorMod(s, 3) == 1;
                 default -> Math.floorMod(s, 4) == 1 || Math.floorMod(s, 4) == 2;
