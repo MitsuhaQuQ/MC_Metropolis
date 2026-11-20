@@ -6,6 +6,7 @@ import com.mtm.citybuilder.core.culture.Style;
 import com.mtm.citybuilder.core.noise.Hash;
 import com.mtm.citybuilder.core.plan.PlanStore;
 import com.mtm.citybuilder.core.terrain.Landform;
+import com.mtm.citybuilder.core.terrain.RiverSample;
 import com.mtm.citybuilder.core.terrain.TerrainView;
 
 import java.util.ArrayList;
@@ -226,16 +227,22 @@ public final class SettlementLayer {
                         && nearest(neighbours, potential.x, potential.z, settings.spacing) == null)
                 .toList());
         potentials.sort((a, b) -> a.beats(b) ? -1 : b.beats(a) ? 1 : 0);
+        // The big tiers were judged without rivers and lakes: each candidate's centre is moved onto dry land, or
+        // dropped. Each answer is independent of the others and of the order, and costs the terrain's drainage around
+        // it, so all are found at once in parallel rather than one by one as they are placed
+        List<Potential> landed = tier.lowlandOnly()
+                ? potentials.parallelStream().map(candidate -> landed(tier, candidate)).toList()
+                : potentials;
 
         List<Settlement> placed = new ArrayList<>();
-        for (Potential candidate : potentials) {
+        for (int c = 0; c < potentials.size(); c++) {
+            Potential candidate = potentials.get(c);
             if (nearest(placed, candidate.x, candidate.z, settings.spacing) != null) {
                 continue;
             }
             Potential potential = candidate;
             if (tier.lowlandOnly()) {
-                // Judged without rivers and lakes; now that it stands, make sure its centre is on dry land
-                potential = landed(tier, candidate);
+                potential = landed.get(c);
                 if (potential == null || nearest(placed, potential.x, potential.z, settings.spacing) != null
                         || nearest(neighbours, potential.x, potential.z, settings.spacing) != null
                         || !clearOfHigher(tier, potential, higher)) {
@@ -250,13 +257,13 @@ public final class SettlementLayer {
     }
 
     /**
-     * A metropolis or city moved, if need be, onto the nearest coarse grid point within half its radius whose full
-     * suitability, rivers and lakes included, makes a centre; null when there is none. The big tiers choose their places
-     * by the suitability without rivers and lakes, which may put a centre in a lake; this is checked only for those that
-     * stand, so the drainage is computed around few places, which their extents will read anyway.
+     * A metropolis or city moved, if need be, off a lake or river onto the nearest grid point within half its radius
+     * that is dry and still suitable for a centre; null when there is none. The big tiers choose their places by the
+     * suitability without rivers and lakes, which may put a centre in a lake; this is checked only for those that
+     * stand, and only at their centres.
      */
     private Potential landed(SettlementTier tier, Potential potential) {
-        if (below.suitability(potential.x, potential.z) >= config.minCentre) {
+        if (!wet(potential.x, potential.z)) {
             return potential;
         }
         int grid = 64;
@@ -277,13 +284,27 @@ public final class SettlementLayer {
         for (int[] offset : offsets) {
             double x = baseX + offset[0] * grid;
             double z = baseZ + offset[1] * grid;
-            if (!terrain.foreign(x, z) && below.suitability(x, z) >= config.minCentre
+            if (!terrain.foreign(x, z) && !wet(x, z) && below.broadSuitability(x, z) >= config.minCentre
                     && below.culture(x, z).margin() >= config.borderBuffer) {
                 return new Potential(potential.cellX, potential.cellZ, x, z, potential.hinterland, potential.score,
                         potential.tieBreak);
             }
         }
         return null;
+    }
+
+    /**
+     * Whether a position lies in a lake or a river channel: asked of the terrain at the one position, not through
+     * the full suitability, which would compute rivers and lakes for every node of the region around (measured: those
+     * whole regions were 44% of a cold start).
+     */
+    private boolean wet(double x, double z) {
+        double lake = terrain.lakeLevel(x, z);
+        if (!Double.isNaN(lake) && lake > terrain.smoothHeight(x, z)) {
+            return true;
+        }
+        RiverSample river = terrain.nearestRiver(x, z);
+        return river != null && river.inWater();
     }
 
     private Potential potential(SettlementTier tier, int cellX, int cellZ) {
