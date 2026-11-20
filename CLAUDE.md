@@ -68,7 +68,12 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 - **本 mod 的方块**（`block.CityBlocks`，经 `Platform.registerBlock` 注册：Fabric 直接注册，Forge 用 `DeferredRegister`，在 mod 构造时挂到事件总线）：`asphalt`、`asphalt_line_white`/`asphalt_line_yellow`（`RotatedPillarBlock`，axis x/z 对应标线方向）、`sidewalk`。贴图由 `tools/textures/road_textures.py` 生成（自制，`assets/citybuilder/ATTRIBUTION` 记录），改贴图改脚本后重跑。
 - Mixin 配置 `citybuilder.mixins.json`：照搬 MTM_worldgen 的 1.20.1 refmap 处理（Fabric 的 `shadowJar` 给 jar 里的配置补上 `refmap`，源码里不写；Forge 用 `loom.forge.mixinConfig`），两个加载器的 `remapJar` 都检查 jar 里的配置写了 refmap 且 refmap 在 jar 里
 - **开发服务器冒烟测试**（用户 2026-11-20 同意接受 EULA）：`fabric/run`（已在 .gitignore）里有 `eula.txt` 和 `server.properties`（`level-type=mtm_worldgen\:realistic`、种子 12345、世界名 `smoke`、RCON 端口 25575 密码 `citybuilder`）。后台跑 `gradlew :fabric:runServer`，等日志出现 `Done (`，再用 `python tools/devserver/rcon.py "forceload add x1 z1 x2 z2" ...` 生成区块；数方块用 `fill ... minecraft:air replace citybuilder:<方块>`（同种方块替换自身只计改变了状态的，数不出来；替换成空气会删掉它们，只在测试世界里这样做），`rcon.py stop` 关服
-- 冒烟测试实测（2026-11-20）：服务器 47 秒启动；在种子 12345 的城下町中心强制加载 8 × 8 区块，第一次规划这座城让主线程卡住 53 秒（"Can't keep up! 52899ms"），之后相邻区块几秒内生成；中心 64 个区块铺了沥青 2879、白线 955、黄线 399、人行道砖 1804 块，平地上的路面都在同一高度（y 66）。没有报错。【待做】规划改成异步，不能让主线程等
+- **游戏内自动测试**（2026-11-20，仿 MTR 的 `MTM_TestKit` + `autotest`）：
+  - TestKit 在 fabric 模块的 `src/testkit` 源码集（mod id `citybuilder_testkit`，只在开发服务器的运行里，不进 jar）：服务器启动后在 127.0.0.1 随机端口开 HTTP，端口、令牌、PID 写进 `fabric/run/testkit/endpoint-server.json`；请求要带 `X-TestKit-Token`，带 `Origin` 的拒绝；接口 `/command`（以控制台执行、返回输出）、`/generate?x1&z1&x2&z2`（加 FORCED 票据异步生成，在 HTTP 线程上等全部 FULL，返回耗时和期间最慢 tick；不能用 `forceload`，它同步加载、卡主线程）、`/blocks`（每列从上往下第一个非空气非树叶方块的统计、本 mod 路面所在高度、路面上方 4 格内有东西的列数）、`/tick`、`/plan-around?x&z`、`/stop`。HTTP 在服务器关闭时停掉（JDK 的分发线程不是守护线程，不停进程不退出）
+  - 运行器 `autotest/`（Node + `@playwright/test` 1.56.1；1.49 在 Node 24 上加载测试文件时挂起）：`cd autotest && npm install && node run.mjs`。写 `server.properties`（世界 `autotest`、种子 12345、只听 127.0.0.1、不开 RCON），删旧世界，后台 `gradlew :fabric:runServer`（输出到 `fabric/run/autotest-server.log`），等 endpoint，跑 `npx playwright test`（`cases/*.spec.mjs`），再 `/stop`、一分钟后按 PID 结束；服务器日志里新增的 ERROR 或异常（除 `KNOWN` 里兄弟 mod 的噪声）算失败
+  - 用例 `cases/streets.spec.mjs`：城下町（-10232, -10272）先预规划再生成 8 × 8 区块，期间最慢 tick < 2 秒；路面、标线、人行道数量够，路面上方 4 格内被盖住的列 < 1%。实测：规划线程 40 秒规划完，生成 48 秒，最慢 tick 1.2 秒；沥青 3022、白线 940、黄线 399、人行道砖 1766，盖住 0 列
+- **后台规划**（`world.CityPlanner`，2026-11-20）：每个服务器一条低优先级守护线程；`MinecraftServerMixin` 每 100 tick 把每个玩家的位置交给它，它规划建成区可能伸到玩家 2.5 km 以内的城（近的先）。区块生成线程遇到没规划好的城仍然等它（玩家跑过规划线程、传送时）
+- 冒烟测试实测（2026-11-20）：服务器 47 秒启动；在种子 12345 的城下町中心强制加载 8 × 8 区块，第一次规划这座城让主线程卡住 53 秒（"Can't keep up! 52899ms"），之后相邻区块几秒内生成；中心 64 个区块铺了沥青 2879、白线 955、黄线 399、人行道砖 1804 块，平地上的路面都在同一高度（y 66）。没有报错（这里卡主线程的是 `forceload` 命令本身同步加载区块）
 
 ## 语言
 
@@ -124,5 +129,6 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 
 素材来自 MIT、CC 等协议，发布前必须能证明每一件素材的授权：
 - 每件导入的素材都记录：来源 URL、作者、协议及版本、是否修改过；（建议集中放在一个清单文件，如 `assets/ATTRIBUTION`/`LICENSES` 目录，随 jar 一起发布）
-- CC BY / BY-SA 需署名，BY-SA 的衍生素材须沿用同一协议；CC **NC**（非商业）、**ND**（禁止演绎）与 mod 的分发和转换方式可能冲突——（【待决定】默认不收录 NC、ND 素材，遇到时先问用户）
+- CC BY / BY-SA 需署名，BY-SA 的衍生素材须沿用同一协议。**NC（非商业）素材可以收录**（用户 2026-11-20：本项目不是商业项目，Minecraft 的使用准则本来就不许 mod 商业化）：本 mod 须免费分发、不以含这些素材收费，收录或改动过的 NC-SA 素材本身沿用 CC BY-NC-SA 4.0，署名和来源记进清单；代码仍按 MIT。ND（禁止演绎）素材不能改动，遇到时先问用户
+- **Yuushya Townscape**（`F:\MC\yuushya-townscape-master`，代码 MIT、美术资源 CC BY-NC-SA 4.0，使用协议见其 `Terms_yuushya_user.md`：可随免费作品分发，须链接创作者页面并标明作品名，不得收费）：有沥青、道路标线（含箭头、匝道标线、人行横道）、电线杆和电线（`CableBlock` 按到电杆的距离算下垂）、路灯、交通标志和信号灯、方向和指引牌、排水沟、消防栓、自动售货机、各种栏杆。方块由 `data/yuushya/register/*.json` 数据驱动注册，id 形如 `yuushya:road_marking_0`。**用法（用户 2026-11-20 选定）**：软依赖，装了才用、按注册 id 在运行时查找，不打包它的素材；但为了可靠，能在我们这边实现的（标线、人行横道、箭头、电线杆和电线、路灯等）都做成本 mod 自己的方块，Yuushya 只补我们没有的东西，没装时一切照常
 - 来源或协议不明的素材不要加入仓库

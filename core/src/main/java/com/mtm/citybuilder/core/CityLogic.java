@@ -423,6 +423,11 @@ public final class CityLogic {
         return streets.plan(settlement);
     }
 
+    /** L5: whether a settlement's streets are planned already, without planning them. */
+    public boolean streetPlanReady(Settlement settlement) {
+        return streets.planned(settlement);
+    }
+
     /** L5: a town's built land in km², what its street statistics are measured over. */
     public double builtArea(Settlement settlement) {
         return streets.builtArea(settlement);

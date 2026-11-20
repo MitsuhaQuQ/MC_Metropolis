@@ -1,0 +1,12 @@
+﻿{
+  "name": "citybuilder-autotest",
+  "private": true,
+  "description": "City Builder's automated in-game tests, after MTR's autotest: Playwright Test drives the dev test server through TestKit",
+  "type": "module",
+  "scripts": {
+    "test": "node run.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

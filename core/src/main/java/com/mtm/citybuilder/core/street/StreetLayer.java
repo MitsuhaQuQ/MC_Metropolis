@@ -114,6 +114,13 @@ public final class StreetLayer {
         }
     }
 
+    /** Whether a town's plan is ready, without planning it. */
+    public boolean planned(Settlement settlement) {
+        synchronized (plans) {
+            return plans.containsKey(settlement.id());
+        }
+    }
+
     /** A town's built land in km²: its extent's nodes above the built intensity. */
     public double builtArea(Settlement settlement) {
         CityExtent extent = logic.extent(settlement);

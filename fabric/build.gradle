@@ -75,3 +75,20 @@ dependencies {
     modLocalRuntime files(rootProject.mtrJar("fabric", "MTM_Logic"), rootProject.mtrJar("fabric", "MTM_Assets"))
     modLocalRuntime "dev.architectury:architectury-fabric:${rootProject.architectury_api_version}"
 }
+
+// TestKit: the automated in-game tests' interface to the dev test server (src/testkit, after MTR's MTM_TestKit). Its
+// own source set, only on the dev server's classpath, never in the mod jar
+sourceSets {
+    testkit {
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
+loom {
+    runs {
+        server {
+            source sourceSets.testkit
+        }
+    }
+}

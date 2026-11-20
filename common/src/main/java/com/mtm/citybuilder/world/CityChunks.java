@@ -87,11 +87,13 @@ public final class CityChunks {
                 if (column.bridge()) {
                     y = (int) column.deck();
                 } else {
-                    // The ground, or the water's surface where a street crosses a stream (a heightmap holds the
-                    // height above its top block)
+                    // The solid ground (not the plants on it: a heightmap holds the height above its top block), or
+                    // the water's surface where a street crosses a stream, the water under it filled
                     int floor = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z) - 1;
-                    int surface = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) - 1;
-                    y = Math.max(floor, surface);
+                    y = floor;
+                    while (y + 1 < top && !chunk.getBlockState(pos.set(baseX + x, y + 1, baseZ + z)).getFluidState().isEmpty()) {
+                        y++;
+                    }
                     for (int fill = floor + 1; fill < y; fill++) {
                         chunk.setBlockState(pos.set(baseX + x, fill, baseZ + z), Blocks.STONE.defaultBlockState(), false);
                     }
@@ -107,25 +109,51 @@ public final class CityChunks {
         }
     }
 
-    /** After decoration: whatever grew over a street from beside it, trees' leaves and trunks, cleared. */
-    public static void clear(WorldGenLevel level, ChunkAccess chunk) {
-        ChunkLayer.Column[] columns = columns(level, chunk);
-        if (columns == null) {
+    /**
+     * After decoration: whatever grew over a street, trees' leaves and trunks, cleared, over this chunk and its eight
+     * neighbours, as a chunk's decoration reaches into its neighbours, some of them decorated already.
+     */
+    public static void clear(WorldGenLevel level, ChunkAccess centre) {
+        if (columns(level, centre) == null) {
             return;
         }
+        CityLogic logic = CityWorlds.of(level.getLevel());
+        int cx = centre.getPos().x;
+        int cz = centre.getPos().z;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (!level.hasChunk(cx + dx, cz + dz)) {
+                    continue;
+                }
+                ChunkAccess chunk = level.getChunk(cx + dx, cz + dz);
+                ChunkLayer.Column[] columns;
+                try {
+                    columns = logic.chunks().columns(cx + dx, cz + dz);
+                } catch (RuntimeException e) {
+                    return;
+                }
+                clearOver(chunk, columns);
+            }
+        }
+    }
+
+    private static void clearOver(ChunkAccess chunk, ChunkLayer.Column[] columns) {
         int baseX = chunk.getPos().getMinBlockX();
         int baseZ = chunk.getPos().getMinBlockZ();
+        int max = chunk.getMaxBuildHeight() - 1;
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                if (columns[x * 16 + z].surface() == ChunkLayer.Surface.NONE) {
+                ChunkLayer.Column column = columns[x * 16 + z];
+                if (column.surface() == ChunkLayer.Surface.NONE) {
                     continue;
                 }
-                // The paving, looked for down from the top; only what lies over it is cleared, and nothing where
-                // it is not found
-                int top = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) - 1;
+                // The paving, looked for in a window round the ground or the deck, not trusting the heightmaps;
+                // only what lies over it is cleared, and nothing where it is not found
+                int ground = column.bridge() ? (int) column.deck() : chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z) - 1;
+                int high = Math.min(max, ground + CLEAR_REACH);
                 int paved = Integer.MIN_VALUE;
-                for (int y = top; y > top - CLEAR_REACH && y > chunk.getMinBuildHeight(); y--) {
+                for (int y = high; y >= ground - 8 && y > chunk.getMinBuildHeight(); y--) {
                     if (paving(chunk.getBlockState(pos.set(baseX + x, y, baseZ + z)))) {
                         paved = y;
                         break;
@@ -134,7 +162,7 @@ public final class CityChunks {
                 if (paved == Integer.MIN_VALUE) {
                     continue;
                 }
-                for (int y = paved + 1; y <= top; y++) {
+                for (int y = paved + 1; y <= high; y++) {
                     BlockState state = chunk.getBlockState(pos.set(baseX + x, y, baseZ + z));
                     if (!state.isAir() && state.getFluidState().isEmpty()) {
                         chunk.setBlockState(pos, Blocks.AIR.defaultBlockState(), false);
