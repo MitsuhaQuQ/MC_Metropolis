@@ -18,7 +18,7 @@ import com.mtm.citybuilder.core.building.temple.Model;
  */
 public record Ballpark(int lines, int centre, int foul, int standDepth, int floodlights) {
     static final int BANK_RUN = 2, BANK_TOP = 6, BANK_FLAT = 3;
-    static final String SEAT = "minecraft:dark_prismarine_stairs", FENCE = "minecraft:green_concrete";
+    static final String SEAT = Arena.SEAT_GREEN, FENCE = "minecraft:green_concrete";
 
     /** The angle from the line to centre field, radians; positive towards first base (east). */
     static double angle(double x, double z) {
@@ -50,32 +50,40 @@ public record Ballpark(int lines, int centre, int foul, int standDepth, int floo
         Field fairField = new Field(x0, z0, x1, z1, this::fair, foul + 1);
         Field f = new Field(x0, z0, x1, z1, (x, z) -> fairField.dist(x, z) <= foul
                 && Math.hypot(x, z) <= fence(angle(x, z)) + 0.5, reach);
-        // The ground: dirt infield and foul territory, grass outfield, lines and bases.
-        double moundZ = -18.4;
+        // The ground: dark soil on the infield and in foul territory, the outfield turf mown in arcs; the foul lines
+        // out to the poles and the batter's boxes painted where they run.
+        double moundZ = -18.4, pole = fence(Math.PI / 4) / Math.sqrt(2);
+        Markings paint = new Markings().segment(0, 0, pole, -pole).segment(0, 0, -pole, -pole)
+                .rect(0.55, -0.9, 1.75, 0.9).rect(-1.75, -0.9, -0.55, 0.9);
         for (int x = x0; x < x1; x++) {
             for (int z = z0; z < z1; z++) {
                 if (!f.in(x, z)) {
                     continue;
                 }
                 boolean grass = fair(x, z) && Math.hypot(x, z - moundZ) > 29;
-                boolean line = (x == -z || x == z) && z <= 0 && fair(x, z);
-                m.set(x, 0, z, line ? Arena.LINE : grass ? Arena.GRASS : "minecraft:coarse_dirt");
+                String base = !grass ? Markings.SOIL
+                        : Math.floorMod((int) Math.floor(Math.hypot(x, z) / 6), 2) == 0 ? Markings.TURF : Markings.TURF_DARK;
+                m.set(x, 0, z, paint.state(base, x, z));
             }
         }
         int b = 19; // 27.43 m between bases
         for (int[] base : new int[][]{{0, 0}, {b, -b}, {0, -2 * b}, {-b, -b}}) {
             m.set(base[0], 0, base[1], "minecraft:quartz_block");
         }
-        Shapes.disk(m, 0, 0, (int) Math.round(moundZ), 2.5, "minecraft:packed_mud");
-        // The batter's boxes either side of the plate, the on-deck circles.
-        for (int z = -1; z <= 1; z++) {
-            m.set(-2, 0, z, Arena.LINE);
-            m.set(2, 0, z, Arena.LINE);
+        // The mound: a low rise of soil (a slab, 25 cm) round the pitcher's plate.
+        int mz = (int) Math.round(moundZ);
+        for (int x = -2; x <= 2; x++) {
+            for (int z = -2; z <= 2; z++) {
+                if (Shapes.inDisk(x, z, 2.5) && (x != 0 || z != 0)) {
+                    m.set(x, 1, mz + z, "minecraft:mud_brick_slab[type=bottom,waterlogged=false]");
+                }
+            }
         }
+        m.set(0, 1, mz, "minecraft:smooth_quartz_slab[type=bottom,waterlogged=false]");
+        // The on-deck circles.
         for (int s : new int[]{-1, 1}) {
             Shapes.disk(m, s * 9, 0, 4, 1, "minecraft:white_concrete_powder");
         }
-        m.set(0, 0, (int) Math.round(moundZ), "minecraft:quartz_block");
         // Infield stands from pole to pole round behind home; their roof over the part behind the plate.
         Zone infield = (x, z, nx, nz) -> !outfield(nx, nz);
         Zone behind = (x, z, nx, nz) -> !outfield(nx, nz) && Math.abs(angle(nx, nz)) >= Math.toRadians(115);

@@ -10,8 +10,9 @@ import com.mtm.citybuilder.core.building.temple.Model;
  *     <li>{@link Type#CAPE}: a white round tower tapering from {@code baseRadius} to {@code topRadius} (犬吠埼 31.6 m to
  *     the top, 潮岬 22.8 m) on a two-step plinth; a door and slit windows facing the four ways, a ladder up a central
  *     post inside; a gallery (回廊) with railings on corbels at {@code tower}, the glazed lantern room (灯籠) over it
- *     with the light on the post, a dark domed roof, vent and lightning rod. Optionally the keeper's house (退息所)
- *     beside it, a single-storey western-style house with a gable roof, as at 犬吠埼 and 潮岬.</li>
+ *     with the lens (this mod's Fresnel lens block, full light) on the post, a dark domed roof, vent and lightning
+ *     rod. Optionally the keeper's house (退息所) beside it, a single-storey western-style house with a gable roof,
+ *     as at 犬吠埼 and 潮岬, inside a low stone wall.</li>
  *     <li>{@link Type#HARBOUR}: a breakwater light (防波堤灯台, 8–12 m), a solid round shaft painted red (the right side
  *     entering port, a red light) or white (the left, a green light) on a square footing, a small platform with
  *     railings and the lamp on top.</li>
@@ -29,7 +30,7 @@ public record Lighthouse(Type type, int tower, double baseRadius, double topRadi
 
     private static final String WHITE = "minecraft:white_concrete", STONE = "minecraft:stone_bricks";
     private static final String PANE = "minecraft:glass_pane", BARS = "minecraft:iron_bars";
-    private static final String DOME = "minecraft:polished_deepslate", LIGHT = "minecraft:sea_lantern";
+    private static final String DOME = "minecraft:polished_deepslate", LENS = "citybuilder:fresnel_lens";
     private static final String ROD = "minecraft:lightning_rod[facing=up,powered=false,waterlogged=false]";
 
     public Lighthouse {
@@ -126,8 +127,8 @@ public record Lighthouse(Type type, int tower, double baseRadius, double topRadi
             }
         }
         m.set(0, tower + 1, 0, WHITE);
-        m.set(0, tower + 2, 0, LIGHT);
-        m.set(0, tower + 3, 0, LIGHT);
+        m.set(0, tower + 2, 0, LENS);
+        m.set(0, tower + 3, 0, LENS);
         // The dome (sloping stairs round a flat top), vent and lightning rod.
         corbel(m, tower + 5, lantern - 0.4, lantern + 0.6, "minecraft:deepslate_tile_stairs", false);
         corbel(m, tower + 6, Math.max(1, lantern - 1.6), Math.max(1.5, lantern - 0.6),

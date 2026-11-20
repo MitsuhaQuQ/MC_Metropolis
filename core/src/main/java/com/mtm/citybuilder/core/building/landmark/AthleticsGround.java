@@ -16,11 +16,13 @@ import com.mtm.citybuilder.core.building.temple.Model;
  * @param roofLength length of the main stand's roof along the straight
  */
 public record AthleticsGround(int standDepth, int roofLength) {
-    static final double HALF_STRAIGHT = 42.195, KERB = 36.5, TRACK = 10, APRON = 3;
+    /** Lane width (1.22 m) and lanes; the surface runs a little past the kerb and the outer line on either side. */
+    static final double HALF_STRAIGHT = 42.195, KERB = 36.5, LANE = 1.22, TRACK = 10.3, APRON = 3;
+    static final int LANES = 8;
     static final int BANK_RUN = 2, BANK_TOP = 5, BANK_FLAT = 3;
-    static final String SURFACE = "minecraft:red_terracotta", SEAT = "minecraft:prismarine_stairs";
+    static final String SURFACE = Markings.TRACK, SEAT = Arena.SEAT_LIGHT_BLUE;
     /** The 100 m start on the home straight: west of the bend's start. */
-    static final int START = (int) Math.round(HALF_STRAIGHT - 100);
+    static final double START = HALF_STRAIGHT - 100;
 
     /** Distance from the column to the axis between the two bend centres. */
     static double rho(int x, int z) {
@@ -30,7 +32,7 @@ public record AthleticsGround(int standDepth, int roofLength) {
 
     /** The extension of the home straight west of the bend, for the 100 m start. */
     static boolean extension(int x, int z) {
-        return x >= START - 2 && x < -HALF_STRAIGHT && z <= -KERB && z > -KERB - TRACK;
+        return x >= START - 2 && x < -HALF_STRAIGHT && z <= -KERB + 0.5 && z > -KERB - TRACK;
     }
 
     public Model build() {
@@ -42,26 +44,27 @@ public record AthleticsGround(int standDepth, int roofLength) {
         int z0 = (int) -edge - reach - 2, z1 = -z0 + 1;
         Field f = new Field(x0, z0, x1, z1, (x, z) -> rho(x, z) < edge
                 || x >= START - 5 && x < 0 && z < 0 && z > -outer - APRON, reach);
+        // The lines: the kerb line and the lane lines 1.22 m apart round the oval (straights and bends), the home
+        // straight's lanes carried on west to the 100 m start; the finish and start lines across the lanes.
+        Markings lines = new Markings();
+        double width = LANE * LANES;
+        for (int k = 0; k <= LANES; k++) {
+            double r = KERB + LANE * k;
+            lines.segment(-HALF_STRAIGHT, -r, HALF_STRAIGHT, -r).segment(-HALF_STRAIGHT, r, HALF_STRAIGHT, r)
+                    .circle(HALF_STRAIGHT, 0, r, (x, z) -> x > HALF_STRAIGHT)
+                    .circle(-HALF_STRAIGHT, 0, r, (x, z) -> x < -HALF_STRAIGHT)
+                    .segment(START - 2, -r, -HALF_STRAIGHT, -r);
+        }
+        lines.rank(1).segment(HALF_STRAIGHT, -KERB, HALF_STRAIGHT, -KERB - width)
+                .segment(START, -KERB, START, -KERB - width);
         for (int x = x0; x < x1; x++) {
             for (int z = z0; z < z1; z++) {
                 if (!f.in(x, z)) {
                     continue;
                 }
                 double r = rho(x, z);
-                String s;
-                if (r < KERB) {
-                    s = Arena.GRASS;
-                } else if (r < outer || extension(x, z)) {
-                    boolean kerb = r < KERB + 1 && !extension(x, z), outerLine = r >= outer - 1 && r < outer;
-                    boolean home = z < 0 && r >= KERB && r < outer || extension(x, z);
-                    boolean finish = home && x == (int) Math.round(HALF_STRAIGHT);
-                    boolean start = extension(x, z) && x == START;
-                    boolean extLine = extension(x, z) && (z == -(int) KERB - 1 || z == -(int) (KERB + TRACK));
-                    s = kerb || outerLine || finish || start || extLine ? Arena.LINE : SURFACE;
-                } else {
-                    s = Arena.GRASS;
-                }
-                m.set(x, 0, z, s);
+                boolean track = r >= KERB - 0.5 && r < KERB + TRACK || extension(x, z);
+                m.set(x, 0, z, track ? lines.state(SURFACE, x, z) : r < KERB ? Markings.TURF : Arena.GRASS);
             }
         }
         Arena.pitch(m, 0, 0);
@@ -107,7 +110,7 @@ public record AthleticsGround(int standDepth, int roofLength) {
         int half = (int) HALF_STRAIGHT + 8;
         Zone main = (x, z, nx, nz) -> z < 0 && Math.abs(x) <= half && nz < -edge + 2;
         Zone covered = (x, z, nx, nz) -> main.accept(x, z, nx, nz) && Math.abs(x) <= roofLength / 2;
-        int top = Arena.stands(m, f, main, standDepth, 1, SEAT, "minecraft:dark_prismarine_stairs");
+        int top = Arena.stands(m, f, main, standDepth, 1, Arena.SEAT_BLUE, SEAT);
         Arena.roof(m, f, covered, standDepth, top, standDepth * 0.3, 4);
         Arena.bank(m, f, (x, z, nx, nz) -> !main.accept(x, z, nx, nz), BANK_RUN, BANK_TOP, BANK_FLAT);
         int sx = (int) (HALF_STRAIGHT + edge) + BANK_TOP * BANK_RUN + 1;

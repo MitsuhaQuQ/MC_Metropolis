@@ -3,7 +3,15 @@ package com.mtm.citybuilder.core.building.landmark;
 import com.mtm.citybuilder.core.building.temple.Model;
 import org.junit.jupiter.api.Test;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,9 +36,35 @@ class LandmarkTest {
     }
 
     @Test
-    void blocksAreVanillaStates() {
+    void blocksAreKnownStates() throws IOException {
+        // Vanilla states, or this mod's blocks with a variant in their block state file (so the game has a model).
+        Path states = Path.of("..", "common", "src", "main", "resources", "assets", "citybuilder", "blockstates");
+        Map<String, JsonObject> files = new HashMap<>();
         for (Model m : List.of(CAPE.build(), HARBOUR.build(), STADIUM.build(), BALLPARK.build(), ATHLETICS.build())) {
-            m.forEach((x, y, z, s) -> assertTrue(s.startsWith("minecraft:") && !s.contains("null"), s));
+            List<String> bad = new ArrayList<>();
+            m.forEach((x, y, z, s) -> {
+                if (s.startsWith("minecraft:") && !s.contains("null")) {
+                    return;
+                }
+                if (!s.startsWith("citybuilder:")) {
+                    bad.add(s);
+                    return;
+                }
+                String name = base(s).substring("citybuilder:".length());
+                JsonObject variants = files.computeIfAbsent(name, n -> {
+                    try {
+                        return JsonParser.parseString(Files.readString(states.resolve(n + ".json")))
+                                .getAsJsonObject().getAsJsonObject("variants");
+                    } catch (IOException e) {
+                        return null;
+                    }
+                });
+                String props = s.indexOf('[') < 0 ? "" : s.substring(s.indexOf('[') + 1, s.length() - 1);
+                if (variants == null || !variants.has(props)) {
+                    bad.add(s);
+                }
+            });
+            assertTrue(bad.isEmpty(), bad.size() + " unknown states, e.g. " + (bad.isEmpty() ? "" : bad.get(0)));
         }
     }
 
@@ -62,7 +96,7 @@ class LandmarkTest {
         for (int y = 2; y <= CAPE.tower(); y++) {
             assertTrue(String.valueOf(m.get(0, y, 1)).contains("ladder"), "ladder at " + y);
         }
-        assertEquals("minecraft:sea_lantern", m.get(0, CAPE.tower() + 2, 0));
+        assertEquals("citybuilder:fresnel_lens", m.get(0, CAPE.tower() + 2, 0));
         assertTrue(base(m.get(2, CAPE.tower() + 3, 0)).equals("minecraft:glass_pane")
                 || base(m.get(3, CAPE.tower() + 3, 0)).equals("minecraft:glass_pane"));
         // The door to the gallery: two blocks of headroom out of the lantern room on the south.
@@ -92,25 +126,34 @@ class LandmarkTest {
 
     @Test
     void stadiumPitchIsFullSize() {
+        // Where the painted goal lines and touchlines really run: 105 × 68.
         Model m = STADIUM.build();
-        int[] goal = lineExtent(m, true, 15);
-        int[] touch = lineExtent(m, false, 20);
-        assertEquals(105, goal[1] - goal[0] + 1, "pitch length");
-        assertEquals(68, touch[1] - touch[0] + 1, "pitch width");
+        double[] length = lineExtent(m, true, 15, 8);
+        double[] width = lineExtent(m, false, 20, 0);
+        assertEquals(105, length[1] - length[0], 0.15, "pitch length");
+        assertEquals(68, width[1] - width[0], 0.15, "pitch width");
     }
 
-    /** The outermost white cells at y = 0 along a row (z = at, x varies) or a column. */
-    private static int[] lineExtent(Model m, boolean alongX, int at) {
-        int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
+    /**
+     * The outermost painted lines of one direction (angle) crossing a row (z = at, x varies) or column, where they
+     * run: the block's middle moved along the angle's normal by the line's offset.
+     */
+    private static double[] lineExtent(Model m, boolean alongX, int at, int angle) {
+        double lo = Double.MAX_VALUE, hi = -Double.MAX_VALUE;
         for (int a = -70; a <= 70; a++) {
             String s = alongX ? m.get(a, 0, at) : m.get(at, 0, a);
-            if (Arena.LINE.equals(s)) {
-                lo = Math.min(lo, a);
-                hi = Math.max(hi, a);
+            if (s == null || !s.contains("_line_white[angle=" + angle + ",")) {
+                continue;
             }
+            double shift = Markings.decode(s)[1];
+            double theta = Math.PI * angle / 16;
+            double p = alongX ? a - Math.sin(theta) * shift : a + Math.cos(theta) * shift;
+            lo = Math.min(lo, p);
+            hi = Math.max(hi, p);
         }
-        return new int[]{lo, hi};
+        return new double[]{lo, hi};
     }
+
 
     @Test
     void sportsGroundsFitTheSite() {
@@ -131,7 +174,7 @@ class LandmarkTest {
             List<String> bad = new ArrayList<>();
             int[] seats = {0};
             m.forEach((x, y, z, s) -> {
-                if (!s.contains("_stairs[")) {
+                if (!s.contains("_stairs[") && !s.startsWith("citybuilder:seat_")) {
                     return;
                 }
                 seats[0]++;
@@ -173,7 +216,7 @@ class LandmarkTest {
     private static int floorBelow(Model m, int x, int z, int limit) {
         for (int y = limit; y >= 0; y--) {
             String b = m.get(x, y, z);
-            if (b != null && !b.contains("_stairs") && !b.contains("glass_pane")) {
+            if (b != null && !b.contains("_stairs") && !b.contains("glass_pane") && !b.contains(":seat_")) {
                 return y;
             }
         }
@@ -218,22 +261,29 @@ class LandmarkTest {
     @Test
     void trackIsFourHundredMetres() {
         Model m = ATHLETICS.build();
-        // The kerb's distance from the middle across (the bend radius) and along (straight plus radius).
-        int across = 0, along = 0;
-        for (int z = 35; z < 45; z++) { // beside the halfway line, past the touchline
-            if (Arena.LINE.equals(m.get(5, 0, z))) {
-                across = z;
-                break;
+        // Where the lines really run: across the straight at x = 5, the kerb and the eight lanes 1.22 m apart; along
+        // z = 0 the kerb's crossing at the east bend.
+        List<Double> across = new ArrayList<>();
+        for (int z = 30; z < 50; z++) {
+            String s = m.get(5, 0, z);
+            if (s != null && s.startsWith("citybuilder:track_line_white[angle=0,")) {
+                across.add(z + Markings.decode(s)[1]);
             }
         }
+        assertEquals(9, across.size(), "kerb and lane lines " + across);
+        for (int k = 0; k < across.size(); k++) {
+            assertEquals(AthleticsGround.KERB + 1.22 * k, across.get(k), 0.08, "line " + k);
+        }
+        double along = 0;
         for (int x = 70; x < 90; x++) {
-            if (Arena.LINE.equals(m.get(x, 0, 0))) {
-                along = x;
+            String s = m.get(x, 0, 0);
+            if (s != null && s.startsWith("citybuilder:track_line_white[angle=8,")) {
+                along = x - Markings.decode(s)[1];
                 break;
             }
         }
-        double radius = across - 0.5 + 0.3, straight = 2 * (along - across); // lane 1 is run 0.3 m off the kerb
-        double lap = 2 * straight + 2 * Math.PI * radius;
-        assertTrue(Math.abs(lap - 400) <= 4, "lap " + lap + " (kerb " + across + ", " + along + ")");
+        double radius = across.get(0), straight = 2 * (along - radius);
+        double lap = 2 * straight + 2 * Math.PI * (radius + 0.3); // lane 1 is run 0.3 m off the kerb
+        assertEquals(400, lap, 1.0, "lap (kerb " + radius + ", bend at " + along + ")");
     }
 }

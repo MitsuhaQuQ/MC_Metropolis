@@ -2,3 +2,9 @@ City Builder assets and where they come from.
 
 textures/block/asphalt.png, asphalt_line_white.png, asphalt_line_yellow.png, sidewalk.png
   Drawn for this mod by tools/textures/road_textures.py (no outside sources); the mod's own licence.
+
+textures/block/track.png, turf.png, turf_dark.png, turf_side.png, soil.png, seat_*.png, fresnel_lens.png,
+led_panel.png and textures/block/line/{track,turf,turf_dark,soil}_white_*.png
+  Drawn for this mod by tools/textures/landmark_textures.py (no outside sources); the mod's own licence.
+  Their models and block states are written by tools/textures/landmark_models.py; the seat's steel bracket uses
+  the vanilla light grey concrete texture by reference (not copied).

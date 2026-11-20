@@ -991,7 +991,7 @@ def write_nbt(path, blocks, size):
         key = (name, tuple(sorted(props.items())) if props else ())
         if key not in index:
             index[key] = len(states)
-            items = [("Name", 8, nbt_string("minecraft:" + name))]
+            items = [("Name", 8, nbt_string(name if ":" in name else "minecraft:" + name))]
             if props:
                 items.append(("Properties", 10, nbt_compound([(k, 8, nbt_string(v)) for k, v in sorted(props.items())])))
             states.append(nbt_compound(items))
@@ -1041,6 +1041,29 @@ PREVIEW_ALIAS = {"white_concrete_powder": "white_concrete", "andesite_wall": "an
                  "stripped_oak_log": "oak_planks", "red_concrete": "red_concrete"}
 
 
+MOD_TEXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "common", "src", "main",
+                            "resources", "assets", "citybuilder", "textures", "block")
+_mod_colours = {}
+
+
+def colour_of(name, bc):
+    """A block's preview colour: vanilla from the client jar's textures (or COLOURS), this mod's own blocks from their
+    textures in the repository, painted lines lighter than their surface."""
+    if name.startswith("citybuilder:"):
+        if name not in _mod_colours:
+            short = name.split(":", 1)[1]
+            line = short.endswith("_line_white")
+            img = Image.open(os.path.join(MOD_TEXTURES, short[:-len("_line_white")] if line else short) + ".png")
+            px = list(img.convert("RGB").getdata())
+            avg = [sum(p[i] for p in px) / len(px) for i in range(3)]
+            if line:
+                avg = [c + (235 - c) * 0.45 for c in avg]
+            _mod_colours[name] = tuple(int(c) for c in avg)
+        return _mod_colours[name]
+    return bc.get(FULL_OF.get(name, PREVIEW_ALIAS.get(name, name))) or ((COLOURS[name] >> 16, (COLOURS[name] >> 8) & 255,
+                                                                          COLOURS[name] & 255) if name in COLOURS else (255, 0, 255))
+
+
 def render(blocks, size, path, bc, max_px=1800):
     sx, sy, sz = size
     s = 2
@@ -1082,8 +1105,7 @@ def render(blocks, size, path, bc, max_px=1800):
             continue
         if name == "spruce_planks" and props is None and name not in bc:
             pass
-        r, g, b = bc.get(FULL_OF.get(name, PREVIEW_ALIAS.get(name, name))) or ((COLOURS[name] >> 16, (COLOURS[name] >> 8) & 255,
-                                                      COLOURS[name] & 255) if name in COLOURS else (255, 0, 255))
+        r, g, b = colour_of(name, bc)
         bx, by = proj(x, y, z)
         bx, by = int(bx) + ox, int(by) + oy
         if name.endswith("trapdoor"):
@@ -1095,7 +1117,7 @@ def render(blocks, size, path, bc, max_px=1800):
         elif props and props.get("type") == "top":
             spr = shapes["slab_top"]
         else:
-            spr = half if props and props.get("type") == "bottom" else full
+            spr = half if props and props.get("type") == "bottom" or name.startswith("citybuilder:seat_") else full
         cols = [bytes((int(r * k), int(g * k), int(b * k))) for k in shade]
         for px, py, f in spr:
             X, Y = bx + px, by + py
@@ -1116,8 +1138,7 @@ def render(blocks, size, path, bc, max_px=1800):
         out[row * W * 3:(row * W + w) * 3] = img[row * w * 3:(row + 1) * w * 3]
     for (x, y), z in front.items():
         name, props = blocks[(x, y, z)]
-        r, g, b = bc.get(FULL_OF.get(name, PREVIEW_ALIAS.get(name, name))) or ((COLOURS[name] >> 16, (COLOURS[name] >> 8) & 255,
-                                                      COLOURS[name] & 255) if name in COLOURS else (255, 0, 255))
+        r, g, b = colour_of(name, bc)
         k = 0.95 - 0.45 * (sz - 1 - z) / max(1, sz - 1)
         col = bytes((int(r * k), int(g * k), int(b * k)))
         for py in range(fs):  # slabs and stairs drawn whole: a roof's steps would show the sky between them
@@ -1137,7 +1158,7 @@ def render(blocks, size, path, bc, max_px=1800):
 
 def thin(name):
     return name.endswith(("trapdoor", "_fence", "_wall", "iron_bars", "lightning_rod", "chain", "_slab", "_stairs")) \
-        or name == "bell"
+        or name == "bell" or name.startswith("citybuilder:seat_")
 
 
 def inside(x, y, poly):
@@ -1163,7 +1184,8 @@ def write_png(path, w, h, rgb):
 def parse_state(state):
     """'minecraft:x[a=b,c=d]' -> ('x', {'a': 'b', 'c': 'd'} or None)."""
     name, _, props = state.partition("[")
-    name = name.split(":", 1)[-1]
+    if name.startswith("minecraft:"):
+        name = name.split(":", 1)[1]  # vanilla names stay bare; the mod's own keep their namespace
     if not props:
         return name, None
     return name, dict(kv.split("=", 1) for kv in props.rstrip("]").split(","))
