@@ -43,6 +43,11 @@ public final class BroadTerrain implements TerrainView {
     }
 
     @Override
+    public double continentHeight(double x, double z) {
+        return terrain.continentHeight(x, z);
+    }
+
+    @Override
     public double seaLevel() {
         return terrain.seaLevel();
     }

@@ -49,6 +49,11 @@ public final class WorldgenTerrainView implements TerrainView {
     }
 
     @Override
+    public double continentHeight(double x, double z) {
+        return logic.sampleContinentHeight(x, z);
+    }
+
+    @Override
     public double smoothHeight(double x, double z) {
         return logic.sampleSmoothLand(x, z);
     }

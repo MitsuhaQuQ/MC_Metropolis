@@ -44,6 +44,11 @@ public final class WithForeign implements TerrainView {
     }
 
     @Override
+    public double continentHeight(double x, double z) {
+        return base.continentHeight(x, z);
+    }
+
+    @Override
     public double seaLevel() {
         return base.seaLevel();
     }

@@ -13,7 +13,10 @@ import com.mtm.citybuilder.core.extent.UrbanSample;
 import com.mtm.citybuilder.core.layer.SuitabilityLayer;
 import com.mtm.citybuilder.core.layer.SuitabilityRegion;
 import com.mtm.citybuilder.core.plan.MemoryPlanStore;
+import com.mtm.citybuilder.core.rail.HighSpeedLayer;
+import com.mtm.citybuilder.core.rail.HighSpeedLine;
 import com.mtm.citybuilder.core.rail.RailEdge;
+import com.mtm.citybuilder.core.rail.SpineNode;
 import com.mtm.citybuilder.core.rail.RailLayer;
 import com.mtm.citybuilder.core.rail.RailRoute;
 import com.mtm.citybuilder.core.road.RoadEdge;
@@ -76,6 +79,7 @@ public final class CityLogic {
     private final RegionCache<UrbanRegion> urban;
     private final RoadLayer roads;
     private final RailLayer rail;
+    private final HighSpeedLayer highSpeed;
 
     /** City logic whose plans are kept in memory only, as for tests and tools. */
     public CityLogic(long seed, CitySettings settings, TerrainView terrain) {
@@ -158,6 +162,7 @@ public final class CityLogic {
                 return CityLogic.this.settlements(minX, minZ, maxX, maxZ, lowest);
             }
         });
+        this.highSpeed = new HighSpeedLayer(seed, settings, terrain, CityLogic.this::settlements);
         this.roads = new RoadLayer(settings, terrain, new RoadLayer.Below() {
             @Override
             public double broadSuitabilityNode(int nodeX, int nodeZ) {
@@ -386,6 +391,26 @@ public final class CityLogic {
     /** L4b: the route of a rail corridor. */
     public RailRoute railRoute(RailEdge edge) {
         return rail.route(edge);
+    }
+
+    /** Reserved high-speed lines: the spine's nodes within a rectangle. */
+    public List<SpineNode> spineNodes(double minX, double minZ, double maxX, double maxZ) {
+        return highSpeed.nodes(minX, minZ, maxX, maxZ);
+    }
+
+    /** Reserved high-speed lines whose routing window touches a rectangle. */
+    public List<HighSpeedLine> highSpeedLines(double minX, double minZ, double maxX, double maxZ) {
+        return highSpeed.lines(minX, minZ, maxX, maxZ);
+    }
+
+    /** The alignment of a reserved high-speed line. */
+    public RailRoute highSpeedRoute(HighSpeedLine line) {
+        return highSpeed.route(line);
+    }
+
+    /** Whether a position lies in a reserved high-speed corridor or station zone, where nothing is to be built. */
+    public boolean highSpeedReserved(double x, double z) {
+        return highSpeed.reserved(x, z);
     }
 
     private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {

@@ -5,7 +5,9 @@ import com.mtm.citybuilder.core.CitySettings;
 import com.mtm.citybuilder.core.culture.CultureRegion;
 import com.mtm.citybuilder.core.debug.CultureMap;
 import com.mtm.citybuilder.core.debug.ExtentMap;
+import com.mtm.citybuilder.core.debug.HighSpeedMap;
 import com.mtm.citybuilder.core.debug.RailMap;
+import com.mtm.citybuilder.core.rail.HighSpeedLine;
 import com.mtm.citybuilder.core.debug.RoadMap;
 import com.mtm.citybuilder.core.rail.RailClass;
 import com.mtm.citybuilder.core.rail.RailCurve;
@@ -54,7 +56,7 @@ public final class CityMap {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 5) {
-            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements|extent|roads|rail]");
+            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements|extent|roads|rail|highspeed]");
             System.exit(2);
         }
         long seed = Long.parseLong(args[0]);
@@ -104,6 +106,11 @@ public final class CityMap {
                 spawn(new CityLogic(seed, CitySettings.DEFAULT, counting), centerX, centerZ, counting);
                 return;
             }
+            case "highspeed" -> {
+                List<HighSpeedLine> lines = highSpeedStats(logic, centerX, centerZ, half);
+                start = System.nanoTime();
+                image = HighSpeedMap.render(logic, lines, centerX, centerZ, scale, size);
+            }
             case "rail" -> {
                 List<RailEdge> lines = railStats(logic, centerX, centerZ, half);
                 start = System.nanoTime();
@@ -114,7 +121,7 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = RoadMap.render(logic, edges, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads or rail");
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail or highspeed");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();
@@ -350,6 +357,52 @@ public final class CityMap {
         Runtime runtime = Runtime.getRuntime();
         System.out.printf("spawn heap in use after a collection: %.0f MB (everything cached: MTM_worldgen's and the city logic's)%n",
                 (runtime.totalMemory() - runtime.freeMemory()) / 1048576.0);
+    }
+
+    /**
+     * Times laying out the reserved high-speed lines of the area: the spine, the stations (which plans the
+     * metropolises near the nodes) and each alignment; reports their length, tunnels and curves.
+     */
+    private static List<HighSpeedLine> highSpeedStats(CityLogic logic, double centerX, double centerZ, double half) {
+        long start = System.nanoTime();
+        int nodes = logic.spineNodes(centerX - half, centerZ - half, centerX + half, centerZ + half).size();
+        System.out.printf("High-speed spine: %d nodes in the area in %.1f s%n", nodes, (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        List<HighSpeedLine> lines = logic.highSpeedLines(centerX - half, centerZ - half, centerX + half, centerZ + half);
+        int stations = 0;
+        for (HighSpeedLine line : lines) {
+            stations += (line.stationA() == null ? 0 : 1) + (line.stationB() == null ? 0 : 1);
+        }
+        System.out.printf("High-speed lines: %d, %d ends at a metropolis, in %.1f s (includes planning the metropolises near the nodes)%n",
+                lines.size(), stations, (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        double length = 0;
+        double tunnel = 0;
+        double straight = 0;
+        int curves = 0;
+        int missing = 0;
+        double tightest = Double.POSITIVE_INFINITY;
+        double slowest = 0;
+        for (HighSpeedLine line : lines) {
+            long one = System.nanoTime();
+            RailRoute route = logic.highSpeedRoute(line);
+            slowest = Math.max(slowest, (System.nanoTime() - one) / 1e9);
+            if (!route.exists()) {
+                missing++;
+                continue;
+            }
+            length += route.length();
+            tunnel += route.length(RailKind.TUNNEL);
+            straight += Math.hypot(line.bx() - line.ax(), line.bz() - line.az());
+            curves += route.curves().size();
+            for (RailCurve curve : route.curves()) {
+                tightest = Math.min(tightest, curve.radius());
+            }
+        }
+        System.out.printf("High-speed alignments in %.1f s, the slowest %.1f s: %.0f km (%d not found), %.2f times the straight line, %.0f%% tunnel, %d curves (tightest %.0f)%n",
+                (System.nanoTime() - start) / 1e9, slowest, length / 1000, missing, straight == 0 ? 0.0 : length / straight,
+                length == 0 ? 0.0 : 100 * tunnel / length, curves, tightest);
+        return lines;
     }
 
     /**

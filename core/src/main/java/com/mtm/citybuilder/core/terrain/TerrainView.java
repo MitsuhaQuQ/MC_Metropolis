@@ -28,6 +28,16 @@ public interface TerrainView {
     /** Height of the land without small-scale texture, erosion or water: the broad shape of the ground. Cheap. */
     double smoothHeight(double x, double z);
 
+    /**
+     * Height of the continent alone, before mountains, hills, rivers and erosion: the land and sea of a whole
+     * continent at a glance, and no more. Costs next to nothing and computes no region of the terrain, so it can be
+     * asked across hundreds of kilometres, as the high-speed lines' spine is. Terrains without such a layer answer
+     * the smooth height.
+     */
+    default double continentHeight(double x, double z) {
+        return smoothHeight(x, z);
+    }
+
     /** Height of the sea's water surface. */
     double seaLevel();
 

@@ -7,12 +7,10 @@ import com.mtm.citybuilder.core.terrain.RiverSample;
 import com.mtm.citybuilder.core.terrain.TerrainView;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.stream.IntStream;
 
 /**
@@ -56,10 +54,6 @@ public final class RailLayer {
     private static final byte LAND = 0;
     private static final byte WATER = 1;
     private static final byte BLOCKED = 2;
-    /** The 16 headings, as steps on the grid, anticlockwise from +x. */
-    private static final int[][] DIRECTIONS = {{1, 0}, {2, 1}, {1, 1}, {1, 2}, {0, 1}, {-1, 2}, {-1, 1}, {-2, 1},
-            {-1, 0}, {-2, -1}, {-1, -1}, {-1, -2}, {0, -1}, {1, -2}, {1, -1}, {2, -1}};
-    private static final int HEADINGS = DIRECTIONS.length;
     private static final int CACHE = 2048;
 
     private final CitySettings.Rail config;
@@ -235,30 +229,6 @@ public final class RailLayer {
         }
     }
 
-    /**
-     * Grid steps of each heading, long enough that turning to a neighbouring heading at the end of one fits an arc of
-     * the least radius: the turn's tangent length, R tan(angle / 2), takes at most half of the step either side.
-     */
-    private int[] stepLengths(double minRadius) {
-        int[] multiples = new int[HEADINGS];
-        for (int d = 0; d < HEADINGS; d++) {
-            double turn = Math.max(angleBetween(d, (d + 1) % HEADINGS), angleBetween(d, (d + HEADINGS - 1) % HEADINGS));
-            double needed = 2.0 * minRadius * Math.tan(0.5 * turn);
-            double unit = Math.hypot(DIRECTIONS[d][0], DIRECTIONS[d][1]) * grid;
-            multiples[d] = Math.max(1, (int) Math.ceil(needed / unit));
-        }
-        return multiples;
-    }
-
-    private static double angle(int d) {
-        return Math.atan2(DIRECTIONS[d][1], DIRECTIONS[d][0]);
-    }
-
-    private static double angleBetween(int a, int b) {
-        double difference = Math.abs(angle(a) - angle(b));
-        return Math.min(difference, 2.0 * Math.PI - difference);
-    }
-
     private RailRoute compute(RailEdge edge) {
         Window window = new Window(edge);
         int start = window.nearestLand(edge.a().x(), edge.a().z());
@@ -266,89 +236,18 @@ public final class RailLayer {
         if (start < 0 || goal < 0) {
             return RailRoute.none(edge);
         }
-        int[] steps = stepLengths(minRadius(edge.railClass()));
-        List<Integer> cells = search(window, start, goal, steps);
+        int[] steps = Alignment.stepLengths(minRadius(edge.railClass()), grid);
+        Alignment.StepCost cost = (i, j, si, sj) -> stepCost(window, i, j, si, sj);
+        List<Integer> cells = Alignment.search(window.width, window.height, grid, start, goal, steps, config.turnCost, cost);
         if (cells == null) {
             return RailRoute.none(edge);
         }
         window.markWater(cells);
-        cells = search(window, start, goal, steps);
+        cells = Alignment.search(window.width, window.height, grid, start, goal, steps, config.turnCost, cost);
         if (cells == null || cells.size() < 2) {
             return RailRoute.none(edge);
         }
         return build(edge, window, cells);
-    }
-
-    /** The vertices of the cheapest route, as cells from start to near the goal, or null. */
-    private List<Integer> search(Window w, int start, int goal, int[] steps) {
-        int cells = w.width * w.height;
-        float[] cost = new float[cells * HEADINGS];
-        Arrays.fill(cost, Float.POSITIVE_INFINITY);
-        int[] previous = new int[cells * HEADINGS];
-        boolean[] done = new boolean[cells * HEADINGS];
-        int goalI = goal / w.height;
-        int goalJ = goal % w.height;
-        int longest = 0;
-        for (int d = 0; d < HEADINGS; d++) {
-            longest = Math.max(longest, (int) Math.ceil(steps[d] * Math.hypot(DIRECTIONS[d][0], DIRECTIONS[d][1])));
-        }
-        PriorityQueue<double[]> queue = new PriorityQueue<>((a, b) -> a[0] != b[0] ? Double.compare(a[0], b[0])
-                : Double.compare(a[1], b[1]));
-        for (int d = 0; d < HEADINGS; d++) {
-            int state = start * HEADINGS + d;
-            cost[state] = 0f;
-            previous[state] = -1;
-            queue.add(new double[]{Math.hypot(start / w.height - goalI, start % w.height - goalJ) * grid, state});
-        }
-        int end = -1;
-        while (!queue.isEmpty()) {
-            int state = (int) queue.poll()[1];
-            if (done[state]) {
-                continue;
-            }
-            done[state] = true;
-            int cell = state / HEADINGS;
-            int heading = state % HEADINGS;
-            int i = cell / w.height;
-            int j = cell % w.height;
-            if (Math.hypot(i - goalI, j - goalJ) <= longest) {
-                end = state;
-                break;
-            }
-            for (int turn = -1; turn <= 1; turn++) {
-                int next = (heading + turn + HEADINGS) % HEADINGS;
-                int si = DIRECTIONS[next][0] * steps[next];
-                int sj = DIRECTIONS[next][1] * steps[next];
-                int ni = i + si;
-                int nj = j + sj;
-                if (!w.inside(ni, nj)) {
-                    continue;
-                }
-                double stepCost = stepCost(w, i, j, si, sj);
-                if (Double.isInfinite(stepCost)) {
-                    continue;
-                }
-                if (turn != 0) {
-                    stepCost += config.turnCost;
-                }
-                int to = (ni * w.height + nj) * HEADINGS + next;
-                double total = cost[state] + stepCost;
-                if (!done[to] && total < cost[to]) {
-                    cost[to] = (float) total;
-                    previous[to] = state;
-                    queue.add(new double[]{total + Math.hypot(ni - goalI, nj - goalJ) * grid, to});
-                }
-            }
-        }
-        if (end < 0) {
-            return null;
-        }
-        List<Integer> vertices = new ArrayList<>();
-        for (int state = end; state >= 0; state = previous[state]) {
-            vertices.add(state / HEADINGS);
-        }
-        java.util.Collections.reverse(vertices);
-        return vertices;
     }
 
     /** What a straight step costs, cell by cell along it; infinite through the sea or a merged-in map. */
@@ -381,93 +280,21 @@ public final class RailLayer {
         RailClass railClass = edge.railClass();
         double minRadius = minRadius(railClass);
         double preferred = railClass == RailClass.TRUNK ? config.trunkRadius : config.branchRadius;
-        // Vertices, with runs in one direction merged into one straight
-        List<double[]> points = new ArrayList<>();
+        List<double[]> vertices = new ArrayList<>();
         for (int cell : cells) {
-            double[] point = {(double) (w.originX + cell / w.height) * grid, (double) (w.originZ + cell % w.height) * grid};
-            if (points.size() >= 2) {
-                double[] a = points.get(points.size() - 2);
-                double[] b = points.get(points.size() - 1);
-                double cross = (b[0] - a[0]) * (point[1] - b[1]) - (b[1] - a[1]) * (point[0] - b[0]);
-                double dot = (b[0] - a[0]) * (point[0] - b[0]) + (b[1] - a[1]) * (point[1] - b[1]);
-                if (Math.abs(cross) < 1e-6 && dot > 0) {
-                    points.set(points.size() - 1, point);
-                    continue;
-                }
-            }
-            points.add(point);
+            vertices.add(new double[]{(double) (w.originX + cell / w.height) * grid, (double) (w.originZ + cell % w.height) * grid});
         }
-
-        // Each turn gets the widest arc the straights either side allow, half of each when both ends turn
+        Alignment.Plan plan = Alignment.fit(vertices, config.maxRadius);
         List<RailCurve> curves = new ArrayList<>();
-        List<double[]> line = new ArrayList<>();
-        line.add(points.get(0));
-        for (int v = 1; v < points.size() - 1; v++) {
-            double[] a = points.get(v - 1);
-            double[] p = points.get(v);
-            double[] b = points.get(v + 1);
-            double inLength = Math.hypot(p[0] - a[0], p[1] - a[1]);
-            double outLength = Math.hypot(b[0] - p[0], b[1] - p[1]);
-            double ux = (p[0] - a[0]) / inLength;
-            double uz = (p[1] - a[1]) / inLength;
-            double vx = (b[0] - p[0]) / outLength;
-            double vz = (b[1] - p[1]) / outLength;
-            double turn = Math.acos(Math.max(-1.0, Math.min(1.0, ux * vx + uz * vz)));
-            if (turn < 1e-3) {
-                line.add(p);
-                continue;
-            }
-            double inShare = v == 1 ? inLength : 0.5 * inLength;
-            double outShare = v == points.size() - 2 ? outLength : 0.5 * outLength;
-            double tangentRoom = Math.min(inShare, outShare);
-            double radius = Math.min(config.maxRadius, tangentRoom / Math.tan(0.5 * turn));
-            double tangent = radius * Math.tan(0.5 * turn);
-            double[] t1 = {p[0] - ux * tangent, p[1] - uz * tangent};
-            double[] t2 = {p[0] + vx * tangent, p[1] + vz * tangent};
-            double side = Math.signum(ux * vz - uz * vx);
-            // The centre lies to the inside of the turn, square to the incoming straight
-            double cx = t1[0] - side * uz * radius;
-            double cz = t1[1] + side * ux * radius;
-            double from = Math.atan2(t1[1] - cz, t1[0] - cx);
-            int pieces = Math.max(2, (int) Math.ceil(radius * turn / 8.0));
-            line.add(t1);
-            for (int q = 1; q < pieces; q++) {
-                double angle = from + side * turn * q / pieces;
-                line.add(new double[]{cx + radius * Math.cos(angle), cz + radius * Math.sin(angle)});
-            }
-            line.add(t2);
+        for (double[] arc : plan.arcs()) {
+            double radius = arc[4];
             double fit = Math.max(0.0, Math.min(1.0, (radius - minRadius) / Math.max(1.0, preferred - minRadius)));
             double transition = railClass == RailClass.TRUNK
                     ? config.trunkTransitionMax - (config.trunkTransitionMax - config.trunkTransitionMin) * fit
                     : config.branchTransitionMax - (config.branchTransitionMax - config.branchTransitionMin) * fit;
-            curves.add(new RailCurve(t1[0], t1[1], t2[0], t2[1], radius, transition, RailCurve.speed(radius)));
+            curves.add(new RailCurve(arc[0], arc[1], arc[2], arc[3], radius, transition, RailCurve.speed(radius)));
         }
-        line.add(points.get(points.size() - 1));
-
-        // Samples along the plan
-        List<double[]> samples = new ArrayList<>();
-        samples.add(line.get(0));
-        double carry = 0.0;
-        for (int p = 1; p < line.size(); p++) {
-            double[] a = line.get(p - 1);
-            double[] b = line.get(p);
-            double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
-            if (length < 1e-9) {
-                continue;
-            }
-            double at = config.sampleSpacing - carry;
-            while (at <= length) {
-                double t = at / length;
-                samples.add(new double[]{a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t});
-                at += config.sampleSpacing;
-            }
-            carry = length - (at - config.sampleSpacing);
-        }
-        double[] last = line.get(line.size() - 1);
-        double[] sampled = samples.get(samples.size() - 1);
-        if (Math.hypot(last[0] - sampled[0], last[1] - sampled[1]) > 1e-6) {
-            samples.add(last);
-        }
+        List<double[]> samples = Alignment.resample(plan.line(), config.sampleSpacing);
 
         int n = samples.size();
         double[] xs = new double[n];
@@ -484,25 +311,12 @@ public final class RailLayer {
             water[i] = inLake || (river != null && river.inWater());
             ground[i] = inLake ? lake : smooth;
         }
-        // Halfway between the highest line no steeper than the grade under the ground and the lowest one over it
-        double grade = grade(railClass);
-        double[] under = ground.clone();
-        double[] over = ground.clone();
-        for (int i = 1; i < n; i++) {
-            double step = grade * Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]);
-            under[i] = Math.min(under[i], under[i - 1] + step);
-            over[i] = Math.max(over[i], over[i - 1] - step);
-        }
-        for (int i = n - 2; i >= 0; i--) {
-            double step = grade * Math.hypot(xs[i + 1] - xs[i], zs[i + 1] - zs[i]);
-            under[i] = Math.min(under[i], under[i + 1] + step);
-            over[i] = Math.max(over[i], over[i + 1] - step);
-        }
+        double[] heights = Alignment.profile(xs, zs, ground, grade(railClass));
         float[] railOut = new float[n];
         float[] groundOut = new float[n];
         RailKind[] kinds = new RailKind[n];
         for (int i = 0; i < n; i++) {
-            double height = 0.5 * (under[i] + over[i]);
+            double height = heights[i];
             double above = height - ground[i];
             if (-above > config.tunnelDepth) {
                 kinds[i] = RailKind.TUNNEL;

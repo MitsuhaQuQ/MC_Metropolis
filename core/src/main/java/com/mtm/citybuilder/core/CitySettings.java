@@ -26,6 +26,7 @@ public final class CitySettings {
     public Rural rural = new Rural();
     public Roads roads = new Roads();
     public Rail rail = new Rail();
+    public HighSpeed highSpeed = new HighSpeed();
 
     public static final class General {
         /** Edge of a logic region in blocks: the unit results are cached in, never a boundary of any rule. */
@@ -308,6 +309,53 @@ public final class CitySettings {
         /** Width of the corridor kept for the track, by class: double track for trunk lines, single for branches. */
         public double trunkWidth = 12.0;
         public double branchWidth = 8.0;
+    }
+
+    /**
+     * Reserved high-speed lines: no structure is built in the first version, but their land is kept free from it on.
+     * A spine is laid out at the scale of a continent first, from the continent's height alone, which costs next to
+     * nothing across hundreds of kilometres: nodes in the middle of large lowlands, joined by a Gabriel graph. Each
+     * node takes the metropolis within {@code snapReach} as its station; lines between them are laid out with the
+     * shared alignment, on a coarse grid, with high-speed radii and grades.
+     */
+    public static final class HighSpeed {
+        /** Edge of the cells spine nodes are chosen in, one at most each, and the least distance between two. */
+        public double nodeCell = 80000.0;
+        public double nodeSpacing = 60000.0;
+        /** Candidates per cell along each axis. */
+        public int nodeCandidates = 9;
+        /** Lowland is measured over this radius around a candidate; a node needs at least {@code minScore}. */
+        public double scoreRadius = 16000.0;
+        public double minScore = 0.5;
+        /** Continent height above the sea at which land no longer counts as lowland. */
+        public double landRange = 300.0;
+        /** Longest line, straight from node to node, and longest stretch of sea it may cross. */
+        public double maxLength = 150000.0;
+        public double maxSea = 50000.0;
+        /** A node takes the metropolis within this distance as its station. */
+        public double snapReach = 20000.0;
+        /** Grid the lines are routed on, and the window around their ends. */
+        public int grid = 512;
+        public double windowMargin = 10000.0;
+        public double windowFactor = 0.2;
+        /** Least, usual and largest curve radius, transition length and steepest grade. */
+        public double minRadius = 2500.0;
+        public double radius = 4000.0;
+        public double maxRadius = 8000.0;
+        public double transition = 250.0;
+        public double grade = 0.02;
+        /** Costs: per metre climbed, extra per block over sea, per change of heading. */
+        public double climbCost = 3.0;
+        public double seaCost = 4.0;
+        public double turnCost = 2000.0;
+        /** Spacing of the profile's samples, and the depth of ground over the line that makes it a tunnel. */
+        public double sampleSpacing = 32.0;
+        public double tunnelDepth = 15.0;
+        /** Width of the double track and the margin kept free either side, and the length of a station's zone. */
+        public double width = 12.0;
+        public double margin = 8.0;
+        public double stationLength = 400.0;
+        public double stationWidth = 60.0;
     }
 
     /** One tier of settlements. */
