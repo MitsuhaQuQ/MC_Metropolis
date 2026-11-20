@@ -475,10 +475,12 @@ public final class CitySettings {
         public double streetBridge = 60.0;
         public double streetBridgeSpacing = 250.0;
         /**
-         * Roads along the banks of wide water run this far from it; a run at least {@code riversideArterial} long is an
+         * Roads along the banks of water wider than a culvert run this far from its edge, on the embankment, whose
+         * crest stands {@code leveeHeight} above the water; a run at least {@code riversideArterial} long is an
          * arterial. An arterial ending at the water joins a bank road within {@code bankJoin} instead of ending there.
          */
-        public double bankOffset = 40.0;
+        public double leveeHeight = 3.0;
+        public double bankOffset = 24.0;
         public double riversideArterial = 600.0;
         public double bankJoin = 120.0;
         /** Built land the arterials miss in patches of at least this many grid nodes is linked by a bridge of its own. */

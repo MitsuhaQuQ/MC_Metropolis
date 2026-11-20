@@ -681,6 +681,7 @@ public final class StreetLayer {
             }
         }
         List<CityRailway> railways = new ArrayList<>();
+        List<Embankment> embankments = new ArrayList<>();
         if (formation != Formation.VILLAGE) {
             mainStation(settlement, window, anchors, railways);
         }
@@ -693,12 +694,17 @@ public final class StreetLayer {
                     moatSide(ground, window, segments);
                 }
             }
-            List<StreetSegment> banks = riverside(window, segments);
+            List<StreetSegment> banks = riverside(window, segments, embankments);
             Field field = new Field(window, formation, settlement, anchors, oldRoad);
             double spacing = spacing(formation);
             Tracer arterials = new Tracer(window, field, StreetClass.ARTERIAL, config.arterialWidth, spacing, false,
                     null, false);
             arterials.bridging = true;
+            Pieces bankPieces = new Pieces();
+            for (StreetSegment bank : banks) {
+                bankPieces.add(bank.x1(), bank.z1(), bank.x2(), bank.z2());
+            }
+            arterials.banks = bankPieces;
             arterials.run(arterialSeeds(anchors, oldRoad, window, spacing), segments);
             linkPatches(window, arterials, segments, spacing);
             demoteDeadEnds(window, segments, anchors, banks);
@@ -729,13 +735,14 @@ public final class StreetLayer {
                 streets.bridging = true;
                 streets.bridgeMax = config.streetBridge;
                 streets.bridgeKeep = config.streetBridgeSpacing;
+                streets.banks = bankPieces;
                 streets.oneSided = formation != Formation.JORI;
                 streets.teeSeed = Hash.mix(settlement.id() ^ 0x7EEL);
                 streets.run(streetSeeds(segments, field, streetSpacing, formation != Formation.JORI), segments);
                 lanes(settlement, formation, window, segments);
             }
         }
-        return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways);
+        return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments);
     }
 
     /**
@@ -788,10 +795,12 @@ public final class StreetLayer {
      * water on the grid and smoothed, cut where the land is not built; a long run is an arterial, a short one a street.
      * Returns the pieces laid, which arterials ending at the water later join.
      */
-    private List<StreetSegment> riverside(Window window, List<StreetSegment> segments) {
-        int size = window.size;
-        double[] d = distances(window.water, size);
+    private List<StreetSegment> riverside(Window window, List<StreetSegment> segments, List<Embankment> embankments) {
+        int size = window.fineSize;
+        float[] d = window.edge;
         double level = config.bankOffset;
+        double baseX = (double) window.originX * grid;
+        double baseZ = (double) window.originZ * grid;
         // Marching squares: pieces of the contour in each cell, joined end to end into lines
         Map<Long, List<double[]>> byEnd = new HashMap<>();
         List<double[]> pieces = new ArrayList<>();
@@ -799,12 +808,14 @@ public final class StreetLayer {
             for (int j = 0; j < size - 1; j++) {
                 int[][] corners = {{i, j}, {i + 1, j}, {i + 1, j + 1}, {i, j + 1}};
                 double[] v = new double[4];
-                boolean finite = true;
+                boolean below = false;
+                boolean above = false;
                 for (int c = 0; c < 4; c++) {
                     v[c] = d[corners[c][0] * size + corners[c][1]];
-                    finite &= !Double.isInfinite(v[c]);
+                    below |= v[c] < level;
+                    above |= v[c] >= level;
                 }
-                if (!finite) {
+                if (!(below && above)) {
                     continue;
                 }
                 List<double[]> crossings = new ArrayList<>();
@@ -813,8 +824,8 @@ public final class StreetLayer {
                     double b = v[(e + 1) % 4];
                     if ((a < level) != (b < level)) {
                         double t = (level - a) / (b - a);
-                        double x = (window.originX + corners[e][0] + t * (corners[(e + 1) % 4][0] - corners[e][0])) * (double) grid;
-                        double z = (window.originZ + corners[e][1] + t * (corners[(e + 1) % 4][1] - corners[e][1])) * (double) grid;
+                        double x = baseX + (corners[e][0] + t * (corners[(e + 1) % 4][0] - corners[e][0])) * FINE;
+                        double z = baseZ + (corners[e][1] + t * (corners[(e + 1) % 4][1] - corners[e][1])) * FINE;
                         crossings.add(new double[]{x, z, e});
                     }
                 }
@@ -874,12 +885,34 @@ public final class StreetLayer {
                 }
             }
             List<double[]> smooth = new ArrayList<>(line);
-            for (int round = 0; round < 3; round++) {
+            for (int round = 0; round < 2; round++) {
                 smooth = chaikin(smooth);
             }
-            laid.addAll(riversideRuns(window, smooth, segments));
+            laid.addAll(riversideRuns(window, smooth, segments, embankments));
         }
         return laid;
+    }
+
+    /**
+     * The crest of the embankment at a point of a bank road: the water's level a little way into the water past the
+     * edge (the lake's, the sea's, or the river valley's smooth ground) plus {@code leveeHeight}, and never below the
+     * ground.
+     */
+    private double crest(Window window, double x, double z) {
+        double gx = window.edge(x + 4, z) - window.edge(x - 4, z);
+        double gz = window.edge(x, z + 4) - window.edge(x, z - 4);
+        double length = Math.hypot(gx, gz);
+        double ground = terrain.smoothHeight(x, z);
+        if (length < 1e-9) {
+            return ground;
+        }
+        double into = window.edge(x, z) + 8.0;
+        double qx = x - gx / length * into;
+        double qz = z - gz / length * into;
+        double lake = terrain.lakeLevel(qx, qz);
+        double level = !Double.isNaN(lake) ? lake
+                : terrain.landform(qx, qz) == Landform.OCEAN ? terrain.seaLevel() : terrain.smoothHeight(qx, qz);
+        return Math.max(ground, level + config.leveeHeight);
     }
 
     private static long endKey(double x, double z) {
@@ -911,7 +944,8 @@ public final class StreetLayer {
     }
 
     /** A bank line cut into runs over built land, laid as pieces about a step long. */
-    private List<StreetSegment> riversideRuns(Window window, List<double[]> line, List<StreetSegment> segments) {
+    private List<StreetSegment> riversideRuns(Window window, List<double[]> line, List<StreetSegment> segments,
+                                              List<Embankment> embankments) {
         // Resample at the step
         List<double[]> points = new ArrayList<>();
         points.add(line.get(0));
@@ -936,6 +970,11 @@ public final class StreetLayer {
                 continue;
             }
             if (run.size() >= 3) {
+                List<double[]> crest = new ArrayList<>();
+                for (double[] p : run) {
+                    crest.add(new double[]{p[0], p[1], crest(window, p[0], p[1])});
+                }
+                embankments.add(new Embankment(crest));
                 double length = (run.size() - 1) * config.step;
                 boolean arterial = length >= config.riversideArterial;
                 for (int q = 1; q < run.size(); q++) {
@@ -1137,7 +1176,7 @@ public final class StreetLayer {
         if (window.water(x, z)) {
             return true;
         }
-        double reach = 3.0 * config.step;
+        double reach = config.bankOffset + 3.0 * config.step;
         for (int a = 0; a < 16; a++) {
             double angle = 2.0 * Math.PI * a / 16;
             for (double r = config.step; r <= reach; r += config.step) {
@@ -1856,6 +1895,9 @@ public final class StreetLayer {
     }
 
     /** A town's window: its extent's nodes, with heights and water, and whether each is built land. */
+    /** Edge of the cells of the fine water grid, in blocks. */
+    private static final int FINE = 16;
+
     private final class Window {
         final CityExtent extent;
         final int originX;
@@ -1869,6 +1911,13 @@ public final class StreetLayer {
         final float[] intensity;
         /** Grounds kept clear of streets: the castle's, the palace's or the temple's. */
         final List<Ground> grounds = new ArrayList<>();
+        /**
+         * Distance to the edge of the water on a grid of {@link #FINE} blocks, negative in the water: rivers wider than
+         * a culvert from the terrain's river lines, so a river narrower than the coarse grid is water too; lakes, the
+         * sea and merged-in maps from the coarse grid.
+         */
+        final int fineSize;
+        final float[] edge;
 
         Window(CityExtent extent) {
             this.extent = extent;
@@ -1920,6 +1969,92 @@ public final class StreetLayer {
                     intensity[i * size + j] = count == 0 ? 0f : (float) (sum / count);
                 }
             }
+            // Water nodes take the intensity of the land beside them, two nodes deep, so the town's intensity holds up
+            // to the bank between nodes instead of falling towards the water's zero; the water itself is told apart
+            // by the edge field
+            for (int pass = 0; pass < 2; pass++) {
+                float[] filled = intensity.clone();
+                for (int i = 0; i < size; i++) {
+                    for (int j = 0; j < size; j++) {
+                        int k = i * size + j;
+                        if (!water[k] || intensity[k] > 0f) {
+                            continue;
+                        }
+                        double sum = 0.0;
+                        int count = 0;
+                        for (int[] d : NEIGHBOURS) {
+                            int ni = i + d[0];
+                            int nj = j + d[1];
+                            if (ni >= 0 && nj >= 0 && ni < size && nj < size && intensity[ni * size + nj] > 0f) {
+                                sum += intensity[ni * size + nj];
+                                count++;
+                            }
+                        }
+                        if (count > 0) {
+                            filled[k] = (float) (sum / count);
+                        }
+                    }
+                }
+                System.arraycopy(filled, 0, intensity, 0, intensity.length);
+            }
+            // The fine edge field
+            boolean[] other = new boolean[size * size];
+            float[] riverEdge = new float[size * size];
+            for (int i = 0; i < size; i++) {
+                for (int j = 0; j < size; j++) {
+                    int k = i * size + j;
+                    RiverSample river = terrain.nearestRiver((double) (originX + i) * grid, (double) (originZ + j) * grid);
+                    boolean wide = river != null && river.width() > config.culvertWidth;
+                    riverEdge[k] = wide ? (float) (river.distance() - 0.5 * river.width()) : Float.POSITIVE_INFINITY;
+                    other[k] = water[k] && !(river != null && river.inWater());
+                }
+            }
+            double[] otherDistance = distances(other, size);
+            // Far from any (infinite) counts as far enough, so interpolation never meets 0 times infinity
+            for (int k = 0; k < otherDistance.length; k++) {
+                otherDistance[k] = Math.min(otherDistance[k], 1e4);
+            }
+            int ratio = grid / FINE;
+            this.fineSize = (size - 1) * ratio + 1;
+            this.edge = new float[fineSize * fineSize];
+            double reach = 3.0 * grid;
+            for (int fi = 0; fi < fineSize; fi++) {
+                for (int fj = 0; fj < fineSize; fj++) {
+                    int i = Math.min(size - 2, fi / ratio);
+                    int j = Math.min(size - 2, fj / ratio);
+                    double fu = (double) fi / ratio - i;
+                    double fv = (double) fj / ratio - j;
+                    double o = (1 - fu) * (1 - fv) * otherDistance[i * size + j] + fu * (1 - fv) * otherDistance[(i + 1) * size + j]
+                            + (1 - fu) * fv * otherDistance[i * size + j + 1] + fu * fv * otherDistance[(i + 1) * size + j + 1];
+                    double value = o - 0.5 * grid;
+                    double nearRiver = Math.min(Math.min(riverEdge[i * size + j], riverEdge[(i + 1) * size + j]),
+                            Math.min(riverEdge[i * size + j + 1], riverEdge[(i + 1) * size + j + 1]));
+                    if (nearRiver < reach) {
+                        double x = (double) originX * grid + fi * FINE;
+                        double z = (double) originZ * grid + fj * FINE;
+                        RiverSample river = terrain.nearestRiver(x, z);
+                        if (river != null && river.width() > config.culvertWidth) {
+                            value = Math.min(value, river.distance() - 0.5 * river.width());
+                        }
+                    }
+                    edge[fi * fineSize + fj] = (float) Math.min(value, 1e4);
+                }
+            }
+        }
+
+        /** Distance to the water's edge, interpolated on the fine grid; negative in the water. */
+        double edge(double x, double z) {
+            double u = (x - (double) originX * grid) / FINE;
+            double v = (z - (double) originZ * grid) / FINE;
+            if (u < 0 || v < 0 || u > fineSize - 1 || v > fineSize - 1) {
+                return -1.0;
+            }
+            int i = Math.min(fineSize - 2, (int) Math.floor(u));
+            int j = Math.min(fineSize - 2, (int) Math.floor(v));
+            double fu = u - i;
+            double fv = v - j;
+            return (1 - fu) * (1 - fv) * edge[i * fineSize + j] + fu * (1 - fv) * edge[(i + 1) * fineSize + j]
+                    + (1 - fu) * fv * edge[i * fineSize + j + 1] + fu * fv * edge[(i + 1) * fineSize + j + 1];
         }
 
         /** Whether the node nearest a position is a culverted stream. */
@@ -1967,10 +2102,9 @@ public final class StreetLayer {
                     + (1 - fu) * fv * height[i * size + j + 1] + fu * fv * height[(i + 1) * size + j + 1];
         }
 
+        /** Whether a position is in water: by the fine edge field; outside the window counts as water. */
         boolean water(double x, double z) {
-            int i = (int) Math.round(x / grid) - originX;
-            int j = (int) Math.round(z / grid) - originZ;
-            return i < 0 || j < 0 || i >= size || j >= size || water[i * size + j];
+            return edge(x, z) < 0.0;
         }
 
         boolean built(double x, double z) {
@@ -2277,6 +2411,8 @@ public final class StreetLayer {
         /** The widest water this tracer's lines bridge, and the least spacing of their bridges. */
         double bridgeMax = config.maxBridge;
         double bridgeKeep = config.bridgeSpacing;
+        /** The bank roads, where a line reaching the water bridges it or ends. */
+        Pieces banks;
         /** Whether lines may climb past {@code maxGrade} as ramps and stairs (streets may, arterials not). */
         boolean climbing;
         /** Share of crossings with a street of the other family where a street ends instead, and their hash's seed. */
@@ -2419,9 +2555,13 @@ public final class StreetLayer {
 
         /**
          * Whether a straight join from one point to another could be a piece of this line: over built land all the
-         * way, and no steeper than the line may climb.
+         * way, onto land (not onto a bridge mid-water), and no steeper than the line may climb.
          */
         private boolean passable(double x, double z, double tx, double tz) {
+            // Not onto a bridge's deck mid-water
+            if (window.water(tx, tz)) {
+                return false;
+            }
             double length = Math.hypot(tx - x, tz - z);
             int samples = Math.max(1, (int) Math.ceil(length / 8.0));
             for (int q = 1; q < samples; q++) {
@@ -2499,6 +2639,25 @@ public final class StreetLayer {
             return null;
         }
 
+        /**
+         * Steps ahead to the first in water, within reach of a bank road just crossed; -1 where the line leaves the
+         * built land first or meets no water.
+         */
+        private int waterAhead(double x, double z, double dx, double dz) {
+            int reach = (int) Math.ceil((config.bankOffset + 2.0 * config.step) / config.step) + 1;
+            for (int q = 1; q <= reach; q++) {
+                double px = x + dx * config.step * q;
+                double pz = z + dz * config.step * q;
+                if (window.water(px, pz)) {
+                    return q;
+                }
+                if (!window.built(px, pz)) {
+                    return -1;
+                }
+            }
+            return -1;
+        }
+
         /** The spacing a bridge of a length keeps from others: wider for a longer, costlier one. */
         private double bridgeSpacing(double length) {
             return bridgeKeep * Math.max(1.0, length / config.bridgeLength);
@@ -2526,6 +2685,33 @@ public final class StreetLayer {
                 double nx = x + dx * config.step;
                 double nz = z + dz * config.step;
                 StreetStructure structure = StreetStructure.GROUND;
+                // A bank road with water just past it: over the water if a bridge may stand here, else the line turns
+                // along the bank, ending on the bank road
+                if (banks != null && travelled >= config.step) {
+                    double[] bank = banks.hit(x, z, nx, nz);
+                    int ahead = bank == null ? -1 : waterAhead(x, z, dx, dz);
+                    if (ahead > 0) {
+                        double lx = x + dx * config.step * (ahead - 1);
+                        double lz = z + dz * config.step * (ahead - 1);
+                        List<double[]> span = bridging ? bridge(lx, lz, dx, dz) : null;
+                        if (span == null) {
+                            if (passable(x, z, bank[0], bank[1])) {
+                                path.add(new double[]{bank[0], bank[1]});
+                            }
+                            break;
+                        }
+                        for (int q = 1; q < ahead; q++) {
+                            path.add(new double[]{x + dx * config.step * q, z + dz * config.step * q});
+                        }
+                        path.addAll(span);
+                        double[] far = span.get(span.size() - 1);
+                        travelled += config.step * (ahead - 1 + span.size() - 1);
+                        x = far[0];
+                        z = far[1];
+                        h = window.height(x, z);
+                        continue;
+                    }
+                }
                 if (!window.built(nx, nz)) {
                     // Arterials bridge rivers where the far bank is near and no bridge stands close by
                     List<double[]> span = bridging && window.water(nx, nz) ? bridge(x, z, dx, dz) : null;
@@ -2552,13 +2738,14 @@ public final class StreetLayer {
                 double spacing = spacing(nx, nz);
                 double[] joined = near(family, nx, nz, 0.5 * spacing, line);
                 if (joined != null && travelled > 0.5 * spacing) {
-                    // The join ends at the first line it meets on the way, if any, not through it
+                    // The join ends at the first line it meets on the way, if any, not through it; where the join
+                    // could not be a street (onto a bridge's deck, over water, too steep) the line runs on instead
                     double[] stop = stop(x, z, joined[0], joined[1], family, true);
                     double[] end = stop != null ? stop : new double[]{joined[0], joined[1]};
                     if (passable(x, z, end[0], end[1])) {
                         path.add(end);
+                        break;
                     }
-                    break;
                 }
                 // A line met on the way: a wall, one of its own family, or at some crossings one of the other
                 if (travelled >= config.step) {

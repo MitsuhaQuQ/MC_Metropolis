@@ -134,6 +134,20 @@ class StreetTerrainTest {
     }
 
     @Test
+    void embankmentsStandAboveTheWater() {
+        CityLogic logic = new CityLogic(3L, SETTINGS, new SyntheticTerrain(0.0, 20000, 80, Landform.PLAINS));
+        StreetPlan plan = logic.streetPlan(city(20300, 0), Formation.CASTLE_TOWN);
+        assertTrue(!plan.embankments().isEmpty(), "embankments");
+        // The synthetic river's water lies at the plain's level: the crest stands leveeHeight above it
+        double water = SyntheticTerrain.SEA + 4.0;
+        for (Embankment embankment : plan.embankments()) {
+            for (double[] point : embankment.points()) {
+                assertTrue(Math.abs(point[2] - (water + SETTINGS.streets.leveeHeight)) < 1e-6, "crest " + point[2]);
+            }
+        }
+    }
+
+    @Test
     void streetsCrossASmallStreamOnCulverts() {
         CityLogic logic = new CityLogic(3L, SETTINGS, new SyntheticTerrain(0.0, 20000, 8, Landform.PLAINS));
         StreetPlan plan = logic.streetPlan(city(20300, 0), Formation.CASTLE_TOWN);
