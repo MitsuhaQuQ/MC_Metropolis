@@ -716,6 +716,7 @@ public final class StreetLayer {
                 // between and halve blocks
                 streets.clearance = formation == Formation.JORI ? 0.95 : 0.7;
                 streets.climbing = true;
+                streets.oneSided = formation != Formation.JORI;
                 streets.teeSeed = Hash.mix(settlement.id() ^ 0x7EEL);
                 streets.run(streetSeeds(segments, field, streetSpacing, formation != Formation.JORI), segments);
                 lanes(settlement, formation, window, segments);
@@ -1237,6 +1238,11 @@ public final class StreetLayer {
         /** Share of crossings with a street of the other family where a street ends instead, and their hash's seed. */
         double teeChance;
         long teeSeed;
+        /**
+         * Whether a line seeded on a line of the other family runs off to one side of it only, the side by the seed's
+         * hash: a line run both ways from a point on another crosses it there, a crossroads at every seed.
+         */
+        boolean oneSided;
         /** Points of traced lines by family, bucketed. */
         final List<Map<Long, List<double[]>>> points = List.of(new HashMap<>(), new HashMap<>());
         /** Pieces of traced lines by family, {x1, z1, x2, z2}, bucketed by their middles. */
@@ -1355,7 +1361,9 @@ public final class StreetLayer {
                     if (length >= here) {
                         length = 0.0;
                         double angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
-                        seeds.add(new double[]{b[0], b[1], 1 - family});
+                        double sense = !oneSided ? 0.0
+                                : Hash.unit(Hash.of(teeSeed ^ 0x51DEL, Math.round(b[0]), Math.round(b[1]))) < 0.5 ? 1.0 : -1.0;
+                        seeds.add(new double[]{b[0], b[1], 1 - family, sense});
                         for (double side : new double[]{1.0, -1.0}) {
                             seeds.add(new double[]{b[0] - side * Math.sin(angle) * here,
                                     b[1] + side * Math.cos(angle) * here, family});
@@ -1380,6 +1388,35 @@ public final class StreetLayer {
             }
             double grade = Math.abs(window.height(tx, tz) - window.height(x, z)) / Math.max(1e-6, length);
             return grade <= (climbing ? config.stairsGrade : config.maxGrade);
+        }
+
+        /**
+         * Where a straight piece from one point toward another first meets a line laid before, as an end of that
+         * line's piece, or null: a wall (which a street ends at unless it crosses walls), a line of its own family
+         * (which it always ends at: lines of one family run side by side, so one cutting through another is a
+         * crossing nobody would build), or one of the other family. At a crossing of the other family a street ends
+         * by the crossing's own hash, {@code teeChance} of the time (T junctions, as old towns have more of than
+         * crossroads), or always for a join, which is a piece the line adds to reach another and should not cut through
+         * a third.
+         */
+        private double[] stop(double x, double z, double tx, double tz, int family, boolean join) {
+            double[] best = null;
+            if (walls != null && !crossWalls) {
+                best = earlier(best, walls.pieces.hit(x, z, tx, tz));
+            }
+            best = earlier(best, pieces.get(family).hit(x, z, tx, tz));
+            if (teeChance > 0) {
+                double[] across = pieces.get(1 - family).hit(x, z, tx, tz);
+                if (across != null && (join || Hash.unit(Hash.of(teeSeed, Math.round(across[0]), Math.round(across[1]))) < teeChance)) {
+                    best = earlier(best, across);
+                }
+            }
+            return best == null ? null : new double[]{best[0], best[1]};
+        }
+
+        /** Of two hits {x, z, t}, the one met first. */
+        private static double[] earlier(double[] a, double[] b) {
+            return a == null ? b : b == null || a[2] <= b[2] ? a : b;
         }
 
         private StreetStructure structure(double[] point) {
@@ -1465,28 +1502,20 @@ public final class StreetLayer {
                 double spacing = spacing(nx, nz);
                 double[] joined = near(family, nx, nz, 0.5 * spacing, line);
                 if (joined != null && travelled > 0.5 * spacing) {
-                    if (passable(x, z, joined[0], joined[1])) {
-                        path.add(new double[]{joined[0], joined[1]});
+                    // The join ends at the first line it meets on the way, if any, not through it
+                    double[] stop = stop(x, z, joined[0], joined[1], family, true);
+                    double[] end = stop != null ? stop : new double[]{joined[0], joined[1]};
+                    if (passable(x, z, end[0], end[1])) {
+                        path.add(end);
                     }
                     break;
                 }
-                // A wall: a street meets the line laid before it there, and ends on it unless it crosses
-                if (walls != null && !crossWalls && travelled >= config.step) {
-                    double[] wall = walls.pieces.hit(x, z, nx, nz);
-                    if (wall != null) {
-                        if (passable(x, z, wall[0], wall[1])) {
-                            path.add(wall);
-                        }
-                        break;
-                    }
-                }
-                // A street crossing one of the other family ends there at some crossings: T junctions, as old towns
-                // have more than crossroads; whether it does is the crossing's own hash
-                if (teeChance > 0 && travelled >= config.step) {
-                    double[] across = pieces.get(1 - family).hit(x, z, nx, nz);
-                    if (across != null && Hash.unit(Hash.of(teeSeed, Math.round(across[0]), Math.round(across[1]))) < teeChance) {
-                        if (passable(x, z, across[0], across[1])) {
-                            path.add(across);
+                // A line met on the way: a wall, one of its own family, or at some crossings one of the other
+                if (travelled >= config.step) {
+                    double[] stop = stop(x, z, nx, nz, family, false);
+                    if (stop != null) {
+                        if (passable(x, z, stop[0], stop[1])) {
+                            path.add(stop);
                         }
                         break;
                     }
@@ -1497,8 +1526,10 @@ public final class StreetLayer {
                 for (int k = 0; k < behind; k += 2) {
                     double[] p = path.get(k);
                     if (Math.hypot(p[0] - nx, p[1] - nz) < 0.5 * spacing) {
-                        if (passable(x, z, p[0], p[1])) {
-                            path.add(new double[]{p[0], p[1]});
+                        double[] stop = stop(x, z, p[0], p[1], family, true);
+                        double[] end = stop != null ? stop : new double[]{p[0], p[1]};
+                        if (passable(x, z, end[0], end[1])) {
+                            path.add(end);
                         }
                         closed = true;
                         break;
@@ -1533,14 +1564,19 @@ public final class StreetLayer {
             return ((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL);
         }
 
-        /** The nearer end of the first piece the step from (x, z) to (nx, nz) crosses or touches, or null. */
+        /**
+         * The nearer end of the first piece the straight from (x, z) to (nx, nz) crosses or touches, with how far
+         * along it is met, {x, z, t}; or null. Pieces are no longer than a few steps, so their middles lie within
+         * reach of the query's.
+         */
         double[] hit(double x, double z, double nx, double nz) {
             long bx = (long) Math.floor(0.5 * (x + nx) / CELL);
             long bz = (long) Math.floor(0.5 * (z + nz) / CELL);
+            int reach = 1 + (int) Math.ceil(0.5 * Math.hypot(nx - x, nz - z) / CELL);
             double[] best = null;
             double bestT = Double.POSITIVE_INFINITY;
-            for (long dx = -1; dx <= 1; dx++) {
-                for (long dz = -1; dz <= 1; dz++) {
+            for (long dx = -reach; dx <= reach; dx++) {
+                for (long dz = -reach; dz <= reach; dz++) {
                     List<double[]> list = buckets.get(((bx + dx) << 32) ^ ((bz + dz) & 0xFFFFFFFFL));
                     if (list == null) {
                         continue;
@@ -1558,7 +1594,7 @@ public final class StreetLayer {
                         double u = ((p[0] - x) * sz - (p[1] - z) * sx) / denominator;
                         if (t > 1e-6 && t <= 1.0 && u >= 0.0 && u <= 1.0 && t < bestT) {
                             bestT = t;
-                            best = u < 0.5 ? new double[]{p[0], p[1]} : new double[]{p[2], p[3]};
+                            best = u < 0.5 ? new double[]{p[0], p[1], t} : new double[]{p[2], p[3], t};
                         }
                     }
                 }

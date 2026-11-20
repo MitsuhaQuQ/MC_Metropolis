@@ -90,7 +90,9 @@ class StreetLayerTest {
                 town.density(), town.deadEnds(), town.threeWay(), town.fourWay(), town.meanBlockHa(), town.laneDensity());
         assertTrue(town.density() >= 10 && town.density() <= 28, report);
         assertTrue(town.threeWay() >= 0.30, report);
-        assertTrue(town.fourWay() <= 0.50, report);
+        // 0.39 here: a boundless plain has no dead ends to take a share (on real terrain the same settings give 30%,
+        // within OpenStreetMap's 12-35%)
+        assertTrue(town.fourWay() <= 0.42, report);
         // Dead ends come from the town's edge and its water, which a boundless flat plain has hardly any of (on real
         // terrain the same settings give 17%, within OpenStreetMap's 9-26%): only the upper bound holds here
         assertTrue(town.deadEnds() <= 0.30, report);
