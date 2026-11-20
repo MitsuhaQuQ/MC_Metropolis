@@ -2,6 +2,12 @@ architectury {
     forge()
 }
 
+loom {
+    forge {
+        mixinConfig "citybuilder.mixins.json"
+    }
+}
+
 configurations {
     common {
         canBeResolved = true
@@ -41,6 +47,19 @@ shadowJar {
 remapJar {
     inputFile.set shadowJar.archiveFile
 }
+
+// Mixins name methods by their Mojang names, which only exist in dev: in a real game they find their targets through the
+// refmap their config names (see MTM_worldgen's CLAUDE.md: a jar without it starts in dev and crashes in a real game)
+remapJar {
+    doLast {
+        def jar = zipTree(archiveFile.get().asFile)
+        def config = new groovy.json.JsonSlurper().parse(jar.matching { include "citybuilder.mixins.json" }.singleFile)
+        if (!config.refmap || jar.matching { include config.refmap }.isEmpty()) {
+            throw new GradleException("${archiveFile.get().asFile.name}: citybuilder.mixins.json names no refmap in the jar")
+        }
+    }
+}
+
 
 dependencies {
     // MTM_worldgen in the dev client and server, so its terrain is there to build on

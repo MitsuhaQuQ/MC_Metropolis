@@ -39,14 +39,34 @@ processResources {
 }
 
 shadowJar {
+    def refmap = project(":common").loom.mixin.defaultRefmapName.get()
+    inputs.property "refmap", refmap
     configurations = [project.configurations.shadowBundle]
     archiveClassifier = "dev-shadow"
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    // The mixin config copied in above for dev wins over the one Architectury gave the refmap, which dev must not have
+    // (Forge's dev run fails with it), so the jar gets it here
+    filesMatching("citybuilder.mixins.json") {
+        filter { line -> line.contains('"compatibilityLevel"') ? line + System.lineSeparator() + "  \"refmap\": \"${refmap}\"," : line }
+    }
 }
 
 remapJar {
     inputFile.set shadowJar.archiveFile
 }
+
+// Mixins name methods by their Mojang names, which only exist in dev: in a real game they find their targets through the
+// refmap their config names (see MTM_worldgen's CLAUDE.md: a jar without it starts in dev and crashes in a real game)
+remapJar {
+    doLast {
+        def jar = zipTree(archiveFile.get().asFile)
+        def config = new groovy.json.JsonSlurper().parse(jar.matching { include "citybuilder.mixins.json" }.singleFile)
+        if (!config.refmap || jar.matching { include config.refmap }.isEmpty()) {
+            throw new GradleException("${archiveFile.get().asFile.name}: citybuilder.mixins.json names no refmap in the jar")
+        }
+    }
+}
+
 
 dependencies {
     // MTM_worldgen in the dev client and server, so its terrain is there to build on

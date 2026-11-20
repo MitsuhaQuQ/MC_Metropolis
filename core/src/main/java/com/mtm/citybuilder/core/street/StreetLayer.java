@@ -61,6 +61,8 @@ public final class StreetLayer {
     private final CitySettings.Streets config;
     private final TerrainView terrain;
     private final int grid;
+    /** Towns being planned, by id, for the threads that ask for them meanwhile; guarded by {@code plans}. */
+    private final Map<Long, java.util.concurrent.CompletableFuture<StreetPlan>> planning = new HashMap<>();
     private final Map<Long, StreetPlan> plans = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<Long, StreetPlan> eldest) {
@@ -77,17 +79,39 @@ public final class StreetLayer {
 
     /** The skeleton of a settlement's streets, laid out once and kept while there is room. */
     public StreetPlan plan(Settlement settlement) {
+        java.util.concurrent.CompletableFuture<StreetPlan> future;
+        boolean mine = false;
         synchronized (plans) {
             StreetPlan plan = plans.get(settlement.id());
             if (plan != null) {
                 return plan;
             }
+            // One thread plans a town; the others asking for it meanwhile wait for its plan
+            future = planning.get(settlement.id());
+            if (future == null) {
+                future = new java.util.concurrent.CompletableFuture<>();
+                planning.put(settlement.id(), future);
+                mine = true;
+            }
         }
-        StreetPlan plan = plan(settlement, formation(settlement));
-        synchronized (plans) {
-            plans.put(settlement.id(), plan);
+        if (!mine) {
+            return future.join();
         }
-        return plan;
+        try {
+            StreetPlan plan = plan(settlement, formation(settlement));
+            synchronized (plans) {
+                plans.put(settlement.id(), plan);
+                planning.remove(settlement.id());
+            }
+            future.complete(plan);
+            return plan;
+        } catch (RuntimeException | Error e) {
+            synchronized (plans) {
+                planning.remove(settlement.id());
+            }
+            future.completeExceptionally(e);
+            throw e;
+        }
     }
 
     /** A town's built land in km²: its extent's nodes above the built intensity. */

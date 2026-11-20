@@ -433,6 +433,18 @@ public final class CityLogic {
         return streets.plan(settlement, formation);
     }
 
+    /** The chunk layer: what each column of a chunk carries. */
+    public com.mtm.citybuilder.core.chunk.ChunkLayer chunks() {
+        synchronized (this) {
+            if (chunks == null) {
+                chunks = new com.mtm.citybuilder.core.chunk.ChunkLayer(this);
+            }
+            return chunks;
+        }
+    }
+
+    private com.mtm.citybuilder.core.chunk.ChunkLayer chunks;
+
     private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {
     }
 }
