@@ -9,6 +9,7 @@ import com.mtm.citybuilder.core.building.temple.Belfry;
 import com.mtm.citybuilder.core.building.temple.Corridor;
 import com.mtm.citybuilder.core.building.temple.Furnishing;
 import com.mtm.citybuilder.core.building.temple.Gate;
+import com.mtm.citybuilder.core.building.temple.Ground;
 import com.mtm.citybuilder.core.building.temple.GateStyle;
 import com.mtm.citybuilder.core.building.temple.Hall;
 import com.mtm.citybuilder.core.building.temple.Honden;
@@ -99,12 +100,25 @@ public final class TempleModels {
             case "corridor" -> new Corridor(i(o, "lengthA"), i(o, "lengthB", 0), i(o, "depth", 4), d(o, "eave"),
                     d(o, "ridge"), palette).build();
             case "lantern" -> Furnishing.lantern(i(o, "height"));
-            case "precinct" -> new Precinct(Precinct.Kind.valueOf(str(o, "precinct", "SHRINE")), i(o, "approach", 36),
-                    palette).build();
+            case "precinct" -> new Precinct(Precinct.Kind.valueOf(str(o, "precinct", "SHRINE")),
+                    o.has("rank") ? Precinct.Rank.valueOf(str(o, "rank", "MEDIUM")) : null, i(o, "width"), i(o, "depth"),
+                    o.has("seed") ? o.get("seed").getAsLong() : 1L, palette, ground(o), bool(o, "showGround")).build();
             case "guardians" -> Furnishing.guardians(i(o, "spacing"), bool(o, "fox"));
             case "temizuya" -> Furnishing.temizuya(i(o, "width"), i(o, "depth"), d(o, "eave"), d(o, "ridge"),
                     RoofType.valueOf(str(o, "roof", "IRIMOYA")), palette);
             default -> throw new IllegalArgumentException("unknown kind: " + o.get("kind"));
+        };
+    }
+
+    /**
+     * The ground under a precinct: {@code "ground": "flat"}, {@code "slope"} (with {@code perX}, {@code perZ}) or
+     * {@code "hillside"} (with {@code foot}, {@code grade}, {@code steepen}).
+     */
+    private static Ground ground(JsonObject o) {
+        return switch (str(o, "ground", "flat")) {
+            case "slope" -> Ground.slope(d(o, "perX", 0), d(o, "perZ", -0.2));
+            case "hillside" -> Ground.hillside(i(o, "foot", 0), d(o, "grade", 0.25), d(o, "steepen", 0.004));
+            default -> Ground.flat();
         };
     }
 

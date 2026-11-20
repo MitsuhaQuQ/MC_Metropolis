@@ -2,6 +2,7 @@ package com.mtm.citybuilder.core.building.temple;
 
 import org.junit.jupiter.api.Test;
 
+import com.mtm.citybuilder.core.building.temple.Parts.Rect;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -337,28 +338,110 @@ class TempleTest {
         assertTrue(!m.has(1, 2, 4), "open on the inner side");
     }
 
+    private static boolean solid(Model m, int x, int y, int z) {
+        String s = m.get(x, y, z);
+        return s != null && !s.equals(Earthwork.AIR) && !s.contains("_leaves");
+    }
+
+    /** The first hall on the axis, where a walk up the approach ends (people walk round a dance hall). */
+    private static int hallFront(List<Precinct.Placed> placed, int cx) {
+        int stop = Integer.MIN_VALUE;
+        for (Precinct.Placed pl : placed) {
+            if (List.of("haiden", "honden", "hondo", "kondo", "kaguraden").contains(pl.name()) && pl.area().x0() <= cx
+                    && cx < pl.area().x1()) {
+                stop = Math.max(stop, pl.area().z1());
+            }
+        }
+        return stop;
+    }
+
     @Test
     void precinctsCanBeWalkedFromTheStreetToTheHalls() {
+        // Every kind and rank, on flat ground and climbing a hillside: from the street up the approach, through the
+        // torii and the gate, up the steps, to the first hall: never more than a block up or down at a time, three
+        // blocks clear overhead.
         for (Precinct.Kind kind : Precinct.Kind.values()) {
-            Precinct pr = new Precinct(kind, 36, kind == Precinct.Kind.SHRINE ? TemplePalette.INARI : TemplePalette.NATURAL);
-            Model m = pr.build();
-            int width = kind == Precinct.Kind.SHRINE ? 51 : 71, depth = kind == Precinct.Kind.SHRINE ? 45 : 63;
-            int cx = width / 2;
-            // From the end of the approach, through the gate, into the court: at most one step up (a platform and its
-            // stairs), and three blocks clear above it.
-            for (int z = depth - 6; z < depth + 36; z++) {
-                int floor = m.has(cx, 0, z) ? 1 : 0;
-                for (int y = floor; y < floor + 3; y++) {
-                    assertTrue(!m.has(cx, y, z), kind + ": blocked at " + cx + "," + y + "," + z + ": " + m.get(cx, y, z));
+            for (Precinct.Rank rank : Precinct.Rank.values()) {
+                for (Ground g : List.of(Ground.flat(), Ground.hillside(70, 0.25, 0.004))) {
+                    int w = rank == Precinct.Rank.SMALL ? 33 : rank == Precinct.Rank.MEDIUM ? 51 : 75;
+                    int d = rank == Precinct.Rank.SMALL ? 45 : rank == Precinct.Rank.MEDIUM ? 75 : 105;
+                    TemplePalette pal = kind == Precinct.Kind.SHRINE ? TemplePalette.INARI : TemplePalette.NATURAL;
+                    List<Precinct.Placed> placed = new ArrayList<>();
+                    Model m = new Precinct(kind, rank, w, d, 42, pal, g, false).plan(placed);
+                    String what = kind + " " + rank + (g.height(0, 0) == 0 ? " flat" : " hill");
+                    int cx = w / 2, stop = hallFront(placed, cx);
+                    assertTrue(stop > 0, what + ": a hall on the axis");
+                    int prev = Integer.MIN_VALUE;
+                    for (int z = d - 1; z >= stop; z--) {
+                        int top = Integer.MIN_VALUE;
+                        int cap = prev == Integer.MIN_VALUE ? 60 : prev + 2;
+                        for (int y = cap; y >= -60; y--) {
+                            if (solid(m, cx, y, z)) {
+                                top = y;
+                                break;
+                            }
+                        }
+                        if (top == Integer.MIN_VALUE) {
+                            top = g.surface(cx, z); // off the model's earthworks: the natural ground
+                        }
+                        if (prev != Integer.MIN_VALUE) {
+                            assertTrue(Math.abs(top - prev) <= 1, what + ": a step of " + (top - prev) + " at z " + z);
+                        }
+                        for (int y = top + 1; y <= top + 3; y++) {
+                            assertTrue(!solid(m, cx, y, z), what + ": blocked at " + cx + "," + y + "," + z + ": "
+                                    + m.get(cx, y, z));
+                        }
+                        prev = top;
+                    }
+                    // Every building stands on something: its footprint's middle has ground under it.
+                    for (Precinct.Placed pl : placed) {
+                        int x = (pl.area().x0() + pl.area().x1()) / 2, z = (pl.area().z0() + pl.area().z1()) / 2;
+                        boolean under = false;
+                        for (int y = pl.level() - 1; y >= pl.level() - 3 && !under; y--) {
+                            under = solid(m, x, y, z) || y <= g.surface(x, z);
+                        }
+                        assertTrue(under, what + ": " + pl.name() + " floats at level " + pl.level());
+                    }
+                    // No two buildings overlap, and each one is inside the plot.
+                    for (int i = 0; i < placed.size(); i++) {
+                        Rect a = placed.get(i).area();
+                        assertTrue(a.x0() >= 0 && a.z0() >= 0 && a.x1() <= w && a.z1() <= d,
+                                what + ": " + placed.get(i).name() + " outside the plot: " + a);
+                        for (int j = i + 1; j < placed.size(); j++) {
+                            Rect b = placed.get(j).area();
+                            boolean overlap = a.x0() < b.x1() && b.x0() < a.x1() && a.z0() < b.z1() && b.z0() < a.z1();
+                            assertTrue(!overlap, what + ": " + placed.get(i).name() + " " + a + " overlaps "
+                                    + placed.get(j).name() + " " + b);
+                        }
+                    }
+                    // No tree grows inside a building.
+                    for (Precinct.Placed pl : placed) {
+                        Rect r = pl.area();
+                        m.forEach((x, y, z, s) -> {
+                            if (r.contains(x, z) && y >= pl.level() && (s.startsWith("minecraft:spruce_log")
+                                    || s.startsWith("minecraft:dark_oak_log") || s.startsWith("minecraft:oak_log"))) {
+                                throw new AssertionError(what + ": a tree in " + pl.name() + " at " + x + "," + y + "," + z);
+                            }
+                        });
+                    }
                 }
             }
-            // Paved underfoot all the way.
-            for (int z = depth; z < depth + 36; z++) {
-                assertEquals(Precinct.PAVING, m.get(cx, -1, z), kind + " paving at z " + z);
-            }
-            assertTrue(count(m, "minecraft:lantern") >= 6, kind + ": lanterns along the approach");
-            assertTrue(count(m, "minecraft:water_cauldron") >= 3, kind + ": a purification pavilion");
         }
+    }
+
+    @Test
+    void precinctsScaleWithTheirPlotAndRepeatWithTheirSeed() {
+        List<Precinct.Placed> small = new ArrayList<>(), big = new ArrayList<>();
+        new Precinct(Precinct.Kind.TEMPLE, Precinct.Rank.MEDIUM, 51, 75, 1, TemplePalette.NATURAL, Ground.flat(), false)
+                .plan(small);
+        new Precinct(Precinct.Kind.TEMPLE, Precinct.Rank.MEDIUM, 71, 95, 1, TemplePalette.NATURAL, Ground.flat(), false)
+                .plan(big);
+        int hs = small.stream().filter(p -> p.name().equals("hondo")).findFirst().orElseThrow().area().width();
+        int hb = big.stream().filter(p -> p.name().equals("hondo")).findFirst().orElseThrow().area().width();
+        assertTrue(hb > hs, "a wider plot, a wider hall: " + hs + " -> " + hb);
+        Precinct a = new Precinct(Precinct.Kind.SHRINE, null, 51, 75, 7, TemplePalette.INARI, Ground.hillside(60, 0.2, 0.003), true);
+        assertEquals(a.build().size(), a.build().size(), "the same seed, the same precinct");
+        assertEquals(Precinct.Rank.MEDIUM, a.effectiveRank());
     }
 
     @Test
