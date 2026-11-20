@@ -21,5 +21,11 @@ public enum Quarter {
      */
     CHAYA,
     /** A storehouse quarter (蔵の町, as Kurashiki): mostly white-walled storehouses (土蔵) among machiya. */
-    STOREHOUSE
+    STOREHOUSE,
+    /**
+     * A merchants' town of the Osaka plain (寺内町 and 城下町, as Tondabayashi or Kishiwada): machiya fronted in charred
+     * cedar boards below a low white upper storey, a strip of river stones at their foot; storehouses; big houses behind
+     * board walls under tiled copings, spiked rails (忍び返し) on top.
+     */
+    JINAIMACHI
 }

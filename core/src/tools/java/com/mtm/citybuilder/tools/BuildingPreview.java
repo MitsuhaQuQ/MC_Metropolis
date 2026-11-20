@@ -61,6 +61,8 @@ final class BuildingPreview {
                 {"yellow_terracotta", 0xBA8523}, {"mangrove_planks", 0x773634}, {"mangrove_log", 0x6B2C2A},
                 {"mangrove_door", 0x773634}, {"bamboo_trapdoor", 0xC4AA4F}, {"magenta_wool", 0xBD44B3},
                 {"purple_wool", 0x7A2AAD},
+                {"stripped_spruce_log", 0x8E6A40}, {"gravel", 0x837E7C}, {"spruce_slab", 0x725431},
+                {"stone_brick_wall", 0x7A7A7A}, {"stone_brick", 0x7A7A7A}, {"pink_terracotta", 0xA14E4E},
                 {"light_gray_concrete", 0x7D7D73},
         };
         for (Object[] row : table) {
@@ -97,7 +99,7 @@ final class BuildingPreview {
             case ROOF_HIGH -> new Voxel(colour(id), 0.5, 0.5);
             case PLANT, SHRUB -> new Voxel(colour(id), 0.5, 0);
             case CARPORT -> new Voxel(colour(id), 0.5, 0.5);
-            case HOOD, LANTERN -> new Voxel(colour(id), 0.5, 0);
+            case HOOD, LANTERN, ENGAWA, TORO_CAP, TORO_LIGHT -> new Voxel(colour(id), 0.5, 0);
             default -> new Voxel(colour(id), 1, 0);
         };
     }

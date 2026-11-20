@@ -27,6 +27,7 @@ public record Palette(String wall, String accent, String trim, String window, St
     private static final List<Palette> ALL = new ArrayList<>();
     private static final List<List<Integer>> BY_TYPE = new ArrayList<>();
     private static final java.util.Map<Quarter, List<Integer>> MACHIYA_BY_QUARTER = new java.util.EnumMap<>(Quarter.class);
+    private static final List<Integer> HOKURIKU_HOUSES = new ArrayList<>();
 
     private static String m(String id) {
         return "minecraft:" + id;
@@ -93,6 +94,24 @@ public record Palette(String wall, String accent, String trim, String window, St
                 lattice(pitched("mangrove_planks", "yellow_terracotta", "dark_oak_log", "mangrove_door", "spruce_planks", "deepslate_tile"), "mangrove_fence"),
                 lattice(pitched("dark_oak_planks", "yellow_terracotta", "mangrove_log", "dark_oak_door", "spruce_planks", "deepslate_tile"), "mangrove_fence"),
                 lattice(pitched("mangrove_planks", "packed_mud", "dark_oak_log", "mangrove_door", "spruce_planks", "polished_blackstone_brick"), "mangrove_fence"));
+        // A merchant town's machiya: charred cedar boards below, white plaster above, river stones at the foot
+        quarter(Quarter.JINAIMACHI,
+                new Palette(m("stripped_spruce_log"), m("white_concrete"), m("dark_oak_log"), m("glass"), m("glass"),
+                        m("dark_oak_fence"), m("dark_oak_door"), m("spruce_planks"), m("deepslate_tile_slab"), m("deepslate_tiles"),
+                        m("smooth_stone"), m("white_concrete"), m("cobblestone")),
+                new Palette(m("dark_oak_planks"), m("calcite"), m("dark_oak_log"), m("glass"), m("glass"),
+                        m("dark_oak_fence"), m("dark_oak_door"), m("spruce_planks"), m("deepslate_tile_slab"), m("deepslate_tiles"),
+                        m("smooth_stone"), m("calcite"), m("cobblestone")));
+        // Hokuriku's houses: siding in beige, grey and brown under glazed black tiles
+        for (Palette p : new Palette[]{
+                pitched("smooth_sandstone", "smooth_sandstone", "dark_oak_planks", "dark_oak_door", "oak_planks", "polished_blackstone_brick"),
+                pitched("light_gray_terracotta", "light_gray_terracotta", "dark_oak_planks", "spruce_door", "spruce_planks", "polished_blackstone_brick"),
+                pitched("white_terracotta", "white_terracotta", "dark_oak_planks", "dark_oak_door", "oak_planks", "polished_blackstone_brick"),
+                pitched("brown_terracotta", "brown_terracotta", "dark_oak_planks", "dark_oak_door", "spruce_planks", "deepslate_tile"),
+                pitched("calcite", "calcite", "dark_oak_log", "dark_oak_door", "spruce_planks", "polished_blackstone_brick")}) {
+            HOKURIKU_HOUSES.add(ALL.size());
+            ALL.add(p);
+        }
         // Low shops: tiled or rendered fronts, glass below
         add(Building.Type.SHOP,
                 block("light_gray_concrete", "gray_concrete", "glass", "glass", "smooth_stone"),
@@ -106,7 +125,9 @@ public record Palette(String wall, String accent, String trim, String window, St
                 block("smooth_quartz", "quartz_pillar", "glass", "glass", "smooth_stone"),
                 block("brown_terracotta", "white_concrete", "glass", "glass", "smooth_stone"),
                 block("light_gray_concrete", "white_concrete", "glass", "glass", "smooth_stone"),
-                block("white_terracotta", "brown_terracotta", "glass", "glass", "smooth_stone"));
+                block("white_terracotta", "brown_terracotta", "glass", "glass", "smooth_stone"),
+                block("pink_terracotta", "white_terracotta", "glass", "glass", "smooth_stone"),
+                block("light_gray_terracotta", "white_concrete", "glass", "glass", "smooth_stone"));
         // Offices: curtain walls and stone
         add(Building.Type.OFFICE,
                 block("light_gray_concrete", "polished_andesite", "light_blue_stained_glass", "glass", "smooth_stone"),
@@ -230,6 +251,14 @@ public record Palette(String wall, String accent, String trim, String window, St
             case SUDARE -> SUDARE;
             case KOMAYOSE -> KOMAYOSE;
             case NOREN_RED -> pick(NOREN_RED, variant ^ 0xAA);
+            case ENGAWA -> m("spruce_slab");
+            case TORO -> m("stone_brick_wall");
+            case TORO_LIGHT -> m("lantern");
+            case TORO_CAP -> m("stone_brick_slab");
+            case GRAVEL -> m("gravel");
+            case BOARD -> m("stripped_spruce_log");
+            case PLASTER -> m("white_concrete");
+            case SPIKE -> m("spruce_fence");
         };
     }
 
@@ -244,7 +273,10 @@ public record Palette(String wall, String accent, String trim, String window, St
     }
 
     /** The palettes a kind of building may use in a quarter, as indexes: a quarter's own machiya where it has them. */
-    public static List<Integer> of(Building.Type type, Quarter quarter) {
+    public static List<Integer> of(Building.Type type, Quarter quarter, Region region) {
+        if (type == Building.Type.HOUSE && region == Region.HOKURIKU) {
+            return HOKURIKU_HOUSES;
+        }
         List<Integer> own = type == Building.Type.MACHIYA ? MACHIYA_BY_QUARTER.get(quarter) : null;
         return own != null ? own : of(type);
     }

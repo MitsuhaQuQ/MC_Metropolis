@@ -42,6 +42,10 @@ public final class BuildingSettings {
     public double[] roofsShop = {0.40, 0.08, 0.52};
     /** Roofs from four storeys up: Kyoto 60% flat at four or five, 80% from six. */
     public double[] roofsTall = {0.10, 0.05, 0.85};
+    /** Roofs of Hokuriku's houses, {gable, hip, flat, hip-and-gable}: the big houses under 入母屋. */
+    public double[] roofsHokuriku = {0.45, 0.10, 0.05, 0.40};
+    /** Roofs of a merchant town's estates. */
+    public double[] roofsEstate = {0.40, 0.10, 0.0, 0.50};
     /** Roofs of works and warehouses. */
     public double[] roofsWorks = {0.55, 0.0, 0.45};
 

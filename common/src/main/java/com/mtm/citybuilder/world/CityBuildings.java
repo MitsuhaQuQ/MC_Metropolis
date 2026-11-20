@@ -138,7 +138,8 @@ public final class CityBuildings {
         } else if (block instanceof WallBannerBlock) {
             state = state.setValue(WallBannerBlock.FACING, outward);
         } else if (block instanceof LanternBlock) {
-            state = state.setValue(LanternBlock.HANGING, true);
+            // Hung by a door; a stone lantern's light stands
+            state = state.setValue(LanternBlock.HANGING, part == BuildingLayer.Part.LANTERN);
         } else if (block instanceof SlabBlock) {
             boolean high = part == BuildingLayer.Part.ROOF_HIGH || part == BuildingLayer.Part.CARPORT;
             state = state.setValue(SlabBlock.TYPE, high ? SlabType.TOP : SlabType.BOTTOM);

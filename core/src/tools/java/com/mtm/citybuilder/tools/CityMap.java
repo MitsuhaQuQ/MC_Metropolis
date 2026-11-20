@@ -140,7 +140,20 @@ public final class CityMap {
             case "preview", "preview1", "preview2", "preview3" -> {
                 // preview:QUARTER shows the old town's lots as that quarter, to see the library's styles; where the
                 // quarters really lie is for the layers that lay out the town to say
-                if (quarter != null) {
+                // preview:HOKURIKU shows the whole town built the Hokuriku way
+                if (quarter != null && quarter.equals("HOKURIKU")) {
+                    logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
+                        @Override
+                        public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Quarter.ORDINARY;
+                        }
+
+                        @Override
+                        public com.mtm.citybuilder.core.building.Region region(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Region.HOKURIKU;
+                        }
+                    });
+                } else if (quarter != null) {
                     com.mtm.citybuilder.core.building.Quarter q = com.mtm.citybuilder.core.building.Quarter.valueOf(quarter);
                     logic.buildings().quarters(plot -> plot.district() == com.mtm.citybuilder.core.street.District.OLD_TOWN
                             ? q : com.mtm.citybuilder.core.building.Quarter.ORDINARY);

@@ -48,6 +48,7 @@ package com.mtm.citybuilder.core.building;
  * @param nz         z
  * @param door       where across the frontage (u) its door is
  * @param quarter    the character of the quarter it stands in
+ * @param region     the regional way of building
  * @param palette    which palette of materials
  * @param variant    a hash for the building's details (rooftop, units, balconies)
  */
@@ -56,7 +57,7 @@ public record Building(long id, Type type, int storeys, int ground, int upper, R
                        double wingFrom, double wingTo, double wingBack, double chamferLeft, double chamferRight,
                        int layout, double lotFrom, double lotTo, double lotDepth, double parkFrom, double parkTo,
                        double parkBack, boolean carport, int base, double ox, double oz, double tx, double tz, double nx, double nz, double door,
-                       Quarter quarter, int palette, long variant) {
+                       Quarter quarter, Region region, int palette, long variant) {
     /** Kinds of buildings of the first version, Japanese. */
     public enum Type {
         /** A detached house, set back with a small garden, gable or hipped. */
@@ -84,7 +85,12 @@ public record Building(long id, Type type, int storeys, int ground, int upper, R
     public enum Roof {
         GABLE,
         HIP,
-        FLAT
+        FLAT,
+        /**
+         * Hip-and-gable (入母屋): hipped at its ends for the first {@link BuildingLayer#IRIMOYA_HIP} blocks in, a gable
+         * standing above them.
+         */
+        IRIMOYA
     }
 
     /** Height from the base to the top of the walls. */
