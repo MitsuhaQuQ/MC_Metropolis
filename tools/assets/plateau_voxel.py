@@ -182,6 +182,24 @@ TEMPLES = {
     "demo_precinct_temple": dict(kind="precinct", role="GARAN", precinct="TEMPLE", approach=30, palette="NATURAL"),
     "demo_hall_copper": dict(kind="hall", role="HAIDEN", width=29, depth=21, eave=8.0, ridge=17.0, roof="IRIMOYA", gableInset=4,
                              overhang=4, platform=2, bay=4.0, palette="COPPER"),
+    # Landmarks PLATEAU does not cover (core.building.landmark), self-made at real Japanese sizes. Lighthouses: a
+    # cape light like Inubōsaki (31.6 m to the top, white round tower, gallery, lantern room, keeper's house) and a
+    # smaller one like Shionomisaki (22.8 m); breakwater lights, red (right side entering port) and white, 11–12 m.
+    "lighthouse_cape": dict(kind="lighthouse", role="LIGHTHOUSE", type="CAPE", tower=23, baseRadius=4.5, topRadius=3.2,
+                            keeperHouse=True),
+    "lighthouse_cape_small": dict(kind="lighthouse", role="LIGHTHOUSE", type="CAPE", tower=14, baseRadius=3.2,
+                                  topRadius=2.6),
+    "harbour_light_red": dict(kind="lighthouse", role="HARBOUR_LIGHT", type="HARBOUR", tower=7, baseRadius=2.2,
+                              topRadius=1.5, colour="RED"),
+    "harbour_light_white": dict(kind="lighthouse", role="HARBOUR_LIGHT", type="HARBOUR", tower=8, baseRadius=2.2,
+                                topRadius=1.5, colour="WHITE"),
+    # Sports grounds for a sports park (a circle of radius 130–180): a football stadium (105 x 68 pitch, four stands,
+    # roofed main stand, floodlights), a municipal ballpark (両翼 98, 中堅 122) and a 400 m athletics ground.
+    "stadium_football": dict(kind="stadium", role="STADIUM", mainDepth=32, backDepth=24, endDepth=20, backRoof=False,
+                             floodlights=40),
+    "stadium_baseball": dict(kind="ballpark", role="BALLPARK", lines=98, centre=122, foul=16, standDepth=26,
+                             floodlights=36),
+    "athletics_ground": dict(kind="athletics", role="ATHLETICS_GROUND", standDepth=20, roofLength=60),
 }
 
 # What each library entry is, for reuse: a category for every building; for sacred buildings also temple (寺院) or
@@ -218,8 +236,17 @@ LABELS = {
     "demo_komainu": ("sacred", SHRINE, "KOMAINU"), "demo_kitsune": ("sacred", SHRINE, "KOMAINU"),
     "demo_temizuya": ("sacred", BOTH, "TEMIZUYA"),
     "demo_precinct_shrine": ("sacred", SHRINE, "KEIDAI"), "demo_precinct_temple": ("sacred", TEMPLE, "GARAN"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
+    # Landmarks: no religion, the role is a core.building.landmark.Landmark.
+    "lighthouse_cape": ("lighthouse", None, "LIGHTHOUSE"), "lighthouse_cape_small": ("lighthouse", None, "LIGHTHOUSE"),
+    "harbour_light_red": ("lighthouse", None, "HARBOUR_LIGHT"),
+    "harbour_light_white": ("lighthouse", None, "HARBOUR_LIGHT"),
+    "stadium_football": ("sports", None, "STADIUM"), "stadium_baseball": ("sports", None, "BALLPARK"),
+    "athletics_ground": ("sports", None, "ATHLETICS_GROUND"),
 }
-DEMO_NAMES = {"demo_precinct_shrine": "神社の境内（稲荷風）", "demo_precinct_temple": "寺院の伽藍", "demo_kasuga": "本殿（春日造）", "demo_hachiman": "本殿（八幡造）", "demo_shinmei": "本殿（神明造）",
+DEMO_NAMES = {"lighthouse_cape": "灯台（岬、犬吠埼風、退息所付き）", "lighthouse_cape_small": "灯台（岬、潮岬風）",
+              "harbour_light_red": "防波堤灯台（赤）", "harbour_light_white": "防波堤灯台（白）",
+              "stadium_football": "球技場（サッカー）", "stadium_baseball": "野球場", "athletics_ground": "陸上競技場",
+              "demo_precinct_shrine": "神社の境内（稲荷風）", "demo_precinct_temple": "寺院の伽藍", "demo_kasuga": "本殿（春日造）", "demo_hachiman": "本殿（八幡造）", "demo_shinmei": "本殿（神明造）",
               "demo_kairo": "回廊（L 字、角）", "demo_toro_kasuga": "石灯籠（春日灯籠）", "demo_toro_small": "石灯籠（小）",
               "demo_komainu": "狛犬", "demo_kitsune": "狐（稲荷）", "demo_temizuya": "手水舎", "inari_otorii": "伏見稲荷大社 大鳥居", "inari_senbon_torii": "伏見稲荷大社 千本鳥居", "demo_honden_nagare": "本殿（流造、檜皮葺）", "demo_honden_chigi": "本殿（千木・鰹木）",
               "demo_torii": "鳥居（明神鳥居）", "demo_otorii": "大鳥居", "demo_gate_vermilion": "二重門（朱塗り、宝蔵門風）", "demo_belfry_open": "鐘楼（吹放し）",
@@ -239,6 +266,12 @@ Source: 3D city model (Project PLATEAU), Kyoto City (FY2025), https://www.geospa
 ブロックの割り当て）。国土交通省および京都市が作成したものではありません。
 These structure templates were made by processing the data above (voxelized at 1 m, turned to the
 grid, blocks assigned). They were not made by MLIT or Kyoto City.
+
+palette "generated" の項目（寺社、灯台、競技場）は core.building の生成器が作ったもので、外部の素材を使っていません
+（寸法は PLATEAU の計測値や実在の施設の公表値を参考にした自作の形状）。本 mod のライセンスに従います。
+Entries with palette "generated" (temples, shrines, lighthouses, sports grounds) are built by the generators in
+core.building from parameters, with no outside material (sizes taken from PLATEAU measurements or published
+dimensions of real facilities); self-made shapes under the mod's own licence.
 """
 
 GML_ID = "{http://www.opengis.net/gml}id"
@@ -984,6 +1017,11 @@ COLOURS = {
     "polished_andesite": 0x848685, "light_gray_concrete": 0x9D9D97, "light_gray_stained_glass": 0x6F8190,
     "white_concrete": 0xCFD5D6, "quartz_stairs": 0xEBE5DE, "quartz_slab": 0xEBE5DE,
     "light_blue_stained_glass": 0x7FB2D8, "white_terracotta": 0xD1B2A1, "stripped_dark_oak_log": 0x4A3A28,
+    # Landmarks (lighthouses, sports grounds); grass as tinted in a temperate biome.
+    "grass_block": 0x5E9D34, "moss_block": 0x4E7F2C, "coarse_dirt": 0x77553A, "dirt": 0x86603F, "sand": 0xDBCFA3,
+    "glass_pane": 0xA8D0D8, "dark_oak_door": 0x4A3220, "spruce_door": 0x6B4F2F, "iron_door": 0xC8C8C8,
+    "ladder": 0x7A5E36, "polished_deepslate_wall": 0x48484B, "quartz_pillar": 0xEBE5DE, "sea_lantern": 0xC4DCD2,
+    "shroomlight": 0xF09246, "verdant_froglight": 0xC9E3B0,
 }
 
 
@@ -1207,7 +1245,8 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
     for e in entries:
         with open(os.path.join(out, e["slug"] + ".png"), "rb") as fh:
             data = base64.b64encode(fh.read()).decode()
-        kind = e["category"] + (f" / {e['religion']} {e['role'] or ''}" if e.get("religion") else "")
+        kind = e["category"] + (f" / {e['religion']} {e['role'] or ''}" if e.get("religion")
+                                else f" / {e['role']}" if e.get("role") else "")
         html.append(f"<figure><img src='data:image/png;base64,{data}'><figcaption><b>{e['name']}</b> [{kind}] "
                     f"{e['slug']} — {e['size'][0]}×{e['size'][1]}×{e['size'][2]}, {e['blocks']} blocks, "
                     f"{e['usage']}, {e['structure']}, {e['year']}, roof {e['roof_shape']} {e['roof_pitch']}°, "

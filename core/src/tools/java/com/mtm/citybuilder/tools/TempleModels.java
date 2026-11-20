@@ -5,6 +5,11 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.mtm.citybuilder.core.building.landmark.AthleticsGround;
+import com.mtm.citybuilder.core.building.landmark.Ballpark;
+import com.mtm.citybuilder.core.building.landmark.Landmark;
+import com.mtm.citybuilder.core.building.landmark.Lighthouse;
+import com.mtm.citybuilder.core.building.landmark.Stadium;
 import com.mtm.citybuilder.core.building.temple.Belfry;
 import com.mtm.citybuilder.core.building.temple.Corridor;
 import com.mtm.citybuilder.core.building.temple.Furnishing;
@@ -36,8 +41,9 @@ import java.util.List;
  * {@code tools/assets/plateau_voxel.py}, which turns them into structure templates and previews.
  *
  * <p>Input: a JSON array of objects with {@code slug}, {@code kind} ({@code hall}, {@code pagoda}, {@code gate}, {@code belfry}, {@code honden}, {@code pavilion}, {@code torii}, {@code torii_tunnel}, {@code sanctuary}, {@code corridor},
- * {@code lantern}, {@code guardians}, {@code temizuya} or {@code precinct}), {@code role} (a
- * {@link SacredBuilding}: temple or shrine and the building's role, written into the output), {@code palette}
+ * {@code lantern}, {@code guardians}, {@code temizuya}, {@code precinct}; or the landmarks {@code lighthouse},
+ * {@code stadium}, {@code ballpark}, {@code athletics}), {@code role} (a {@link SacredBuilding}: temple or shrine and
+ * the building's role; or a {@link Landmark}; written into the output), {@code palette}
  * ({@code NATURAL}, {@code VERMILION}, {@code COPPER}, {@code WEATHERED}, {@code HIWADA}, {@code DARK} or {@code INARI}) and the fields of {@link Hall}, {@link Pagoda}, {@link Gate}, {@link Belfry}, {@link Honden}, {@link Pavilion} or {@link Torii}. Output:
  * {@code <out>/<slug>.json} with {@code role}, {@code religion}, {@code size} and {@code blocks} ([x, y, z, state], from 0).
  */
@@ -57,10 +63,9 @@ public final class TempleModels {
             JsonObject o = el.getAsJsonObject();
             String slug = o.get("slug").getAsString();
             long t0 = System.nanoTime();
-            // Every model says what it is (temple or shrine, and its role), so precincts can reuse it.
-            SacredBuilding role = SacredBuilding.valueOf(o.get("role").getAsString());
+            // Every model says what it is (temple or shrine and its role, or which landmark), so it can be reused.
             Model m = build(o);
-            write(m, role, out.resolve(slug + ".json"));
+            write(m, o.get("role").getAsString(), out.resolve(slug + ".json"));
             System.out.printf("%-24s %4d x %3d x %4d  %7d blocks  %d ms%n", slug, m.maxX() - m.minX() + 1,
                     m.maxY() - m.minY() + 1, m.maxZ() - m.minZ() + 1, m.size(), (System.nanoTime() - t0) / 1_000_000);
         }
@@ -104,8 +109,25 @@ public final class TempleModels {
             case "guardians" -> Furnishing.guardians(i(o, "spacing"), bool(o, "fox"));
             case "temizuya" -> Furnishing.temizuya(i(o, "width"), i(o, "depth"), d(o, "eave"), d(o, "ridge"),
                     RoofType.valueOf(str(o, "roof", "IRIMOYA")), palette);
+            case "lighthouse" -> new Lighthouse(Lighthouse.Type.valueOf(str(o, "type", "CAPE")), i(o, "tower"),
+                    d(o, "baseRadius"), d(o, "topRadius"), Lighthouse.Colour.valueOf(str(o, "colour", "WHITE")),
+                    bool(o, "keeperHouse")).build();
+            case "stadium" -> new Stadium(i(o, "mainDepth"), i(o, "backDepth"), i(o, "endDepth"), bool(o, "backRoof"),
+                    i(o, "floodlights", 0)).build();
+            case "ballpark" -> new Ballpark(i(o, "lines", 98), i(o, "centre", 122), i(o, "foul", 16),
+                    i(o, "standDepth"), i(o, "floodlights", 0)).build();
+            case "athletics" -> new AthleticsGround(i(o, "standDepth"), i(o, "roofLength")).build();
             default -> throw new IllegalArgumentException("unknown kind: " + o.get("kind"));
         };
+    }
+
+    private static boolean isLandmark(String name) {
+        for (Landmark l : Landmark.values()) {
+            if (l.name().equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean bool(JsonObject o, String k) {
@@ -132,14 +154,22 @@ public final class TempleModels {
         return o.has(k) ? o.get(k).getAsDouble() : def;
     }
 
-    static void write(Model m, SacredBuilding role, Path file) throws IOException {
+    /** Writes a model with its role: a {@link SacredBuilding} or a {@link Landmark}. */
+    static void write(Model m, String roleName, Path file) throws IOException {
         List<Object[]> blocks = new ArrayList<>();
         int x0 = m.minX(), y0 = m.minY(), z0 = m.minZ();
         m.forEach((x, y, z, s) -> blocks.add(new Object[]{x - x0, y - y0, z - z0, s}));
         JsonObject root = new JsonObject();
-        root.addProperty("role", role.name());
-        root.addProperty("religion", role.religion().name());
-        root.addProperty("role_ja", role.japanese());
+        root.addProperty("role", roleName);
+        if (isLandmark(roleName)) {
+            Landmark role = Landmark.valueOf(roleName);
+            root.addProperty("category", role.category().label());
+            root.addProperty("role_ja", role.japanese());
+        } else {
+            SacredBuilding role = SacredBuilding.valueOf(roleName);
+            root.addProperty("religion", role.religion().name());
+            root.addProperty("role_ja", role.japanese());
+        }
         JsonArray size = new JsonArray();
         size.add(m.maxX() - x0 + 1);
         size.add(m.maxY() - y0 + 1);
