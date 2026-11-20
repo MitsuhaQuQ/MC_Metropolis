@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TempleTest {
     /** Tō-ji's kondō as measured on PLATEAU's LOD2: a pent roof round an irimoya hall. */
     private static final Hall KONDO = new Hall(37, 23, 18.2, 24.9, RoofType.IRIMOYA, 3.2, 4, 45, 29, 11.4, 3, 2, 4.5,
-            false, TemplePalette.NATURAL);
+            false, HallInterior.BUTSUDO, TemplePalette.NATURAL);
     /** Tō-ji's five-storey pagoda. */
     private static final Pagoda PAGODA = new Pagoda(5, 19, 15, 9, 7, 10.5, 35.6, 40.2, 55, 2, 0.42,
             TemplePalette.NATURAL);
@@ -44,9 +44,14 @@ class TempleTest {
         // The front steps stand on one side only.
         bad.removeIf(b -> b.contains("stone_brick_stairs"));
         assertTrue(bad.isEmpty(), bad.size() + " asymmetric, e.g. " + (bad.isEmpty() ? "" : bad.get(0)));
-        m.forEach((x, y, z, s) -> {
+        // Front to back only the shell: inside, the sanctum is at the back.
+        Hall k = KONDO;
+        Model shell = new Hall(k.width(), k.depth(), k.eave(), k.ridge(), k.roof(), k.gableInset(), k.overhang(),
+                k.mokoshiWidth(), k.mokoshiDepth(), k.mokoshiEave(), k.mokoshiOverhang(), k.platform(), k.bay(),
+                k.veranda(), HallInterior.NONE, k.palette()).build();
+        shell.forEach((x, y, z, s) -> {
             if (!s.contains("stone_brick_stairs")) {
-                String mz = m.get(x, y, sz - z);
+                String mz = shell.get(x, y, sz - z);
                 assertTrue(mz != null && base(mz).equals(base(s)) || s.contains("[facing=north,half=bottom]")
                         || mz == null && s.contains("stone_brick_stairs"), x + "," + y + "," + z + " " + s + " / " + mz);
             }
@@ -92,7 +97,7 @@ class TempleTest {
     @Test
     void eavesOverhangTheWalls() {
         // The eave outline is the model's outline, wider than the walls by the overhang on each side.
-        Model m = new Hall(31, 19, 9, 18, RoofType.HIP, 0, 4, 0, 0, 0, 0, 2, 4.5, false, TemplePalette.VERMILION).build();
+        Model m = new Hall(31, 19, 9, 18, RoofType.HIP, 0, 4, 0, 0, 0, 0, 2, 4.5, false, HallInterior.NONE, TemplePalette.VERMILION).build();
         assertEquals(31, m.maxX() - m.minX() + 1);
         assertTrue(m.maxZ() - m.minZ() + 1 >= 19);
         // The walls (columns) stand 4 in from the eaves.
@@ -463,5 +468,78 @@ class TempleTest {
         assertEquals(pair.get(0, 2, 0), pair.get(6, 2, 0));
         Model temizuya = Furnishing.temizuya(9, 7, 4.5, 7.5, RoofType.IRIMOYA, TemplePalette.COPPER);
         assertTrue(count(temizuya, "minecraft:water_cauldron") >= 3, "a basin of water");
+    }
+
+    private static boolean open(Model m, int x, int y, int z) {
+        String s = m.get(x, y, z);
+        return s == null || s.equals("minecraft:air");
+    }
+
+    /** Where one can stand at y: nothing there (or a slab, a half step up) and room above. */
+    private static boolean walkable(Model m, int x, int y, int z) {
+        String s = m.get(x, y, z);
+        boolean slab = s != null && s.endsWith("_slab[type=bottom]");
+        return (open(m, x, y, z) || slab) && open(m, x, y + 1, z) && (!slab || open(m, x, y + 2, z));
+    }
+
+    /** The share of the standable tatami in a hall one can walk to from outside, on the floor at y. */
+    private static double tatamiReached(Model m, int y) {
+        int x0 = m.minX(), x1 = m.maxX(), z0 = m.minZ(), z1 = m.maxZ();
+        boolean[][] seen = new boolean[x1 - x0 + 1][z1 - z0 + 1];
+        java.util.ArrayDeque<int[]> q = new java.util.ArrayDeque<>();
+        for (int x = x0; x <= x1; x++) {
+            for (int z = z0; z <= z1; z++) {
+                if ((x == x0 || x == x1 || z == z0 || z == z1) && walkable(m, x, y, z)) {
+                    seen[x - x0][z - z0] = true;
+                    q.add(new int[]{x, z});
+                }
+            }
+        }
+        while (!q.isEmpty()) {
+            int[] c = q.poll();
+            for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                int x = c[0] + d[0], z = c[1] + d[1];
+                if (x >= x0 && x <= x1 && z >= z0 && z <= z1 && !seen[x - x0][z - z0] && walkable(m, x, y, z)) {
+                    seen[x - x0][z - z0] = true;
+                    q.add(new int[]{x, z});
+                }
+            }
+        }
+        int all = 0, reached = 0;
+        for (int x = x0; x <= x1; x++) {
+            for (int z = z0; z <= z1; z++) {
+                String below = m.get(x, y - 1, z);
+                if (below != null && below.startsWith(Interior.TATAMI) && walkable(m, x, y, z)) {
+                    all++;
+                    reached += seen[x - x0][z - z0] ? 1 : 0;
+                }
+            }
+        }
+        assertTrue(all > 0, "tatami to walk on");
+        return reached / (double) all;
+    }
+
+    @Test
+    void hallInteriors() {
+        Model kondo = KONDO.build();
+        assertTrue(count(kondo, Interior.TATAMI) > 200, "tatami floors");
+        assertTrue(count(kondo, Interior.GOLD) >= 10, "the main image and its halo");
+        assertTrue(count(kondo, Interior.FUSUMA) > 20, "sliding partitions");
+        assertTrue(tatamiReached(kondo, 2) >= 0.9, "every room has a way in");
+        for (HallInterior kind : new HallInterior[]{HallInterior.KODO, HallInterior.SHOIN}) {
+            Model m = new Hall(31, 21, 9, 15, RoofType.IRIMOYA, 3, 4, 0, 0, 0, 0, 2, 4.5, false, kind,
+                    TemplePalette.NATURAL).build();
+            assertTrue(tatamiReached(m, 2) >= 0.9, kind + ": every room has a way in");
+        }
+        assertEquals(0, count(new Hall(31, 21, 9, 15, RoofType.IRIMOYA, 3, 4, 0, 0, 0, 0, 2, 4.5, false,
+                HallInterior.NONE, TemplePalette.NATURAL).build(), Interior.TATAMI), "a shell only");
+        Model pagoda = PAGODA.build();
+        int c = (int) Math.floor(19 / 2.0);
+        for (int y = 2; y < 30; y++) {
+            assertTrue(pagoda.get(c, y, c).startsWith("minecraft:stripped_dark_oak_log"), "the heart pillar at " + y);
+        }
+        for (int[] d : new int[][]{{2, 0}, {-2, 0}, {0, 2}, {0, -2}}) {
+            assertEquals(Interior.GOLD, pagoda.get(c + d[0], 3, c + d[1]), "four Buddhas round it");
+        }
     }
 }

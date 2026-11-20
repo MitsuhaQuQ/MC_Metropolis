@@ -12,6 +12,7 @@ import com.mtm.citybuilder.core.building.temple.Gate;
 import com.mtm.citybuilder.core.building.temple.Ground;
 import com.mtm.citybuilder.core.building.temple.GateStyle;
 import com.mtm.citybuilder.core.building.temple.Hall;
+import com.mtm.citybuilder.core.building.temple.HallInterior;
 import com.mtm.citybuilder.core.building.temple.Honden;
 import com.mtm.citybuilder.core.building.temple.Pavilion;
 import com.mtm.citybuilder.core.building.temple.Precinct;
@@ -39,7 +40,8 @@ import java.util.List;
  * <p>Input: a JSON array of objects with {@code slug}, {@code kind} ({@code hall}, {@code pagoda}, {@code gate}, {@code belfry}, {@code honden}, {@code pavilion}, {@code torii}, {@code torii_tunnel}, {@code sanctuary}, {@code corridor},
  * {@code lantern}, {@code guardians}, {@code temizuya} or {@code precinct}), {@code role} (a
  * {@link SacredBuilding}: temple or shrine and the building's role, written into the output), {@code palette}
- * ({@code NATURAL}, {@code VERMILION}, {@code COPPER}, {@code WEATHERED}, {@code HIWADA}, {@code DARK} or {@code INARI}) and the fields of {@link Hall}, {@link Pagoda}, {@link Gate}, {@link Belfry}, {@link Honden}, {@link Pavilion} or {@link Torii}. Output:
+ * ({@code NATURAL}, {@code VERMILION}, {@code COPPER}, {@code WEATHERED}, {@code HIWADA}, {@code DARK} or {@code INARI}) and the fields of {@link Hall}, {@link Pagoda}, {@link Gate}, {@link Belfry}, {@link Honden}, {@link Pavilion} or {@link Torii}.
+ * A hall takes {@code interior} (a {@link HallInterior}; by default the one its role calls for). Output:
  * {@code <out>/<slug>.json} with {@code role}, {@code religion}, {@code size} and {@code blocks} ([x, y, z, state], from 0).
  */
 public final class TempleModels {
@@ -74,6 +76,8 @@ public final class TempleModels {
                     RoofType.valueOf(str(o, "roof", "IRIMOYA")), d(o, "gableInset", 0), i(o, "overhang", 4),
                     i(o, "mokoshiWidth", 0), i(o, "mokoshiDepth", 0), d(o, "mokoshiEave", 0),
                     i(o, "mokoshiOverhang", 0), i(o, "platform", 2), d(o, "bay", 4.5), bool(o, "veranda"),
+                    o.has("interior") ? HallInterior.valueOf(str(o, "interior", "NONE"))
+                            : HallInterior.forRole(SacredBuilding.valueOf(o.get("role").getAsString())),
                     palette).build();
             case "pagoda" -> new Pagoda(i(o, "storeys"), i(o, "span"), i(o, "topSpan"), i(o, "body"), i(o, "topBody"),
                     d(o, "firstEave"), d(o, "topEave"), d(o, "apex"), i(o, "height"), i(o, "platform", 2),

@@ -52,7 +52,7 @@ public record Pagoda(int storeys, int span, int topSpan, int body, int topBody, 
         double c = span / 2.0;
         int centre = (int) Math.floor(c);
         Parts.platform(m, p, Rect.centred(c, c, odd(body + (span - body) * 0.6), odd(body + (span - body) * 0.6)), platform);
-        int base = platform;
+        int base = platform, lastTop = platform;
         for (int i = 0; i < storeys; i++) {
             int w = bodyOf(i), s = spanOf(i);
             double e = eaveOf(i);
@@ -82,13 +82,34 @@ public record Pagoda(int storeys, int span, int topSpan, int body, int topBody, 
             }
             roof.build(m);
             Parts.closeToRoof(m, p, r, top + 1, (int) Math.ceil(ridge) + 1);
+            lastTop = top;
             if (next != null) { // the next storey stands where the roof reaches its walls
                 double h = roof.height(next.x0() - 1, centre);
                 base = (int) Math.floor(h - 1e-6) + 1;
             }
         }
+        interior(m, p, centre, lastTop);
         finial(m, p, centre);
         return m;
+    }
+
+    /**
+     * Inside: the heart pillar (心柱) from the platform through every storey to the top one's head beam, and on the
+     * ground floor the four Buddhas (四方仏) facing out round it, on a low dais, where the storey is wide enough.
+     */
+    private void interior(Model m, TemplePalette p, int c, int top) {
+        for (int y = platform; y <= top; y++) {
+            m.set(c, y, c, Parts.upright(p.column()));
+        }
+        if (bodyOf(0) < 7) {
+            return;
+        }
+        for (int[] d : new int[][]{{2, 0}, {-2, 0}, {0, 2}, {0, -2}}) {
+            int x = c + d[0], z = c + d[1];
+            m.set(x, platform, z, p.wood());
+            m.set(x, platform + 1, z, Interior.GOLD);
+            m.set(x, platform + 2, z, "minecraft:gilded_blackstone");
+        }
     }
 
     /**

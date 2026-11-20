@@ -133,7 +133,7 @@ public record Precinct(Kind kind, Rank rank, int width, int depth, long seed, Te
         }
         boolean east = Hash.unit(Hash.of(seed, 2)) < 0.5;
         int hw = odd(Math.max(17, (rk == Rank.SMALL ? 21 : rk == Rank.MEDIUM ? 27 : 31) * s));
-        Model hall = new Hall(hw, odd(hw * 0.68), 9.0 * hs, 15.0 * hs, RoofType.IRIMOYA, 3, 4, 0, 0, 0, 0, 2, 4.5, false, p)
+        Model hall = new Hall(hw, odd(hw * 0.68), 9.0 * hs, 15.0 * hs, RoofType.IRIMOYA, 3, 4, 0, 0, 0, 0, 2, 4.5, false, HallInterior.BUTSUDO, p)
                 .build();
         Model pagoda = null;
         if (rk != Rank.SMALL) {

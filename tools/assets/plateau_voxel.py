@@ -195,6 +195,8 @@ TEMPLES = {
                                        ground="slope", perX=0, perZ=-0.05, showGround=True, palette="NATURAL"),
     "demo_hall_copper": dict(kind="hall", role="HAIDEN", width=29, depth=21, eave=8.0, ridge=17.0, roof="IRIMOYA", gableInset=4,
                              overhang=4, platform=2, bay=4.0, palette="COPPER"),
+    "demo_shoin": dict(kind="hall", role="QUARTERS", width=27, depth=21, eave=5.5, ridge=11.0, roof="IRIMOYA",
+                       gableInset=3, overhang=3, platform=1, bay=3.0, veranda=True),
 }
 
 # What each library entry is, for reuse: a category for every building; for sacred buildings also temple (寺院) or
@@ -235,6 +237,7 @@ LABELS = {
     "demo_precinct_shrine_large": ("sacred", SHRINE, "KEIDAI"),
     "demo_precinct_temple_medium_hill": ("sacred", TEMPLE, "GARAN"),
     "demo_precinct_temple_large": ("sacred", TEMPLE, "GARAN"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
+    "demo_shoin": ("sacred", TEMPLE, "QUARTERS"),
 }
 DEMO_NAMES = {"demo_precinct_shrine_small_hill": "小さな神社（山の斜面）", "demo_precinct_shrine_medium_hill": "中規模の神社（山麓）",
               "demo_precinct_shrine_large": "大きな神社（稲荷風、緩い斜面）", "demo_precinct_temple_medium_hill": "中規模の寺院（山麓）",
@@ -242,7 +245,8 @@ DEMO_NAMES = {"demo_precinct_shrine_small_hill": "小さな神社（山の斜面
               "demo_kairo": "回廊（L 字、角）", "demo_toro_kasuga": "石灯籠（春日灯籠）", "demo_toro_small": "石灯籠（小）",
               "demo_komainu": "狛犬", "demo_kitsune": "狐（稲荷）", "demo_temizuya": "手水舎", "inari_otorii": "伏見稲荷大社 大鳥居", "inari_senbon_torii": "伏見稲荷大社 千本鳥居", "demo_honden_nagare": "本殿（流造、檜皮葺）", "demo_honden_chigi": "本殿（千木・鰹木）",
               "demo_torii": "鳥居（明神鳥居）", "demo_otorii": "大鳥居", "demo_gate_vermilion": "二重門（朱塗り、宝蔵門風）", "demo_belfry_open": "鐘楼（吹放し）",
-              "demo_belfry_hakamagoshi": "鐘楼（袴腰）","demo_pagoda_vermilion": "五重塔（朱塗り、浅草寺風）", "demo_hall_copper": "拝殿（銅板葺、神社）"}
+              "demo_belfry_hakamagoshi": "鐘楼（袴腰）","demo_pagoda_vermilion": "五重塔（朱塗り、浅草寺風）", "demo_hall_copper": "拝殿（銅板葺、神社）",
+              "demo_shoin": "書院・庫裏（和室）"}
 
 
 def label(slug):
@@ -1393,6 +1397,7 @@ def write_nbt(path, blocks, size):
 # ---------------------------------------------------------------- preview
 
 COLOURS = {
+    "stripped_bamboo_block": 0xC2B86C, "candle": 0xE6DEC8,
     "deepslate_tiles": 0x3A3A3E, "deepslate_tile_stairs": 0x3A3A3E, "deepslate_tile_slab": 0x3A3A3E,
     "calcite": 0xDFE0DC, "dark_oak_planks": 0x4A3220, "dark_oak_log": 0x3C2E1A, "spruce_planks": 0x725431,
     "bricks": 0x976253, "stone_bricks": 0x7A7A7A, "smooth_stone": 0x9E9E9E, "gray_stained_glass": 0x4C5258,
@@ -1554,6 +1559,19 @@ def parse_state(state):
     return name, dict(kv.split("=", 1) for kv in props.rstrip("]").split(","))
 
 
+def interior_cut(blocks, kind):
+    """The height to cut a building at to show its interior: three above its lowest tatami (the fusuma and the beam
+    over them, below the rooms' ceilings), or above a pagoda's ground floor; None without an interior. The images
+    (gold) are kept whole above the cut."""
+    if kind not in ("hall", "pagoda"):
+        return None  # a precinct's hillside would be cut through too
+    tatami = [y for (x, y, z), (n, _) in blocks.items() if n == "stripped_bamboo_block"]
+    if tatami:
+        return min(tatami) + 3
+    gold = [y for (x, y, z), (n, _) in blocks.items() if n == "gold_block"]
+    return min(gold) + 2 if gold and kind == "pagoda" else None
+
+
 def build_temple(out, gid, slug, name, row, bc):
     with open(os.path.join(out, "models", slug + ".json"), encoding="utf-8") as fh:
         model = json.load(fh)
@@ -1561,6 +1579,16 @@ def build_temple(out, gid, slug, name, row, bc):
     size = tuple(model["size"])
     write_nbt(os.path.join(out, slug + ".nbt"), blocks, size)
     render(blocks, size, os.path.join(out, slug + ".png"), bc)
+    cut = interior_cut(blocks, TEMPLES[slug]["kind"])
+    if cut is not None:  # a cutaway: everything above the rooms' fusuma taken off, the rooms seen from above
+        floor = [v for v, b in blocks.items() if b[0] in ("stripped_bamboo_block", "gold_block") and v[1] <= cut]
+        x0, x1 = min(v[0] for v in floor), max(v[0] for v in floor)
+        z0, z1 = min(v[2] for v in floor), max(v[2] for v in floor)
+        kept = {v: b for v, b in blocks.items() if v[1] <= cut or b[0] in ("gold_block", "gilded_blackstone")
+                and v[1] <= cut + 6 and x0 <= v[0] <= x1 and z0 <= v[2] <= z1}
+        render(kept, (size[0], max(v[1] for v in kept) + 1, size[2]), os.path.join(out, slug + "_interior.png"), bc)
+    elif os.path.exists(os.path.join(out, slug + "_interior.png")):
+        os.remove(os.path.join(out, slug + "_interior.png"))
     counts = {}
     for n, _ in blocks.values():
         counts[n] = counts.get(n, 0) + 1
@@ -1796,6 +1824,11 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
     for e in entries:
         with open(os.path.join(out, e["slug"] + ".png"), "rb") as fh:
             data = base64.b64encode(fh.read()).decode()
+        cutaway = os.path.join(out, e["slug"] + "_interior.png")
+        if os.path.exists(cutaway):
+            with open(cutaway, "rb") as fh:
+                html.append(f"<figure><img src='data:image/png;base64,{base64.b64encode(fh.read()).decode()}'>"
+                            f"<figcaption><b>{e['name']}</b> — 内部（切断）</figcaption></figure>")
         kind = e["category"] + (f" / {e['religion']} {e['role'] or ''}" if e.get("religion") else "")
         html.append(f"<figure><img src='data:image/png;base64,{data}'><figcaption><b>{e['name']}</b> [{kind}] "
                     f"{e['slug']} — {e['size'][0]}×{e['size'][1]}×{e['size'][2]}, {e['blocks']} blocks, "
