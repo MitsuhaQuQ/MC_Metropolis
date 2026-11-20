@@ -145,7 +145,7 @@ TEMPLES = {
     "inari_honden": dict(kind="honden", role="HONDEN", width=31, bodyWidth=23, bodyDepth=11, porch=6, eave=6.0,
                          ridge=9.1, floor=2, palette="INARI"),
     "inari_otorii": dict(kind="torii", role="TORII", span=10, height=13, palette="INARI"),
-    "inari_senbon_torii": dict(kind="torii_tunnel", role="TORII", length=40, span=3, height=5, spacing=2,
+    "inari_senbon_torii": dict(kind="torii_tunnel", role="TORII", length=40, span=3, height=7, spacing=2,
                                palette="INARI"),
     # Not from PLATEAU: the same generators in the painted styles (Senso-ji's vermilion pagoda, a shrine hall
     # under a copper roof), to check the palettes.
@@ -1066,7 +1066,7 @@ def render(blocks, size, path, bc, max_px=1800):
         if z > front.get((x, y), -1):
             front[(x, y)] = z
     fs = max(2, s)
-    fw, fh = sx * fs, sy * fs
+    fw, fh = (sx + 3) * fs, sy * fs  # three columns more on the left for a person, to judge the height by
     W, H = w + 16 + fw, max(h, fh + 8)
     out = bytearray(bytes((0xf4, 0xf1, 0xea)) * (W * H))
     for row in range(h):
@@ -1079,9 +1079,16 @@ def render(blocks, size, path, bc, max_px=1800):
         col = bytes((int(r * k), int(g * k), int(b * k)))
         for py in range(fs):  # slabs and stairs drawn whole: a roof's steps would show the sky between them
             Y = H - 4 - (y + 1) * fs + py
-            X0 = w + 16 + x * fs
+            X0 = w + 16 + (x + 3) * fs
             if 0 <= Y < H:
                 out[(Y * W + X0) * 3:(Y * W + X0 + fs) * 3] = col * fs
+    # The person: 1.8 m, legs and body over two blocks, at the left on the ground line.
+    for py in range(int(1.8 * fs)):
+        Y = H - 4 - py - 1
+        col = bytes((50, 60, 120)) if py < 0.9 * fs else bytes((70, 110, 70)) if py < 1.55 * fs else bytes((205, 165, 135))
+        X0 = w + 16 + fs // 2
+        if 0 <= Y < H:
+            out[(Y * W + X0) * 3:(Y * W + X0 + max(1, fs // 2)) * 3] = col * max(1, fs // 2)
     write_png(path, W, H, out)
 
 

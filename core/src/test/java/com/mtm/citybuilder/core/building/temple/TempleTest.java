@@ -274,6 +274,14 @@ class TempleTest {
                     x + "," + y + " " + s + " / " + o);
         });
         Model tunnel = new ToriiTunnel(40, 3, 5, 2, TemplePalette.INARI).build();
+        // Even asked for a low one, there is room to walk through: nothing over the path below the tie beam's height.
+        for (int z = 0; z < 40; z++) {
+            for (int y = 0; y < Torii.CLEAR; y++) {
+                for (int x = 1; x <= 2; x++) {
+                    assertTrue(!tunnel.has(x, y, z), "blocked at " + x + "," + y + "," + z + ": " + tunnel.get(x, y, z));
+                }
+            }
+        }
         int[] feet = {0};
         tunnel.forEach((x, y, z, s) -> {
             if (y == 0) {

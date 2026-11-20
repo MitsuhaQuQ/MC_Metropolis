@@ -7,10 +7,14 @@ package com.mtm.citybuilder.core.building.temple;
  * thick. The way through runs along z.
  *
  * @param span    distance between the pillars' centres
- * @param height  height to the top of the upper beam (its turned-up tips stand one higher)
+ * @param height  height to the top of the upper beam (its turned-up tips stand one higher); raised if needed to
+ *                keep {@link #CLEAR} blocks under the tie beam (at least 7)
  * @param palette materials: {@code column} for the pillars and beams, {@code ridge} for the black parts
  */
 public record Torii(int span, int height, TemplePalette palette) {
+
+    /** Headroom under the tie beam (貫): three blocks, so a torii can be walked through. */
+    public static final int CLEAR = 3;
 
     public int thickness() {
         return span >= 9 ? 2 : 1;
@@ -22,7 +26,9 @@ public record Torii(int span, int height, TemplePalette palette) {
         int t = thickness();
         int over = Math.max(2, span / 4); // how far the top beams run past the pillars
         int left = 0, right = span; // pillars' first columns
-        int kasagi = height - 1, shimaki = height - 2, nuki = height - 2 - Math.max(2, height / 5);
+        // The tie beam leaves at least CLEAR blocks to walk under; a torii too low for that is made taller.
+        int nuki = Math.max(CLEAR, height - 2 - Math.max(2, height / 5));
+        int shimaki = Math.max(nuki + 2, height - 2), kasagi = shimaki + 1;
         for (int dz = 0; dz < t; dz++) {
             for (int dx = 0; dx < t; dx++) {
                 for (int x : new int[]{left + dx, right + dx}) {
