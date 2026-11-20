@@ -236,6 +236,45 @@ class BuildingLayerTest {
         assertTrue(tenant > 0, "no store in a ground floor");
     }
 
+    @Test
+    void neighboursAreNotAlike() {
+        CityLogic logic = logic();
+        Settlement city = city(logic);
+        CityExtent extent = logic.extent(city);
+        TownPlots plots = logic.plots().town(city);
+        BuildingLayer layer = logic.buildings();
+        // Houses by street (chain and side) and number along it
+        java.util.Map<Long, Building> byLot = new java.util.HashMap<>();
+        for (double x = extent.coreX() - 3000; x < extent.coreX() + 3000; x += 4) {
+            for (double z = extent.coreZ() - 300; z < extent.coreZ() + 300; z += 4) {
+                Plot plot = plots.at(x, z);
+                Building b = layer.building(plots, plot);
+                if (b != null && b.type() == Building.Type.HOUSE) {
+                    byLot.putIfAbsent(((long) plot.chain() << 32) ^ ((long) (plot.side() + 1) << 24) ^ plot.index(), b);
+                }
+            }
+        }
+        int pairs = 0;
+        int alike = 0;
+        int samePalette = 0;
+        for (java.util.Map.Entry<Long, Building> e : byLot.entrySet()) {
+            Building next = byLot.get(e.getKey() + 1);
+            if (next == null) {
+                continue;
+            }
+            pairs++;
+            Building b = e.getValue();
+            samePalette += b.palette() == next.palette() ? 1 : 0;
+            if (b.palette() == next.palette() && b.composition().equals(next.composition())) {
+                alike++;
+            }
+        }
+        assertTrue(pairs > 100, "pairs " + pairs);
+        // Next-door houses: rarely the same palette, almost never the same house
+        assertTrue(samePalette < 0.15 * pairs, "same palette " + samePalette + " of " + pairs);
+        assertTrue(alike < 0.02 * pairs, "alike " + alike + " of " + pairs);
+    }
+
     /** Parts of a garden that may stand away from the house: a shed's roof, a coped wall. */
     private static boolean isGarden(Building b, BuildingLayer.Part p) {
         return b.type() == Building.Type.HOUSE && (p == BuildingLayer.Part.ROOF_LOW || p == BuildingLayer.Part.HOOD);

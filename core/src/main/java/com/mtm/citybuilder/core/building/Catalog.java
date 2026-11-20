@@ -145,6 +145,36 @@ public final class Catalog {
         return paletteIndex.get(draw(style.palettes(), u));
     }
 
+    /**
+     * A palette for a lot of a run (a stretch of street, a development): the run keeps to two or three of its style's
+     * palettes, chosen by the run's hash, and its lots take them in turn by their number along the street, so
+     * neighbours are never alike while the stretch still hangs together.
+     */
+    public int paletteNear(Style style, long run, int index) {
+        List<String> names = new ArrayList<>(style.palettes().keySet());
+        int n = names.size();
+        if (n == 1) {
+            return paletteIndex.get(names.get(0));
+        }
+        int m = Math.min(3, n);
+        int start = (int) Math.floorMod(Hash.mix(run), (long) n);
+        int stride = 1 + (int) Math.floorMod(Hash.mix(run ^ 0x51L), (long) (n - 1));
+        List<String> few = new ArrayList<>();
+        for (int k = 0; k < n && few.size() < m; k++) {
+            String name = names.get(Math.floorMod(start + k * stride, n));
+            if (!few.contains(name)) {
+                few.add(name);
+            }
+        }
+        for (int k = 0; few.size() < m; k++) {
+            String name = names.get(Math.floorMod(start + k, n));
+            if (!few.contains(name)) {
+                few.add(name);
+            }
+        }
+        return paletteIndex.get(few.get(Math.floorMod(index + (int) Math.floorMod(Hash.mix(run ^ 0x52L), (long) m), m)));
+    }
+
     /** One of the material choices under a key, by a hash. */
     public String material(String key, long hash) {
         List<String> options = materials.get(key);

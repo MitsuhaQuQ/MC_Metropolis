@@ -204,6 +204,10 @@ public final class BuildingLayer {
 
     private static final int CACHE = 50_000;
 
+    /** The slots a development's houses each fill for themselves: their finish, not their frame. */
+    private static final Slot[] FINISH = {Slot.TWO_TONE, Slot.WINDOWS, Slot.WINDOW_HOOD, Slot.GRILLE, Slot.HOUSE_BALCONY,
+            Slot.WAINSCOT, Slot.YARD, Slot.TREES, Slot.PINE, Slot.SHED, Slot.BOUNDARY, Slot.DOWNPIPE, Slot.CARPORT, Slot.GROUND};
+
     /** How far in from its ends a hip-and-gable roof is hipped before its gable stands up. */
     public static final double IRIMOYA_HIP = 2.0;
 
@@ -368,6 +372,15 @@ public final class BuildingLayer {
         // The building's interchangeable parts, drawn from its style; a development's houses share them
         long seed = project ? group : h;
         Composition composition = catalog.compose(style, seed);
+        if (project) {
+            // A development shares its houses' frame (storeys, roof, layout, setback, form); each house its own finish
+            Composition own = catalog.compose(style, h);
+            for (Slot slot : FINISH) {
+                if (style.options().containsKey(slot)) {
+                    composition = composition.with(slot, own.get(slot));
+                }
+            }
+        }
         // A program the lot was given: standalone where the lot is open (not downtown or in the old town, wide and deep
         // enough for parking in front), else the ground floor of a shop, office or block of flats
         boolean standalone = false;
@@ -674,12 +687,13 @@ public final class BuildingLayer {
             }
         }
 
-        // Palette, one of its style's: lots in a run along the street share one, three in five of them; a development,
-        // its own
+        // Palette, one of its style's: a run of lots along the street (or a development) keeps to a few related
+        // palettes, neighbours taking turns so no two side by side are alike; one lot in four picks its own
         long run = Hash.of(logic.seed() ^ 0x9A1E77EL, plot.chain(), (long) Math.floor(plot.start() / config.paletteRun));
-        long pick = project ? Hash.of(group, 7) : Hash.unit(Hash.of(h, 7)) < 0.6 ? Hash.mix(run) : Hash.of(h, 8);
-        int palette = catalog.palette(style, Hash.unit(pick));
-        long variant = project ? Hash.of(group, 9) : Hash.of(h, 9);
+        int palette = !project && Hash.unit(Hash.of(h, 7)) < config.ownPalette
+                ? catalog.palette(style, Hash.unit(Hash.of(h, 8)))
+                : catalog.paletteNear(style, project ? group : run, plot.index());
+        long variant = Hash.of(h, 9);
 
         boolean carport = layout != 0 && composition.is(Slot.CARPORT, "carport");
         return new Building(plot.id(), type, storeys, ground, upper, roof, ridgeAlong, slope, from, to, front, back,

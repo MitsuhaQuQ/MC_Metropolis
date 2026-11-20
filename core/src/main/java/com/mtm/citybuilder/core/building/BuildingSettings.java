@@ -40,11 +40,13 @@ public final class BuildingSettings {
      * Developments (建売住宅): residential lots along streets and lanes go in runs of {@code projectRun}, this share of
      * the runs built as one house repeated (same storeys, roof, palette, setback and depth, the doors alternating).
      */
-    public double projects = 0.35;
+    public double projects = 0.2;
     public int projectRun = 4;
     /** Share of ordinary old-town lots built as a storehouse (土蔵) rather than a machiya or shop. */
     public double kura = 0.15;
 
     /** Along a street, lots in runs this long share a palette family (one developer, one era): colour changes by area. */
     public double paletteRun = 60.0;
+    /** Share of lots that pick a palette of their own rather than take a turn among their run's few. */
+    public double ownPalette = 0.25;
 }
