@@ -1,8 +1,0 @@
-{
-  "parent": "minecraft:block/cube_bottom_top",
-  "textures": {
-    "top": "citybuilder:block/line/white_x_0",
-    "side": "citybuilder:block/asphalt",
-    "bottom": "citybuilder:block/asphalt"
-  }
-}

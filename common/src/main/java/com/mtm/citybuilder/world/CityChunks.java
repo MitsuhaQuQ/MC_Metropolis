@@ -42,8 +42,7 @@ public final class CityChunks {
     }
 
     private static BlockState line(Block block, ChunkLayer.Mark mark) {
-        return block.defaultBlockState().setValue(MarkingBlock.ORIENTATION, MarkingBlock.Orientation.of(mark.orientation()))
-                .setValue(MarkingBlock.OFFSET, mark.offset());
+        return block.defaultBlockState().setValue(MarkingBlock.ANGLE, mark.angle()).setValue(MarkingBlock.OFFSET, mark.offset());
     }
 
     private static boolean paving(BlockState state) {

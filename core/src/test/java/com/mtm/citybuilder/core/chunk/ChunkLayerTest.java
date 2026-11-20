@@ -132,17 +132,30 @@ class ChunkLayerTest {
                         across, heading, cx * ux + cz * uz, 16.0));
                 if (mark.paving() == ChunkLayer.Paving.YELLOW_LINE) {
                     found++;
-                    assertEquals(ChunkLayer.Orientation.X, mark.orientation());
+                    if (found > 1) {
+                        continue;
+                    }
+                    assertEquals(ChunkLayer.angle(heading), mark.angle());
                     int position = z * ChunkLayer.OFFSETS + mark.offset();
                     if (previous >= 0) {
-                        assertTrue(Math.abs(position - previous) <= 2, "the line jumps at x " + x + ": " + previous + " to " + position);
+                        assertTrue(Math.abs(position - previous) <= ChunkLayer.OFFSETS, "the line jumps at x " + x + ": " + previous + " to " + position);
                     }
                     previous = position;
                     previousZ = z;
                 }
             }
-            assertEquals(1, found, "one block of the centre line at x " + x);
+            // A slanting line crosses one block of each column, or two where it passes from one to the next
+            assertTrue(found == 1 || found == 2, found + " blocks of the centre line at x " + x);
         }
         assertTrue(previousZ > 0, "the line climbed");
+    }
+
+    @Test
+    void anglesStepEvery180OverTheirCount() {
+        assertEquals(0, ChunkLayer.angle(0.0));
+        assertEquals(0, ChunkLayer.angle(Math.PI));
+        assertEquals(ChunkLayer.ANGLES / 2, ChunkLayer.angle(Math.PI / 2));
+        assertEquals(ChunkLayer.ANGLES / 4, ChunkLayer.angle(Math.PI / 4));
+        assertEquals(ChunkLayer.ANGLES - 1, ChunkLayer.angle(-Math.PI / ChunkLayer.ANGLES));
     }
 }

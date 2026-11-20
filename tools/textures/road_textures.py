@@ -2,6 +2,7 @@
 
 The textures are made by this script for this mod (no outside sources), so they carry the mod's own licence.
 """
+import math
 import os
 import struct
 import zlib
@@ -54,15 +55,17 @@ def line(colour):
     return rows
 
 
-ORIENTATIONS = ['x', 'z', 'diagonal_plus', 'diagonal_minus']
+ANGLES = 16
 OFFSETS = 8
 
 
-def marking(colour, orientation, offset):
+def marking(colour, angle, offset):
     """Asphalt with a line 3 pixels wide across it, as the chunk layer places it (core ChunkLayer.mark): the top face
-    runs u along +x and v along +z; the line along x sits at a position along +z, along z at a position along +x, a
-    diagonal at a position along (-x, +z) or (+x, +z), one of OFFSETS across the block's span."""
-    span = 0.5 if orientation in ('x', 'z') else 0.5 ** 0.5
+    runs u along +x and v along +z; the line runs at angle * 180 / ANGLES degrees from +x towards +z, at one of OFFSETS
+    positions measured along its normal (-sin, cos) across the block's span that way."""
+    theta = math.pi * angle / ANGLES
+    nx, nz = -math.sin(theta), math.cos(theta)
+    span = 0.5 * (abs(nx) + abs(nz))
     centre = -span + (offset + 0.5) * 2 * span / OFFSETS
     rows = []
     for y in range(16):
@@ -70,9 +73,7 @@ def marking(colour, orientation, offset):
         for x in range(16):
             px = (x + 0.5) / 16 - 0.5
             pz = (y + 0.5) / 16 - 0.5
-            t = {'x': pz, 'z': px, 'diagonal_plus': (pz - px) * 0.5 ** 0.5,
-                 'diagonal_minus': (px + pz) * 0.5 ** 0.5}[orientation]
-            if abs(t - centre) <= 1.5 / 16:
+            if abs(px * nx + pz * nz - centre) <= 1.5 / 16:
                 n = noise(x, y, 3) * 6
                 row.append(tuple(clamp(c + n) for c in colour))
             else:
@@ -100,9 +101,9 @@ def main():
     os.makedirs(os.path.join(OUT, 'line'), exist_ok=True)
     png(os.path.join(OUT, 'asphalt.png'), [[asphalt(x, y) for x in range(16)] for y in range(16)])
     for name, colour in (('white', (228, 228, 222)), ('yellow', (226, 178, 44))):
-        for orientation in ORIENTATIONS:
+        for angle in range(ANGLES):
             for offset in range(OFFSETS):
-                png(os.path.join(OUT, 'line', f'{name}_{orientation}_{offset}.png'), marking(colour, orientation, offset))
+                png(os.path.join(OUT, 'line', f'{name}_{angle}_{offset}.png'), marking(colour, angle, offset))
     png(os.path.join(OUT, 'sidewalk.png'), sidewalk())
 
 
