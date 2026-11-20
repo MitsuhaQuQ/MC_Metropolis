@@ -42,12 +42,12 @@ class StreetLayerTest {
     }
 
     @Test
-    void aCastleTownHasTwoMoatsCrossedOnlyAtItsGates() {
+    void aCastleTownsMoatsAreCrossedOnlyAtItsGates() {
         CityLogic logic = new CityLogic(3L, SETTINGS, SyntheticTerrain.flatPlains());
         Settlement city = metropolis(logic);
         assertNotNull(city);
         StreetPlan plan = logic.streetPlan(city, Formation.CASTLE_TOWN);
-        assertEquals(2, plan.moats().size(), "an outer and an inner moat");
+        assertTrue(plan.moats().size() >= 2, "an outer and an inner moat, and maybe a middle one");
         assertTrue(plan.moats().stream().allMatch(Moat::wet), "a flatland castle has wet moats");
         long gates = plan.anchors().stream().filter(a -> a.kind() == Anchor.Kind.GATE).count();
         assertTrue(gates >= 2 && gates <= SETTINGS.streets.gates, "gates: " + gates);
@@ -71,7 +71,7 @@ class StreetLayerTest {
                 }
             }
         }
-        assertEquals(2 * gates, crossings, "bridges over both moats at each gate");
+        assertEquals(plan.moats().size() * gates, crossings, "a bridge over every moat at each gate");
     }
 
     @Test

@@ -142,9 +142,14 @@ public final class StreetLayer {
     }
 
     /**
-     * A castle's moats, gates and approaches: the outer moat just inside the edge of its grounds, the inner one round
-     * the keep, both rounded squares turned with the castle's patch of the grid; gates where arterials reach the
-     * grounds, at most {@code gates}, at least {@code gateAngle} apart, each with an approach to the keep.
+     * A castle's moats, gates and approaches. Moats are not drawn with a ruler: each is a ring of seven to ten straight
+     * runs between angled corners, its corners' directions and distances varied by the castle's hash, its width varying
+     * along it; the inner moat is set off to one side, so the rings are not concentric. On a hill castle each corner
+     * lies where the ground has fallen away from the top, so the moats follow the hill. Where a river or a lake lies
+     * between the castle and its outer moat, the river serves as the moat and that stretch is left out. A metropolis's
+     * castle may have a middle moat too, round its third bailey. Gates stand where arterials reach the grounds, facing
+     * the station first and spread round; each approach bends sideways between two moats, as a masugata gate does,
+     * and no other street crosses a moat.
      */
     private void castle(Settlement settlement, Anchor castle, Field field, Window window, List<Anchor> anchors,
                         List<StreetSegment> segments, List<Moat> moats) {
@@ -159,7 +164,6 @@ public final class StreetLayer {
             case CITY -> config.innerMoatCity;
             default -> config.innerMoatTown;
         };
-        // A hill castle has dry moats: its grounds rise well above their lowest
         double lowest = Double.POSITIVE_INFINITY;
         double highest = Double.NEGATIVE_INFINITY;
         for (double dx = -radius; dx <= radius; dx += grid) {
@@ -171,16 +175,31 @@ public final class StreetLayer {
                 }
             }
         }
-        boolean wet = highest - lowest <= config.dryMoatRelief;
+        double relief = highest - lowest;
+        boolean wet = relief <= config.dryMoatRelief;
+        long seed = Hash.mix(settlement.id() ^ 0xCA571EL);
         double turn = field.patchAngle(settlement, castle.x(), castle.z());
-        // A rounded square reaches 2^(1/4) of its half width at its corners: keep the corners inside the grounds
-        double corner = Math.pow(2.0, 0.25);
-        double outer = (radius - 0.5 * outerWidth) / corner;
-        double inner = config.innerMoatShare * radius / corner;
-        moats.add(new Moat(ring(castle, outer, turn), outerWidth, wet, false));
-        moats.add(new Moat(ring(castle, inner, turn), innerWidth, wet, true));
+        boolean third = settlement.tier() == SettlementTier.METROPOLIS && Hash.unit(Hash.mix(seed + 3)) < config.thirdBaileyChance;
 
-        // Gates where arterials end at the grounds' edge, spread round the castle
+        // Rings from the outside in, each within the band its neighbours leave it
+        double outerMax = radius - 0.6 * outerWidth;
+        double offsetAngle = 2.0 * Math.PI * Hash.unit(Hash.mix(seed + 7));
+        double offset = 0.05 * radius;
+        double innerX = castle.x() + offset * Math.cos(offsetAngle);
+        double innerZ = castle.z() + offset * Math.sin(offsetAngle);
+        moats.add(new Moat(ring(castle.x(), castle.z(), outerMax, 0.80, third ? 0.72 : 0.70, turn, seed + 11, outerWidth,
+                window, wet ? Double.NaN : highest - 0.5 * relief, true), wet, false));
+        if (third) {
+            moats.add(new Moat(ring(castle.x(), castle.z(), 0.66 * radius, 0.78, 0.78, turn + 0.1, seed + 13,
+                    0.8 * outerWidth, window, Double.NaN, false), wet, false));
+            moats.add(new Moat(ring(innerX, innerZ, 0.42 * radius, 0.78, 0.78, turn - 0.1, seed + 17, innerWidth, window,
+                    Double.NaN, false), wet, true));
+        } else {
+            moats.add(new Moat(ring(innerX, innerZ, 0.5 * radius, 0.78, 0.78, turn - 0.1, seed + 17, innerWidth, window,
+                    Double.NaN, false), wet, true));
+        }
+
+        // Gates where arterials end at the grounds' edge, spread round the castle, the first facing the station
         List<double[]> ends = new ArrayList<>();
         for (StreetSegment segment : segments) {
             if (segment.streetClass() != StreetClass.ARTERIAL) {
@@ -193,7 +212,6 @@ public final class StreetLayer {
                 }
             }
         }
-        // Gates facing the station first, then round from there, so the main gate meets the town's front
         double front = turn;
         for (Anchor anchor : anchors) {
             if (anchor.kind() == Anchor.Kind.STATION) {
@@ -208,44 +226,123 @@ public final class StreetLayer {
             if (gates.size() >= config.gates) {
                 break;
             }
-            boolean apart = gates.stream().allMatch(g -> angleBetween(g[2], end[2]) >= config.gateAngle);
-            if (apart) {
+            if (gates.stream().allMatch(g -> angleBetween(g[2], end[2]) >= config.gateAngle)) {
                 gates.add(end);
             }
         }
+        int g = 0;
         for (double[] gate : gates) {
             anchors.add(new Anchor(Anchor.Kind.GATE, gate[0], gate[1]));
-            // The approach: straight towards the keep, over the outer moat and the inner one, to the keep's edge
-            double length = Math.hypot(castle.x() - gate[0], castle.z() - gate[1]) - inner + 0.5 * innerWidth + config.step;
             double ux = (castle.x() - gate[0]) / Math.hypot(castle.x() - gate[0], castle.z() - gate[1]);
             double uz = (castle.z() - gate[1]) / Math.hypot(castle.x() - gate[0], castle.z() - gate[1]);
-            double px = gate[0];
-            double pz = gate[1];
-            for (double t = config.step; t <= length; t += config.step) {
-                double x = gate[0] + ux * t;
-                double z = gate[1] + uz * t;
-                segments.add(new StreetSegment(px, pz, x, z, StreetClass.ARTERIAL, Era.TOWN, config.approachWidth));
-                px = x;
-                pz = z;
+            double side = Hash.unit(Hash.mix(seed + 31 + g++)) < 0.5 ? 1.0 : -1.0;
+            // Where the way in crosses each moat, outermost first; it bends sideways halfway between two
+            double[] crossings = new double[moats.size()];
+            for (int m = 0; m < moats.size(); m++) {
+                crossings[m] = crossing(moats.get(m), castle.x(), castle.z(), -ux, -uz);
+            }
+            List<double[]> path = new ArrayList<>();
+            path.add(new double[]{gate[0], gate[1]});
+            double shift = 0.0;
+            for (int m = 0; m + 1 < moats.size(); m++) {
+                double b = 0.5 * (crossings[m] + crossings[m + 1]);
+                double jog = side * 0.25 * (crossings[m] - crossings[m + 1]);
+                path.add(new double[]{castle.x() - ux * b - uz * shift, castle.z() - uz * b + ux * shift});
+                shift += jog;
+                path.add(new double[]{castle.x() - ux * b - uz * shift, castle.z() - uz * b + ux * shift});
+                side = -side;
+            }
+            double end = 0.5 * crossings[moats.size() - 1];
+            path.add(new double[]{castle.x() - ux * end - uz * shift, castle.z() - uz * end + ux * shift});
+            for (int k = 1; k < path.size(); k++) {
+                double[] a = path.get(k - 1);
+                double[] b = path.get(k);
+                double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+                int pieces = Math.max(1, (int) Math.ceil(length / config.step));
+                for (int p = 0; p < pieces; p++) {
+                    double t0 = (double) p / pieces;
+                    double t1 = (double) (p + 1) / pieces;
+                    segments.add(new StreetSegment(a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0,
+                            a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1, StreetClass.ARTERIAL, Era.TOWN,
+                            config.approachWidth));
+                }
             }
         }
     }
 
-    /** A rounded square about a centre, half as wide as given, turned by an angle. */
-    private static List<double[]> ring(Anchor centre, double half, double turn) {
+    /**
+     * A moat ring: seven to ten corners round a centre, at directions spread round with some play and at distances
+     * between {@code least} and 1 times {@code most}, joined by straight runs; widths varying by corner. Where
+     * {@code contour} is a height, each corner moves in, down to {@code floor} times {@code most}, to where the ground
+     * falls below it (a hill castle's moat follows the hill). Where {@code rivers}, a corner with water between it and the centre leaves the runs either
+     * side of it to the river.
+     */
+    private List<double[]> ring(double cx, double cz, double most, double least, double floor, double turn, long seed,
+                                double width, Window window, double contour, boolean rivers) {
+        int corners = 7 + (int) (4 * Hash.unit(Hash.mix(seed)));
+        double[] xs = new double[corners];
+        double[] zs = new double[corners];
+        double[] ws = new double[corners];
+        boolean[] river = new boolean[corners];
+        for (int k = 0; k < corners; k++) {
+            long hash = Hash.mix(seed * 31 + k);
+            double angle = turn + 2.0 * Math.PI * (k + 0.5 * (Hash.unit(hash) - 0.5)) / corners;
+            double r = most * (least + (1.0 - least) * Hash.unit(Hash.mix(hash)));
+            if (!Double.isNaN(contour)) {
+                for (double t = floor * most; t <= r; t += 8.0) {
+                    if (window.height(cx + t * Math.cos(angle), cz + t * Math.sin(angle)) < contour) {
+                        r = Math.max(floor * most, t);
+                        break;
+                    }
+                }
+            }
+            if (rivers) {
+                for (double t = 0.5 * r; t <= r + 2.0 * width; t += 8.0) {
+                    if (window.water(cx + t * Math.cos(angle), cz + t * Math.sin(angle))) {
+                        river[k] = true;
+                        break;
+                    }
+                }
+            }
+            xs[k] = cx + r * Math.cos(angle);
+            zs[k] = cz + r * Math.sin(angle);
+            ws[k] = width * (0.7 + 0.6 * Hash.unit(Hash.mix(Hash.mix(hash))));
+        }
         List<double[]> points = new ArrayList<>();
-        int pieces = 96;
-        for (int k = 0; k < pieces; k++) {
-            double t = 2.0 * Math.PI * k / pieces;
-            double c = Math.cos(t);
-            double s = Math.sin(t);
-            // A superellipse of exponent 4: square with rounded corners
-            double u = half * Math.signum(c) * Math.sqrt(Math.abs(c));
-            double v = half * Math.signum(s) * Math.sqrt(Math.abs(s));
-            points.add(new double[]{centre.x() + u * Math.cos(turn) - v * Math.sin(turn),
-                    centre.z() + u * Math.sin(turn) + v * Math.cos(turn)});
+        for (int k = 0; k < corners; k++) {
+            int next = (k + 1) % corners;
+            boolean open = river[k] || river[next];
+            double length = Math.hypot(xs[next] - xs[k], zs[next] - zs[k]);
+            int pieces = Math.max(1, (int) Math.ceil(length / config.step));
+            for (int p = 0; p < pieces; p++) {
+                double t = (double) p / pieces;
+                double w = open ? 0.0 : ws[k] + (ws[next] - ws[k]) * t;
+                points.add(new double[]{xs[k] + (xs[next] - xs[k]) * t, zs[k] + (zs[next] - zs[k]) * t, w});
+            }
         }
         return points;
+    }
+
+    /** How far out from a point a ray in a direction last crosses a moat's middle line; 0 when it does not. */
+    private static double crossing(Moat moat, double x, double z, double dx, double dz) {
+        double farthest = 0.0;
+        List<double[]> ring = moat.ring();
+        for (int k = 0; k < ring.size(); k++) {
+            double[] a = ring.get(k);
+            double[] b = ring.get((k + 1) % ring.size());
+            double ex = b[0] - a[0];
+            double ez = b[1] - a[1];
+            double denominator = dx * ez - dz * ex;
+            if (Math.abs(denominator) < 1e-12) {
+                continue;
+            }
+            double t = ((a[0] - x) * ez - (a[1] - z) * ex) / denominator;
+            double u = ((a[0] - x) * dz - (a[1] - z) * dx) / denominator;
+            if (t > 0 && u >= 0 && u <= 1) {
+                farthest = Math.max(farthest, t);
+            }
+        }
+        return farthest;
     }
 
     private static double angleBetween(double a, double b) {

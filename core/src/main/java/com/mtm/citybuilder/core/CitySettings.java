@@ -412,6 +412,8 @@ public final class CitySettings {
         public double innerMoatCity = 25.0;
         public double innerMoatTown = 15.0;
         public double dryMoatRelief = 15.0;
+        /** Chance a metropolis's castle has a third bailey, with a middle moat. */
+        public double thirdBaileyChance = 0.5;
         /** Most gates of the outer moat, and the least angle between two. */
         public int gates = 4;
         public double gateAngle = Math.PI / 2;

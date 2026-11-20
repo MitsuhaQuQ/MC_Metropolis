@@ -29,22 +29,20 @@ public final class StreetMap {
         double top = centerZ - size * scale / 2.0;
         Graphics2D g = image.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        // Moats under the streets, so the approaches show as bridges over them
+        // Moats under the streets, so the approaches show as bridges over them; none where a river serves
         for (Moat moat : plan.moats()) {
             g.setColor(moat.wet() ? new Color(70, 130, 205) : new Color(150, 120, 80));
-            g.setStroke(new BasicStroke((float) Math.max(2.0, moat.width() / scale), BasicStroke.CAP_ROUND,
-                    BasicStroke.JOIN_ROUND));
-            java.awt.geom.Path2D.Double path = new java.awt.geom.Path2D.Double();
             for (int k = 0; k < moat.ring().size(); k++) {
-                double[] p = moat.ring().get(k);
-                if (k == 0) {
-                    path.moveTo((p[0] - left) / scale, (p[1] - top) / scale);
-                } else {
-                    path.lineTo((p[0] - left) / scale, (p[1] - top) / scale);
+                double[] a = moat.ring().get(k);
+                double[] b = moat.ring().get((k + 1) % moat.ring().size());
+                if (a[2] <= 0 || b[2] <= 0) {
+                    continue;
                 }
+                g.setStroke(new BasicStroke((float) Math.max(2.0, a[2] / scale), BasicStroke.CAP_ROUND,
+                        BasicStroke.JOIN_ROUND));
+                g.draw(new Line2D.Double((a[0] - left) / scale, (a[1] - top) / scale, (b[0] - left) / scale,
+                        (b[1] - top) / scale));
             }
-            path.closePath();
-            g.draw(path);
         }
         for (StreetSegment segment : plan.segments()) {
             g.setColor(switch (segment.streetClass()) {
