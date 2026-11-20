@@ -66,7 +66,9 @@ final class BuildingPreview {
                 {"light_blue_terracotta", 0x716C89}, {"ochre_froglight", 0xF5E9B5}, {"pearlescent_froglight", 0xEBDCE1},
                 {"verdant_froglight", 0xD4EAD0}, {"chiseled_bookshelf", 0x725431}, {"barrel", 0x86643B},
                 {"bookshelf", 0x6B5839}, {"magenta_concrete", 0xA9309F}, {"pink_concrete", 0xD5658E},
-                {"green_concrete", 0x495B24}, {"decorated_pot", 0x8C4F3C}, {"oak_sign", 0xA2834F}, {"composter", 0x7D5A33}, {"stone_brick", 0x7A7A7A}, {"pink_terracotta", 0xA14E4E},
+                {"green_concrete", 0x495B24}, {"cyan_terracotta", 0x565B5B}, {"polished_granite", 0x9A6A59},
+                {"cyan_stained_glass", 0x4C7F99}, {"brown_stained_glass", 0x664C33}, {"blue_stained_glass", 0x334CB2},
+                {"polished_deepslate", 0x484848}, {"brick", 0x976253}, {"decorated_pot", 0x8C4F3C}, {"oak_sign", 0xA2834F}, {"composter", 0x7D5A33}, {"stone_brick", 0x7A7A7A}, {"pink_terracotta", 0xA14E4E},
                 {"light_gray_concrete", 0x7D7D73},
         };
         for (Object[] row : table) {

@@ -24,6 +24,10 @@ package com.mtm.citybuilder.core.building;
  * @param step       the storey from which the upper storeys are set back (above the road slant line); {@code storeys}
  *                   if none are
  * @param stepBack   how far back from the front wall those storeys stand
+ * @param upFrom     where the upper storeys (from {@code step}) start across the frontage (u): 0 unless set in at the
+ *                   sides (a podium's tower) or covering part of the house (部分二階)
+ * @param upTo       where they end
+ * @param upBack     how far in from the back wall they stand
  * @param wingFrom   an annex behind (下屋, a one-storey lean-to making the plan an L): where it starts across the
  *                   frontage; {@code wingTo} equal to it if there is none
  * @param wingTo     where it ends
@@ -59,6 +63,7 @@ package com.mtm.citybuilder.core.building;
  */
 public record Building(long id, Type type, int storeys, int ground, int upper, Roof roof, boolean ridgeAlong,
                        double slope, double from, double to, double front, double back, int step, double stepBack,
+                       double upFrom, double upTo, double upBack,
                        double wingFrom, double wingTo, double wingBack, double chamferLeft, double chamferRight,
                        int layout, double lotFrom, double lotTo, double lotDepth, double parkFrom, double parkTo,
                        double parkBack, boolean carport, int base, double ox, double oz, double tx, double tz, double nx, double nz, double door,
@@ -92,6 +97,8 @@ public record Building(long id, Type type, int storeys, int ground, int upper, R
         GABLE,
         HIP,
         FLAT,
+        /** A lean-to over the whole house (片流れ): one plane rising from the front (or the left) to the back. */
+        SHED,
         /**
          * Hip-and-gable (入母屋): hipped at its ends for the first {@link BuildingLayer#IRIMOYA_HIP} blocks in, a gable
          * standing above them.

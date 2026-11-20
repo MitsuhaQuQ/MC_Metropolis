@@ -145,6 +145,10 @@ public final class BuildingLayer {
         POSTBOX,
         /** A pole sign's pole. */
         POLE,
+        /** The other material of two-tone walls: a base storey's brick or stone, an upper storey's siding. */
+        WALL_ALT,
+        /** A step of an outside stair. */
+        STEP,
         /** A light inside, so nothing spawns there. */
         LIGHT
     }
@@ -574,12 +578,38 @@ public final class BuildingLayer {
             style = catalog.forType(type, region, district, Hash.unit(Hash.of(seed, 36)));
             composition = catalog.compose(style, seed);
         }
+        // The upper volume: from storey {@code step} up the building covers only the rectangle from upFrom to upTo
+        // across and from stepBack (in from the front) to upBack in from the back. Set back at the front above the slant
+        // line; an office tower set in on every side over its podium; a house's upper storey over part of it
+        double upFrom = 0.0;
+        double upTo = width;
+        double upBack = 0.0;
+        if (step == storeys && type == Building.Type.OFFICE && storeys >= 6 && width >= 14 && depth >= 14
+                && composition.is(Slot.PODIUM, "podium")) {
+            step = 2 + (Hash.unit(Hash.of(seed, 44)) < 0.5 ? 1 : 0);
+            upFrom = 2.0;
+            upTo = width - 2.0;
+            stepBack = 2.0;
+            upBack = 2.0;
+        } else if (step == storeys && type == Building.Type.HOUSE && storeys >= 2 && width >= 8
+                && composition.is(Slot.UPPER_PLAN, "partial")) {
+            step = 1;
+            double share = Math.floor(width * (0.55 + 0.15 * Hash.unit(Hash.of(seed, 45))));
+            if (Hash.unit(Hash.of(seed, 46)) < 0.5) {
+                upTo = share;
+            } else {
+                upFrom = width - share;
+            }
+        }
+        boolean pitchedUpper = type == Building.Type.HOUSE;
 
-        Building.Roof roof = step < storeys ? Building.Roof.FLAT
+        Building.Roof roof = step < storeys && !pitchedUpper ? Building.Roof.FLAT
                 : Building.Roof.valueOf(composition.get(storeys >= 4 ? Slot.ROOF_TALL : Slot.ROOF).toUpperCase(java.util.Locale.ROOT));
-        // Machiya keep their ridge along the street (平入り); storehouses as their composition says
+        // Machiya keep their ridge along the street (平入り); storehouses as their composition says; others along the
+        // longer side of their upper volume
         boolean ridgeAlong = type == Building.Type.MACHIYA
-                || (type == Building.Type.KURA ? composition.is(Slot.RIDGE_DIR, "along") : width >= depth);
+                || (type == Building.Type.KURA ? composition.is(Slot.RIDGE_DIR, "along")
+                : upTo - upFrom >= depth - stepBack - upBack);
         double slope = type == Building.Type.WORKS ? 0.5 : 1.0;
 
         // The base: the ground under the footprint (a 3 × 3 grid over it), its median, and no lower than the ground
@@ -638,7 +668,7 @@ public final class BuildingLayer {
 
         boolean carport = layout != 0 && composition.is(Slot.CARPORT, "carport");
         return new Building(plot.id(), type, storeys, ground, upper, roof, ridgeAlong, slope, from, to, front, back,
-                step, stepBack, wingFrom, wingTo, wingBack, chamferLeft, chamferRight, layout, plot.start() - from,
+                step, stepBack, upFrom, upTo, upBack, wingFrom, wingTo, wingBack, chamferLeft, chamferRight, layout, plot.start() - from,
                 plot.end() - from, plot.maxDepth(), parkFrom, parkTo, parkBack, carport, base, ox, oz, p[2], p[3], nx, nz,
                 door, quarter, region, composition, program, standalone, palette, variant);
     }
@@ -772,8 +802,13 @@ public final class BuildingLayer {
             }
             door = (face == Face.FRONT || inner == Face.FRONT) && Math.abs(u - b.door()) < 0.5;
         }
-        double inAcross = Math.min(v - b.front(), b.back() - v);
-        double inAlong = Math.min(u, w - u);
+        // The roof stands over the upper volume
+        double uu = u - b.upFrom();
+        double uw = b.upTo() - b.upFrom();
+        double vf = b.front() + b.stepBack();
+        double vb = b.back() - b.upBack();
+        double inAcross = Math.min(v - vf, vb - v);
+        double inAlong = Math.min(uu, uw - uu);
         double eaveDistance = switch (b.roof()) {
             case HIP -> Math.min(inAcross, inAlong);
             case GABLE -> b.ridgeAlong() ? inAcross : inAlong;
@@ -782,15 +817,16 @@ public final class BuildingLayer {
                 double ends = b.ridgeAlong() ? inAlong : inAcross;
                 yield ends < IRIMOYA_HIP ? Math.min(across, ends) : across;
             }
+            case SHED -> b.ridgeAlong() ? v - vf : uu;
             case FLAT -> 0.0;
         };
         double span = switch (b.roof()) {
-            case HIP -> Math.min(w, b.depth());
-            case GABLE, IRIMOYA -> b.ridgeAlong() ? b.depth() : w;
-            case FLAT -> 0.0;
+            case HIP -> Math.min(uw, vb - vf);
+            case GABLE, IRIMOYA -> b.ridgeAlong() ? vb - vf : uw;
+            case SHED, FLAT -> 0.0;
         };
         int eave = (int) Math.floor(eaveDistance);
-        boolean ridge = b.roof() != Building.Roof.FLAT && eave >= (int) Math.floor(0.5 * span - 0.5);
+        boolean ridge = b.roof() != Building.Roof.FLAT && b.roof() != Building.Roof.SHED && eave >= (int) Math.floor(0.5 * span - 0.5);
         boolean light = !ring && face == Face.NONE && Math.floorMod((long) Math.floor(u), 8) == 3
                 && Math.floorMod((long) Math.floor(v - b.front()), 8) == 3;
         Face lot = Face.NONE;
@@ -979,25 +1015,65 @@ public final class BuildingLayer {
         return Part.NONE;
     }
 
-    /** Whether a column lies on the terrace in front of set-back upper storeys. */
+    /** Whether a ring column lies beside the upper volume, where its roof's eaves overhang: within a block of it. */
+    private static boolean overUpper(Building b, Column c) {
+        double in = c.v() - b.front();
+        return c.u() >= b.upFrom() - 1.0 && c.u() < b.upTo() + 1.0 && in >= b.stepBack() - 1.0 && in < b.depth() - b.upBack() + 1.0;
+    }
+
+    /** Whether a column lies under the upper volume (the storeys from {@code step} up). */
+    private static boolean inUpper(Building b, Column c) {
+        double in = c.v() - b.front();
+        return c.u() >= b.upFrom() && c.u() < b.upTo() && in >= b.stepBack() && in < b.depth() - b.upBack();
+    }
+
+    /** Whether a column lies outside the upper volume: a terrace, a podium's roof, a house's lower roof. */
     private static boolean terrace(Building b, Column c) {
-        return b.step() < b.storeys() && c.v() - b.front() < b.stepBack();
+        return b.step() < b.storeys() && !inUpper(b, c);
+    }
+
+    /** Which wall of the upper volume a column of it lies on, where that is not a wall of the whole building; else NONE. */
+    private static Face upperFace(Building b, Column c) {
+        if (b.step() >= b.storeys() || !inUpper(b, c)) {
+            return Face.NONE;
+        }
+        double in = c.v() - b.front();
+        if (in - b.stepBack() < 1.0 && b.stepBack() > 0) {
+            return Face.FRONT;
+        }
+        if (b.depth() - b.upBack() - in < 1.0 && b.upBack() > 0) {
+            return Face.BACK;
+        }
+        if (c.u() - b.upFrom() < 1.0 && b.upFrom() > 0 || b.upTo() - c.u() < 1.0 && b.upTo() < b.width()) {
+            return Face.SIDE;
+        }
+        return Face.NONE;
     }
 
     /** Whether a column lies on the front wall of the set-back upper storeys. */
     private static boolean stepWall(Building b, Column c) {
-        double in = c.v() - b.front() - b.stepBack();
-        return b.step() < b.storeys() && in >= 0 && in < 1.0;
+        return upperFace(b, c) != Face.NONE;
+    }
+
+    /** A house's lower roof beside its upper storey: a lean-to rising towards it, half blocks over the ground floor. */
+    private static int lowerHalves(Building b, Column c) {
+        double d = c.u() < b.upFrom() ? c.u() : b.width() - c.u();
+        if (c.u() >= b.upFrom() && c.u() < b.upTo()) {
+            d = Math.min(c.v() - b.front(), b.back() - c.v());
+        }
+        return (int) Math.floor(Math.max(0.0, d) * b.slope()) + 1;
     }
 
     /** A rooftop housing (stairs, lift, water tank) on flat roofs from four storeys: {u from, v from, size}, or null. */
     private static double[] housing(Building b) {
-        if (b.roof() != Building.Roof.FLAT || b.storeys() < 4 || b.width() < 9 || b.depth() - b.stepBack() < 9) {
+        double uw = b.upTo() - b.upFrom();
+        double vd = b.depth() - b.stepBack() - b.upBack();
+        if (b.roof() != Building.Roof.FLAT || b.storeys() < 4 || uw < 9 || vd < 9) {
             return null;
         }
         double size = 4.0;
-        double u = 2.0 + Math.floor((b.width() - size - 4.0) * Hash.unit(Hash.of(b.variant(), 1)));
-        double v = b.front() + b.stepBack() + 2.0 + Math.floor((b.depth() - b.stepBack() - size - 4.0) * Hash.unit(Hash.of(b.variant(), 2)));
+        double u = b.upFrom() + 2.0 + Math.floor((uw - size - 4.0) * Hash.unit(Hash.of(b.variant(), 1)));
+        double v = b.front() + b.stepBack() + 2.0 + Math.floor((vd - size - 4.0) * Hash.unit(Hash.of(b.variant(), 2)));
         return new double[]{u, v, size};
     }
 
@@ -1024,12 +1100,15 @@ public final class BuildingLayer {
                     top = dy;
                 }
             }
-            if (b.roof() != Building.Roof.FLAT && c.eave() >= -1 && c.adjacent()) {
+            if (b.roof() != Building.Roof.FLAT && c.eave() >= -1 && c.adjacent() && overUpper(b, c)) {
                 top = Math.max(top, roofRow(b, c));
             }
             return b.base() + top;
         }
         if (terrace(b, c)) {
+            if (b.type() == Building.Type.HOUSE) {
+                return b.base() + b.floorOf(b.step()) + 1 + Math.floorDiv(lowerHalves(b, c) - 1, 2);
+            }
             return b.base() + b.floorOf(b.step()) + (c.edge() ? 1 : 0);
         }
         int wallTop = b.base() + b.wallHeight();
@@ -1067,7 +1146,7 @@ public final class BuildingLayer {
             return wingPart(b, c, dy);
         }
         if (c.ring()) {
-            if (b.roof() != Building.Roof.FLAT && c.eave() >= -1 && c.adjacent() && dy == roofRow(b, c)) {
+            if (b.roof() != Building.Roof.FLAT && c.eave() >= -1 && c.adjacent() && overUpper(b, c) && dy == roofRow(b, c)) {
                 return c.ridge() ? Part.RIDGE : Math.floorMod(halves(b, c), 2) == 1 ? Part.ROOF_LOW : Part.ROOF_HIGH;
             }
             return ringPart(b, c, dy);
@@ -1081,6 +1160,21 @@ public final class BuildingLayer {
         }
         if (terrace(b, c) && dy >= b.floorOf(b.step())) {
             int t = dy - b.floorOf(b.step());
+            if (b.type() == Building.Type.HOUSE) {
+                // A house's lower roof: a ceiling, then a lean-to rising to its upper storey's wall
+                int halves = lowerHalves(b, c);
+                int roof = 1 + Math.floorDiv(halves - 1, 2);
+                if (t == 0) {
+                    return c.edge() ? Part.ACCENT : Part.FLOOR;
+                }
+                if (t < roof) {
+                    return c.edge() ? Part.ACCENT : Part.AIR;
+                }
+                if (t == roof) {
+                    return Math.floorMod(halves, 2) == 1 ? Part.ROOF_LOW : Part.ROOF_HIGH;
+                }
+                return Part.AIR;
+            }
             if (t == 0) {
                 return c.edge() ? Part.PARAPET : Part.FLAT;
             }
@@ -1103,8 +1197,9 @@ public final class BuildingLayer {
             boolean corner = c.corner();
             boolean stepped = storey >= b.step() && stepWall(b, c);
             if (stepped) {
-                corner = face == Face.SIDE;
-                face = Face.FRONT;
+                Face up = upperFace(b, c);
+                corner = face != Face.NONE && face != up;
+                face = up;
             }
             if (storey == 0 && row > 0) {
                 Part ground = ground(b, c, face, corner, row, height);
@@ -1171,7 +1266,8 @@ public final class BuildingLayer {
         if (b.roof() == Building.Roof.IRIMOYA) {
             // The gable of a hip-and-gable roof stands on the hips, a block in from their top: its face filled down to
             // them, the hips' last step at its foot
-            double ends = b.ridgeAlong() ? Math.min(c.u(), b.width() - c.u()) : Math.min(c.v() - b.front(), b.back() - c.v());
+            double ends = b.ridgeAlong() ? Math.min(c.u() - b.upFrom(), b.upTo() - c.u())
+                    : Math.min(c.v() - b.front() - b.stepBack(), b.back() - b.upBack() - c.v());
             if (ends >= IRIMOYA_HIP && ends < IRIMOYA_HIP + 1.0) {
                 int hipHalves = (int) Math.floor(IRIMOYA_HIP * b.slope()) + 1;
                 int hipRow = 1 + Math.floorDiv(hipHalves - 1, 2);
@@ -1595,9 +1691,18 @@ public final class BuildingLayer {
                             if (dy == f) {
                                 return Part.ACCENT;
                             }
+                            if (dy == f + 1 && b.composition().is(Slot.BALCONY_SPLIT, "units")
+                                    && Math.floorMod((long) Math.floor(u), 5) == 0) {
+                                return Part.ACCENT;
+                            }
                             if (dy == f + 1) {
                                 return detail(b, c, 5 + k) < 0.12 ? Part.EQUIPMENT
                                         : b.composition().is(Slot.BALCONY, "rail") ? Part.RAIL : Part.PARAPET;
+                            }
+                            if (dy == f + 2 && b.composition().is(Slot.BALCONY_SPLIT, "units")
+                                    && Math.floorMod((long) Math.floor(u), 5) == 0) {
+                                // A screen between two flats' balconies
+                                return Part.ACCENT;
                             }
                         }
                     }
@@ -1809,6 +1914,27 @@ public final class BuildingLayer {
             return null;
         }
         long s = (long) Math.floor(along);
+        if (b.type() == Building.Type.HOUSE && against == Face.FRONT && b.storeys() >= 2
+                && b.composition().is(Slot.HOUSE_BALCONY, "front")) {
+            // A balcony along part of the upper storey's front, over the upper volume, a railing round it
+            double from = b.upFrom() + 1.0;
+            double to = Math.min(b.upTo() - 1.0, from + Math.max(3.0, Math.floor(0.6 * (b.upTo() - b.upFrom()))));
+            if (along >= from && along < to && b.front() >= 1.0) {
+                int f = b.floorOf(1);
+                if (dy == f) {
+                    return Part.ACCENT;
+                }
+                if (dy == f + 1) {
+                    return Part.RAIL;
+                }
+            }
+        }
+        if (b.type() == Building.Type.APARTMENT && b.composition().is(Slot.ACCESS, "corridor")) {
+            Part access = corridor(b, c, against, along, dy);
+            if (access != null) {
+                return access;
+            }
+        }
         if (b.type() == Building.Type.KURA) {
             if (!b.composition().is(Slot.LEDGE, "tiled")) {
                 return null;
@@ -1873,6 +1999,47 @@ public final class BuildingLayer {
         return groundStyle(b) == 1 ? b.ground() - 1 : 2;
     }
 
+    /**
+     * A block of flats reached by open corridors (外廊下): along its back at every floor, a slab and a railing; up one
+     * end, an outside stair in flights of three steps, turning at each floor. Null where none of these is.
+     */
+    private static Part corridor(Building b, Column c, Face against, double along, int dy) {
+        double w = b.width();
+        if (against == Face.BACK) {
+            if (dy == 0) {
+                return Part.PAVING;
+            }
+            for (int k = 1; k < b.step(); k++) {
+                int f = b.floorOf(k);
+                if (dy == f) {
+                    return Part.ACCENT;
+                }
+                if (dy == f + 1) {
+                    return Part.RAIL;
+                }
+            }
+            return null;
+        }
+        // The stair: in the ring beside the right-hand wall, its last three blocks before the back
+        if (against == Face.SIDE && c.u() >= w) {
+            double fromBack = b.depth() - along;
+            if (fromBack >= 0.0 && fromBack < 3.0) {
+                int j = (int) Math.floor(fromBack);
+                for (int k = 1; k < b.step(); k++) {
+                    int f0 = b.floorOf(k - 1);
+                    int rise = b.floorOf(k) - f0;
+                    // Flights alternate: away from the back, then towards it
+                    int position = Math.floorMod(k, 2) == 1 ? 2 - j : j;
+                    int stepDy = f0 + 1 + position * rise / 3;
+                    if (dy == stepDy) {
+                        return Part.STEP;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     private static Part wall(Building b, Column c, Face face, boolean corner, int storey, int row, int height) {
         double facadeAt = face == Face.SIDE ? c.v() - b.front() : c.u();
         if (b.type() == Building.Type.KURA) {
@@ -1901,8 +2068,26 @@ public final class BuildingLayer {
         }
         boolean upper = storey > 0;
         Part wall = upper && b.type() == Building.Type.MACHIYA ? Part.ACCENT : Part.WALL;
+        if (b.type() == Building.Type.HOUSE || b.type() == Building.Type.APARTMENT) {
+            // Two-tone walls: a base storey of brick or stone, or the upper storeys in another siding
+            String tone = b.composition().get(Slot.TWO_TONE);
+            if (tone.equals("base") && storey == 0 || tone.equals("upper") && upper) {
+                wall = Part.WALL_ALT;
+            }
+        }
         if (row == 0 && b.type() == Building.Type.KURA) {
             return Part.WALL;
+        }
+        String facadeSystem = b.composition().get(Slot.FACADE);
+        if (upper && b.type() == Building.Type.OFFICE && facadeSystem.equals("curtain")) {
+            // A curtain wall: glass from floor to floor, mullions every fourth block
+            long m = (long) Math.floor(face == Face.SIDE ? c.v() - b.front() : c.u());
+            return Math.floorMod(m, 4) == 0 ? Part.TRIM : Part.WINDOW;
+        }
+        if (upper && b.type() == Building.Type.OFFICE && facadeSystem.equals("grid")) {
+            // A framed grid: the frame's posts every third block and its beams at the floors, glass between
+            long m = (long) Math.floor(face == Face.SIDE ? c.v() - b.front() : c.u());
+            return Math.floorMod(m, 3) == 0 ? Part.TRIM : row == 0 ? Part.ACCENT : Part.WINDOW;
         }
         if (row == 0) {
             // The band between storeys
@@ -1923,12 +2108,18 @@ public final class BuildingLayer {
             // The upper storey glazed across in wooden frames
             return Math.floorMod(s, 3) == 0 ? Part.TRIM : Part.WINDOW;
         }
+        boolean ribbon = b.composition().is(Slot.FACADE, "ribbon");
         boolean window = switch (b.type()) {
-            case HOUSE -> Math.floorMod(s, 4) == 1 || Math.floorMod(s, 4) == 2;
+            case HOUSE -> switch (b.composition().get(Slot.WINDOWS)) {
+                case "wide" -> Math.floorMod(s, 5) >= 1 && Math.floorMod(s, 5) <= 3;
+                case "single" -> Math.floorMod(s, 3) == 1;
+                default -> Math.floorMod(s, 4) == 1 || Math.floorMod(s, 4) == 2;
+            };
             case MACHIYA -> row == 1 && Math.floorMod(s, 4) == 2;
             case SHOP -> Math.floorMod(s, 3) != 0;
-            case APARTMENT -> face == Face.FRONT ? Math.floorMod(s, 4) != 0 : Math.floorMod(s, 4) == 2;
-            case OFFICE -> Math.floorMod(s, 5) != 0;
+            case APARTMENT -> ribbon ? Math.floorMod(s, 6) != 0
+                    : face == Face.FRONT ? Math.floorMod(s, 4) != 0 : Math.floorMod(s, 4) == 2;
+            case OFFICE -> ribbon ? Math.floorMod(s, 7) != 0 : Math.floorMod(s, 5) != 0;
             case WORKS -> row == height - 2 && Math.floorMod(s, 2) == 0;
             case KURA -> row == 2 && Math.floorMod(s, 5) == 2;
         };

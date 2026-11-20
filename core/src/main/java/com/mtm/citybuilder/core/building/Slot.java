@@ -10,7 +10,7 @@ import java.util.List;
  */
 public enum Slot {
     /** The roof of a building of three storeys or fewer. */
-    ROOF("gable", "hip", "flat", "irimoya"),
+    ROOF("gable", "hip", "flat", "irimoya", "shed"),
     /** The roof from four storeys up. */
     ROOF_TALL("flat", "gable", "hip", "irimoya"),
     /** A storehouse's ridge: along the street (平入り) or its gable to it (妻入り). */
@@ -81,7 +81,23 @@ public enum Slot {
     /** Goods on show behind a shop's glass. */
     DISPLAY("none", "goods"),
     /** Billboards of a busy downtown block: on its roof, on a side wall, both. */
-    AD("none", "roof", "wall", "both");
+    AD("none", "roof", "wall", "both"),
+    /** A house's upper storey over all its ground floor (総二階) or part of it (部分二階), the rest under a lean-to. */
+    UPPER_PLAN("full", "partial"),
+    /** An office tower on a podium: the lower storeys over the lot, the upper set in on every side. */
+    PODIUM("none", "podium"),
+    /** A house's windows: in pairs, wide, single. */
+    WINDOWS("pairs", "wide", "single"),
+    /** Two materials on the walls: a base storey of brick or stone, or an upper storey in another siding. */
+    TWO_TONE("none", "base", "upper"),
+    /** A house's balcony along the front of its upper storey. */
+    HOUSE_BALCONY("none", "front"),
+    /** How the flats of a block are reached: inside, or along open corridors at the back with an outside stair (外廊下). */
+    ACCESS("interior", "corridor"),
+    /** Balconies continuous or split flat by flat by screens. */
+    BALCONY_SPLIT("none", "units"),
+    /** A block's walls: punched windows, ribbon windows, a curtain wall, a framed grid. */
+    FACADE("punched", "ribbon", "curtain", "grid");
 
     private final List<String> options;
 

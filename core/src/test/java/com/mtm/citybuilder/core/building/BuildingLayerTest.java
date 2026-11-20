@@ -79,7 +79,10 @@ class BuildingLayerTest {
                 assertTrue(b.parkTo() <= b.parkFrom() || b.parkTo() <= 1e-9 || b.parkFrom() >= b.width() - 1e-9
                         || b.parkBack() <= b.front() + 1e-9, "parking " + b);
                 // Set-back upper storeys only on flat-roofed blocks, behind a terrace that leaves room inside
-                assertTrue(b.step() == b.storeys() || b.roof() == Building.Roof.FLAT && b.depth() - b.stepBack() >= 6);
+                assertTrue(b.step() == b.storeys() || b.type() == Building.Type.HOUSE
+                        || b.roof() == Building.Roof.FLAT && b.depth() - b.stepBack() - b.upBack() >= 6);
+                // The upper volume lies within the footprint
+                assertTrue(b.upFrom() >= 0 && b.upTo() <= b.width() + 1e-9 && b.upFrom() < b.upTo(), "upper " + b);
                 assertTrue(b.width() >= 4 && b.depth() >= 4, "size " + b);
                 // The road slant line, two storeys always allowed
                 // A corner lot, on two streets, may rise a storey more
