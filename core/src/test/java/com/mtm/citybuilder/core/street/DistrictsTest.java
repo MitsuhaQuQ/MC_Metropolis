@@ -144,5 +144,18 @@ class DistrictsTest {
                 assertTrue(plan.districts().at(point[0], point[1]) != District.GROUNDS, "a line through grounds");
             }
         }
+        // The station avenue: arterials widened from the station to the castle's gate nearest it
+        List<StreetSegment> avenue = plan.segments().stream()
+                .filter(g -> g.width() >= SETTINGS.streets.stationAvenueWidth - 1e-9).toList();
+        assertTrue(!avenue.isEmpty(), "a station avenue; gates " + plan.anchors().stream()
+                .filter(a -> a.kind() == Anchor.Kind.GATE).map(a -> Math.round(Math.hypot(a.x() - station.x(), a.z() - station.z()))).toList());
+        Anchor gate = plan.anchors().stream().filter(a -> a.kind() == Anchor.Kind.GATE)
+                .min(java.util.Comparator.comparingDouble(a -> Math.hypot(a.x() - station.x(), a.z() - station.z()))).orElseThrow();
+        double nearStation = avenue.stream().mapToDouble(g -> Math.min(Math.hypot(g.x1() - station.x(), g.z1() - station.z()),
+                Math.hypot(g.x2() - station.x(), g.z2() - station.z()))).min().orElseThrow();
+        double nearGate = avenue.stream().mapToDouble(g -> Math.min(Math.hypot(g.x1() - gate.x(), g.z1() - gate.z()),
+                Math.hypot(g.x2() - gate.x(), g.z2() - gate.z()))).min().orElseThrow();
+        assertTrue(nearStation < 1.0, "the avenue starts at the station: " + nearStation);
+        assertTrue(nearGate < 200.0, "the avenue reaches the gate: " + nearGate);
     }
 }

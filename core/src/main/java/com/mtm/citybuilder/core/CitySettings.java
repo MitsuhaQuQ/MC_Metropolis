@@ -428,12 +428,12 @@ public final class CitySettings {
         public double templeReach = 1500.0;
         /** Above this urban intensity, streets belong to the old town; below, to the modern town. */
         public double oldTownIntensity = 0.55;
-        /** Widths: old roads, arterials, and the avenue from the station to the centre. */
+        /** Widths: old roads, arterials, and the avenue from the station to the town's heart. */
         public double oldRoadWidth = 8.0;
         public double arterialWidth = 16.0;
         public double stationAvenueWidth = 24.0;
-        /** A station avenue is laid only up to this long. */
-        public double stationAvenueMax = 4000.0;
+        /** A station avenue is laid only where the station is at most this far from the heart it leads to. */
+        public double stationAvenueMax = 6000.0;
         /**
          * Streets between the arterials, the spacing by formation (Kyoto's blocks are about 120 blocks square), from
          * {@code denseSpacing} of it in the heart of town to {@code thinSpacing} of it at the edge.

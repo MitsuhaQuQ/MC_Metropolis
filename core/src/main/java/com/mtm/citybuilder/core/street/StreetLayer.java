@@ -708,16 +708,17 @@ public final class StreetLayer {
             arterials.run(arterialSeeds(anchors, oldRoad, window, spacing), segments);
             linkPatches(window, arterials, segments, spacing);
             demoteDeadEnds(window, segments, anchors, banks);
-            for (Anchor anchor : anchors) {
-                if (anchor.kind() == Anchor.Kind.STATION) {
-                    avenue(anchor, extent, window, segments);
-                }
-            }
+            // Gates first: the station avenue heads for the gate nearest the station
             for (Anchor anchor : List.copyOf(anchors)) {
                 if (anchor.kind() == Anchor.Kind.CASTLE) {
                     castleGates(settlement, anchor, window, anchors, segments, moats);
                 } else if (anchor.kind() == Anchor.Kind.TEMPLE) {
                     sando(anchor, extent, window, segments);
+                }
+            }
+            for (Anchor anchor : List.copyOf(anchors)) {
+                if (anchor.kind() == Anchor.Kind.STATION) {
+                    avenue(anchor, anchors, extent, window, segments);
                 }
             }
             // Streets between the arterials, ending at them (a capital's grid crosses them), then lanes
@@ -2257,30 +2258,172 @@ public final class StreetLayer {
         return points;
     }
 
-    /** A straight avenue from a station to the centre, over built land and bridges. */
-    private void avenue(Anchor station, CityExtent extent, Window window, List<StreetSegment> segments) {
-        double length = Math.hypot(extent.coreX() - station.x(), extent.coreZ() - station.z());
-        if (length < config.step || length > config.stationAvenueMax) {
-            return;
-        }
-        int steps = (int) Math.ceil(length / config.step);
-        double px = station.x();
-        double pz = station.z();
-        for (int s = 1; s <= steps; s++) {
-            double t = (double) s / steps;
-            double x = station.x() + (extent.coreX() - station.x()) * t;
-            double z = station.z() + (extent.coreZ() - station.z()) * t;
-            if (window.inside(x, z) && !window.inGrounds(x, z) && !window.inGrounds(px, pz)) {
-                boolean over = window.water(x, z) || window.water(px, pz) || window.water(0.5 * (x + px), 0.5 * (z + pz));
-                double grade = Math.abs(window.height(x, z) - window.height(px, pz)) / config.step;
-                if (over || grade <= config.maxGrade) {
-                    segments.add(new StreetSegment(px, pz, x, z, StreetClass.ARTERIAL, Era.MODERN, config.stationAvenueWidth,
-                            over ? StreetStructure.BRIDGE : StreetStructure.GROUND));
+    /**
+     * The station avenue: the way from a station to the town's heart along the arterials already laid, widened, as
+     * castle towns widened an old street towards the castle when the railway came (Himeji's Otemae-dori, Toyama's
+     * Joshi-odori; Kanazawa's bends with the streets it follows), not a new straight cut across the old town. The heart
+     * is the castle's gate nearest the station in a castle town, the centre elsewhere. The way is the shortest over the
+     * arterials and old roads, crossings included, from the node nearest the station (joined to it by a short straight
+     * where it lies off the network) to the node nearest the heart. Nothing is laid where the network does not reach.
+     */
+    private void avenue(Anchor station, List<Anchor> anchors, CityExtent extent, Window window, List<StreetSegment> segments) {
+        double tx = extent.coreX();
+        double tz = extent.coreZ();
+        double nearestGate = Double.POSITIVE_INFINITY;
+        for (Anchor anchor : anchors) {
+            if (anchor.kind() == Anchor.Kind.GATE) {
+                double d = Math.hypot(anchor.x() - station.x(), anchor.z() - station.z());
+                if (d < nearestGate) {
+                    nearestGate = d;
+                    tx = anchor.x();
+                    tz = anchor.z();
                 }
             }
-            px = x;
-            pz = z;
         }
+        if (Math.hypot(tx - station.x(), tz - station.z()) > config.stationAvenueMax) {
+            return;
+        }
+        // The network: ends of arterial and old-road pieces, and the points where pieces cross
+        List<Integer> pieces = new ArrayList<>();
+        for (int k = 0; k < segments.size(); k++) {
+            StreetClass c = segments.get(k).streetClass();
+            if (c == StreetClass.ARTERIAL || c == StreetClass.OLD_ROAD) {
+                pieces.add(k);
+            }
+        }
+        Map<Long, Integer> ids = new HashMap<>();
+        List<double[]> nodes = new ArrayList<>();
+        List<List<double[]>> edges = new ArrayList<>();
+        java.util.function.BiFunction<Double, Double, Integer> node = (x, z) -> ids.computeIfAbsent(nodeKey(x, z), key -> {
+            nodes.add(new double[]{x, z});
+            edges.add(new ArrayList<>());
+            return nodes.size() - 1;
+        });
+        // {other node, length, piece}
+        java.util.function.BiConsumer<int[], double[]> link = (ab, info) -> {
+            edges.get(ab[0]).add(new double[]{ab[1], info[0], info[1]});
+            edges.get(ab[1]).add(new double[]{ab[0], info[0], info[1]});
+        };
+        Map<Long, List<Integer>> cells = new HashMap<>();
+        for (int k : pieces) {
+            StreetSegment g = segments.get(k);
+            int a = node.apply(g.x1(), g.z1());
+            int b = node.apply(g.x2(), g.z2());
+            double cost = g.length() * (g.structure() == StreetStructure.BRIDGE ? 1.5 : 1.0);
+            link.accept(new int[]{a, b}, new double[]{cost, k});
+            for (long cx = (long) Math.floor(Math.min(g.x1(), g.x2()) / 64); cx <= (long) Math.floor(Math.max(g.x1(), g.x2()) / 64); cx++) {
+                for (long cz = (long) Math.floor(Math.min(g.z1(), g.z2()) / 64); cz <= (long) Math.floor(Math.max(g.z1(), g.z2()) / 64); cz++) {
+                    cells.computeIfAbsent((cx << 32) ^ (cz & 0xFFFFFFFFL), key -> new ArrayList<>()).add(k);
+                }
+            }
+        }
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        for (List<Integer> list : cells.values()) {
+            for (int p = 0; p < list.size(); p++) {
+                for (int q = p + 1; q < list.size(); q++) {
+                    int i = Math.min(list.get(p), list.get(q));
+                    int j = Math.max(list.get(p), list.get(q));
+                    if (!seen.add(((long) i << 32) | j)) {
+                        continue;
+                    }
+                    StreetSegment a = segments.get(i);
+                    StreetSegment b = segments.get(j);
+                    if (!properlyCross(a, b)) {
+                        continue;
+                    }
+                    double[] at = intersection(a, b);
+                    if (at == null) {
+                        continue;
+                    }
+                    int c = node.apply(at[0], at[1]);
+                    for (StreetSegment g : new StreetSegment[]{a, b}) {
+                        int piece = g == a ? i : j;
+                        link.accept(new int[]{c, node.apply(g.x1(), g.z1())},
+                                new double[]{Math.hypot(at[0] - g.x1(), at[1] - g.z1()), piece});
+                        link.accept(new int[]{c, node.apply(g.x2(), g.z2())},
+                                new double[]{Math.hypot(at[0] - g.x2(), at[1] - g.z2()), piece});
+                    }
+                }
+            }
+        }
+        if (nodes.isEmpty()) {
+            return;
+        }
+        int from = nearestNode(nodes, station.x(), station.z());
+        int to = nearestNode(nodes, tx, tz);
+        if (from == to) {
+            return;
+        }
+        // Dijkstra over the network
+        double[] cost = new double[nodes.size()];
+        int[] previous = new int[nodes.size()];
+        int[] via = new int[nodes.size()];
+        java.util.Arrays.fill(cost, Double.POSITIVE_INFINITY);
+        java.util.Arrays.fill(previous, -1);
+        cost[from] = 0.0;
+        java.util.PriorityQueue<double[]> queue = new java.util.PriorityQueue<>((p, q) -> Double.compare(p[0], q[0]));
+        queue.add(new double[]{0.0, from});
+        while (!queue.isEmpty()) {
+            double[] head = queue.poll();
+            int n = (int) head[1];
+            if (head[0] > cost[n]) {
+                continue;
+            }
+            if (n == to) {
+                break;
+            }
+            for (double[] e : edges.get(n)) {
+                int m = (int) e[0];
+                double c = cost[n] + e[1];
+                if (c < cost[m]) {
+                    cost[m] = c;
+                    previous[m] = n;
+                    via[m] = (int) e[2];
+                    queue.add(new double[]{c, m});
+                }
+            }
+        }
+        if (Double.isInfinite(cost[to])) {
+            return;
+        }
+        // Widen the pieces along the way
+        java.util.Set<Integer> widened = new java.util.TreeSet<>();
+        for (int n = to; previous[n] >= 0; n = previous[n]) {
+            widened.add(via[n]);
+        }
+        for (int k : widened) {
+            StreetSegment g = segments.get(k);
+            segments.set(k, new StreetSegment(g.x1(), g.z1(), g.x2(), g.z2(), StreetClass.ARTERIAL, Era.MODERN,
+                    Math.max(g.width(), config.stationAvenueWidth), g.structure()));
+        }
+        // The station's own short way onto the network
+        double[] first = nodes.get(from);
+        double gap = Math.hypot(first[0] - station.x(), first[1] - station.z());
+        if (gap > 1.0) {
+            int steps = Math.max(1, (int) Math.ceil(gap / config.step));
+            for (int q = 0; q < steps; q++) {
+                double ax = station.x() + (first[0] - station.x()) * q / steps;
+                double az = station.z() + (first[1] - station.z()) * q / steps;
+                double bx = station.x() + (first[0] - station.x()) * (q + 1) / steps;
+                double bz = station.z() + (first[1] - station.z()) * (q + 1) / steps;
+                boolean over = window.water(ax, az) || window.water(bx, bz);
+                segments.add(new StreetSegment(ax, az, bx, bz, StreetClass.ARTERIAL, Era.MODERN, config.stationAvenueWidth,
+                        over ? StreetStructure.BRIDGE : StreetStructure.GROUND));
+            }
+        }
+    }
+
+    private static int nearestNode(List<double[]> nodes, double x, double z) {
+        int best = 0;
+        double bestDistance = Double.POSITIVE_INFINITY;
+        for (int k = 0; k < nodes.size(); k++) {
+            double d = Math.hypot(nodes.get(k)[0] - x, nodes.get(k)[1] - z);
+            if (d < bestDistance) {
+                bestDistance = d;
+                best = k;
+            }
+        }
+        return best;
     }
 
     /**
