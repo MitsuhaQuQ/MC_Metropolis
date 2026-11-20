@@ -717,39 +717,150 @@ public final class StreetLayer {
                 // Through to the street behind (onto its centre line), or now and then a dead end short of it
                 boolean through = Hash.unit(Hash.mix(place + side)) >= config.interiorDeadEnd;
                 double total = through ? edge + hit[0] : edge + Math.min(free - config.interiorBack, config.interiorMax);
-                List<double[]> path = lanePath(px, pz, nx, nz, total, through ? other : null, Hash.mix(place ^ (side * 0x51L)));
-                double[] last = path.get(path.size() - 1);
-                // Near the street behind every step is near it: only clear of others up to there
-                double clearEnd = through ? 0.5 * other.width() + config.interiorClear : -1.0;
-                // In steps, while on built land and clear of every other street and lane
-                List<StreetSegment> lane = new ArrayList<>();
-                double ax = px;
-                double az = pz;
-                double laid = 0.0;
-                double walked = 0.0;
-                for (double[] b : path) {
-                    walked += Math.hypot(b[0] - ax, b[1] - az);
-                    if (!window.built(b[0], b[1]) || walked > edge + config.laneStep
-                            && Math.hypot(last[0] - b[0], last[1] - b[1]) > clearEnd
-                            && all.near(b[0], b[1], config.interiorClear, px, pz)) {
-                        break;
-                    }
-                    lane.add(new StreetSegment(ax, az, b[0], b[1], StreetClass.LANE,
-                            window.old(b[0], b[1]) ? Era.TOWN : Era.MODERN, config.laneWidth));
-                    ax = b[0];
-                    az = b[1];
-                    laid = walked - edge;
+                List<StreetSegment> lane = layLane(window, all, px, pz, nx, nz, edge, total, through ? other : null,
+                        Hash.mix(place ^ (side * 0x51L)));
+                if (lane != null) {
+                    lanes.addAll(lane);
                 }
-                if (laid < config.interiorMinLane) {
-                    continue;
-                }
-                for (StreetSegment piece : lane) {
-                    all.add(piece);
-                }
-                lanes.addAll(lane);
             }
         }
         segments.addAll(lanes);
+    }
+
+    /**
+     * The lanes knit into a net, as a castle town's narrow ways are: from each lane laid into the blocks, about every
+     * {@code branchSpacing} along it (by the place's hash, 0.7 to 1.3 of it), a branch to one side (by the hash), where
+     * the land runs deeper than {@code branchMin} square from the lane to the next street or lane, on through to it
+     * (bowed, cranked or aslant like the lanes); and a lane's dead end with a street or lane within
+     * {@code joinReach} straight ahead is carried on to it. A capital's roji stay dead ends, as Kyoto's are.
+     */
+    private void laneNet(Settlement settlement, Window window, Districts districts, List<StreetSegment> segments, int from) {
+        Sounding all = new Sounding(segments);
+        List<StreetSegment> added = new ArrayList<>();
+        // The lanes laid into the blocks, as runs of pieces end to end
+        List<List<StreetSegment>> runs = new ArrayList<>();
+        List<StreetSegment> run = null;
+        for (int k = from; k < segments.size(); k++) {
+            StreetSegment g = segments.get(k);
+            if (g.streetClass() != StreetClass.LANE) {
+                continue;
+            }
+            if (run == null || Math.hypot(run.get(run.size() - 1).x2() - g.x1(), run.get(run.size() - 1).z2() - g.z1()) > 1e-6) {
+                run = new ArrayList<>();
+                runs.add(run);
+            }
+            run.add(g);
+        }
+        for (List<StreetSegment> lane : runs) {
+            StreetSegment first = lane.get(0);
+            // Branches along the lane
+            double spacing = config.branchSpacing;
+            double since = 0.0;
+            for (int i = 0; i < lane.size(); i++) {
+                StreetSegment g = lane.get(i);
+                since += g.length();
+                if (since < spacing || i == lane.size() - 1) {
+                    continue;
+                }
+                since = 0.0;
+                long place = Hash.of(settlement.id() ^ 0xB4A7L, Math.round(g.x2()), Math.round(g.z2()));
+                spacing = config.branchSpacing * (0.7 + 0.6 * Hash.unit(place));
+                if (window.inCapital(g.x2(), g.z2())) {
+                    continue;
+                }
+                double ux = (g.x2() - g.x1()) / g.length();
+                double uz = (g.z2() - g.z1()) / g.length();
+                int side = Hash.unit(Hash.mix(place)) < 0.5 ? 1 : -1;
+                double nx = -uz * side;
+                double nz = ux * side;
+                double edge = 0.5 * g.width();
+                double px = g.x2();
+                double pz = g.z2();
+                double[] hit = all.sound(px + nx * edge, pz + nz * edge, nx, nz, 160.0, px, pz);
+                if (hit == null) {
+                    continue;
+                }
+                StreetSegment other = all.piece((int) hit[1]);
+                double free = hit[0] - 0.5 * other.width();
+                District district = districts.at(px + nx * (edge + 0.5 * free), pz + nz * (edge + 0.5 * free));
+                if (free < config.branchMin || district != District.OLD_TOWN && district != District.RESIDENTIAL
+                        && district != District.CENTRAL && district != District.STATION_FRONT) {
+                    continue;
+                }
+                List<StreetSegment> branch = layLane(window, all, px, pz, nx, nz, edge, edge + hit[0], other,
+                        Hash.mix(place + 7));
+                if (branch != null) {
+                    added.addAll(branch);
+                }
+            }
+            // A dead end carried on to what lies just ahead
+            StreetSegment last = lane.get(lane.size() - 1);
+            if (window.inCapital(last.x2(), last.z2()) || all.endsOn(last.x2(), last.z2(), last)) {
+                continue;
+            }
+            double ux = (last.x2() - last.x1()) / last.length();
+            double uz = (last.z2() - last.z1()) / last.length();
+            double[] hit = all.sound(last.x2(), last.z2(), ux, uz, config.joinReach, last.x2(), last.z2());
+            if (hit == null) {
+                continue;
+            }
+            double ex = last.x2() + ux * hit[0];
+            double ez = last.z2() + uz * hit[0];
+            if (!window.built(ex, ez) || window.water(0.5 * (last.x2() + ex), 0.5 * (last.z2() + ez))) {
+                continue;
+            }
+            int steps = Math.max(1, (int) Math.ceil(hit[0] / config.laneStep));
+            double ax = last.x2();
+            double az = last.z2();
+            for (int q = 1; q <= steps; q++) {
+                double bx = last.x2() + ux * hit[0] * q / steps;
+                double bz = last.z2() + uz * hit[0] * q / steps;
+                StreetSegment piece = new StreetSegment(ax, az, bx, bz, StreetClass.LANE, first.era(), config.laneWidth);
+                all.add(piece);
+                added.add(piece);
+                ax = bx;
+                az = bz;
+            }
+        }
+        segments.addAll(added);
+    }
+
+    /**
+     * A lane from (px, pz) on a street or lane, square to it along (nx, nz), {@code total} deep to the centre line of
+     * {@code behind} (or a dead end short of it when {@code behind} is null), on its way by {@link #lanePath}; in steps
+     * while on built land and clear of every other street and lane, the last stretch by the street it meets aside.
+     * Added to the sounding and returned; null if it would come out shorter than {@code interiorMinLane}.
+     */
+    private List<StreetSegment> layLane(Window window, Sounding all, double px, double pz, double nx, double nz, double edge,
+                                        double total, StreetSegment behind, long hash) {
+        List<double[]> path = lanePath(px, pz, nx, nz, total, behind, hash);
+        double[] last = path.get(path.size() - 1);
+        double clearEnd = behind != null ? 0.5 * behind.width() + config.interiorClear : -1.0;
+        List<StreetSegment> lane = new ArrayList<>();
+        double ax = px;
+        double az = pz;
+        double laid = 0.0;
+        double walked = 0.0;
+        for (double[] b : path) {
+            walked += Math.hypot(b[0] - ax, b[1] - az);
+            if (!window.built(b[0], b[1]) || walked > edge + config.laneStep
+                    && Math.hypot(last[0] - b[0], last[1] - b[1]) > clearEnd
+                    && all.near(b[0], b[1], config.interiorClear, px, pz)) {
+                break;
+            }
+            lane.add(new StreetSegment(ax, az, b[0], b[1], StreetClass.LANE,
+                    window.old(b[0], b[1]) ? Era.TOWN : Era.MODERN, config.laneWidth));
+            ax = b[0];
+            az = b[1];
+            laid = walked - edge;
+        }
+        if (laid < config.interiorMinLane) {
+            return null;
+        }
+        for (StreetSegment piece : lane) {
+            all.add(piece);
+        }
+        return lane;
     }
 
     /**
@@ -907,6 +1018,23 @@ public final class StreetLayer {
                 }
             }
             return found < 0 ? null : new double[]{best, found};
+        }
+
+        /** Whether a piece other than {@code self} ends at or passes through a point: a lane's end joined to it. */
+        boolean endsOn(double x, double z, StreetSegment self) {
+            long cx = (long) Math.floor(x / CELL);
+            long cz = (long) Math.floor(z / CELL);
+            for (long ix = cx - 1; ix <= cx + 1; ix++) {
+                for (long iz = cz - 1; iz <= cz + 1; iz++) {
+                    for (int k : cells.getOrDefault((ix << 32) ^ (iz & 0xFFFFFFFFL), List.of())) {
+                        StreetSegment g = pieces.get(k);
+                        if (g != self && distance(g, x, z) < 0.5) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
         }
 
         /** Whether a piece (but those touching (ox, oz)) passes within a distance of its edge of a point. */
@@ -1147,8 +1275,10 @@ public final class StreetLayer {
                 dedupe(segments);
                 squareJoins(window, segments);
                 unsqueeze(window, segments, bankPieces);
+                int laneFrom = segments.size();
                 lanes(settlement, formation, window, districts, segments);
                 interiorLanes(settlement, window, districts, segments);
+                laneNet(settlement, window, districts, segments, laneFrom);
             }
             // Whatever was laid before the railway was known (old roads, arterials before the town's own lines) and
             // crosses it at grade crosses at a level crossing

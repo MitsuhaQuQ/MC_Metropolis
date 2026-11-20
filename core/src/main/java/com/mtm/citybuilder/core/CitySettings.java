@@ -638,6 +638,14 @@ public final class CitySettings {
         public double interiorMax = 100.0;
         public double interiorClear = 8.0;
         public double interiorMinLane = 25.0;
+        /**
+         * The lanes knit into a net: branches about every {@code branchSpacing} along a lane, to one side, where the
+         * land runs deeper than {@code branchMin} to the next street or lane; a dead end with a street or lane within
+         * {@code joinReach} ahead carried on to it.
+         */
+        public double branchSpacing = 40.0;
+        public double branchMin = 35.0;
+        public double joinReach = 30.0;
         /** Streams this narrow are culverted: streets cross them, and later run along them. */
         public double culvertWidth = 12.0;
         /**
