@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "low=false": {
+      "model": "citybuilder:block/manhole"
+    },
+    "low=true": {
+      "model": "citybuilder:block/manhole_low"
+    }
+  }
+}

@@ -1,7 +1,17 @@
 {
   "block.citybuilder.asphalt": "\u6ca5\u9752",
+  "block.citybuilder.asphalt_hatch": "\u6ca5\u9752\uff08\u5bfc\u6d41\u5e26\u659c\u7eb9\uff09",
   "block.citybuilder.asphalt_line_white": "\u6ca5\u9752\uff08\u767d\u7ebf\uff09",
   "block.citybuilder.asphalt_line_yellow": "\u6ca5\u9752\uff08\u9ec4\u7ebf\uff09",
   "block.citybuilder.asphalt_white": "\u6ca5\u9752\uff08\u767d\u6f06\uff09",
-  "block.citybuilder.sidewalk": "\u4eba\u884c\u9053\u7816"
+  "block.citybuilder.curb": "\u8def\u7f18\u77f3",
+  "block.citybuilder.drain_grate": "\u6392\u6c34\u6c9f\u683c\u6805",
+  "block.citybuilder.manhole": "\u4e95\u76d6",
+  "block.citybuilder.road_arrow_head": "\u8def\u9762\u7bad\u5934\uff08\u7bad\u5934\uff09",
+  "block.citybuilder.road_arrow_shaft": "\u8def\u9762\u7bad\u5934\uff08\u7bad\u6746\uff09",
+  "block.citybuilder.sidewalk": "\u4eba\u884c\u9053\u7816",
+  "block.citybuilder.sidewalk_granite": "\u82b1\u5c97\u5ca9\u94fa\u88c5",
+  "block.citybuilder.sidewalk_interlocking": "\u8fde\u9501\u7816",
+  "block.citybuilder.tactile_dot": "\u76f2\u9053\u7816\uff08\u70b9\u72b6\uff09",
+  "block.citybuilder.tactile_line": "\u76f2\u9053\u7816\uff08\u6761\u72b6\uff09"
 }

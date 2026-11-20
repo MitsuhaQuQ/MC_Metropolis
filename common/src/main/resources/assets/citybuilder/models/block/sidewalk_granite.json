@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "citybuilder:block/sidewalk_granite",
+    "side": "citybuilder:block/sidewalk_side",
+    "bottom": "citybuilder:block/sidewalk_side"
+  }
+}
