@@ -5,11 +5,11 @@ import com.mtm.citybuilder.core.settlement.Settlement;
 import java.util.List;
 
 /**
- * The streets of one settlement as far as they are laid out: its formation, its anchors, its street pieces, and a
- * castle town's moats.
+ * The streets of one settlement as far as they are laid out: its formation, its anchors, its street pieces, a castle
+ * town's moats, and the districts the town is zoned into.
  */
 public record StreetPlan(Settlement settlement, Formation formation, List<Anchor> anchors, List<StreetSegment> segments,
-                         List<Moat> moats) {
+                         List<Moat> moats, Districts districts) {
     public StreetPlan {
         anchors = List.copyOf(anchors);
         segments = List.copyOf(segments);

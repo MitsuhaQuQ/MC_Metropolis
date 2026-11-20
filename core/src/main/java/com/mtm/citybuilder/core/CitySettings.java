@@ -471,6 +471,21 @@ public final class CitySettings {
         public double stairsGrade = 0.35;
         /** Width of a temple's approach. */
         public double sandoWidth = 6.0;
+        /**
+         * Districts (L5): downtown is this share of the built land, the nodes nearest the heart; the industrial
+         * districts this share of the modern town, on land no steeper than {@code industrialGrade}, drawn to water
+         * within about {@code industrialWater}, in clusters of at least {@code industrialCluster} nodes; the port the
+         * flat land within {@code portDepth} of the sea; the station front everything within {@code stationFront} of
+         * the main station.
+         */
+        public double centralShare = 0.05;
+        public double industrialShare = 0.12;
+        public double industrialGrade = 0.03;
+        public double industrialWater = 500.0;
+        public int industrialCluster = 6;
+        public double portDepth = 256.0;
+        public double portGrade = 0.05;
+        public double stationFront = 400.0;
         /** Most streamlines traced for one town. */
         public int maxLines = 20000;
     }

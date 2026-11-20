@@ -2,6 +2,8 @@ package com.mtm.citybuilder.core.debug;
 
 import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.street.Anchor;
+import com.mtm.citybuilder.core.street.District;
+import com.mtm.citybuilder.core.street.Districts;
 import com.mtm.citybuilder.core.street.Moat;
 import com.mtm.citybuilder.core.street.StreetPlan;
 import com.mtm.citybuilder.core.street.StreetSegment;
@@ -24,11 +26,51 @@ public final class StreetMap {
     }
 
     public static BufferedImage render(CityLogic logic, StreetPlan plan, double centerX, double centerZ, int scale, int size) {
+        return render(logic, plan, centerX, centerZ, scale, size, false);
+    }
+
+    /** The colour a district is painted in on the districts map. */
+    public static Color color(District district) {
+        return switch (district) {
+            case GROUNDS -> new Color(60, 140, 60);
+            case CENTRAL -> new Color(220, 40, 40);
+            case OLD_TOWN -> new Color(170, 110, 60);
+            case RESIDENTIAL -> new Color(245, 215, 120);
+            case INDUSTRIAL -> new Color(150, 90, 190);
+            case PORT -> new Color(40, 150, 200);
+            case STATION_FRONT -> new Color(250, 130, 30);
+            case NONE -> null;
+        };
+    }
+
+    /**
+     * The streets, over the districts the town is zoned into when asked for: downtown red, old town brown, houses
+     * yellow, works purple, port blue, station front orange, grounds green.
+     */
+    public static BufferedImage render(CityLogic logic, StreetPlan plan, double centerX, double centerZ, int scale, int size,
+                                       boolean showDistricts) {
         BufferedImage image = ExtentMap.render(logic, centerX, centerZ, scale, size);
         double left = centerX - size * scale / 2.0;
         double top = centerZ - size * scale / 2.0;
         Graphics2D g = image.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        if (showDistricts) {
+            Districts districts = plan.districts();
+            int grid = logic.settings().general.gridSize;
+            for (int i = 0; i < districts.size(); i++) {
+                for (int j = 0; j < districts.size(); j++) {
+                    Color color = color(districts.node(i, j));
+                    if (color == null) {
+                        continue;
+                    }
+                    double x = (districts.originX() + i - 0.5) * grid;
+                    double z = (districts.originZ() + j - 0.5) * grid;
+                    g.setColor(color);
+                    g.fill(new java.awt.geom.Rectangle2D.Double((x - left) / scale, (z - top) / scale,
+                            (double) grid / scale, (double) grid / scale));
+                }
+            }
+        }
         // Moats under the streets, so the approaches show as bridges over them; none where a river serves
         for (Moat moat : plan.moats()) {
             g.setColor(moat.wet() ? new Color(70, 130, 205) : new Color(150, 120, 80));
@@ -97,9 +139,12 @@ public final class StreetMap {
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
         g.setColor(new Color(255, 255, 255, 215));
-        g.fillRect(6, 6, 600, 22);
+        g.fillRect(6, 6, showDistricts ? 860 : 600, 22);
         g.setColor(Color.DARK_GRAY);
-        g.drawString(String.format("L5 streets of a %s %s: old roads brown, old-town arterials black, modern blue; %d blocks/px",
+        g.drawString(showDistricts
+                ? String.format("L5 districts of a %s %s: downtown red, old town brown, houses yellow, works purple, port blue, station front orange; %d blocks/px",
+                plan.formation(), plan.settlement().tier(), scale)
+                : String.format("L5 streets of a %s %s: old roads brown, old-town arterials black, modern blue; %d blocks/px",
                 plan.formation(), plan.settlement().tier(), scale), 12, 21);
         g.dispose();
         return image;

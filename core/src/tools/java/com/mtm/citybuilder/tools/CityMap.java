@@ -112,10 +112,10 @@ public final class CityMap {
                 spawn(new CityLogic(seed, CitySettings.DEFAULT, counting), centerX, centerZ, counting);
                 return;
             }
-            case "streets" -> {
+            case "streets", "districts" -> {
                 StreetPlan plan = streetStats(logic, centerX, centerZ);
                 start = System.nanoTime();
-                image = StreetMap.render(logic, plan, centerX, centerZ, scale, size);
+                image = StreetMap.render(logic, plan, centerX, centerZ, scale, size, layer.equals("districts"));
             }
             case "highspeed" -> {
                 List<HighSpeedLine> lines = highSpeedStats(logic, centerX, centerZ, half);
@@ -408,6 +408,16 @@ public final class CityMap {
             System.out.printf("  %-9s %6.2f km in %d pieces%n", structure, built.stream().mapToDouble(StreetSegment::length).sum() / 1000,
                     built.size());
         }
+        java.util.Map<com.mtm.citybuilder.core.street.District, Integer> counts = plan.districts().counts();
+        int zoned = counts.entrySet().stream().filter(e -> e.getKey() != com.mtm.citybuilder.core.street.District.NONE)
+                .mapToInt(Map.Entry::getValue).sum();
+        StringBuilder shares = new StringBuilder("  districts:");
+        for (var entry : counts.entrySet()) {
+            if (entry.getKey() != com.mtm.citybuilder.core.street.District.NONE) {
+                shares.append(String.format(" %s %.0f%%", entry.getKey(), 100.0 * entry.getValue() / Math.max(1, zoned)));
+            }
+        }
+        System.out.println(shares);
         StreetMetrics.Network network = StreetMetrics.network(plan.segments(), logic.builtArea(nearest));
         System.out.printf("  built %.1f km2; street density %.1f km/km2 (OSM: Kyoto 16.9, Kanazawa 20.4, Takayama 12.1)%n",
                 logic.builtArea(nearest), network.density());

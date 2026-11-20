@@ -678,6 +678,7 @@ public final class StreetLayer {
                 castleMoats(settlement, anchor, window, moats);
             }
         }
+        Districts districts = districts(window, anchors);
         List<StreetSegment> segments = new ArrayList<>();
         List<double[]> oldRoad = oldRoads(settlement, window, segments);
         if (formation != Formation.VILLAGE) {
@@ -722,7 +723,224 @@ public final class StreetLayer {
                 lanes(settlement, formation, window, segments);
             }
         }
-        return new StreetPlan(settlement, formation, anchors, segments, moats);
+        return new StreetPlan(settlement, formation, anchors, segments, moats, districts);
+    }
+
+    /**
+     * The districts of a town, node by node over its window. Downtown is the share of the built land nearest the
+     * heart, by intensity; the old town the rest of the land intense enough to be old; the port the flat land along the
+     * sea; the industrial districts the flat modern land scoring best on nearness to water and to the edge of town,
+     * the score smoothed so works cluster, and clusters too small left as houses; the station front all round the
+     * main station; houses everywhere else. A pure function of the extent, the grounds, the anchors and the terrain.
+     */
+    private Districts districts(Window window, List<Anchor> anchors) {
+        int size = window.size;
+        int n = size * size;
+        byte[] kinds = new byte[n];
+        boolean[] built = new boolean[n];
+        double[] slope = new double[n];
+        int builtCount = 0;
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                int k = i * size + j;
+                double x = (double) (window.originX + i) * grid;
+                double z = (double) (window.originZ + j) * grid;
+                if (window.water[k] || window.intensity[k] <= config.builtIntensity) {
+                    continue;
+                }
+                if (window.inGrounds(x, z)) {
+                    kinds[k] = (byte) District.GROUNDS.ordinal();
+                    continue;
+                }
+                built[k] = true;
+                builtCount++;
+                kinds[k] = (byte) (window.intensity[k] > config.oldTownIntensity ? District.OLD_TOWN : District.RESIDENTIAL).ordinal();
+                double steepest = 0.0;
+                for (int[] d : NEIGHBOURS) {
+                    int ni = i + d[0];
+                    int nj = j + d[1];
+                    if (ni >= 0 && nj >= 0 && ni < size && nj < size && !window.water[ni * size + nj]) {
+                        steepest = Math.max(steepest, Math.abs(window.height[ni * size + nj] - window.height[k]) / grid);
+                    }
+                }
+                slope[k] = steepest;
+            }
+        }
+        if (builtCount == 0) {
+            return new Districts(window.originX, window.originZ, size, grid, kinds);
+        }
+        // Distances over the grid to water and to the sea; the sea is the water whose landform is ocean
+        boolean[] sea = new boolean[n];
+        for (int k = 0; k < n; k++) {
+            if (window.water[k]) {
+                sea[k] = terrain.landform((double) (window.originX + k / size) * grid,
+                        (double) (window.originZ + k % size) * grid) == Landform.OCEAN;
+            }
+        }
+        double[] toWater = distances(window.water, size);
+        double[] toSea = distances(sea, size);
+        // Downtown: the most intense built nodes, ties broken by nearness to the actual centre
+        double cx = window.extent.coreX();
+        double cz = window.extent.coreZ();
+        double[] rank = new double[n];
+        List<Integer> order = new ArrayList<>();
+        for (int k = 0; k < n; k++) {
+            if (built[k]) {
+                double x = (double) (window.originX + k / size) * grid;
+                double z = (double) (window.originZ + k % size) * grid;
+                rank[k] = window.intensity[k] - 1e-7 * Math.hypot(x - cx, z - cz);
+                order.add(k);
+            }
+        }
+        order.sort((a, b) -> rank[a] != rank[b] ? Double.compare(rank[b], rank[a]) : Integer.compare(a, b));
+        int central = Math.min(order.size(), Math.max(4, (int) Math.ceil(config.centralShare * builtCount)));
+        for (int q = 0; q < central; q++) {
+            kinds[order.get(q)] = (byte) District.CENTRAL.ordinal();
+        }
+        // The port: flat land along the sea
+        for (int k = 0; k < n; k++) {
+            if (built[k] && kinds[k] != District.CENTRAL.ordinal() && toSea[k] <= config.portDepth
+                    && slope[k] <= config.portGrade) {
+                kinds[k] = (byte) District.PORT.ordinal();
+            }
+        }
+        // Works: flat modern land near water and towards the edge of town, the score smoothed so they cluster
+        double[] score = new double[n];
+        boolean[] candidate = new boolean[n];
+        int modern = 0;
+        for (int k = 0; k < n; k++) {
+            if (!built[k] || window.intensity[k] > config.oldTownIntensity) {
+                continue;
+            }
+            modern++;
+            if (kinds[k] != District.RESIDENTIAL.ordinal() || slope[k] > config.industrialGrade) {
+                continue;
+            }
+            candidate[k] = true;
+            score[k] = Math.exp(-toWater[k] / config.industrialWater)
+                    + 0.5 * (1.0 - window.intensity[k] / config.oldTownIntensity);
+        }
+        double[] smooth = new double[n];
+        List<Integer> candidates = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                int k = i * size + j;
+                if (!candidate[k]) {
+                    continue;
+                }
+                double sum = 0.0;
+                for (int di = -2; di <= 2; di++) {
+                    for (int dj = -2; dj <= 2; dj++) {
+                        int ni = i + di;
+                        int nj = j + dj;
+                        if (ni >= 0 && nj >= 0 && ni < size && nj < size && candidate[ni * size + nj]) {
+                            sum += score[ni * size + nj];
+                        }
+                    }
+                }
+                smooth[k] = sum / 25.0;
+                candidates.add(k);
+            }
+        }
+        candidates.sort((a, b) -> smooth[a] != smooth[b] ? Double.compare(smooth[b], smooth[a]) : Integer.compare(a, b));
+        int works = Math.min(candidates.size(), (int) Math.round(config.industrialShare * modern));
+        boolean[] industrial = new boolean[n];
+        for (int q = 0; q < works; q++) {
+            industrial[candidates.get(q)] = true;
+        }
+        // Clusters too small for works stay houses
+        boolean[] seen = new boolean[n];
+        for (int start = 0; start < n; start++) {
+            if (!industrial[start] || seen[start]) {
+                continue;
+            }
+            List<Integer> cluster = new ArrayList<>();
+            ArrayDeque<Integer> queue = new ArrayDeque<>();
+            queue.add(start);
+            seen[start] = true;
+            while (!queue.isEmpty()) {
+                int k = queue.poll();
+                cluster.add(k);
+                int i = k / size;
+                int j = k % size;
+                for (int[] d : NEIGHBOURS) {
+                    int ni = i + d[0];
+                    int nj = j + d[1];
+                    int nk = ni * size + nj;
+                    if (ni >= 0 && nj >= 0 && ni < size && nj < size && industrial[nk] && !seen[nk]) {
+                        seen[nk] = true;
+                        queue.add(nk);
+                    }
+                }
+            }
+            if (cluster.size() >= config.industrialCluster) {
+                for (int k : cluster) {
+                    kinds[k] = (byte) District.INDUSTRIAL.ordinal();
+                }
+            }
+        }
+        // The station front, round each station of the town
+        for (Anchor anchor : anchors) {
+            if (anchor.kind() != Anchor.Kind.STATION) {
+                continue;
+            }
+            for (int k = 0; k < n; k++) {
+                double x = (double) (window.originX + k / size) * grid;
+                double z = (double) (window.originZ + k % size) * grid;
+                if (built[k] && kinds[k] != District.CENTRAL.ordinal() && kinds[k] != District.PORT.ordinal()
+                        && Math.hypot(x - anchor.x(), z - anchor.z()) <= config.stationFront) {
+                    kinds[k] = (byte) District.STATION_FRONT.ordinal();
+                }
+            }
+        }
+        return new Districts(window.originX, window.originZ, size, grid, kinds);
+    }
+
+    private static final int[][] NEIGHBOURS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+    /** Distance in blocks from every node to the nearest marked node, over the grid (a two-pass chamfer). */
+    private double[] distances(boolean[] marked, int size) {
+        double[] d = new double[size * size];
+        double straight = grid;
+        double diagonal = grid * Math.sqrt(2.0);
+        for (int k = 0; k < d.length; k++) {
+            d[k] = marked[k] ? 0.0 : Double.POSITIVE_INFINITY;
+        }
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                int k = i * size + j;
+                if (i > 0) {
+                    d[k] = Math.min(d[k], d[k - size] + straight);
+                    if (j > 0) {
+                        d[k] = Math.min(d[k], d[k - size - 1] + diagonal);
+                    }
+                    if (j < size - 1) {
+                        d[k] = Math.min(d[k], d[k - size + 1] + diagonal);
+                    }
+                }
+                if (j > 0) {
+                    d[k] = Math.min(d[k], d[k - 1] + straight);
+                }
+            }
+        }
+        for (int i = size - 1; i >= 0; i--) {
+            for (int j = size - 1; j >= 0; j--) {
+                int k = i * size + j;
+                if (i < size - 1) {
+                    d[k] = Math.min(d[k], d[k + size] + straight);
+                    if (j > 0) {
+                        d[k] = Math.min(d[k], d[k + size - 1] + diagonal);
+                    }
+                    if (j < size - 1) {
+                        d[k] = Math.min(d[k], d[k + size + 1] + diagonal);
+                    }
+                }
+                if (j < size - 1) {
+                    d[k] = Math.min(d[k], d[k + 1] + straight);
+                }
+            }
+        }
+        return d;
     }
 
     /**
