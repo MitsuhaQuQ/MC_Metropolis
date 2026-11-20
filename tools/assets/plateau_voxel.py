@@ -19,6 +19,8 @@ and slabs where the surface sits in the lower half of a block.
 
 Usage:
     python -I tools/assets/plateau_voxel.py extract <citygml.zip> <buildings.csv> <out> [--id GMLID ...]
+    python -I tools/assets/plateau_voxel.py specs <out>          (then gradlew :core:templeModels
+                                                                    -Pin=<out>/temple_specs.json -Pout=<out>/models)
     python -I tools/assets/plateau_voxel.py build <buildings.csv> <out> [--id GMLID ...] [--no-textures]
                                                   [--mc-jar <1.20.1 client jar>]
 
@@ -78,6 +80,57 @@ LANDMARKS = [
     ("bldg_d118eb3a-f9be-49e8-b223-e53f755ac502", "railway_museum", "京都鉄道博物館", None),
     ("bldg_34c21757-8a98-4dc8-b7d0-ea85209a07f1", "umekoji_depot", "梅小路の大型倉庫", None),
 ]
+
+# Buildings whose LOD2 shape is too coarse to voxelize (a pagoda is a box with a hip roof, halls lose their eaves
+# and pent roofs): they are built by the temple generators in core (core.building.temple) from these specs, sizes
+# taken from the LOD2 surfaces (eave outlines, eave and ridge heights, gable insets), rounded to whole blocks.
+# `specs` writes them for `gradlew :core:templeModels`, whose models `build` then uses instead of voxels.
+TEMPLES = {
+    # LOD2: first eave outline 18.5 m square, top eaves 35.6 m, top roof 40.2 m, finial to 55 m.
+    "toji_pagoda": dict(kind="pagoda", role="PAGODA", storeys=5, span=19, topSpan=15, body=9, topBody=7, firstEave=10.5,
+                        topEave=35.6, apex=40.2, height=55, platform=2, pitch=0.42),
+    # LOD2: pent roof (裳階) eaves 44.4 x 29.1 m at 11.4 m; main eaves 37.9 x 22.4 m at 18.2 m, irimoya ridge
+    # 24.9 m with the gable walls 3.2 m in from the hipped ends.
+    "toji_kondo": dict(kind="hall", role="KONDO", width=37, depth=23, eave=18.2, ridge=24.9, roof="IRIMOYA", gableInset=3.2,
+                       overhang=4, mokoshiWidth=45, mokoshiDepth=29, mokoshiEave=11.4, mokoshiOverhang=3,
+                       platform=2, bay=4.5),
+    # LOD2: eaves 45.6 x 26.1 m at 6.9 m, irimoya ridge 17.7 m, gable walls 4.8 m in.
+    "toji_kodo": dict(kind="hall", role="KODO", width=45, depth=27, eave=6.9, ridge=17.7, roof="IRIMOYA", gableInset=4.8,
+                      overhang=4, platform=2, bay=4.5),
+    # Not from PLATEAU: the same generators in the painted styles (Senso-ji's vermilion pagoda, a shrine hall
+    # under a copper roof), to check the palettes.
+    "demo_pagoda_vermilion": dict(kind="pagoda", role="PAGODA", storeys=5, span=19, topSpan=15, body=9, topBody=7, firstEave=10.5,
+                                  topEave=35.6, apex=40.2, height=55, platform=2, pitch=0.42, palette="VERMILION"),
+    "demo_hall_copper": dict(kind="hall", role="HAIDEN", width=29, depth=21, eave=8.0, ridge=17.0, roof="IRIMOYA", gableInset=4,
+                             overhang=4, platform=2, bay=4.0, palette="COPPER"),
+}
+
+# What each library entry is, for reuse: a category for every building; for sacred buildings also temple (寺院) or
+# shrine (神社) and the role (core.building.temple.SacredBuilding; None where the entry is several buildings or the
+# role is not known).
+TEMPLE, SHRINE = "TEMPLE", "SHRINE"
+LABELS = {
+    "kyoto_station": ("station",), "kyoto_tower": ("tower",),
+    "toji_pagoda": ("sacred", TEMPLE, "PAGODA"), "toji_kondo": ("sacred", TEMPLE, "KONDO"),
+    "toji_kodo": ("sacred", TEMPLE, "KODO"),
+    "higashi_honganji_complex": ("sacred", TEMPLE, None), "higashi_honganji_annex": ("sacred", TEMPLE, None),
+    "nishi_honganji_goeido": ("sacred", TEMPLE, "MIEIDO"), "nishi_honganji_amidado": ("sacred", TEMPLE, "AMIDADO"),
+    "nishi_honganji_hall": ("sacred", TEMPLE, None), "temple_hall_karasuma": ("sacred", TEMPLE, "HONDO"),
+    "nijo_ninomaru": ("palace",), "minamiza": ("theatre",),
+    "pref_office_old": ("government",), "city_hall": ("government",),
+    "takashimaya": ("store",), "daimaru": ("store",), "aeon_mall": ("store",),
+    "hotel_okura": ("hotel",), "westin_miyako": ("hotel",),
+    "aquarium": ("museum",), "railway_museum": ("museum",), "umekoji_depot": ("warehouse",),
+    "demo_pagoda_vermilion": ("sacred", TEMPLE, "PAGODA"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
+}
+DEMO_NAMES = {"demo_pagoda_vermilion": "五重塔（朱塗り、浅草寺風）", "demo_hall_copper": "拝殿（銅板葺、神社）"}
+
+
+def label(slug):
+    lab = LABELS.get(slug, ("other",))
+    return {"category": lab[0], "religion": lab[1] if len(lab) > 1 else None,
+            "role": lab[2] if len(lab) > 2 else None}
+
 
 ATTRIBUTION = """出典：3D都市モデル（Project PLATEAU）京都市（2025年度）
 Source: 3D city model (Project PLATEAU), Kyoto City (FY2025), https://www.geospatial.jp/ckan/dataset/plateau-26100-kyoto-shi-2025
@@ -592,7 +645,7 @@ def block_colours(jar, cache):
     """Average colour (alpha-weighted, first animation frame) of each candidate block's texture in
     the vanilla client jar. Read locally to pick blocks; nothing from the jar is written out
     except these averages, cached in `cache`."""
-    names = sorted(set(WALL_BLOCKS + GLASS_BLOCKS + FLAT_EXTRA + [f[0] for f in ROOF_FAMILIES]))
+    names = sorted(set(WALL_BLOCKS + GLASS_BLOCKS + FLAT_EXTRA + [f[0] for f in ROOF_FAMILIES] + ["gold_block"]))
     if os.path.exists(cache):
         with open(cache, encoding="utf-8") as fh:
             got = json.load(fh)
@@ -834,6 +887,15 @@ COLOURS = {
 }
 
 
+PREVIEW_ALIAS = {"dark_oak_fence": "dark_oak_planks", "mangrove_fence": "mangrove_planks",
+                 "polished_blackstone_wall": "polished_blackstone", "iron_trapdoor": "iron_block",
+                 "dark_oak_trapdoor": "dark_oak_planks", "iron_bars": "iron_block", "lightning_rod": "cut_copper",
+                 "bell": "gold_block", "gilded_blackstone": "gold_block", "waxed_oxidized_cut_copper": "oxidized_cut_copper",
+                 "waxed_oxidized_cut_copper_stairs": "oxidized_cut_copper",
+                 "waxed_oxidized_cut_copper_slab": "oxidized_cut_copper", "waxed_oxidized_copper": "oxidized_cut_copper",
+                 "stripped_oak_log": "oak_planks", "red_concrete": "red_concrete"}
+
+
 def render(blocks, size, path, bc, max_px=1800):
     sx, sy, sz = size
     s = 2
@@ -847,10 +909,11 @@ def render(blocks, size, path, bc, max_px=1800):
     def proj(x, y, z):
         return (x - z) * s, (x + z) * s / 2 - y * s
 
-    def sprite(top):
-        faces = {0: [(0, top, 0), (1, top, 0), (1, top, 1), (0, top, 1)],
-                 1: [(1, 0, 0), (1, top, 0), (1, top, 1), (1, 0, 1)],
-                 2: [(0, 0, 1), (1, 0, 1), (1, top, 1), (0, top, 1)]}
+    def sprite(top, bottom=0.0, lo=0.0, hi=1.0):
+        """A box [lo, hi] x [bottom, top] x [lo, hi] in the block: its top, east and south faces."""
+        faces = {0: [(lo, top, lo), (hi, top, lo), (hi, top, hi), (lo, top, hi)],
+                 1: [(hi, bottom, lo), (hi, top, lo), (hi, top, hi), (hi, bottom, hi)],
+                 2: [(lo, bottom, hi), (hi, bottom, hi), (hi, top, hi), (lo, top, hi)]}
         pix = []
         for py in range(-s * 2, s * 2):
             for px in range(-s * 2, s * 2):
@@ -863,20 +926,31 @@ def render(blocks, size, path, bc, max_px=1800):
         return pix
 
     full, half = sprite(1), sprite(0.5)
+    shapes = {"plate_top": sprite(1, 0.8), "plate_bottom": sprite(0.2), "post": sprite(1, 0, 0.3, 0.7),
+              "bell": sprite(0.9, 0.2, 0.25, 0.75), "slab_top": sprite(1, 0.5)}
     shade = (1.0, 0.78, 0.6)
     order = sorted(blocks, key=lambda v: (v[0] + v[1] + v[2], v[1]))
     for v in order:
         x, y, z = v
         name, props = blocks[v]
-        if (x + 1, y, z) in blocks and (x, y, z + 1) in blocks and (x, y + 1, z) in blocks:
+        if all(n in blocks and not thin(blocks[n][0]) for n in ((x + 1, y, z), (x, y, z + 1), (x, y + 1, z))):
             continue
         if name == "spruce_planks" and props is None and name not in bc:
             pass
-        r, g, b = bc.get(FULL_OF.get(name, name)) or ((COLOURS[name] >> 16, (COLOURS[name] >> 8) & 255,
+        r, g, b = bc.get(FULL_OF.get(name, PREVIEW_ALIAS.get(name, name))) or ((COLOURS[name] >> 16, (COLOURS[name] >> 8) & 255,
                                                       COLOURS[name] & 255) if name in COLOURS else (255, 0, 255))
         bx, by = proj(x, y, z)
         bx, by = int(bx) + ox, int(by) + oy
-        spr = half if props and props.get("type") == "bottom" else full
+        if name.endswith("trapdoor"):
+            spr = shapes["plate_top" if props and props.get("half") == "top" else "plate_bottom"]
+        elif name.endswith(("_fence", "_wall", "iron_bars", "lightning_rod", "chain")):
+            spr = shapes["post"]
+        elif name == "bell":
+            spr = shapes["bell"]
+        elif props and props.get("type") == "top":
+            spr = shapes["slab_top"]
+        else:
+            spr = half if props and props.get("type") == "bottom" else full
         cols = [bytes((int(r * k), int(g * k), int(b * k))) for k in shade]
         for px, py, f in spr:
             X, Y = bx + px, by + py
@@ -884,6 +958,11 @@ def render(blocks, size, path, bc, max_px=1800):
                 i = (Y * w + X) * 3
                 img[i:i + 3] = cols[f]
     write_png(path, w, h, img)
+
+
+def thin(name):
+    return name.endswith(("trapdoor", "_fence", "_wall", "iron_bars", "lightning_rod", "chain", "_slab", "_stairs")) \
+        or name == "bell"
 
 
 def inside(x, y, poly):
@@ -906,8 +985,37 @@ def write_png(path, w, h, rgb):
 
 # ---------------------------------------------------------------- build
 
+def parse_state(state):
+    """'minecraft:x[a=b,c=d]' -> ('x', {'a': 'b', 'c': 'd'} or None)."""
+    name, _, props = state.partition("[")
+    name = name.split(":", 1)[-1]
+    if not props:
+        return name, None
+    return name, dict(kv.split("=", 1) for kv in props.rstrip("]").split(","))
+
+
+def build_temple(out, gid, slug, name, row, bc):
+    with open(os.path.join(out, "models", slug + ".json"), encoding="utf-8") as fh:
+        model = json.load(fh)
+    blocks = {(x, y, z): parse_state(st) for x, y, z, st in model["blocks"]}
+    size = tuple(model["size"])
+    write_nbt(os.path.join(out, slug + ".nbt"), blocks, size)
+    render(blocks, size, os.path.join(out, slug + ".png"), bc)
+    counts = {}
+    for n, _ in blocks.values():
+        counts[n] = counts.get(n, 0) + 1
+    return {"slug": slug, "name": name, "plateau_id": gid, "usage": row.get("usage"),
+            "structure": row.get("structure"), "year": row.get("year"), "measured_height": row.get("height"),
+            "storeys": row.get("storeys"), "roof_shape": row.get("roof_shape"), "roof_pitch": row.get("roof_pitch"),
+            **label(slug), "palette": "generated", "spec": TEMPLES[slug], "size": list(size), "blocks": len(blocks),
+            "surfaces": 0, "textured_polygons": 0, "recoloured_blocks": 0, "rotation_deg": 0.0,
+            "block_counts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
+
+
 def build_one(args):
     out, gid, slug, name, pal, row, bc, textured = args
+    if slug in TEMPLES and os.path.exists(os.path.join(out, "models", slug + ".json")):
+        return build_temple(out, gid, slug, name, row, bc)
     with open(os.path.join(out, "geom", gid + ".json"), encoding="utf-8") as fh:
         geom = json.load(fh)
     surf = geom["surfaces"]
@@ -925,7 +1033,7 @@ def build_one(args):
     counts = {}
     for n, _ in blocks.values():
         counts[n] = counts.get(n, 0) + 1
-    return {"slug": slug, "name": name, "plateau_id": gid, "lat": round(lat, 6), "lon": round(lon, 6),
+    return {"slug": slug, "name": name, **label(slug), "plateau_id": gid, "lat": round(lat, 6), "lon": round(lon, 6),
             "usage": row.get("usage"), "structure": row.get("structure"), "year": row.get("year"),
             "measured_height": row.get("height"), "storeys": row.get("storeys"),
             "roof_shape": row.get("roof_shape"), "roof_pitch": row.get("roof_pitch"),
@@ -939,6 +1047,9 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
     bc = block_colours(jar, os.path.join(out, "block_colours.json"))
     jobs = [(out, gid, slug, name, pal, rows.get(gid, {}), bc, textured) for gid, slug, name, pal in chosen
             if os.path.exists(os.path.join(out, "geom", gid + ".json"))]
+    if len(chosen) == len(LANDMARKS) or any(c[1].startswith("demo_") for c in chosen):
+        jobs += [(out, None, slug, DEMO_NAMES.get(slug, slug), None, {}, bc, textured) for slug in TEMPLES
+                 if slug.startswith("demo_") and os.path.exists(os.path.join(out, "models", slug + ".json"))]
     entries = []
     with multiprocessing.Pool(max(1, min(len(jobs), (os.cpu_count() or 2) - 1))) as pool:
         for e in pool.imap(build_one, jobs):
@@ -960,7 +1071,8 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
     for e in entries:
         with open(os.path.join(out, e["slug"] + ".png"), "rb") as fh:
             data = base64.b64encode(fh.read()).decode()
-        html.append(f"<figure><img src='data:image/png;base64,{data}'><figcaption><b>{e['name']}</b> "
+        kind = e["category"] + (f" / {e['religion']} {e['role'] or ''}" if e.get("religion") else "")
+        html.append(f"<figure><img src='data:image/png;base64,{data}'><figcaption><b>{e['name']}</b> [{kind}] "
                     f"{e['slug']} — {e['size'][0]}×{e['size'][1]}×{e['size'][2]}, {e['blocks']} blocks, "
                     f"{e['usage']}, {e['structure']}, {e['year']}, roof {e['roof_shape']} {e['roof_pitch']}°, "
                     f"palette {e['palette']}</figcaption></figure>")
@@ -969,6 +1081,13 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
 
 
 def main(argv):
+    if len(argv) >= 2 and argv[0] == "specs":
+        os.makedirs(argv[1], exist_ok=True)
+        path = os.path.join(argv[1], "temple_specs.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump([dict(slug=k, **v) for k, v in TEMPLES.items()], fh, indent=1)
+        print(path)
+        return 0
     if len(argv) < 3 or argv[0] not in ("extract", "build"):
         print(__doc__)
         return 2
