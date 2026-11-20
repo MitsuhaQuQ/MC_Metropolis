@@ -331,6 +331,47 @@ public final class StreetMetrics {
         return Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z);
     }
 
+    /**
+     * The dead ends of a town's lanes: ends of lane pieces that meet no other piece (no other end there, not lying on
+     * another piece).
+     */
+    public static int laneDeadEnds(List<StreetSegment> segments) {
+        double cell = 32.0;
+        java.util.Map<Long, List<StreetSegment>> cells = new java.util.HashMap<>();
+        java.util.Map<Long, Integer> ends = new java.util.HashMap<>();
+        for (StreetSegment s : segments) {
+            ends.merge(key(s.x1(), s.z1()), 1, Integer::sum);
+            ends.merge(key(s.x2(), s.z2()), 1, Integer::sum);
+            for (long cx = (long) Math.floor(Math.min(s.x1(), s.x2()) / cell); cx <= (long) Math.floor(Math.max(s.x1(), s.x2()) / cell); cx++) {
+                for (long cz = (long) Math.floor(Math.min(s.z1(), s.z2()) / cell); cz <= (long) Math.floor(Math.max(s.z1(), s.z2()) / cell); cz++) {
+                    cells.computeIfAbsent((cx << 32) ^ (cz & 0xFFFFFFFFL), k -> new java.util.ArrayList<>()).add(s);
+                }
+            }
+        }
+        int dead = 0;
+        for (StreetSegment s : segments) {
+            if (s.streetClass() != StreetClass.LANE) {
+                continue;
+            }
+            for (double[] e : new double[][]{{s.x1(), s.z1()}, {s.x2(), s.z2()}}) {
+                if (ends.get(key(e[0], e[1])) > 1) {
+                    continue;
+                }
+                boolean on = false;
+                for (StreetSegment o : cells.getOrDefault(((long) Math.floor(e[0] / cell) << 32) ^ ((long) Math.floor(e[1] / cell) & 0xFFFFFFFFL), List.of())) {
+                    if (o != s && pointDistance(o, e[0], e[1]) < 0.5) {
+                        on = true;
+                        break;
+                    }
+                }
+                if (!on) {
+                    dead++;
+                }
+            }
+        }
+        return dead;
+    }
+
     /** Orientation order: 1 for a perfect grid, 0 for streets running every way alike. */
     public static double orientationOrder(List<StreetSegment> segments) {
         double grid = Math.log(4.0);

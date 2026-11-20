@@ -532,7 +532,9 @@ public final class CityMap {
                 100 * StreetMetrics.squeezed(plan.segments(), main, 12.0),
                 100 * StreetMetrics.squeezed(plan.segments(), s -> s.streetClass() == StreetClass.STREET, 12.0));
         System.out.printf("  main roads 16+ wide %.1f km, narrower %.1f km%n", widths[0] / 1000, widths[1] / 1000);
-        System.out.printf("  street orientation order %.2f%n",StreetMetrics.orientationOrder(plan.segments().stream()
+        System.out.printf("  lane dead ends %d, %.1f per lane km%n", StreetMetrics.laneDeadEnds(plan.segments()),
+                StreetMetrics.laneDeadEnds(plan.segments()) / Math.max(1e-9, plan.length(StreetClass.LANE) / 1000));
+        System.out.printf("  street orientation order %.2f%n", StreetMetrics.orientationOrder(plan.segments().stream()
                 .filter(s -> s.streetClass() != StreetClass.LANE).toList()));
         System.out.printf("  arterial orientation order %.2f (OSM: Kyoto 0.81, Kanazawa 0.06, Takayama 0.17)%n",
                 StreetMetrics.orientationOrder(plan.segments().stream()

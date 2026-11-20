@@ -618,20 +618,21 @@ public final class CitySettings {
          * these chances by formation, as deep as {@code laneDepth} of the street spacing.
          */
         public double laneChanceJori = 0.85;
-        public double laneChanceCastle = 0.8;
-        public double laneChanceTown = 0.4;
+        public double laneChanceCastle = 0.3;
+        public double laneChanceTown = 0.2;
         public double laneSpacing = 30.0;
         public double laneDepth = 0.4;
         public double laneStep = 4.0;
         public double laneWidth = 2.5;
         /**
-         * Lanes into blocks' interiors (the land behind the lots): soundings every {@code interiorLaneSpacing} along the
-         * streets; where a block runs deeper than {@code interiorMin} from a street's edge to the next, a dead-end lane
-         * goes in, stopping {@code interiorBack} short of the street behind, at most {@code interiorMax} long, kept
+         * Lanes through blocks' interiors (the land behind the lots): soundings about every {@code interiorLaneSpacing}
+         * along the streets; where a block runs deeper than {@code interiorMin} from a street's edge to the next, a lane
+         * runs through to it, cutting the block in two (a share {@code interiorDeadEnd} of them a dead end, stopping
+         * {@code interiorBack} short of the street behind, at most {@code interiorMax} long), kept
          * {@code interiorClear} from other streets and lanes, and laid only if at least {@code interiorMinLane} long.
-         * Two rows of the lane's lots (5-8 by 8-12) either side of it fill the spacing.
          */
-        public double interiorLaneSpacing = 26.0;
+        public double interiorLaneSpacing = 50.0;
+        public double interiorDeadEnd = 0.2;
         public double interiorMin = 55.0;
         public double interiorBack = 20.0;
         public double interiorMax = 100.0;
