@@ -540,6 +540,7 @@ def voxelize(rings, tex=None, texdir=None):
     surf = {}  # voxel -> class
     height = {}  # column -> highest roof point
     colours = {}  # (voxel, class) -> [rgb]
+    owners = {}  # wall voxel -> {polygon id: samples}
     columns = set()
     prio = {"ground": 0, "wall": 1, "roof": 2}
     for cls, ring, holes, pid in rings:
@@ -563,6 +564,9 @@ def voxelize(rings, tex=None, texdir=None):
                     lst = colours.setdefault((v, cls), [])
                     if len(lst) < 32:
                         lst.append(pix[px, py])
+                    if cls == "wall":
+                        o = owners.setdefault(v, {})
+                        o[pid] = o.get(pid, 0) + 1
             if cls == "roof":
                 col = (v[0], v[2])
                 if y > height.get(col, -1e9):
@@ -598,7 +602,7 @@ def voxelize(rings, tex=None, texdir=None):
                 solid.add((col[0], y, col[1]))
     if odd:
         print(f"  {odd} of {len(hits)} columns cross the surface an odd number of times", flush=True)
-    return solid, surf, height, colours
+    return solid, surf, height, colours, owners
 
 
 # ---------------------------------------------------------------- palettes
@@ -949,6 +953,216 @@ def recolour(blocks, solid, colours, pal, bc):
     return len(final)
 
 
+# ---------------------------------------------------------------- windows from the textures
+
+def _glass_for(rgb):
+    """The stained glass whose tint a window's colour suggests: blue, teal, grey or dark."""
+    r, g, b = rgb
+    if b > r + 18 and b >= g - 5:
+        return "light_blue" if b > 120 else "blue"
+    if g > r + 12 and b > r + 8:
+        return "cyan"
+    return "gray" if luminance(rgb) < 85 else "light_gray"
+
+
+def _smooth(vals, w):
+    """Moving average over a window of 2w+1, ignoring None."""
+    out = []
+    for i in range(len(vals)):
+        seg = [v for v in vals[max(0, i - w):i + w + 1] if v is not None]
+        out.append(sum(seg) / len(seg) if seg else None)
+    return out
+
+
+def _period(profile, lo, hi):
+    """The lag in [lo, hi] at which a profile (None for no data) best matches itself, and that correlation."""
+    xs = [v for v in profile if v is not None]
+    if len(xs) < 2 * hi:
+        return None, 0.0
+    mu = sum(xs) / len(xs)
+    var = sum((v - mu) ** 2 for v in xs) / len(xs)
+    if var < 1e-6:
+        return None, 0.0
+    best = (None, 0.0)
+    for lag in range(lo, hi + 1):
+        pairs = [(profile[i] - mu, profile[i + lag] - mu) for i in range(len(profile) - lag)
+                 if profile[i] is not None and profile[i + lag] is not None]
+        if len(pairs) < lag:
+            continue
+        c = sum(x * y for x, y in pairs) / len(pairs) / var
+        if c > best[1]:
+            best = (lag, c)
+    return best
+
+
+def _fold(profile, period):
+    bins = [[] for _ in range(period)]
+    for i, v in enumerate(profile):
+        if v is not None:
+            bins[i % period].append(v)
+    return [sum(b) / len(b) if b else None for b in bins]
+
+
+STEP_F = 0.25  # metres between samples on a facade
+
+
+def facade_patterns(rings, tex, texdir):
+    """For each textured wall polygon tall enough to hold storeys, its window pattern read off the photograph.
+
+    The polygon is sampled every 25 cm in its own frame (along the wall, up); each sample's brightness is divided by
+    the mean of its 6 m neighbourhood, which takes out shade and the sun's gradient. The vertical profile's period
+    (2.8 to 5 m, by autocorrelation) is the storey; folded by it, the darker part is the window band. Within that
+    band the horizontal profile's period (1.25 to 8 m) and its brighter part are the piers, if it has one clearly.
+    Returns {polygon id: dict(origin, u, base, storey, band, pier, piers, glass, wall rgb)}."""
+    out = {}
+    for cls, ring, holes, pid in rings:
+        if cls != "wall" or not tex or pid not in tex:
+            continue
+        pts = open_ring(ring)
+        if len(pts) < 3:
+            continue
+        n = newell(pts)
+        nh = math.hypot(n[0], n[2])
+        if nh < 1e-6 or abs(n[1]) > 0.2 * nh:
+            continue  # not a vertical wall
+        ux, uz = -n[2] / nh, n[0] / nh
+        ox, oz = pts[0][0], pts[0][2]
+        A = [(p[0] - ox) * ux + (p[2] - oz) * uz for p in pts]
+        H = [p[1] for p in pts]
+        a0, a1, h0, h1 = min(A), max(A), min(H), max(H)
+        if h1 - h0 < 8 or a1 - a0 < 4:
+            continue
+        tm = texture_map(ring, tex[pid])
+        if not tm:
+            continue
+        pix, W, Hh = atlas(os.path.join(texdir, tm[0]))
+        _, ta, tb, cu, cv = tm
+        poly2 = list(zip(A, H))
+        na, nhh = int((a1 - a0) / STEP_F), int((h1 - h0) / STEP_F)
+        grid = [[None] * na for _ in range(nhh)]
+        rgbs = [[None] * na for _ in range(nhh)]
+        for j in range(nhh):
+            h = h0 + (j + 0.5) * STEP_F
+            for i in range(na):
+                a = a0 + (i + 0.5) * STEP_F
+                if not inside(a, h, poly2):
+                    continue
+                p3 = (ox + a * ux, h, oz + a * uz)
+                u = cu[0] + cu[1] * p3[ta] + cu[2] * p3[tb]
+                w = cv[0] + cv[1] * p3[ta] + cv[2] * p3[tb]
+                px, py = int(u * W), int((1 - w) * Hh)
+                if 0 <= px < W and 0 <= py < Hh:
+                    c = pix[px, py]
+                    grid[j][i] = luminance(c)
+                    rgbs[j][i] = c
+        # Take out the shading: divide by the 6 m neighbourhood (rows, then columns, of the moving average).
+        k = int(3 / STEP_F)
+        rows_sm = [_smooth(r, k) for r in grid]
+        cols_sm = [[None] * na for _ in range(nhh)]
+        for i in range(na):
+            col = _smooth([rows_sm[j][i] for j in range(nhh)], k)
+            for j in range(nhh):
+                cols_sm[j][i] = col[j]
+        ratio = [[grid[j][i] / cols_sm[j][i] if grid[j][i] is not None and cols_sm[j][i] else None
+                  for i in range(na)] for j in range(nhh)]
+        vert = []
+        for j in range(nhh):
+            r = [v for v in ratio[j] if v is not None]
+            vert.append(sum(r) / len(r) if len(r) > na * 0.3 else None)
+        storey, corr = _period(vert, int(2.8 / STEP_F), int(5.0 / STEP_F))
+        if not storey or corr < 0.3:
+            continue
+        folded = _fold(vert, storey)
+        if any(v is None for v in folded) or max(folded) - min(folded) < 0.08:
+            continue
+        mid = (max(folded) + min(folded)) / 2
+        band = [v < mid for v in folded]
+        if all(band) or not any(band):
+            continue
+        horiz = []
+        for i in range(na):
+            r = [ratio[j][i] for j in range(nhh) if band[j % storey] and ratio[j][i] is not None]
+            horiz.append(sum(r) / len(r) if len(r) > 2 else None)
+        pier, pc = _period(horiz, int(1.25 / STEP_F), int(8 / STEP_F))
+        piers = None
+        if pier and pc > 0.35:
+            fh = _fold(horiz, pier)
+            if all(v is not None for v in fh) and max(fh) - min(fh) > 0.08:
+                hmid = (max(fh) + min(fh)) / 2
+                piers = [v >= hmid for v in fh]
+                if all(piers) or not any(piers):
+                    piers = None
+        win, wall = [], []
+        for j in range(nhh):
+            for i in range(na):
+                c = rgbs[j][i]
+                if c is None:
+                    continue
+                is_win = band[j % storey] and not (piers and piers[i % pier])
+                (win if is_win else wall).append(c)
+        if not win or not wall:
+            continue
+        med = lambda cs: tuple(sorted(c[t] for c in cs)[len(cs) // 2] for t in range(3))
+        out[pid] = dict(origin=(ox, oz), u=(ux, uz), a0=a0, h0=h0, storey=storey, band=band, pier=pier,
+                        piers=piers, glass=_glass_for(med(win)), wall=med(wall))
+    return out
+
+
+def windows(blocks, solid, owners, patterns, bc):
+    """Puts the windows read off the photographs into the walls: each outer wall block takes the pattern of the
+    polygon that gave it most of its samples, and is a window if most of its metre lies in the window band and off
+    the piers. Windows become stained glass panes (set back in the wall), the rest of that polygon's wall one block,
+    the commonest the colours gave it, or the nearest to its wall colour."""
+    by_pid = {}
+    for v, (name, props) in blocks.items():
+        x, y, z = v
+        if props is not None or (x, y + 1, z) not in solid or v not in owners:
+            continue
+        sides = [d for d in ((1, 0), (-1, 0), (0, 1), (0, -1)) if (x + d[0], y, z + d[1]) not in solid]
+        if len(sides) != 1:
+            continue
+        pid = max(owners[v], key=owners[v].get)
+        if pid in patterns:
+            by_pid.setdefault(pid, []).append((v, sides[0]))
+    walls = Matcher(bc, [b for b in WALL_BLOCKS])
+    changed = 0
+    for pid, cells in by_pid.items():
+        pt = patterns[pid]
+        ox, oz = pt["origin"]
+        ux, uz = pt["u"]
+        st, band, pier, piers = pt["storey"], pt["band"], pt["pier"], pt["piers"]
+
+        def window_at(x, y, z):
+            hits = 0
+            for dy in (0.125, 0.375, 0.625, 0.875):
+                for da in (-0.375, -0.125, 0.125, 0.375):
+                    a = (x + 0.5 - ox) * ux + (z + 0.5 - oz) * uz + da
+                    jj = int((y + dy - pt["h0"]) / STEP_F)
+                    ii = int((a - pt["a0"]) / STEP_F)
+                    if jj < 0 or ii < 0:
+                        continue
+                    if band[jj % st] and not (piers and piers[ii % pier]):
+                        hits += 1
+            return hits >= 8
+        count = {}
+        flags = []
+        for v, d in cells:
+            w = window_at(*v)
+            flags.append((v, d, w))
+            n = blocks[v][0]
+            if not w and "glass" not in n:
+                count[n] = count.get(n, 0) + 1
+        wall = max(count, key=count.get) if count else walls(pt["wall"])
+        pane = pt["glass"] + "_stained_glass_pane"
+        for v, d, w in flags:
+            if w:
+                blocks[v] = (pane, {"east": "true", "west": "true"} if d[0] == 0 else {"north": "true", "south": "true"})
+            else:
+                blocks[v] = (wall, None)
+            changed += 1
+    return changed
+
+
 # ---------------------------------------------------------------- NBT
 
 def nbt_string(s):
@@ -1066,6 +1280,8 @@ def render(blocks, size, path, bc, max_px=1800):
             continue
         if name == "spruce_planks" and props is None and name not in bc:
             pass
+        if name.endswith("_pane"):
+            name = name[:-5]
         r, g, b = bc.get(FULL_OF.get(name, PREVIEW_ALIAS.get(name, name))) or ((COLOURS[name] >> 16, (COLOURS[name] >> 8) & 255,
                                                       COLOURS[name] & 255) if name in COLOURS else (255, 0, 255))
         bx, by = proj(x, y, z)
@@ -1100,6 +1316,8 @@ def render(blocks, size, path, bc, max_px=1800):
         out[row * W * 3:(row * W + w) * 3] = img[row * w * 3:(row + 1) * w * 3]
     for (x, y), z in front.items():
         name, props = blocks[(x, y, z)]
+        if name.endswith("_pane"):
+            name = name[:-5]
         r, g, b = bc.get(FULL_OF.get(name, PREVIEW_ALIAS.get(name, name))) or ((COLOURS[name] >> 16, (COLOURS[name] >> 8) & 255,
                                                       COLOURS[name] & 255) if name in COLOURS else (255, 0, 255))
         k = 0.95 - 0.45 * (sz - 1 - z) / max(1, sz - 1)
@@ -1272,11 +1490,13 @@ def build_one(args):
     if not surf:
         return None
     rings, angle, (lat, lon) = to_local(surf)
-    solid, cls, height, colours = voxelize(rings, geom.get("tex") if textured else None, os.path.join(out, "tex"))
+    tex = geom.get("tex") if textured else None
+    solid, cls, height, colours, owners = voxelize(rings, tex, os.path.join(out, "tex"))
     pal = pal or choose_palette(row)
     sh = storey_height(row)
     blocks = assign_blocks(solid, cls, height, pal, sh)
     recoloured = recolour(blocks, solid, colours, pal, bc)
+    glazed = windows(blocks, solid, owners, facade_patterns(rings, tex, os.path.join(out, "tex")), bc) if tex else 0
     if slug in LANDMARK_FIXES:
         LANDMARK_FIXES[slug](blocks)
     size = tuple(max(v[i] for v in blocks) + 1 for i in range(3))
@@ -1291,7 +1511,7 @@ def build_one(args):
             "roof_shape": row.get("roof_shape"), "roof_pitch": row.get("roof_pitch"),
             "palette": pal, "storey_height": sh, "rotation_deg": round(angle, 1),
             "size": list(size), "blocks": len(blocks), "surfaces": len(surf),
-            "textured_polygons": len(geom.get("tex", {})), "recoloured_blocks": recoloured,
+            "textured_polygons": len(geom.get("tex", {})), "recoloured_blocks": recoloured, "window_blocks": glazed,
             "block_counts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
 
 
@@ -1310,7 +1530,7 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
                 entries.append(e)
                 print(f"{e['slug']:24s} {e['name']:16s} {e['size'][0]:4d}x{e['size'][1]:3d}x{e['size'][2]:4d} "
                       f"{e['blocks']:7d} blocks  {e['palette']:6s} turned {e['rotation_deg']:+.1f}  "
-                      f"{e['recoloured_blocks']} from textures", flush=True)
+                      f"{e['recoloured_blocks']} from textures, {e.get('window_blocks', 0)} facade blocks redone", flush=True)
     with open(os.path.join(out, "library.json"), "w", encoding="utf-8") as fh:
         json.dump({"source": "PLATEAU Kyoto City FY2025 LOD2", "attribution": "ATTRIBUTION",
                    "buildings": entries}, fh, ensure_ascii=False, indent=1)
