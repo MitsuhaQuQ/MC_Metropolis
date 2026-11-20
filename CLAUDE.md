@@ -26,6 +26,8 @@ gradlew :core:cityMap -Players=plots -Pseed=12345 -Px=-10400 -Pz=-10150 -Pscale=
 gradlew :core:osmStats -Pin=F:/MC/citybuilder/core/build/osm/kyoto.osm -Pbox="34.975 135.735 35.035 135.785"   # OSM 街道统计（路径要绝对路径，相对路径按 core 目录解析；数据从 Overpass 下载要先问用户）
 python -I tools/assets/plateau_buildings.py F:/MC/citybuilder/core/build/plateau/26100_kyoto-shi_city_2025_citygml_1_op.zip F:/MC/citybuilder/core/build/plateau/kyoto-buildings.csv   # PLATEAU 建筑属性和 LOD2 屋顶形式 → CSV，全京都约 1 分钟（多进程）
 python -I tools/assets/plateau_stats.py F:/MC/citybuilder/core/build/plateau/kyoto-buildings.csv [--box 34.975,135.735,35.035,135.785 --streets F:/MC/citybuilder/core/build/osm/kyoto.osm]   # 层高、占地、屋顶、圆环、按临街道路等级的层数（设计文档第 6 节"京都实测"）
+python -I tools/assets/plateau_voxel.py extract F:/MC/citybuilder/core/build/plateau/26100_kyoto-shi_city_2025_citygml_1_op.zip F:/MC/citybuilder/core/build/plateau/kyoto-buildings.csv F:/MC/citybuilder/core/build/plateau/library   # 取出 LANDMARKS 里大型和特殊建筑的 LOD2 面，约半分钟
+python -I tools/assets/plateau_voxel.py build F:/MC/citybuilder/core/build/plateau/kyoto-buildings.csv F:/MC/citybuilder/core/build/plateau/library   # 体素化成原版结构模板 .nbt、等轴预览 .png、library.json、preview.html（一页看全部），十几秒
 python -I tools/assets/osm_buildings.py F:/MC/citybuilder/core/build/osm/kanazawa-bld.json --streets F:/MC/citybuilder/core/build/osm/kanazawa.osm   # OSM 建筑统计（Overpass 的 out geom JSON）
 python -I tools/assets/nbt_survey.py <目录或 .nbt>   # 原版结构模板（如 kogtyv-TAV）的尺寸、DataVersion、1.20.1 没有的方块、拼图池、层高估计
 gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验证）
