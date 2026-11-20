@@ -1,0 +1,476 @@
+"""Measures bridges and viaducts on PLATEAU, the sizes for City Builder's bridge, viaduct and station models
+(core.building.rail).
+
+    python -I tools/assets/plateau_bridges.py survey <plateau dir> <out>
+    python -I tools/assets/plateau_bridges.py stations <buildings dir> <out>
+
+`stations` reads the <city>-buildings.csv that plateau_buildings.py writes (F:/MC/citybuilder/core/build/plateau) and
+measures the platform canopies and station buildings of the stations in STATIONS.
+
+<plateau dir> holds <city>.zip as plateau_fetch.py packs them with --kinds=brid,trk (F:/MC/citybuilder/core/build/
+plateau/bridges). Writes <out>/bridges.csv, one row a bridge, and prints the percentiles by kind.
+
+Each brid:Bridge is measured on its own surfaces, turned to its own axis (the long side of the least rectangle round
+its outline): length and width; the deck's top (the floor surfaces, area weighted) and underside (the ceiling
+surfaces); the ground (the lowest tenth of its points, where the piers stand); so the clearance under it and the
+girder's depth. Piers are the construction elements marked 橋脚, or else the walls standing down from the underside to
+the ground, gathered into bents across the axis: the spans between bents, the columns in a bent and their size.
+Railings and sound walls (installations, or walls rising above the deck at its edges) give the parapet's height.
+
+Kinds: PLATEAU's function code (道路橋 01, 鉄道橋 02, 横断歩道橋 07, ペデストリアンデッキ 08, ...); where it says 不明 (99,
+most of central Tokyo's), by shape: width 7-13 m, deck 5 m or more up and 60 m or longer as a railway viaduct
+("rail?"), wider and as high as an elevated road ("road?"), narrow ones with stairs as footbridges.
+
+Source: 3D city models of Project PLATEAU (MLIT; copyright of each city), PLATEAU site policy (compatible with CC BY
+4.0); statistics only, nothing of the meshes is shipped.
+"""
+import csv
+import glob
+import math
+import os
+import re
+import sys
+import zipfile
+import xml.etree.ElementTree as ET
+
+NS = {
+    'gml': 'http://www.opengis.net/gml',
+    'brid': 'http://www.opengis.net/citygml/bridge/2.0',
+    'core': 'http://www.opengis.net/citygml/2.0',
+}
+G = '{%s}' % NS['gml']
+B = '{%s}' % NS['brid']
+FUNCTION = {'01': 'road', '02': 'rail', '03': 'aqueduct', '04': 'cable', '05': 'side walk', '06': 'canal',
+            '07': 'footbridge', '08': 'deck', '99': 'unknown'}
+CLASS = {'01': 'girder', '02': 'truss', '03': 'arch', '04': 'rigid frame', '05': 'suspension', '06': 'cable-stayed',
+         '99': 'unknown'}
+
+
+def local(tag):
+    return tag.rsplit('}', 1)[-1]
+
+
+def rings_of(element):
+    """Every polygon's exterior ring under an element, as [(lat, lon, z)]."""
+    out = []
+    for pos in element.iter(G + 'posList'):
+        v = [float(t) for t in pos.text.split()]
+        out.append([(v[i], v[i + 1], v[i + 2]) for i in range(0, len(v) - 2, 3)])
+    return out
+
+
+class Frame:
+    """Local metres round a latitude, east x and north y."""
+
+    def __init__(self, lat, lon):
+        self.lat, self.lon = lat, lon
+        self.kx = 111320.0 * math.cos(math.radians(lat))
+
+    def __call__(self, p):
+        return (p[1] - self.lon) * self.kx, (p[0] - self.lat) * 111320.0, p[2]
+
+
+def hull(points):
+    pts = sorted(set(points))
+    if len(pts) < 3:
+        return pts
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    lower, upper = [], []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    return lower[:-1] + upper[:-1]
+
+
+def min_rect(points):
+    """The least-area rectangle round the points: (angle of its long side, length, width)."""
+    h = hull(points)
+    best = None
+    for a, b in zip(h, h[1:] + h[:1]):
+        ang = math.atan2(b[1] - a[1], b[0] - a[0])
+        c, s = math.cos(ang), math.sin(ang)
+        us = [p[0] * c + p[1] * s for p in h]
+        vs = [-p[0] * s + p[1] * c for p in h]
+        du, dv = max(us) - min(us), max(vs) - min(vs)
+        if best is None or du * dv < best[0]:
+            best = (du * dv, ang, du, dv) if du >= dv else (du * dv, ang + math.pi / 2, dv, du)
+    if best is None:
+        return 0.0, 0.0, 0.0
+    return best[1], best[2], best[3]
+
+
+def area_z(rings):
+    """Area-weighted median height of near-horizontal surfaces, with their plan area."""
+    items = []
+    for r in rings:
+        a = 0.0
+        for p, q in zip(r, r[1:] + r[:1]):
+            a += p[0] * q[1] - q[0] * p[1]
+        a = abs(a) / 2
+        zs = [p[2] for p in r]
+        if a > 0.05 and max(zs) - min(zs) < max(1.0, 0.15 * math.sqrt(a)):
+            items.append((sum(zs) / len(zs), a))
+    if not items:
+        return None, 0.0
+    items.sort()
+    total = sum(a for _, a in items)
+    acc = 0.0
+    for z, a in items:
+        acc += a
+        if acc >= total / 2:
+            return z, total
+    return items[-1][0], total
+
+
+def deck_width(rings, cell=0.5):
+    """The deck's width where it runs, not its outline's: the floor surfaces rasterised, each cell's distance to
+    the deck's edge (chamfer), twice the ridge's distance. Returns (median, 10th, 90th percentile, plan length:
+    the floor's area over its median width)."""
+    rings = [r for r in rings if len(r) >= 3]
+    if not rings:
+        return None
+    xs = [p[0] for r in rings for p in r]
+    ys = [p[1] for r in rings for p in r]
+    x0, y0 = min(xs) - 1, min(ys) - 1
+    nx, ny = int((max(xs) - x0) / cell) + 3, int((max(ys) - y0) / cell) + 3
+    if nx * ny > 6_000_000:
+        cell *= 2
+        nx, ny = int((max(xs) - x0) / cell) + 3, int((max(ys) - y0) / cell) + 3
+    grid = bytearray(nx * ny)
+    for r in rings:
+        poly = [((p[0] - x0) / cell, (p[1] - y0) / cell) for p in r]
+        lo, hi = int(min(p[1] for p in poly)), int(max(p[1] for p in poly)) + 1
+        for j in range(max(lo, 0), min(hi, ny)):
+            yc = j + 0.5
+            cuts = []
+            for (ax, ay), (bx, by) in zip(poly, poly[1:] + poly[:1]):
+                if (ay > yc) != (by > yc):
+                    cuts.append(ax + (yc - ay) * (bx - ax) / (by - ay))
+            cuts.sort()
+            for a, b in zip(cuts[0::2], cuts[1::2]):
+                for i in range(max(int(a + 0.5), 0), min(int(b + 0.5), nx)):
+                    grid[j * nx + i] = 1
+    INF = 1 << 30
+    d = [0 if not g else INF for g in grid]
+    for j in range(1, ny - 1):
+        row = j * nx
+        for i in range(1, nx - 1):
+            k = row + i
+            if d[k]:
+                d[k] = min(d[k], d[k - 1] + 3, d[k - nx] + 3, d[k - nx - 1] + 4, d[k - nx + 1] + 4)
+    for j in range(ny - 2, 0, -1):
+        row = j * nx
+        for i in range(nx - 2, 0, -1):
+            k = row + i
+            if d[k]:
+                d[k] = min(d[k], d[k + 1] + 3, d[k + nx] + 3, d[k + nx + 1] + 4, d[k + nx - 1] + 4)
+    ridge = []
+    for j in range(1, ny - 1):
+        for i in range(1, nx - 1):
+            k = j * nx + i
+            v = d[k]
+            if v and v >= d[k - 1] and v >= d[k + 1] and v >= d[k - nx] and v >= d[k + nx]                     and (v > d[k - 1] or v > d[k + 1]) and (v > d[k - nx] or v > d[k + nx]) or                     v and v >= max(d[k - 1], d[k + 1], d[k - nx], d[k + nx]) and v > min(d[k - 1], d[k + 1]) + 1:
+                ridge.append(v)
+    if not ridge:
+        return None
+    ws = [2 * v / 3 * cell for v in ridge]
+    area = sum(grid) * cell * cell
+    w = pct(ws, 0.5)
+    return w, pct(ws, 0.1), pct(ws, 0.9), area / max(w, 0.5)
+
+
+def pct(values, q):
+    v = sorted(values)
+    if not v:
+        return float('nan')
+    i = (len(v) - 1) * q
+    lo = int(i)
+    return v[lo] + (v[min(lo + 1, len(v) - 1)] - v[lo]) * (i - lo)
+
+
+def measure(bridge, city):
+    code = {}
+    for key in ('function', 'class', 'yearOfConstruction'):
+        e = bridge.find(B + key)
+        if e is not None and e.text:
+            code[key] = e.text.strip()
+    name = bridge.find(G + 'name')
+    surfaces = {}
+    for bb in bridge.findall(B + 'boundedBy'):
+        for s in bb:
+            surfaces.setdefault(local(s.tag), []).extend(rings_of(s))
+    piers, others = [], []
+    for oc in bridge.findall(B + 'outerBridgeConstruction'):
+        for el in oc:
+            f = el.find(B + 'function')
+            (piers if f is not None and f.text and f.text.strip() == '01' else others).append(rings_of(el))
+    installs = []
+    for oi in bridge.findall(B + 'outerBridgeInstallation'):
+        for el in oi:
+            f = el.find(B + 'function')
+            installs.append(((f.text.strip() if f is not None and f.text else '90'), rings_of(el)))
+    allr = [r for rs in surfaces.values() for r in rs] + [r for p in piers for r in p] \
+        + [r for o in others for r in o] + [r for _, rs in installs for r in rs]
+    if not allr:
+        for el in bridge.iter():
+            if local(el.tag) in ('lod1Solid', 'lod2Solid', 'lod3Solid', 'lod2MultiSurface'):
+                allr.extend(rings_of(el))
+    if not allr:
+        return None
+    pts = [p for r in allr for p in r]
+    fr = Frame(sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
+    loc = lambda rs: [[fr(p) for p in r] for r in rs]  # noqa: E731
+    lp = [fr(p) for p in pts]
+    ang, length, width = min_rect([(p[0], p[1]) for p in lp])
+    c, s = math.cos(ang), math.sin(ang)
+    u = lambda p: p[0] * c + p[1] * s  # noqa: E731
+    v = lambda p: -p[0] * s + p[1] * c  # noqa: E731
+    zs = sorted(p[2] for p in lp)
+    ground = pct(zs, 0.03)
+    top, top_area = area_z(loc(surfaces.get('OuterFloorSurface', []) + surfaces.get('RoofSurface', [])))
+    under, _ = area_z(loc(surfaces.get('OuterCeilingSurface', [])))
+    if top is None:  # LOD1 or unlabelled: the top of the solid
+        top = pct(zs, 0.97)
+    floor = loc(surfaces.get('OuterFloorSurface', []) + surfaces.get('RoofSurface', []))
+    dw = deck_width([[(p[0], p[1]) for p in r] for r in floor if max(p[2] for p in r) > top - 1.5])
+    row = {
+        'city': city, 'id': bridge.get(G + 'id'), 'name': name.text if name is not None else '',
+        'function': FUNCTION.get(code.get('function', '99'), code.get('function')),
+        'class': CLASS.get(code.get('class', '99'), code.get('class')), 'year': code.get('yearOfConstruction', ''),
+        'length': round(length, 1), 'width': round(width, 1), 'ground': round(ground, 2),
+        'deck': round(top - ground, 2), 'clearance': round(under - ground, 2) if under is not None else '',
+        'girder': round(top - under, 2) if under is not None else '',
+        'deck_width': round(dw[0], 1) if dw else '', 'width_p10': round(dw[1], 1) if dw else '',
+        'width_p90': round(dw[2], 1) if dw else '', 'run': round(dw[3], 1) if dw else '',
+        'lon': round(fr.lon, 6), 'lat': round(fr.lat, 6), 'axis': round(math.degrees(ang) % 180, 1),
+    }
+    # Piers: marked ones, or else the walls reaching from near the ground to near the underside.
+    columns = []
+    for pr in piers:
+        q = [p for r in loc(pr) for p in r]
+        if q:
+            columns.append(q)
+    if not columns and under is not None and under - ground > 2.5:
+        walls = loc(surfaces.get('WallSurface', []))
+        for r in walls:
+            rz = [p[2] for p in r]
+            if min(rz) < ground + 1.0 and max(rz) > under - 1.0 and max(rz) < top + 0.5:
+                columns.append(r)
+    bents = []
+    for q in columns:
+        us, vs = [u(p) for p in q], [v(p) for p in q]
+        bents.append(((min(us) + max(us)) / 2, (min(vs) + max(vs)) / 2, max(us) - min(us), max(vs) - min(vs)))
+    bents.sort()
+    groups = []
+    for b in bents:  # walls of one column, or columns of one bent, lie within 2.5 m along the axis
+        if groups and b[0] - groups[-1][-1][0] < 2.5:
+            groups[-1].append(b)
+        else:
+            groups.append([b])
+    if len(groups) >= 2:
+        centres = [sum(b[0] for b in g) / len(g) for g in groups]
+        spans = [b - a for a, b in zip(centres, centres[1:])]
+        row['bents'] = len(groups)
+        row['span'] = round(pct(spans, 0.5), 1)
+        row['span_max'] = round(max(spans), 1)
+        cols = []
+        for g in groups:  # columns: distinct positions across the axis, 1.5 m apart
+            vs = sorted(b[1] for b in g)
+            n = 1 + sum(1 for a, b in zip(vs, vs[1:]) if b - a > 1.5)
+            cols.append(n)
+        row['columns'] = round(pct(cols, 0.5))
+        if piers:
+            row['pier_along'] = round(pct([b[2] for b in bents], 0.5), 1)
+            row['pier_across'] = round(pct([b[3] for b in bents], 0.5), 1)
+    # Parapets: installations marked 高欄/防護柵/遮音壁, or walls rising above the deck along its edges.
+    para = {}
+    for f, rs in installs:
+        if f in ('05', '06', '07'):
+            hz = max(p[2] for r in loc(rs) for p in r) - top
+            if 0.3 < hz < 8:
+                para[f] = max(para.get(f, 0), hz)
+    if not para:
+        rise = []
+        for r in loc(surfaces.get('WallSurface', [])):
+            rz = [p[2] for p in r]
+            if min(rz) > top - 0.6 and 0.3 < max(rz) - top < 6:
+                rise.append(max(rz) - top)
+        if rise:
+            para['edge'] = pct(rise, 0.5)
+    row['parapet'] = round(max(para.values()), 2) if para else ''
+    row['soundwall'] = 1 if '07' in para else ''
+    row['stairs'] = sum(1 for f, _ in installs if f == '13')
+    row['kind'] = kind(row)
+    return row
+
+
+def kind(row):
+    f, d = row['function'], row['deck']
+    w = row['deck_width'] if row.get('deck_width') not in ('', None) else row['width']
+    ln = max(row['length'], row['run'] or 0) if row.get('run') not in ('', None) else row['length']
+    if f not in ('unknown', None):
+        return f
+    if w < 6.5 and d > 4 and ln < 80:
+        return 'footbridge?'
+    if 7 <= w <= 13 and d >= 5 and ln >= 60:
+        return 'rail?'
+    if w > 13 and d >= 6 and ln >= 60:
+        return 'road?'
+    return 'unknown'
+
+
+def survey(src, out):
+    os.makedirs(out, exist_ok=True)
+    rows = []
+    for z in sorted(glob.glob(os.path.join(src, '*.zip'))):
+        city = os.path.splitext(os.path.basename(z))[0]
+        with zipfile.ZipFile(z) as Z:
+            for n in Z.namelist():
+                if '/brid/' not in n or not n.endswith('.gml'):
+                    continue
+                with Z.open(n) as fh:
+                    for _, el in ET.iterparse(fh, events=('end',)):
+                        if el.tag == B + 'Bridge':
+                            r = measure(el, city)
+                            if r:
+                                rows.append(r)
+                            el.clear()
+        print('%s: %d bridges' % (city, sum(1 for r in rows if r['city'] == city)), flush=True)
+    keys = ['city', 'id', 'name', 'kind', 'function', 'class', 'year', 'length', 'width', 'deck_width', 'width_p10', 'width_p90',
+            'run', 'ground', 'deck',
+            'clearance', 'girder', 'bents', 'span', 'span_max', 'columns', 'pier_along', 'pier_across', 'parapet',
+            'soundwall', 'stairs', 'axis', 'lat', 'lon']
+    with open(os.path.join(out, 'bridges.csv'), 'w', newline='', encoding='utf-8') as fh:
+        w = csv.DictWriter(fh, keys, extrasaction='ignore')
+        w.writeheader()
+        for r in rows:
+            w.writerow(r)
+    report(rows)
+
+
+def report(rows):
+    kinds = sorted(set(r['kind'] for r in rows))
+    print('%-12s %4s  %-20s %-20s %-20s %-20s %-20s %-20s %-16s %-16s' % (
+        'kind', 'n', 'run', 'deck_width', 'deck', 'clearance', 'girder', 'span', 'parapet', 'pier'))
+    for k in kinds:
+        rs = [r for r in rows if r['kind'] == k]
+
+        def q(key):
+            v = [float(r[key]) for r in rs if r.get(key) not in ('', None)]
+            if not v:
+                return '-'
+            return '%.1f/%.1f/%.1f (%d)' % (pct(v, .25), pct(v, .5), pct(v, .75), len(v))
+        print('%-12s %4d  %-20s %-20s %-20s %-20s %-20s %-20s %-16s %-16s' % (
+            k, len(rs), q('run'), q('deck_width'), q('deck'), q('clearance'), q('girder'), q('span'), q('parapet'),
+            q('pier_across')))
+        cols = [r['columns'] for r in rs if r.get('columns')]
+        if cols:
+            print('%16s columns a bent: %s' % ('', {n: cols.count(n) for n in sorted(set(cols))}))
+
+
+# Stations whose platforms PLATEAU has as buildings (運輸施設 / 運輸倉庫施設): (city csv, name, lat, lon). Which are
+# elevated is measured (the canopies' height), not taken from here.
+STATIONS = [
+    ('kyoto', '京都', 34.9858, 135.7588), ('kyoto', '二条', 35.0108, 135.7417), ('kyoto', '円町', 35.0146, 135.7322),
+    ('kyoto', '丹波口', 34.9898, 135.7432), ('kyoto', '嵯峨嵐山', 35.0181, 135.6813), ('kyoto', '花園', 35.0168, 135.7203),
+    ('kyoto', '太秦', 35.0175, 135.7105), ('kyoto', '山科', 34.9930, 135.8160), ('kyoto', '東福寺', 34.9811, 135.7695),
+    ('kyoto', '稲荷', 34.9671, 135.7701), ('kyoto', '桂川', 34.9500, 135.7120), ('kyoto', '西大路', 34.9817, 135.7330),
+    ('himeji', '姫路', 34.8268, 134.6907), ('kanazawa', '金沢', 36.5781, 136.6478),
+    ('taito', '上野', 35.7138, 139.7770), ('taito', '御徒町', 35.7075, 139.7748), ('taito', '鶯谷', 35.7212, 139.7781),
+    ('taito', '浅草橋', 35.6975, 139.7863), ('taito', '秋葉原', 35.6984, 139.7731), ('chuo', '東京', 35.6812, 139.7671),
+]
+
+
+def stations(src, out):
+    """Platform canopies (long, narrow transport buildings within 250 m of a station) and the station buildings
+    beside them (compact transport buildings within 120 m of a canopy). A station is elevated where its canopies'
+    tops stand 9 m or more over the ground."""
+    by_city = {}
+    for city, name, lat, lon in STATIONS:
+        by_city.setdefault(city, []).append((name, lat, lon))
+    canopies, houses = [], []
+    for city, sts in by_city.items():
+        path = os.path.join(src, city + '-buildings.csv')
+        if not os.path.exists(path):
+            print('no', path)
+            continue
+        with open(path, encoding='utf-8') as fh:
+            rows = [r for r in csv.DictReader(fh) if '運輸' in r['usage'] + r['detailed_usage']
+                    and '倉庫施設等' not in r['detailed_usage']]
+        for name, lat, lon in sts:
+            kx = 111320.0 * math.cos(math.radians(lat))
+            near = []
+            for r in rows:
+                d = math.hypot((float(r['lat']) - lat) * 111320.0, (float(r['lon']) - lon) * kx)
+                if d < 250:
+                    near.append((d, r))
+            cs = [(d, r) for d, r in near if float(r['length']) >= 40 and float(r['length']) >= 4 * float(r['depth'])
+                  and 3 <= float(r['depth']) <= 20 and 3 <= float(r['height'] or 0) <= 16]
+            if not cs:
+                print('%-8s no canopies' % name)
+                continue
+            top = pct([float(r['height']) for _, r in cs], 0.5)
+            elevated = top >= 9
+            for d, r in cs:
+                canopies.append({'station': name, 'elevated': elevated, 'length': float(r['length']),
+                                 'depth': float(r['depth']), 'height': float(r['height'])})
+            for d, r in near:
+                L, D = float(r['length']), float(r['depth'])
+                if L < 4 * D and float(r['area']) >= 80 and 3 <= float(r['height'] or 0) <= 40:
+                    near_c = min(math.hypot((float(r['lat']) - float(c['lat'])) * 111320.0,
+                                            (float(r['lon']) - float(c['lon'])) * kx) for _, c in cs)
+                    if near_c < 120:
+                        houses.append({'station': name, 'elevated': elevated, 'length': L, 'depth': D,
+                                       'height': float(r['height']), 'storeys': r['storeys'], 'roof': r['roof_shape']})
+            print('%-8s %-8s canopies %2d: length %s, depth %s, top %.1f' % (
+                name, 'elevated' if elevated else 'ground', len(cs),
+                '/'.join('%.0f' % pct([float(r['length']) for _, r in cs], q) for q in (.25, .5, .75)),
+                '/'.join('%.1f' % pct([float(r['depth']) for _, r in cs], q) for q in (.25, .5, .75)), top))
+    os.makedirs(out, exist_ok=True)
+    for fname, rows in (('canopies.csv', canopies), ('station_houses.csv', houses)):
+        if rows:
+            with open(os.path.join(out, fname), 'w', newline='', encoding='utf-8') as fh:
+                w = csv.DictWriter(fh, list(rows[0].keys()))
+                w.writeheader()
+                w.writerows(rows)
+    for elevated in (False, True):
+        for label, rows, keys in (('canopy', canopies, ('length', 'depth', 'height')),
+                                  ('station building', houses, ('length', 'depth', 'height'))):
+            rs = [r for r in rows if r['elevated'] == elevated]
+            if rs:
+                print('%-8s %-16s n %3d  ' % ('elevated' if elevated else 'ground', label, len(rs)) + '  '.join(
+                    '%s %s' % (k, '/'.join('%.1f' % pct([r[k] for r in rs], q) for q in (.25, .5, .75)))
+                    for k in keys))
+
+
+def main(argv):
+    if len(argv) >= 3 and argv[0] == 'stations':
+        stations(argv[1], argv[2])
+        return 0
+    if len(argv) >= 3 and argv[0] == 'survey':
+        survey(argv[1], argv[2])
+        return 0
+    if len(argv) >= 2 and argv[0] == 'report':
+        with open(argv[1], encoding='utf-8') as fh:
+            rows = list(csv.DictReader(fh))
+        for r in rows:
+            for k in ('length', 'width', 'deck'):
+                r[k] = float(r[k])
+            r['run'] = float(r['run']) if r.get('run') else ''
+            r['deck_width'] = float(r['deck_width']) if r.get('deck_width') else ''
+            r['columns'] = int(r['columns']) if r.get('columns') else None
+        report(rows)
+        return 0
+    print(__doc__)
+    return 2
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
