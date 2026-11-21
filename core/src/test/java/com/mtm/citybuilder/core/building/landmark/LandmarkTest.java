@@ -174,7 +174,8 @@ class LandmarkTest {
             List<String> bad = new ArrayList<>();
             int[] seats = {0};
             m.forEach((x, y, z, s) -> {
-                if (!s.contains("_stairs[") && !s.startsWith("citybuilder:seat_")) {
+                // (The vomitories' stone brick steps, climbing from the concourse to the rows, are no seats)
+                if (!s.contains("_stairs[") && !s.startsWith("citybuilder:seat_") || s.startsWith("minecraft:stone_brick_stairs")) {
                     return;
                 }
                 seats[0]++;

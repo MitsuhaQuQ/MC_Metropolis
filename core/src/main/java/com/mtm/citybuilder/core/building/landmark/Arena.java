@@ -198,6 +198,10 @@ final class Arena {
                     above = "minecraft:glass_pane"; // a railing along the hood's front edge
                 }
             } else if (vomitory && row > mid + 2) {
+                // Right behind the hood no seat: it would face the hood's back, a block higher than its row
+                if (row == mid + 3) {
+                    seat = null;
+                }
                 // The stair down from the tunnel to the concourse, one block per block away from the field.
                 int c = (int) Math.floor(s - 2 * (mid + 3));
                 int floor = tunnel - 1 - c;

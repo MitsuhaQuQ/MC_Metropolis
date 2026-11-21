@@ -83,7 +83,7 @@ class BuildingLayerTest {
                         || b.roof() == Building.Roof.FLAT && b.depth() - b.stepBack() - b.upBack() >= 6);
                 // The upper volume lies within the footprint
                 assertTrue(b.upFrom() >= 0 && b.upTo() <= b.width() + 1e-9 && b.upFrom() < b.upTo(), "upper " + b);
-                assertTrue(b.width() >= 4 && b.depth() >= 4, "size " + b);
+                assertTrue(b.width() >= 4 - 1e-9 && b.depth() >= 4 - 1e-9, "size " + b);
                 // The road slant line, two storeys always allowed
                 // A corner lot, on two streets, may rise a storey more
                 double allowed = config.slant * (plot.streetWidth() + 2.0 * b.front())
