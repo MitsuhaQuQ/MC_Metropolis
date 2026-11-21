@@ -1,0 +1,134 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "particle": "citybuilder:block/window_glass_gray",
+    "frame": "citybuilder:block/window_frame_white",
+    "glass": "citybuilder:block/window_glass_gray"
+  },
+  "elements": [
+    {
+      "from": [
+        7,
+        1,
+        0
+      ],
+      "to": [
+        9,
+        15,
+        7
+      ],
+      "faces": {
+        "west": {
+          "uv": [
+            0,
+            1,
+            7,
+            15
+          ],
+          "texture": "#glass"
+        },
+        "east": {
+          "uv": [
+            9,
+            1,
+            16,
+            15
+          ],
+          "texture": "#glass"
+        }
+      }
+    },
+    {
+      "from": [
+        7,
+        15,
+        0
+      ],
+      "to": [
+        9,
+        16,
+        7
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            7,
+            0,
+            9,
+            7
+          ],
+          "texture": "#frame"
+        },
+        "down": {
+          "uv": [
+            7,
+            0,
+            9,
+            7
+          ],
+          "texture": "#frame"
+        },
+        "west": {
+          "uv": [
+            0,
+            0,
+            7,
+            1
+          ],
+          "texture": "#frame"
+        },
+        "east": {
+          "uv": [
+            9,
+            0,
+            16,
+            1
+          ],
+          "texture": "#frame"
+        }
+      }
+    },
+    {
+      "from": [
+        6,
+        0,
+        0
+      ],
+      "to": [
+        10,
+        1,
+        7
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            6,
+            0,
+            10,
+            7
+          ],
+          "texture": "#frame"
+        },
+        "west": {
+          "uv": [
+            0,
+            15,
+            7,
+            16
+          ],
+          "texture": "#frame"
+        },
+        "east": {
+          "uv": [
+            9,
+            15,
+            16,
+            16
+          ],
+          "texture": "#frame"
+        }
+      }
+    }
+  ]
+}

@@ -1,7 +1,44 @@
 {
-  "variants": {
-    "": {
-      "model": "citybuilder:block/window_dark_blue"
+  "multipart": [
+    {
+      "apply": {
+        "model": "citybuilder:block/window_dark_blue_post"
+      }
+    },
+    {
+      "when": {
+        "north": "true"
+      },
+      "apply": {
+        "model": "citybuilder:block/window_dark_blue_side"
+      }
+    },
+    {
+      "when": {
+        "east": "true"
+      },
+      "apply": {
+        "model": "citybuilder:block/window_dark_blue_side",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true"
+      },
+      "apply": {
+        "model": "citybuilder:block/window_dark_blue_side",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true"
+      },
+      "apply": {
+        "model": "citybuilder:block/window_dark_blue_side",
+        "y": 270
+      }
     }
-  }
+  ]
 }

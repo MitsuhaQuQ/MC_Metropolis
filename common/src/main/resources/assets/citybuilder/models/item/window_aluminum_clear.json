@@ -1,3 +1,6 @@
 {
-  "parent": "citybuilder:block/window_aluminum_clear"
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "citybuilder:block/window_glass_clear"
+  }
 }

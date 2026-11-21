@@ -4,9 +4,10 @@ tables and names. Run from the repository root: python tools/textures/window_tex
 The textures are drawn by this script for this mod (no outside sources), so they carry the mod's own licence.
 
 The blocks (see common's block.BuildingBlocks; core's building.Palette picks them for a building's windows and shop
-fronts): window_<frame>_<glass>, a whole block of glazing, translucent, drawn the same on every side. Its frame runs
-along its top and bottom and down its left edge, so windows side by side make one band of glass with a mullion every
-metre, and turn a corner unbroken. Frames: aluminium (the usual Japanese sash), dark (offices' black frames), wood
+fronts): window_<frame>_<glass>, joined to the windows beside it as a pane is (its block state is the pane's), but
+framed and set back: the glass two pixels thick in the middle of the block, a head along its top, a sill a pixel proud
+of the glass along its foot, a mullion at the middle; so a wall keeps its depth round its windows, and windows side by
+side run on as one band. Frames: aluminium (the usual Japanese sash), dark (offices' black frames), wood
 (houses and machiya), white; glass: clear, blue, grey.
 """
 import json
@@ -52,26 +53,55 @@ def shade(c, d):
     return tuple(clamp(v + d) for v in c[:3])
 
 
-def window(frame, glass):
-    """A metre of glazing: the frame along the top and the sill along the bottom, a mullion down the left edge; the
-    glass with a faint reflection running across it diagonally."""
+def frame_texture(frame):
+    """A window's frame: the colour, a little lighter along the top of each pixel row's grain."""
+    return [[(*shade(frame, 8 if y % 4 == 0 else -4 if y % 4 == 3 else 0), 255) for x in range(16)] for y in range(16)]
+
+
+def glass_texture(glass):
+    """A window's glass: the tint, with a faint reflection running across it diagonally."""
     rows = []
     for y in range(16):
         row = []
         for x in range(16):
-            if y == 0:
-                row.append((*shade(frame, 10), 255))
-            elif y == 15:
-                row.append((*shade(frame, -22), 255))
-            elif x == 0:
-                row.append((*frame, 255))
-            else:
-                band = 9 <= (x + 16 - y) % 16 <= 11
-                r, g, b, a = glass
-                d = 26 if band else 0
-                row.append((clamp(r + d), clamp(g + d), clamp(b + d), clamp(a + (30 if band else 0))))
+            band = 9 <= (x + 16 - y) % 16 <= 11
+            r, g, b, a = glass
+            d = 26 if band else 0
+            row.append((clamp(r + d), clamp(g + d), clamp(b + d), clamp(a + (30 if band else 0))))
         rows.append(row)
     return rows
+
+
+def element(frm, to, texture, faces):
+    """A box with the faces named, each textured to its own extent of the texture."""
+    x0, y0, z0 = frm
+    x1, y1, z1 = to
+    uv = {'down': [x0, z0, x1, z1], 'up': [x0, z0, x1, z1], 'north': [16 - x1, 16 - y1, 16 - x0, 16 - y0],
+          'south': [x0, 16 - y1, x1, 16 - y0], 'west': [z0, 16 - y1, z1, 16 - y0], 'east': [16 - z1, 16 - y1, 16 - z0, 16 - y0]}
+    return {'from': list(frm), 'to': list(to), 'faces': {f: {'uv': uv[f], 'texture': texture} for f in faces}}
+
+
+SIDES = ('down', 'up', 'west', 'east')
+
+
+def post_model(frame, glass):
+    """The middle of a window: the mullion, the full height, and the sill's foot under it."""
+    return {'parent': 'minecraft:block/block', 'render_type': 'minecraft:translucent',
+            'textures': {'particle': f'citybuilder:block/window_glass_{glass}', 'frame': f'citybuilder:block/window_frame_{frame}'},
+            'elements': [element((7, 0, 7), (9, 16, 9), '#frame', ('down', 'up', 'north', 'south', 'west', 'east')),
+                         element((6, 0, 6), (10, 1, 10), '#frame', ('up', 'north', 'south', 'west', 'east'))]}
+
+
+def side_model(frame, glass):
+    """A window's half towards the north, from its middle to the block's edge: the glass two pixels thick, the head
+    along its top and the sill a pixel proud of it either side along its foot; no end faces, so windows side by side
+    run on as one."""
+    return {'parent': 'minecraft:block/block', 'render_type': 'minecraft:translucent',
+            'textures': {'particle': f'citybuilder:block/window_glass_{glass}', 'frame': f'citybuilder:block/window_frame_{frame}',
+                         'glass': f'citybuilder:block/window_glass_{glass}'},
+            'elements': [element((7, 1, 0), (9, 15, 7), '#glass', ('west', 'east')),
+                         element((7, 15, 0), (9, 16, 7), '#frame', ('up', 'down', 'west', 'east')),
+                         element((6, 0, 0), (10, 1, 7), '#frame', ('up', 'west', 'east'))]}
 
 
 def write(path, data):
@@ -101,15 +131,28 @@ def add_names(names):
 
 def main():
     names = {}
+    for frame, (fc, _, _) in FRAMES.items():
+        png(os.path.join(TEXTURES, f'window_frame_{frame}.png'), frame_texture(fc))
+    for glass, (gc, _, _) in GLASS.items():
+        png(os.path.join(TEXTURES, f'window_glass_{glass}.png'), glass_texture(gc))
     for frame, (fc, fen, fzh) in FRAMES.items():
         for glass, (gc, gen, gzh) in GLASS.items():
             n = f'window_{frame}_{glass}'
-            png(os.path.join(TEXTURES, f'{n}.png'), window(fc, gc))
-            write(os.path.join(MODELS, f'{n}.json'), {'parent': 'minecraft:block/cube_all',
-                                                      'render_type': 'minecraft:translucent',
-                                                      'textures': {'all': f'citybuilder:block/{n}'}})
-            write(os.path.join(BLOCKSTATES, f'{n}.json'), {'variants': {'': {'model': f'citybuilder:block/{n}'}}})
-            write(os.path.join(ITEMS, f'{n}.json'), {'parent': f'citybuilder:block/{n}'})
+            # The first version's whole-block glazing, gone
+            for old in (os.path.join(TEXTURES, f'{n}.png'), os.path.join(MODELS, f'{n}.json')):
+                if os.path.exists(old):
+                    os.remove(old)
+            write(os.path.join(MODELS, f'{n}_post.json'), post_model(frame, glass))
+            write(os.path.join(MODELS, f'{n}_side.json'), side_model(frame, glass))
+            side = f'citybuilder:block/{n}_side'
+            write(os.path.join(BLOCKSTATES, f'{n}.json'), {'multipart': [
+                {'apply': {'model': f'citybuilder:block/{n}_post'}},
+                {'when': {'north': 'true'}, 'apply': {'model': side}},
+                {'when': {'east': 'true'}, 'apply': {'model': side, 'y': 90}},
+                {'when': {'south': 'true'}, 'apply': {'model': side, 'y': 180}},
+                {'when': {'west': 'true'}, 'apply': {'model': side, 'y': 270}}]})
+            write(os.path.join(ITEMS, f'{n}.json'), {'parent': 'minecraft:item/generated',
+                                                    'textures': {'layer0': f'citybuilder:block/window_glass_{glass}'}})
             write(os.path.join(LOOT, f'{n}.json'), {
                 'type': 'minecraft:block',
                 'pools': [{'rolls': 1, 'entries': [{'type': 'minecraft:item', 'name': f'citybuilder:{n}'}],
