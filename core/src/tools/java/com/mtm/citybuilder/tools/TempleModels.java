@@ -8,6 +8,7 @@ import com.google.gson.JsonParser;
 import com.mtm.citybuilder.core.building.temple.Belfry;
 import com.mtm.citybuilder.core.building.temple.Corridor;
 import com.mtm.citybuilder.core.building.temple.Furnishing;
+import com.mtm.citybuilder.core.building.temple.Garden;
 import com.mtm.citybuilder.core.building.temple.Gate;
 import com.mtm.citybuilder.core.building.temple.Ground;
 import com.mtm.citybuilder.core.building.temple.GateStyle;
@@ -69,6 +70,24 @@ public final class TempleModels {
         }
     }
 
+    /** A garden on a bed of earth one block deep: {@code style} karesansui or moss, {@code width}, {@code depth}. */
+    static Model garden(JsonObject o) {
+        Model m = new Model();
+        int w = i(o, "width"), d = i(o, "depth");
+        for (int x = 0; x < w; x++) {
+            for (int z = 0; z < d; z++) {
+                m.set(x, 0, z, "minecraft:dirt");
+            }
+        }
+        long seed = o.has("seed") ? o.get("seed").getAsLong() : 1L;
+        if (str(o, "style", "karesansui").equals("moss")) {
+            Garden.moss(m, w, d, 2, seed);
+        } else {
+            Garden.karesansui(m, w, d, 2, seed);
+        }
+        return m;
+    }
+
     static Model build(JsonObject o) {
         TemplePalette palette = TemplePalette.named(str(o, "palette", "NATURAL"));
         return switch (o.get("kind").getAsString()) {
@@ -96,14 +115,17 @@ public final class TempleModels {
                     RoofType.valueOf(str(o, "roof", "IRIMOYA")), d(o, "gableInset", 0), i(o, "overhang", 2),
                     i(o, "floor", 2), bool(o, "lanterns"), bool(o, "panels"), bool(o, "fence"), palette).build();
             case "torii" -> new Torii(i(o, "span"), i(o, "height"), palette).build();
-            case "torii_tunnel" -> new ToriiTunnel(i(o, "length"), i(o, "span"), i(o, "height"), i(o, "spacing", 2),
-                    palette).build();
+            case "torii_tunnel" -> o.has("ground")
+                    ? new ToriiTunnel(i(o, "length"), i(o, "span"), i(o, "height"), i(o, "spacing", 2), palette)
+                    .build(ground(o), bool(o, "showGround"))
+                    : new ToriiTunnel(i(o, "length"), i(o, "span"), i(o, "height"), i(o, "spacing", 2), palette).build();
             case "sanctuary" -> new Sanctuary(Sanctuary.Style.valueOf(str(o, "style", "KASUGA")), i(o, "bodyWidth"),
                     i(o, "bodyDepth"), i(o, "overhang", 2), d(o, "eave"), d(o, "ridge"), i(o, "floor", 2), palette)
                     .build();
             case "corridor" -> new Corridor(i(o, "lengthA"), i(o, "lengthB", 0), i(o, "depth", 4), d(o, "eave"),
                     d(o, "ridge"), palette).build();
             case "lantern" -> Furnishing.lantern(i(o, "height"));
+            case "garden" -> garden(o);
             case "precinct" -> new Precinct(Precinct.Kind.valueOf(str(o, "precinct", "SHRINE")),
                     o.has("rank") ? Precinct.Rank.valueOf(str(o, "rank", "MEDIUM")) : null, i(o, "width"), i(o, "depth"),
                     o.has("seed") ? o.get("seed").getAsLong() : 1L, palette, ground(o), bool(o, "showGround")).build();

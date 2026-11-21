@@ -1,0 +1,14 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "citybuilder:block/raked_gravel"
+    },
+    "axis=y": {
+      "model": "citybuilder:block/raked_gravel"
+    },
+    "axis=z": {
+      "model": "citybuilder:block/raked_gravel",
+      "y": 90
+    }
+  }
+}

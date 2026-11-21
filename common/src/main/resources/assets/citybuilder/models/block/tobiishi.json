@@ -1,0 +1,109 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "citybuilder:block/koke",
+    "top": "citybuilder:block/koke",
+    "side": "citybuilder:block/koke_side",
+    "bottom": "minecraft:block/dirt",
+    "stone": "citybuilder:block/tobiishi_stone",
+    "rock": "citybuilder:block/niwaishi"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "down": {
+          "texture": "#bottom",
+          "cullface": "down"
+        },
+        "up": {
+          "texture": "#top"
+        },
+        "north": {
+          "texture": "#side",
+          "cullface": "north"
+        },
+        "south": {
+          "texture": "#side",
+          "cullface": "south"
+        },
+        "west": {
+          "texture": "#side",
+          "cullface": "west"
+        },
+        "east": {
+          "texture": "#side",
+          "cullface": "east"
+        }
+      }
+    },
+    {
+      "from": [
+        2,
+        16,
+        2
+      ],
+      "to": [
+        14,
+        18,
+        14
+      ],
+      "faces": {
+        "up": {
+          "texture": "#stone",
+          "uv": [
+            2,
+            2,
+            14,
+            14
+          ]
+        },
+        "north": {
+          "texture": "#rock",
+          "uv": [
+            2,
+            0,
+            14,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#rock",
+          "uv": [
+            2,
+            0,
+            14,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#rock",
+          "uv": [
+            2,
+            0,
+            14,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#rock",
+          "uv": [
+            2,
+            0,
+            14,
+            2
+          ]
+        }
+      }
+    }
+  ]
+}

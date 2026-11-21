@@ -23,10 +23,131 @@ class TempleTest {
     }
 
     @Test
-    void blocksAreVanillaStates() {
-        for (Model m : List.of(KONDO.build(), PAGODA.build())) {
-            m.forEach((x, y, z, s) -> assertTrue(s.startsWith("minecraft:") && !s.contains("null"), s));
+    void blocksAreVanillaOrOurs() {
+        Model precinct = new Precinct(Precinct.Kind.TEMPLE, Precinct.Rank.LARGE, 89, 121, 8, TemplePalette.NATURAL,
+                Ground.flat(), false).build();
+        for (Model m : List.of(KONDO.build(), PAGODA.build(), precinct)) {
+            m.forEach((x, y, z, s) -> {
+                String id = s.contains("[") ? s.substring(0, s.indexOf('[')) : s;
+                assertTrue(id.startsWith("minecraft:") || Decor.IDS.contains(id), s);
+                assertTrue(!s.contains("null"), s);
+            });
         }
+    }
+
+    @Test
+    void tatamiLieInPairs() {
+        // Each tatami block is half a mat: the block beside it, away from its seam end, faces the other way.
+        Model m = KONDO.build();
+        int[] halves = {0, 0};
+        m.forEach((x, y, z, s) -> {
+            if (!s.startsWith(Decor.TATAMI)) {
+                return;
+            }
+            halves[0]++;
+            String f = s.substring(s.indexOf("facing=") + 7, s.length() - 1);
+            int dx = f.equals("east") ? -1 : f.equals("west") ? 1 : 0, dz = f.equals("south") ? -1 : f.equals("north") ? 1 : 0;
+            String o = f.equals("east") ? "west" : f.equals("west") ? "east" : f.equals("north") ? "south" : "north";
+            if (Decor.tatami(o).equals(m.get(x + dx, y, z + dz))) {
+                halves[1]++;
+            }
+        });
+        assertTrue(halves[1] >= 0.85 * halves[0], halves[1] + " of " + halves[0] + " tatami halves in a mat");
+    }
+
+    @Test
+    void stairwaysFollowTheGround() {
+        // Up a hill that steepens towards the top: the approach's steps come closer together where it is steeper,
+        // the steep flights are broken by landings, and it meets the ground at the street.
+        Ground g = Ground.hillside(100, 0.15, 0.007);
+        int n = 100;
+        List<Integer> landings = new ArrayList<>();
+        int top = (int) Math.round(g.height(0, 0));
+        int[] lv = Earthwork.approach(new Model(), g, 0, 2, 5, 0, n, top, Decor.ISHIDATAMI, Decor.TAMAJARI,
+                "minecraft:red_nether_brick_fence", landings);
+        for (int i = 1; i < n; i++) {
+            assertTrue(Math.abs(lv[i] - lv[i - 1]) <= 1, "a step at a time at " + i);
+        }
+        assertTrue(Math.abs(lv[n - 1] - g.height(0, n - 1)) <= 1, "meets the street: " + lv[n - 1]);
+        // Rises per block over the top (steep) and the foot (gentle) of the climb.
+        double steep = Math.abs(lv[30] - lv[0]) / 30.0, gentle = Math.abs(lv[95] - lv[70]) / 25.0;
+        // Steeper than 1:1 above: a step every block; lower down about as steep as the ground there (0.4).
+        assertTrue(steep >= 0.9 && gentle > 0.2 && gentle < 0.7, "steep " + steep + ", gentle " + gentle);
+        double foot = Math.abs(lv[99] - lv[88]) / 11.0;
+        assertTrue(foot < gentle, "gentler still at the very foot: " + foot);
+        assertTrue(!landings.isEmpty(), "landings on the steep flights");
+        for (int lz : landings) {
+            assertEquals(lv[lz - 1], lv[lz]);
+            assertEquals(lv[lz], lv[lz + 1], "a landing is level");
+        }
+    }
+
+    @Test
+    void toriiTunnelClimbsTheMountain() {
+        // The torii tunnel on a mountain path: the path steps with the ground as an approach does, each torii stands
+        // on the path where it is, and one walks up it a block at a time, the tie beams clear overhead.
+        Ground g = Ground.hillside(58, 0.2, 0.008);
+        ToriiTunnel t = new ToriiTunnel(60, 3, 7, 2, TemplePalette.INARI);
+        Model m = t.build(g, false);
+        int prev = Integer.MIN_VALUE, rises = 0;
+        for (int z = 0; z < 60; z++) {
+            int top = Integer.MIN_VALUE;
+            for (int y = 80; y >= -10; y--) {
+                String s = m.get(1, y, z);
+                if (s != null && (s.equals(Decor.ISHIDATAMI) || s.contains("stone_brick_stairs"))) {
+                    for (int k = 1; k <= 3; k++) {
+                        assertTrue(!solid(m, 1, y + k, z), "clear over the path at z " + z + ": " + m.get(1, y + k, z));
+                    }
+                    top = y;
+                    break;
+                }
+            }
+            assertTrue(top > Integer.MIN_VALUE, "a path at z " + z);
+            if (prev != Integer.MIN_VALUE) {
+                assertTrue(Math.abs(top - prev) <= 1, "a step of " + (top - prev) + " at z " + z);
+                rises += top != prev ? 1 : 0;
+            }
+            prev = top;
+        }
+        assertTrue(rises >= 15, "it climbs: " + rises);
+        // A torii's pillar stands on the path: something solid right under its foot.
+        int pillars = 0;
+        for (int z = 0; z < 60; z += 2) {
+            for (int y = 80; y >= -10; y--) {
+                String s = m.get(0, y, z);
+                if (s != null && s.contains("concrete") && (m.get(0, y - 1, z) == null || !m.get(0, y - 1, z).contains("concrete"))) {
+                    assertTrue(solid(m, 0, y - 1, z), "a pillar on the ground at z " + z);
+                    pillars++;
+                    break;
+                }
+            }
+        }
+        assertTrue(pillars >= 25, "torii all the way: " + pillars);
+    }
+
+    @Test
+    void gardens() {
+        Model m = new Model();
+        List<int[]> rocks = Garden.karesansui(m, new Rect(0, 0, 21, 13), 1, 3);
+        assertTrue(rocks.size() >= 2, "rock groups: " + rocks.size());
+        for (int[] c : rocks) {
+            // Rings all round each group, moss and a stone at its middle.
+            assertTrue(m.get(c[0] + 2, 0, c[1] + 2).startsWith("citybuilder:raked_gravel_ring[facing=south"));
+            assertTrue(m.get(c[0] - 3, 0, c[1] - 1).startsWith("citybuilder:raked_gravel_ring[facing=north"));
+            assertEquals(Decor.KOKE, m.get(c[0], 0, c[1]));
+        }
+        assertEquals(Decor.ISHIDATAMI, m.get(0, 0, 0), "a border of paving");
+        assertTrue(count(m, Decor.NIWAISHI) >= 3 * rocks.size());
+        Model moss = new Model();
+        Garden.moss(moss, new Rect(0, 0, 13, 15), 1, 3);
+        assertTrue(count(moss, Decor.TOBIISHI) >= 5, "a path of stepping stones");
+        assertTrue(count(moss, Decor.BAMBOO_FENCE) > 30, "fenced");
+        // Precincts get gardens where they have room: the large temple both, the large shrine a moss garden.
+        List<Precinct.Placed> placed = new ArrayList<>();
+        new Precinct(Precinct.Kind.TEMPLE, Precinct.Rank.LARGE, 89, 121, 8, TemplePalette.NATURAL, Ground.flat(), false)
+                .plan(placed);
+        assertTrue(placed.stream().anyMatch(pl -> pl.name().equals("karesansui")), "a dry garden");
+        assertTrue(placed.stream().anyMatch(pl -> pl.name().equals("moss_garden")), "a moss garden");
     }
 
     @Test
@@ -524,7 +645,9 @@ class TempleTest {
         Model kondo = KONDO.build();
         assertTrue(count(kondo, Interior.TATAMI) > 200, "tatami floors");
         assertTrue(count(kondo, Interior.GOLD) >= 10, "the main image and its halo");
-        assertTrue(count(kondo, Interior.FUSUMA) > 20, "sliding partitions");
+        assertTrue(count(kondo, Decor.FUSUMA) > 20, "sliding partitions");
+        assertTrue(count(kondo, Decor.COFFERED_CEILING) > 100 && count(kondo, Decor.ZABUTON) > 10
+                && count(kondo, Decor.KORO) == 1 && count(kondo, Decor.RANMA) > 10, "ceiling, cushions, incense, transoms");
         assertTrue(tatamiReached(kondo, 2) >= 0.9, "every room has a way in");
         for (HallInterior kind : new HallInterior[]{HallInterior.KODO, HallInterior.SHOIN}) {
             Model m = new Hall(31, 21, 9, 15, RoofType.IRIMOYA, 3, 4, 0, 0, 0, 0, 2, 4.5, false, kind,

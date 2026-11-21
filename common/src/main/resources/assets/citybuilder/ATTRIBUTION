@@ -2,3 +2,9 @@ City Builder assets and where they come from.
 
 textures/block/asphalt.png, asphalt_line_white.png, asphalt_line_yellow.png, sidewalk.png
   Drawn for this mod by tools/textures/road_textures.py (no outside sources); the mod's own licence.
+
+textures/block/ishidatami.png, shirasu.png, tamajari.png, koke*.png, raked_gravel*.png, tobiishi_stone.png,
+niwaishi.png, bamboo_fence*.png, tatami*.png, fusuma*.png, shoji*.png, ranma*.png, coffered_ceiling*.png,
+zabuton.png, koro*.png, chochin*.png, shimenawa.png, shide.png, saisen_bako*.png
+  Drawn for this mod by tools/textures/temple_blocks.py (no outside sources); the mod's own licence. The moss
+  block's bottom refers to the game's own dirt texture (nothing copied).

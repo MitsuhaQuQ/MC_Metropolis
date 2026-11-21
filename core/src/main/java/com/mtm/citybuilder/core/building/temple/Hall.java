@@ -102,7 +102,7 @@ public record Hall(int width, int depth, double eave, double ridge, RoofType roo
                 }
             }
             Interior.hall(m, p, outerWalls, platform, mTop, interior);
-            Interior.entrance(m, outerWalls, platform, Math.min(3, mTop - platform));
+            Interior.entrance(m, outerWalls, platform, Math.min(3, mTop - platform), interior == HallInterior.BUTSUDO);
         }
         return m;
     }

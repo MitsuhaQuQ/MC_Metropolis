@@ -67,42 +67,97 @@ final class Earthwork {
         }
     }
 
+    /** Gradient classes of the ground under an approach, by its smoothed slope (rise per block). */
+    static final double STEEP = 0.7, MODERATE = 0.35, GENTLE = 0.12;
+    /** The most rises in one flight before a landing, by gradient class (0 flat .. 3 steep); 0: no landings. */
+    private static final int[] FLIGHT = {0, 0, 14, 10};
+    /** A landing's length along the approach. */
+    static final int LANDING = 3;
+
     /**
-     * The approach along the axis x = cx from z0 southwards to z1 (exclusive): a bed {@code bedHalf} each side of
-     * the axis, levelled across, following the ground lengthwise but never more than one block up or down per block,
-     * starting at {@code fromLevel} at z0. Paved {@code paveHalf} each side, gravel beyond; stairs where it steps,
-     * filled below (stone walls at the bed's sides) and cut above. Returns the level at each z, index z - z0.
+     * The approach along the axis x = cx from z0 southwards to z1 (exclusive), starting at {@code fromLevel} at z0: a
+     * bed {@code bedHalf} each side of the axis, levelled across, filled below (stone walls at the bed's sides) and
+     * cut above; paved {@code paveHalf} each side, gravel beyond. Returns the level at each z, index z - z0.
+     *
+     * <p>Its gradient follows the ground's. The level first follows the ground (smoothed over 7 blocks) as closely
+     * as one block per block allows. Then the approach is cut into sections by the ground's gradient (steep, moderate,
+     * gentle, flat; a section at least 4 long), and each section's rise is spread over it evenly, as the treads of one
+     * stairway are even: on steep ground a step every block, on moderate ground every block or two, on gentle ground
+     * long treads between single steps. Where a steep or moderate section rises more than a flight's worth (10 or
+     * 14), it is broken by flat landings (踊り場), {@link #LANDING} long, their middles added to {@code landings}.
+     * Every step runs the bed's whole width (stone stairs, the treads paved); on steep and moderate sections a rail
+     * ({@code rail}, if given) runs along both sides.
      */
     static int[] approach(Model m, Ground g, int cx, int paveHalf, int bedHalf, int z0, int z1, int fromLevel,
-                          String paving, String gravel) {
-        int[] lv = new int[Math.max(0, z1 - z0)];
+                          String paving, String gravel, String rail, java.util.List<Integer> landings) {
+        int n = Math.max(0, z1 - z0);
+        int[] lv = new int[n];
+        if (n == 0) {
+            return lv;
+        }
+        double[] t = new double[n];
+        for (int i = 0; i < n; i++) {
+            double sum = 0;
+            for (int k = -3; k <= 3; k++) {
+                sum += g.height(cx, z0 + Math.max(0, Math.min(n - 1, i + k)));
+            }
+            t[i] = sum / 7;
+        }
         int cur = fromLevel;
-        for (int z = z0; z < z1; z++) {
-            int want = (int) Math.round(g.height(cx, z));
-            cur = z == z0 ? fromLevel : cur + Integer.signum(want - cur);
-            lv[z - z0] = cur;
+        for (int i = 0; i < n; i++) {
+            cur = i == 0 ? fromLevel : cur + Integer.signum((int) Math.round(t[i]) - cur);
+            lv[i] = cur;
+        }
+        int[] cls = new int[n];
+        for (int i = 0; i < n; i++) {
+            int lo = Math.max(0, i - 3), hi = Math.min(n - 1, i + 3);
+            double slope = hi > lo ? Math.abs(t[hi] - t[lo]) / (hi - lo) : 0;
+            cls[i] = slope >= STEEP ? 3 : slope >= MODERATE ? 2 : slope >= GENTLE ? 1 : 0;
+        }
+        for (int i = 1; i < n; i++) { // sections shorter than 4 join the one before
+            int j = i;
+            while (j + 1 < n && cls[j + 1] == cls[i]) {
+                j++;
+            }
+            if (cls[i] != cls[i - 1] && j - i + 1 < 4) {
+                for (int k = i; k <= j; k++) {
+                    cls[k] = cls[i - 1];
+                }
+            }
+            i = j;
+        }
+        for (int a = 0; a < n; ) {
+            int b = a;
+            while (b + 1 < n && cls[b + 1] == cls[a]) {
+                b++;
+            }
+            even(lv, a, b, FLIGHT[cls[a]], z0, landings);
+            a = b + 1;
         }
         for (int z = z0; z < z1; z++) {
             int l = lv[z - z0];
             boolean stepDown = z + 1 < z1 && lv[z + 1 - z0] < l; // dropping southwards: a step on the next block
             boolean stepUp = z + 1 < z1 && lv[z + 1 - z0] > l; // rising southwards: a step on this block
+            boolean stair = stepDown || stepUp || z > z0 && lv[z - 1 - z0] != l;
             for (int x = cx - bedHalf; x <= cx + bedHalf; x++) {
                 boolean side = Math.abs(x - cx) == bedHalf;
                 int s = g.surface(x, z);
                 for (int y = s + 1; y < l - 1; y++) {
                     m.set(x, y, z, side ? wall(x, y, z) : FILL);
                 }
-                m.set(x, l - 1, z, Math.abs(x - cx) <= paveHalf ? paving : gravel);
+                m.set(x, l - 1, z, Math.abs(x - cx) <= paveHalf || stair && !side ? paving : gravel);
                 for (int y = l; y <= Math.max(s, l + 3); y++) {
                     m.setIfEmpty(x, y, z, AIR);
                 }
-                if (Math.abs(x - cx) <= paveHalf) {
+                if (!side) {
                     if (stepDown) {
                         m.set(x, l - 1, z + 1, STEP + "[facing=north,half=bottom]");
                     }
                     if (stepUp) {
                         m.set(x, l, z, STEP + "[facing=south,half=bottom]");
                     }
+                } else if (rail != null && cls[z - z0] >= 2) {
+                    m.set(x, l, z, rail);
                 }
             }
             // Where the ground beside the bed stands higher, a wall holds it back.
@@ -113,6 +168,45 @@ final class Earthwork {
             }
         }
         return lv;
+    }
+
+    /**
+     * Respaces the steps between indices a and b of a level profile (keeping both ends' levels): the net rise spread
+     * evenly over the section, in flights of at most {@code flight} rises (0: one flight) with flat landings between.
+     */
+    private static void even(int[] lv, int a, int b, int flight, int z0, java.util.List<Integer> landings) {
+        int len = b - a, k = Math.abs(lv[b] - lv[a]), dir = Integer.signum(lv[b] - lv[a]);
+        if (len <= 0) {
+            return;
+        }
+        int flights = flight > 0 ? (k + flight - 1) / flight : 1;
+        while (flights > 1 && len - (flights - 1) * LANDING < k) {
+            flights--;
+        }
+        flights = Math.max(1, flights);
+        int usable = len - (flights - 1) * LANDING, extra = usable - k;
+        int[] delta = new int[len];
+        int pos = 0, risesDone = 0, extraDone = 0;
+        for (int f = 0; f < flights; f++) {
+            int rises = (int) ((long) k * (f + 1) / flights) - risesDone;
+            int more = (int) ((long) extra * (f + 1) / flights) - extraDone;
+            int span = rises + more;
+            for (int j = 0; j < span; j++) {
+                delta[pos + j] = (int) ((long) (j + 1) * rises / span - (long) j * rises / span);
+            }
+            pos += span;
+            risesDone += rises;
+            extraDone += more;
+            if (f < flights - 1) {
+                if (landings != null) {
+                    landings.add(z0 + a + pos + LANDING / 2);
+                }
+                pos += LANDING;
+            }
+        }
+        for (int i = 0; i < len; i++) {
+            lv[a + i + 1] = lv[a + i] + dir * delta[i];
+        }
     }
 
     /**

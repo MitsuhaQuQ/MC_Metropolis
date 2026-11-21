@@ -54,7 +54,12 @@ public record Precinct(Kind kind, Rank rank, int width, int depth, long seed, Te
         }
     }
 
-    static final String GRAVEL = "minecraft:white_concrete_powder", PAVING = "minecraft:polished_andesite";
+    static final String PAVING = Decor.ISHIDATAMI;
+
+    /** The courts' and the approach's gravel: white sand at a temple (白砂), grey pebbles at a shrine (玉砂利). */
+    private String gravel() {
+        return kind == Kind.TEMPLE ? Decor.SHIRASU : Decor.TAMAJARI;
+    }
 
     /** The court's width a rank's parts are sized for at scale 1. */
     private static int referenceCourt(Kind kind, Rank r) {
@@ -217,12 +222,14 @@ public record Precinct(Kind kind, Rank rank, int width, int depth, long seed, Te
         // A large precinct's corridor runs round the whole court on one level; smaller ones step up to the inner terrace.
         int lc = Earthwork.level(ground, rk == Rank.LARGE ? court : front);
         int li = rk == Rank.LARGE ? lc : Math.max(lc, Math.min(lc + 6, Earthwork.level(ground, inner)));
-        Earthwork.terrace(m, ground, front, lc, GRAVEL);
-        Earthwork.terrace(m, ground, inner, li, GRAVEL);
+        Earthwork.terrace(m, ground, front, lc, gravel());
+        Earthwork.terrace(m, ground, inner, li, gravel());
         if (li > lc) {
             Earthwork.steps(m, cx, 2, inner.z1() - 1, lc, li);
         }
-        int[] path = Earthwork.approach(m, ground, cx, 2, 5, court.z1(), depth, lc, PAVING, GRAVEL);
+        List<Integer> landings = new ArrayList<>();
+        int[] path = Earthwork.approach(m, ground, cx, 2, 5, court.z1(), depth, lc, PAVING, gravel(),
+                kind == Kind.SHRINE ? p.rail() : "minecraft:stone_brick_wall", landings);
         keep.add(new Rect(cx - 6, court.z1(), cx + 7, depth));
 
         // The corridor round the court and the gate in its front, or the gate at the court's front.
@@ -260,6 +267,7 @@ public record Precinct(Kind kind, Rank rank, int width, int depth, long seed, Te
             int bz = Math.min(courtFront, afterSteps + b.depth() - 1);
             put(m, b, bx, bz, lc, side < 0 ? k.leftName : k.rightName, keep, placed);
         }
+        gardens(m, inner, li, front, lc, k.ring, cx, placed);
         // On the approach: guardians at the court, the purification pavilion, lanterns, the torii at the street.
         int g0 = court.z1() + 2;
         if (kind == Kind.SHRINE) {
@@ -268,13 +276,31 @@ public record Precinct(Kind kind, Rank rank, int width, int depth, long seed, Te
         if (rk != Rank.SMALL && depth - court.z1() > 16) {
             temizuya(m, p, kind == Kind.SHRINE ? cx + 8 : cx - 8 - 9, court.z1() + 6, path, court.z1(), keep, placed);
         }
-        Model lantern = Furnishing.lantern(rk == Rank.SMALL ? 5 : 7);
+        // Lanterns in pairs along the level stretches (not on the steps), and at every landing of a stairway.
+        Model lantern = Furnishing.lantern(rk == Rank.SMALL ? 5 : 7), small = Furnishing.lantern(4);
         int approachLen = depth - court.z1();
         int every = rk == Rank.SMALL ? Math.max(6, approachLen / 2) : 8;
-        for (int z = court.z1() + 5; z < depth - 4; z += every) {
-            int l = path[z - court.z1()];
-            m.place(lantern, cx - 4 - lantern.width() / 2, l, z - lantern.depth() / 2, false);
-            m.place(lantern, cx + 4 - lantern.width() / 2, l, z - lantern.depth() / 2, false);
+        for (int z = court.z1() + 5; z < depth - 4; ) {
+            int i = z - court.z1();
+            boolean level = path[i - 1] == path[i] && path[i] == path[Math.min(path.length - 1, i + 1)];
+            int zz = z;
+            boolean nearLanding = landings.stream().anyMatch(lz -> Math.abs(lz - zz) <= 2);
+            if (!level || nearLanding) {
+                z++;
+                continue;
+            }
+            m.place(lantern, cx - 4 - lantern.width() / 2, path[i], z - lantern.depth() / 2, false);
+            m.place(lantern, cx + 4 - lantern.width() / 2, path[i], z - lantern.depth() / 2, false);
+            z += every;
+        }
+        for (int lz : landings) {
+            int l = path[lz - court.z1()];
+            m.place(small, cx - 4, l, lz + 1, false);
+            m.place(small, cx + 4, l, lz + 1, false);
+            // A shrine's stairway passes under a torii at each landing (not crowding the court or the street torii).
+            if (kind == Kind.SHRINE && rk != Rank.SMALL && lz > court.z1() + 6 && lz < depth - 9) {
+                put(m, new Torii(7, 8, p).build(), cx, lz, l, "torii_landing", keep, placed);
+            }
         }
         if (k.torii != null) {
             int tz = depth - 3;
@@ -297,6 +323,87 @@ public record Precinct(Kind kind, Rank rank, int width, int depth, long seed, Te
             Earthwork.showGround(m, ground, new Rect(0, 0, width, depth), bottom - 2);
         }
         return m;
+    }
+
+    /**
+     * Gardens in the largest free rectangles of the terraces once the buildings stand: at a temple a dry garden and a
+     * moss garden, at a shrine a moss garden. Free means clear of every building by a block, of the axis (the path up
+     * it) by three, of the corridor, and of the terraces' edges; a garden is at least {@link Garden#MIN} each way and
+     * at most 21.
+     */
+    private void gardens(Model m, Rect inner, int li, Rect front, int lc, boolean ring, int cx, List<Placed> placed) {
+        boolean[][] taken = new boolean[width][depth];
+        for (Placed pl : placed) {
+            mark(taken, pl.area().grow(1));
+        }
+        mark(taken, new Rect(cx - 4, 0, cx + 5, depth));
+        List<String> kinds = kind == Kind.TEMPLE ? List.of("karesansui", "moss_garden") : List.of("moss_garden");
+        for (int g = 0; g < kinds.size(); g++) {
+            Rect best = null;
+            int bestLevel = 0;
+            for (int t = 0; t < 2; t++) {
+                Rect terrace = (t == 0 ? inner : front).grow(ring ? -6 : -1);
+                Rect r = largestFree(taken, terrace, Garden.MIN, 21);
+                if (r != null && (best == null || r.width() * r.depth() > best.width() * best.depth())) {
+                    best = r;
+                    bestLevel = t == 0 ? li : lc;
+                }
+            }
+            if (best == null) {
+                break;
+            }
+            long h = Hash.of(seed, 5 + g);
+            if (kinds.get(g).equals("karesansui")) {
+                Garden.karesansui(m, best, bestLevel, h);
+            } else {
+                Garden.moss(m, best, bestLevel, h);
+            }
+            placed.add(new Placed(kinds.get(g), best, bestLevel));
+            mark(taken, best.grow(1));
+        }
+    }
+
+    private void mark(boolean[][] taken, Rect r) {
+        for (int x = Math.max(0, r.x0()); x < Math.min(width, r.x1()); x++) {
+            for (int z = Math.max(0, r.z0()); z < Math.min(depth, r.z1()); z++) {
+                taken[x][z] = true;
+            }
+        }
+    }
+
+    /** The largest free rectangle inside {@code within}, sides from min to max; ties to the first found. */
+    private Rect largestFree(boolean[][] taken, Rect within, int min, int max) {
+        int x0 = Math.max(0, within.x0()), z0 = Math.max(0, within.z0());
+        int x1 = Math.min(width, within.x1()), z1 = Math.min(depth, within.z1());
+        if (x1 - x0 < min || z1 - z0 < min) {
+            return null;
+        }
+        int[][] sum = new int[x1 - x0 + 1][z1 - z0 + 1]; // taken blocks in [x0, x) x [z0, z)
+        for (int x = x0; x < x1; x++) {
+            for (int z = z0; z < z1; z++) {
+                sum[x - x0 + 1][z - z0 + 1] = sum[x - x0][z - z0 + 1] + sum[x - x0 + 1][z - z0] - sum[x - x0][z - z0]
+                        + (taken[x][z] ? 1 : 0);
+            }
+        }
+        Rect best = null;
+        int area = 0;
+        for (int a = 0; a + min <= x1 - x0; a++) {
+            for (int b = 0; b + min <= z1 - z0; b++) {
+                for (int w = Math.min(max, x1 - x0 - a); w >= min; w--) {
+                    if (w * Math.min(max, z1 - z0 - b) <= area) {
+                        break;
+                    }
+                    for (int d = Math.min(max, z1 - z0 - b); d >= min && w * d > area; d--) {
+                        int n = sum[a + w][b + d] - sum[a][b + d] - sum[a + w][b] + sum[a][b];
+                        if (n == 0) {
+                            best = new Rect(x0 + a, z0 + b, x0 + a + w, z0 + b + d);
+                            area = w * d;
+                        }
+                    }
+                }
+            }
+        }
+        return best;
     }
 
     private static List<Rect> keepBut(List<Rect> keep, int skip) {

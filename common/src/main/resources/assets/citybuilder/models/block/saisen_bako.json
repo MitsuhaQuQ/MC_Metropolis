@@ -1,0 +1,42 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "citybuilder:block/saisen_bako",
+    "f": "citybuilder:block/saisen_bako",
+    "top": "citybuilder:block/saisen_bako_top"
+  },
+  "elements": [
+    {
+      "from": [
+        1,
+        0,
+        3
+      ],
+      "to": [
+        15,
+        10,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#f"
+        },
+        "south": {
+          "texture": "#f"
+        },
+        "west": {
+          "texture": "#f"
+        },
+        "east": {
+          "texture": "#f"
+        },
+        "up": {
+          "texture": "#top"
+        },
+        "down": {
+          "texture": "#f"
+        }
+      }
+    }
+  ]
+}

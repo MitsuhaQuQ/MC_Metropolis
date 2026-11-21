@@ -133,6 +133,12 @@ public final class Model {
         for (int k = 0; k < props.length; k++) {
             String[] kv = props[k].split("=", 2);
             String v = kv[1];
+            for (int f = 0; f < 4; f++) { // a pane's joins on its sides turn with it
+                if (FACINGS[f].equals(kv[0])) {
+                    kv[0] = FACINGS[(f + q) % 4];
+                    break;
+                }
+            }
             if (kv[0].equals("facing")) {
                 for (int f = 0; f < 4; f++) {
                     if (FACINGS[f].equals(v)) {

@@ -195,6 +195,17 @@ TEMPLES = {
                                        ground="slope", perX=0, perZ=-0.05, showGround=True, palette="NATURAL"),
     "demo_hall_copper": dict(kind="hall", role="HAIDEN", width=29, depth=21, eave=8.0, ridge=17.0, roof="IRIMOYA", gableInset=4,
                              overhang=4, platform=2, bay=4.0, palette="COPPER"),
+    # A shrine high on a mountainside: the approach climbs ~40 m from the street, gentle at the foot, steeper and
+    # steeper up the hill, so its stairway's treads shorten and landings with torii break the steep flights.
+    "demo_precinct_shrine_mountain": dict(kind="precinct", role="KEIDAI", precinct="SHRINE", width=41, depth=121,
+                                          seed=12, ground="hillside", foot=112, grade=0.25, steepen=0.006,
+                                          showGround=True, palette="VERMILION"),
+    # The torii tunnel up a mountain path (Inariyama): gentle at the foot, steeper higher up, landings on the steep part.
+    "demo_senbon_torii_mountain": dict(kind="torii_tunnel", role="TORII", length=60, span=3, height=7, spacing=2,
+                                       ground="hillside", foot=58, grade=0.2, steepen=0.008, showGround=True,
+                                       palette="INARI"),
+    "demo_karesansui": dict(kind="garden", role="TEIEN", style="karesansui", width=25, depth=15, seed=7),
+    "demo_moss_garden": dict(kind="garden", role="TEIEN", style="moss", width=15, depth=17, seed=7),
     "demo_shoin": dict(kind="hall", role="QUARTERS", width=27, depth=21, eave=5.5, ridge=11.0, roof="IRIMOYA",
                        gableInset=3, overhang=3, platform=1, bay=3.0, veranda=True),
 }
@@ -238,6 +249,9 @@ LABELS = {
     "demo_precinct_temple_medium_hill": ("sacred", TEMPLE, "GARAN"),
     "demo_precinct_temple_large": ("sacred", TEMPLE, "GARAN"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
     "demo_shoin": ("sacred", TEMPLE, "QUARTERS"),
+    "demo_precinct_shrine_mountain": ("sacred", SHRINE, "KEIDAI"),
+    "demo_senbon_torii_mountain": ("sacred", SHRINE, "TORII"),
+    "demo_karesansui": ("sacred", TEMPLE, "TEIEN"), "demo_moss_garden": ("sacred", BOTH, "TEIEN"),
 }
 DEMO_NAMES = {"demo_precinct_shrine_small_hill": "小さな神社（山の斜面）", "demo_precinct_shrine_medium_hill": "中規模の神社（山麓）",
               "demo_precinct_shrine_large": "大きな神社（稲荷風、緩い斜面）", "demo_precinct_temple_medium_hill": "中規模の寺院（山麓）",
@@ -246,7 +260,10 @@ DEMO_NAMES = {"demo_precinct_shrine_small_hill": "小さな神社（山の斜面
               "demo_komainu": "狛犬", "demo_kitsune": "狐（稲荷）", "demo_temizuya": "手水舎", "inari_otorii": "伏見稲荷大社 大鳥居", "inari_senbon_torii": "伏見稲荷大社 千本鳥居", "demo_honden_nagare": "本殿（流造、檜皮葺）", "demo_honden_chigi": "本殿（千木・鰹木）",
               "demo_torii": "鳥居（明神鳥居）", "demo_otorii": "大鳥居", "demo_gate_vermilion": "二重門（朱塗り、宝蔵門風）", "demo_belfry_open": "鐘楼（吹放し）",
               "demo_belfry_hakamagoshi": "鐘楼（袴腰）","demo_pagoda_vermilion": "五重塔（朱塗り、浅草寺風）", "demo_hall_copper": "拝殿（銅板葺、神社）",
-              "demo_shoin": "書院・庫裏（和室）"}
+              "demo_shoin": "書院・庫裏（和室）", "demo_karesansui": "枯山水（砂紋、石組）",
+              "demo_precinct_shrine_mountain": "山上の神社（石段の参道、踊り場に鳥居）",
+              "demo_senbon_torii_mountain": "千本鳥居（山道、石段）",
+              "demo_moss_garden": "苔庭（飛石、灯籠、紅葉、建仁寺垣）"}
 
 
 def label(slug):
@@ -1378,7 +1395,7 @@ def write_nbt(path, blocks, size):
         key = (name, tuple(sorted(props.items())) if props else ())
         if key not in index:
             index[key] = len(states)
-            items = [("Name", 8, nbt_string("minecraft:" + name))]
+            items = [("Name", 8, nbt_string(name if ":" in name else "minecraft:" + name))]
             if props:
                 items.append(("Properties", 10, nbt_compound([(k, 8, nbt_string(v)) for k, v in sorted(props.items())])))
             states.append(nbt_compound(items))
@@ -1397,7 +1414,7 @@ def write_nbt(path, blocks, size):
 # ---------------------------------------------------------------- preview
 
 COLOURS = {
-    "stripped_bamboo_block": 0xC2B86C, "candle": 0xE6DEC8,
+    "candle": 0xE6DEC8,
     "deepslate_tiles": 0x3A3A3E, "deepslate_tile_stairs": 0x3A3A3E, "deepslate_tile_slab": 0x3A3A3E,
     "calcite": 0xDFE0DC, "dark_oak_planks": 0x4A3220, "dark_oak_log": 0x3C2E1A, "spruce_planks": 0x725431,
     "bricks": 0x976253, "stone_bricks": 0x7A7A7A, "smooth_stone": 0x9E9E9E, "gray_stained_glass": 0x4C5258,
@@ -1478,8 +1495,12 @@ def render(blocks, size, path, bc, max_px=1800):
             spr = shapes["plate_top" if props and props.get("half") == "top" else "plate_bottom"]
         elif name.endswith(("_fence", "_wall", "iron_bars", "lightning_rod", "chain")):
             spr = shapes["post"]
-        elif name == "bell":
+        elif name in ("bell", "citybuilder:koro", "citybuilder:chochin"):
             spr = shapes["bell"]
+        elif name == "citybuilder:zabuton":
+            spr = shapes["plate_bottom"]
+        elif name == "citybuilder:shimenawa":
+            spr = shapes["plate_top"]
         elif props and props.get("type") == "top":
             spr = shapes["slab_top"]
         else:
@@ -1527,7 +1548,8 @@ def render(blocks, size, path, bc, max_px=1800):
 
 def thin(name):
     return name.endswith(("trapdoor", "_fence", "_wall", "iron_bars", "lightning_rod", "chain", "_slab", "_stairs")) \
-        or name == "bell"
+        or name in ("bell", "citybuilder:koro", "citybuilder:chochin", "citybuilder:zabuton", "citybuilder:shimenawa",
+                    "citybuilder:saisen_bako")
 
 
 def inside(x, y, poly):
@@ -1553,10 +1575,60 @@ def write_png(path, w, h, rgb):
 def parse_state(state):
     """'minecraft:x[a=b,c=d]' -> ('x', {'a': 'b', 'c': 'd'} or None)."""
     name, _, props = state.partition("[")
-    name = name.split(":", 1)[-1]
+    if name.startswith("minecraft:"):
+        name = name[len("minecraft:"):]  # vanilla blocks by their bare names; this mod's keep their namespace
     if not props:
         return name, None
     return name, dict(kv.split("=", 1) for kv in props.rstrip("]").split(","))
+
+
+def own_top_texture(name, props):
+    """The texture file of this mod's block's top face, and the quarter turns it is drawn with; None if not ours."""
+    if not name.startswith("citybuilder:"):
+        return None
+    n = name.split(":", 1)[1]
+    props = props or {}
+    if n == "raked_gravel_ring":
+        return f"raked_gravel_ring_{props['facing']}_{props['part']}", 0
+    if n == "raked_gravel":
+        return "raked_gravel", 1 if props.get("axis") == "z" else 0
+    if n == "tatami":
+        return "tatami", {"north": 0, "east": 1, "south": 2, "west": 3}[props.get("facing", "north")]
+    return {"tobiishi": "tobiishi_stone", "fusuma": "fusuma_upper", "fusuma_gold": "fusuma_gold_upper",
+            "saisen_bako": "saisen_bako_top", "koro": "koro_top", "chochin": "chochin_cap",
+            "coffered_ceiling": "coffered_ceiling_side"}.get(n, n), 0
+
+
+def render_plan(blocks, size, path, bc, px=8):
+    """Seen from straight above, every column's top block drawn with its own texture where it is one of this mod's
+    (scaled to px per block), else its average colour; higher blocks a little lighter. Shows raking, tatami and
+    paving, which the averaged isometric view cannot."""
+    sx, _, sz = size
+    top = {}
+    for (x, y, z), b in blocks.items():
+        if b[0] != "air" and y > top.get((x, z), (-1, None))[0]:
+            top[(x, z)] = (y, b)
+    ymin = min(t[0] for t in top.values())
+    img = Image.new("RGB", (sx * px, sz * px), (244, 241, 234))
+    cache = {}
+    for (x, z), (y, (name, props)) in top.items():
+        tex = own_top_texture(name, props)
+        k = 1 + 0.03 * (y - ymin)
+        if tex:
+            key = tex
+            if key not in cache:
+                t = Image.open(os.path.join(OWN_TEXTURES, tex[0] + ".png")).convert("RGB")
+                for _ in range(tex[1]):
+                    t = t.transpose(Image.Transpose.ROTATE_270)  # a quarter turn clockwise
+                cache[key] = t.resize((px, px), Image.Resampling.BOX)
+            tile = cache[key].point(lambda v: min(255, int(v * k)))
+        else:
+            n = name[:-5] if name.endswith("_pane") else name
+            c = bc.get(FULL_OF.get(n, PREVIEW_ALIAS.get(n, n))) or ((COLOURS[n] >> 16, (COLOURS[n] >> 8) & 255,
+                                                                      COLOURS[n] & 255) if n in COLOURS else (255, 0, 255))
+            tile = Image.new("RGB", (px, px), tuple(min(255, int(v * k)) for v in c))
+        img.paste(tile, (x * px, z * px))
+    img.save(path)
 
 
 def interior_cut(blocks, kind):
@@ -1565,7 +1637,7 @@ def interior_cut(blocks, kind):
     (gold) are kept whole above the cut."""
     if kind not in ("hall", "pagoda"):
         return None  # a precinct's hillside would be cut through too
-    tatami = [y for (x, y, z), (n, _) in blocks.items() if n == "stripped_bamboo_block"]
+    tatami = [y for (x, y, z), (n, _) in blocks.items() if n == "citybuilder:tatami"]
     if tatami:
         return min(tatami) + 3
     gold = [y for (x, y, z), (n, _) in blocks.items() if n == "gold_block"]
@@ -1579,9 +1651,11 @@ def build_temple(out, gid, slug, name, row, bc):
     size = tuple(model["size"])
     write_nbt(os.path.join(out, slug + ".nbt"), blocks, size)
     render(blocks, size, os.path.join(out, slug + ".png"), bc)
+    if TEMPLES[slug]["kind"] == "garden":
+        render_plan(blocks, size, os.path.join(out, slug + "_plan.png"), bc, px=16)
     cut = interior_cut(blocks, TEMPLES[slug]["kind"])
     if cut is not None:  # a cutaway: everything above the rooms' fusuma taken off, the rooms seen from above
-        floor = [v for v, b in blocks.items() if b[0] in ("stripped_bamboo_block", "gold_block") and v[1] <= cut]
+        floor = [v for v, b in blocks.items() if b[0] in ("citybuilder:tatami", "gold_block") and v[1] <= cut]
         x0, x1 = min(v[0] for v in floor), max(v[0] for v in floor)
         z0, z1 = min(v[2] for v in floor), max(v[2] for v in floor)
         kept = {v: b for v, b in blocks.items() if v[1] <= cut or b[0] in ("gold_block", "gilded_blackstone")
@@ -1795,8 +1869,33 @@ def build_one(args):
             "block_counts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
 
 
+# This mod's blocks: the texture whose colour stands for each in previews (the rest by their own names).
+OWN_TEXTURE = {"fusuma": "fusuma_lower", "fusuma_gold": "fusuma_gold_lower", "raked_gravel_ring": "raked_gravel",
+               "tobiishi": "tobiishi_stone", "saisen_bako": "saisen_bako_top"}
+OWN_TEXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "common", "src", "main",
+                            "resources", "assets", "citybuilder", "textures", "block")
+
+
+def own_colours():
+    """Average colours of this mod's own block textures (drawn by tools/textures), keyed 'citybuilder:<id>'."""
+    out = {}
+    for f in os.listdir(OWN_TEXTURES):
+        if not f.endswith(".png"):
+            continue
+        img = Image.open(os.path.join(OWN_TEXTURES, f)).convert("RGB")
+        px = list(img.getdata())
+        out[f[:-4]] = tuple(round(sum(c[i] for c in px) / len(px)) for i in range(3))
+    named = {}
+    for tex in out:
+        named["citybuilder:" + tex] = out[tex]
+    for block, tex in OWN_TEXTURE.items():
+        named["citybuilder:" + block] = out[tex]
+    return named
+
+
 def build(rows, out, chosen, jar=MC_JAR, textured=True):
     bc = block_colours(jar, os.path.join(out, "block_colours.json"))
+    bc.update(own_colours())
     jobs = [(out, gid, slug, name, pal, rows.get(gid, {}), bc, textured) for gid, slug, name, pal in chosen
             if os.path.exists(os.path.join(out, "geom", gid + ".json"))
             or slug in TEMPLES and os.path.exists(os.path.join(out, "models", slug + ".json"))]  # LOD1-only ones too
@@ -1824,6 +1923,11 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
     for e in entries:
         with open(os.path.join(out, e["slug"] + ".png"), "rb") as fh:
             data = base64.b64encode(fh.read()).decode()
+        plan = os.path.join(out, e["slug"] + "_plan.png")
+        if os.path.exists(plan):
+            with open(plan, "rb") as fh:
+                html.append(f"<figure><img src='data:image/png;base64,{base64.b64encode(fh.read()).decode()}'>"
+                            f"<figcaption><b>{e['name']}</b> — 俯瞰（实际纹理）</figcaption></figure>")
         cutaway = os.path.join(out, e["slug"] + "_interior.png")
         if os.path.exists(cutaway):
             with open(cutaway, "rb") as fh:

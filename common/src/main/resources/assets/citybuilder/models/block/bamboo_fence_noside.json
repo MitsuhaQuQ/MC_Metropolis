@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/template_glass_pane_noside",
+  "textures": {
+    "pane": "citybuilder:block/bamboo_fence",
+    "edge": "citybuilder:block/bamboo_fence_edge"
+  }
+}

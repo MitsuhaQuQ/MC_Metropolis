@@ -51,6 +51,8 @@ public enum SacredBuilding {
     TEMIZUYA(Religion.BOTH, "手水舎"),
     /** 石灯籠: a stone lantern. */
     TORO(Religion.BOTH, "石灯籠"),
+    /** 庭園: a garden (a dry garden, 枯山水, at temples; a moss garden, 苔庭, at either). */
+    TEIEN(Religion.BOTH, "庭園"),
     // Whole precincts
     /** 伽藍: a temple's buildings together, gate, halls, pagoda and corridor. */
     GARAN(Religion.TEMPLE, "伽藍"),
