@@ -185,6 +185,14 @@ public record Palette(String wall, String accent, String trim, String window, St
             case CHIMNEY_TOP -> c.material("chimneyTop", variant);
             case DANCHI_NO -> c.material("danchiNumber", variant);
             case CREST -> c.material("crest", variant);
+            case TANK_SHELL -> c.material("tankShell", variant ^ 0x707);
+            case PIPE -> c.material("pipe", position);
+            case DECK -> c.material("deck", variant);
+            case STACK -> c.material("stack", variant);
+            case COAL -> c.material("coal", variant);
+            case STEEL -> c.material("steel", variant);
+            case TRANSFORMER -> c.material("transformer", variant);
+            case FLARE_TOP -> c.material("flareTop", variant);
             case SHELF -> c.material("shelf", position);
             case TABLE -> c.material("table", variant);
             case KITCHEN -> c.material("kitchen", position);

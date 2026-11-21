@@ -2376,6 +2376,66 @@
    "parapet": "minecraft:stone_bricks",
    "foundation": "minecraft:cobblestone"
   },
+  "plant.1": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "plant.2": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:light_blue_terracotta",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "plant.3": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "plant.4": {
+   "wall": "minecraft:light_blue_terracotta",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_blue_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
   "works.1": {
    "wall": "minecraft:white_concrete",
    "accent": "minecraft:light_blue_terracotta",
@@ -2763,6 +2823,41 @@
   ],
   "mesh": [
    "minecraft:iron_bars"
+  ],
+  "tankShell": [
+   "minecraft:white_concrete",
+   "minecraft:smooth_quartz",
+   "minecraft:light_gray_concrete",
+   "minecraft:white_concrete"
+  ],
+  "pipe": [
+   "minecraft:white_concrete",
+   "minecraft:light_gray_concrete",
+   "minecraft:yellow_terracotta",
+   "minecraft:iron_block",
+   "minecraft:orange_terracotta"
+  ],
+  "deck": [
+   "minecraft:smooth_stone_slab"
+  ],
+  "stack": [
+   "minecraft:light_gray_concrete",
+   "minecraft:white_concrete"
+  ],
+  "coal": [
+   "minecraft:coal_block"
+  ],
+  "steel": [
+   "minecraft:polished_andesite"
+  ],
+  "transformer": [
+   "minecraft:gray_concrete"
+  ],
+  "flareTop": [
+   "minecraft:shroomlight"
+  ],
+  "brandPlant": [
+   "minecraft:light_gray_concrete"
   ],
   "chimney": [
    "minecraft:bricks",
@@ -4255,6 +4350,102 @@
     }
    }
   },
+  "plant.petrochemical": {
+   "type": "WORKS",
+   "storeys": 2,
+   "palettes": {
+    "plant.1": 1.0,
+    "plant.2": 1.0,
+    "plant.3": 1.0,
+    "plant.4": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "WORKS_WALL": {
+     "plain": 0.5,
+     "ribbed": 0.5
+    },
+    "WORKS_WINDOWS": {
+     "band": 0.6,
+     "high": 0.4
+    },
+    "PIPES": {
+     "pipes": 1.0
+    },
+    "WORKS_SIGN": {
+     "sign": 0.7,
+     "none": 0.3
+    },
+    "WORKS_FENCE": {
+     "mesh": 1.0
+    }
+   }
+  },
+  "plant.power": {
+   "type": "WORKS",
+   "storeys": 2,
+   "palettes": {
+    "plant.1": 1.0,
+    "plant.2": 1.0,
+    "plant.3": 1.0,
+    "plant.4": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 0.6,
+     "gable": 0.4
+    },
+    "WORKS_WALL": {
+     "plain": 0.4,
+     "ribbed": 0.6
+    },
+    "WORKS_WINDOWS": {
+     "high": 0.6,
+     "band": 0.4
+    },
+    "PIPES": {
+     "pipes": 0.6,
+     "none": 0.4
+    },
+    "WORKS_SIGN": {
+     "sign": 0.8,
+     "none": 0.2
+    },
+    "WORKS_FENCE": {
+     "mesh": 1.0
+    }
+   }
+  },
+  "plant.substation": {
+   "type": "WORKS",
+   "storeys": 1,
+   "palettes": {
+    "plant.1": 1.0,
+    "plant.2": 1.0,
+    "plant.3": 1.0,
+    "plant.4": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "WORKS_WALL": {
+     "plain": 1.0
+    },
+    "WORKS_WINDOWS": {
+     "high": 0.5,
+     "none": 0.5
+    },
+    "WORKS_SIGN": {
+     "none": 1.0
+    },
+    "WORKS_FENCE": {
+     "mesh": 1.0
+    }
+   }
+  },
   "works.warehouse": {
    "type": "WORKS",
    "palettes": {
@@ -5674,6 +5865,18 @@
   "POST_OFFICE": {
    "standalone": "postoffice.standalone",
    "brand": "brandPost"
+  },
+  "PETROCHEMICAL": {
+   "standalone": "plant.petrochemical",
+   "brand": "brandPlant"
+  },
+  "POWER_PLANT": {
+   "standalone": "plant.power",
+   "brand": "brandPlant"
+  },
+  "SUBSTATION": {
+   "standalone": "plant.substation",
+   "brand": "brandPlant"
   }
  },
  "regions": {

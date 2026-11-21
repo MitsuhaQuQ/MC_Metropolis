@@ -29,7 +29,7 @@ class CatalogTest {
         }
         assertEquals(null, c.forQuarter(Quarter.ORDINARY, 0.5));
         for (Program p : Program.values()) {
-            assertEquals(Building.Type.SHOP, c.standalone(p).type());
+            assertEquals(p.plant() ? Building.Type.WORKS : Building.Type.SHOP, c.standalone(p).type());
         }
         assertEquals("downtown.office", c.forType(Building.Type.OFFICE, Region.KINKI,
                 com.mtm.citybuilder.core.street.District.CENTRAL, 0.5).name());

@@ -213,6 +213,22 @@ public final class BuildingLayer {
         DANCHI_NO,
         /** A crest on a gable. */
         CREST,
+        /** A tank's or a column's shell. */
+        TANK_SHELL,
+        /** A pipe on a rack. */
+        PIPE,
+        /** A platform round a column (a slab). */
+        DECK,
+        /** A power station's stack. */
+        STACK,
+        /** A coal heap. */
+        COAL,
+        /** A gantry's steel beam. */
+        STEEL,
+        /** A transformer. */
+        TRANSFORMER,
+        /** A flare stack's flame. */
+        FLARE_TOP,
         /** Shelves, chests and barrels against a wall. */
         SHELF,
         /** A low table (a slab). */
@@ -472,7 +488,15 @@ public final class BuildingLayer {
         // A program the lot was given: standalone where the lot is open (not downtown or in the old town, wide and deep
         // enough for parking in front), else the ground floor of a shop, office or block of flats
         boolean standalone = false;
-        if (program != null) {
+        if (program != null && program.plant()) {
+            // An industrial plant: its style, over its whole lot
+            project = false;
+            style = catalog.standalone(program);
+            type = style.type();
+            storeys = style.storeys() == null ? 1 : style.storeys();
+            seed = h;
+            composition = catalog.compose(style, seed);
+        } else if (program != null) {
             boolean open = !downtown && district != District.OLD_TOWN && plot.frontage() >= 12.0 && plot.maxDepth() >= 18.0;
             if (open) {
                 standalone = true;
@@ -552,6 +576,17 @@ public final class BuildingLayer {
                 backGap = 3.0;
                 depth = plot.maxDepth();
             }
+        }
+        if (program != null && program.plant()) {
+            // The plant's building, set back from the gate, its equipment round it
+            // A share of the lot, the rest for the equipment
+            double share = program == Program.POWER_PLANT ? 0.45 : program == Program.PETROCHEMICAL ? 0.3 : 0.25;
+            double most = program == Program.POWER_PLANT ? 36.0 : program == Program.PETROCHEMICAL ? 20.0 : 10.0;
+            double bw = Math.max(6.0, Math.min(Math.floor(share * plot.frontage()), most));
+            front = 6.0;
+            sideGap = Math.max(2.0, 0.5 * (plot.frontage() - bw));
+            backGap = 2.0;
+            depth = Math.max(5.0, Math.min(Math.floor((share + 0.05) * plot.maxDepth()), program == Program.POWER_PLANT ? 24.0 : 12.0));
         }
         if (standalone) {
             // A box set back behind its parking, five blocks of bays and a lane
@@ -813,11 +848,13 @@ public final class BuildingLayer {
         long variant = Hash.of(h, 9);
 
         boolean carport = layout != 0 && composition.is(Slot.CARPORT, "carport");
-        return new Building(plot.id(), type, storeys, ground, upper, roof, ridgeAlong, slope, from, to, front, back,
+        Building made = new Building(plot.id(), type, storeys, ground, upper, roof, ridgeAlong, slope, from, to, front, back,
                 step, stepBack, upFrom, upTo, upBack, wingFrom, wingTo, wingBack, chamferLeft, chamferRight, layout, plot.start() - from,
                 plot.end() - from, plot.maxDepth(), parkFrom, parkTo, parkBack, carport, base, ox, oz, p[2], p[3], nx, nz,
                 door, quarter, region, composition, program, standalone, palette, variant, waterside,
-                age(type, quarter, project, standalone, Hash.unit(Hash.of(h, 87))), plot.streetWidth());
+                age(type, quarter, project, standalone, Hash.unit(Hash.of(h, 87))), plot.streetWidth(), java.util.List.of());
+        // A plant's equipment, over the lot as it is (its outline is not the frame's rectangle)
+        return program != null && program.plant() ? made.withEquipment(layOut(made, plots, plot)) : made;
     }
 
     /**
@@ -909,7 +946,7 @@ public final class BuildingLayer {
                     Building lot = lots[c];
                     double[] l = lot.local(wx, wz);
                     // A house's ring is its whole lot: the garden
-                    boolean garden = lot.type() == Building.Type.HOUSE || lot.type() == Building.Type.MACHIYA;
+                    boolean garden = lot.type() == Building.Type.HOUSE || lot.type() == Building.Type.MACHIYA || plant(lot);
                     boolean outside = outsideAccess(lot);
                     if (garden || l[0] >= -1 && l[0] < lot.width() + (outside ? STAIR_SIDE : 1.0)
                             && l[1] >= lot.front() - yard(lot)
@@ -1325,7 +1362,7 @@ public final class BuildingLayer {
         if (c.ring()) {
             int top = -1;
             for (int dy = 0; dy <= Math.max(b.wallHeight() + 2, 11) + (c.v() < 0.0 ? 8 : 0)
-                    + (b.type() == Building.Type.WORKS ? 10 : 0); dy++) {
+                    + (b.type() == Building.Type.WORKS ? 10 : 0) + (plant(b) ? PLANT_HEIGHT : 0); dy++) {
                 if (ringPart(b, c, dy) != Part.NONE) {
                     top = dy;
                 }
@@ -1747,6 +1784,358 @@ public final class BuildingLayer {
 
     /** How deep the open corridor along a block of flats' back is: the walk, two blocks, and its rail and posts. */
     static final double CORRIDOR = 3.0;
+
+    /** How high a plant's equipment may stand over its base, at most: a power station's stack. */
+    private static final int PLANT_HEIGHT = 100;
+
+    /** Whether a building is an industrial plant's. */
+    static boolean plant(Building b) {
+        return b.program() != null && b.program().plant();
+    }
+
+    /** Kinds of a plant's equipment. */
+    public enum Equipment {
+        TANK, SPHERE, COLUMN, RACK, FLARE, STACK, BOILER, COAL, GANTRY, TRANSFORMER
+    }
+
+    /**
+     * A piece of a plant's equipment: its kind, where its middle stands on the lot (u, v), its radius or half-size, its
+     * height.
+     */
+    public record Equip(Equipment kind, double u, double v, double r, int h) {
+    }
+
+    /**
+     * A plant's equipment, laid out over its lot in cells ten blocks square round its building: the nearest cells to the
+     * building's back take what stands by it (a power station's boiler house and stack), the farthest a refinery's
+     * flare; the rest by the plant's mix. Each piece fits its cell.
+     */
+    public static java.util.List<Equip> plantEquipment(Building b) {
+        return b.equipment();
+    }
+
+    /** Whether a point in a building's frame lies on its own lot. */
+    private static boolean onLot(Building b, TownPlots plots, Plot plot, double u, double v) {
+        double a = u - 0.5 * b.width();
+        Plot p = plots.at(b.ox() + a * b.tx() + v * b.nx(), b.oz() + a * b.tz() + v * b.nz());
+        return p != null && p.id() == plot.id();
+    }
+
+    /** How far a piece of equipment reaches from its middle, its pad included (half the side of its square). */
+    private static double reach(Equip e) {
+        return switch (e.kind()) {
+            case TANK, STACK -> e.r() + 1.0;
+            case SPHERE -> e.r() + 1.0;
+            case COLUMN, FLARE -> e.r() + 1.5;
+            case RACK, BOILER, COAL, GANTRY -> e.r();
+            case TRANSFORMER -> e.r() + 0.5;
+        };
+    }
+
+    /** A piece of equipment of a kind, its size drawn from {@code size} in [0, 1). */
+    private static Equip piece(Equipment kind, double u, double v, double size) {
+        return switch (kind) {
+            case TANK -> new Equip(kind, u, v, 3.0 + Math.floor(2.0 * size), 5 + (int) Math.floor(4.0 * size));
+            case SPHERE -> new Equip(kind, u, v, 3.5, 0);
+            case COLUMN -> new Equip(kind, u, v, 1.3, 14 + (int) Math.floor(12.0 * size));
+            case RACK -> new Equip(kind, u, v, 4.5, 5);
+            case FLARE -> new Equip(kind, u, v, 0.75, 30 + (int) Math.floor(12.0 * size));
+            case STACK -> new Equip(kind, u, v, 2.3, 64 + (int) Math.floor(20.0 * size));
+            case BOILER -> new Equip(kind, u, v, 4.0, 22 + (int) Math.floor(8.0 * size));
+            case COAL -> new Equip(kind, u, v, 4.5, 3 + (int) Math.floor(2.0 * size));
+            case GANTRY -> new Equip(kind, u, v, 3.5, 8 + (int) Math.floor(3.0 * size));
+            case TRANSFORMER -> new Equip(kind, u, v, 1.5, 3);
+        };
+    }
+
+    /**
+     * A plant's equipment over its lot as it is, placed one piece at a time: each at the first point (every two blocks,
+     * nearest the building's back first) where its square lies wholly on the lot, clear of the building, the road from
+     * the gate and the pieces already placed. A power station places its stack and boiler house first, by the building;
+     * a refinery its flare, as far off as it goes; then each the plant's mix, as long as anything fits.
+     */
+    private static java.util.List<Equip> layOut(Building b, TownPlots plots, Plot plot) {
+        double w = b.width();
+        java.util.List<double[]> points = new java.util.ArrayList<>();
+        for (double cu = Math.ceil(b.lotFrom()) + 1.5; cu < b.lotTo() - 1.0; cu += 2.0) {
+            for (double cv = 2.5; cv < b.lotDepth() - 1.0; cv += 2.0) {
+                points.add(new double[]{cu, cv});
+            }
+        }
+        points.sort(java.util.Comparator.comparingDouble(p -> (p[0] - 0.5 * w) * (p[0] - 0.5 * w) + (p[1] - b.back()) * (p[1] - b.back())));
+        java.util.List<Equip> out = new java.util.ArrayList<>();
+        Program program = b.program();
+        java.util.List<Equipment> first = switch (program) {
+            case POWER_PLANT -> java.util.List.of(Equipment.STACK, Equipment.BOILER);
+            case PETROCHEMICAL -> java.util.List.of(Equipment.FLARE);
+            default -> java.util.List.of();
+        };
+        int k = 0;
+        for (Equipment kind : first) {
+            java.util.List<double[]> order = points;
+            if (kind == Equipment.FLARE) {
+                order = new java.util.ArrayList<>(points);
+                java.util.Collections.reverse(order);
+            }
+            Equip placed = place(b, plots, plot, out, order, kind, Hash.unit(Hash.of(b.variant(), k++, 2)));
+            if (placed != null) {
+                out.add(placed);
+            }
+        }
+        for (int tries = 0; tries < 60 && out.size() < 40; tries++) {
+            double a = Hash.unit(Hash.of(b.variant(), k, 1));
+            Equipment kind = switch (program) {
+                case POWER_PLANT -> a < 0.3 ? Equipment.TANK : a < 0.55 ? Equipment.COAL : a < 0.85 ? Equipment.GANTRY : Equipment.TRANSFORMER;
+                case PETROCHEMICAL -> a < 0.3 ? Equipment.TANK : a < 0.45 ? Equipment.SPHERE : a < 0.65 ? Equipment.COLUMN : Equipment.RACK;
+                default -> a < 0.55 ? Equipment.GANTRY : Equipment.TRANSFORMER;
+            };
+            Equip placed = place(b, plots, plot, out, points, kind, Hash.unit(Hash.of(b.variant(), k, 2)));
+            k++;
+            if (placed != null) {
+                out.add(placed);
+            }
+        }
+        return java.util.List.copyOf(out);
+    }
+
+    /** The first point where a piece of a kind fits, as it is or (failing that) at its smallest; null if none. */
+    private static Equip place(Building b, TownPlots plots, Plot plot, java.util.List<Equip> placed, java.util.List<double[]> points,
+                               Equipment kind, double size) {
+        for (double s : new double[]{size, 0.0}) {
+            for (double[] p : points) {
+                Equip e = piece(kind, p[0], p[1], s);
+                if (fits(b, plots, plot, placed, e)) {
+                    return e;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Whether a piece's square lies on the lot, clear of the building, the gate's road and the pieces placed. */
+    private static boolean fits(Building b, TownPlots plots, Plot plot, java.util.List<Equip> placed, Equip e) {
+        double r = reach(e);
+        double w = b.width();
+        // Clear of the building (a block round it) and the road in from the gate
+        if (e.u() + r > -1.0 && e.u() - r < w + 1.0 && e.v() + r > b.front() - 1.0 && e.v() - r < b.back() + 1.0) {
+            return false;
+        }
+        if (Math.abs(e.u() - 0.5 * w) - r < 4.0 && e.v() - r < b.front()) {
+            return false;
+        }
+        if (e.v() - r < 1.5) {
+            return false;
+        }
+        for (Equip o : placed) {
+            double gap = r + reach(o) + 1.0;
+            if (Math.abs(o.u() - e.u()) < gap && Math.abs(o.v() - e.v()) < gap) {
+                return false;
+            }
+        }
+        for (double du = -r; du <= r + 0.01; du += Math.max(1.0, r / 2.0)) {
+            for (double dv = -r; dv <= r + 0.01; dv += Math.max(1.0, r / 2.0)) {
+                if (!onLot(b, plots, plot, e.u() + du, e.v() + dv)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * A plant's lot, at a column of its ring: a mesh fence along its lines with a gate in the front, gravel; its
+     * equipment. Null for the building's own ring (its walls' details).
+     */
+    private static Part plantYard(Building b, Column c, int dy) {
+        double u = c.u();
+        double v = c.v();
+        double w = b.width();
+        if (c.lot() != Face.NONE || v < 1.0) {
+            boolean gate = v < 1.0 && Math.abs(u - 0.5 * w) < 4.0;
+            if (dy == 0) {
+                return gate ? Part.PAVING : Part.GRAVEL;
+            }
+            return !gate && (dy == 1 || dy == 2) ? Part.MESH : Part.NONE;
+        }
+        for (Equip e : plantEquipment(b)) {
+            Part p = equipPart(e, u, v, dy);
+            if (p != null) {
+                return p;
+            }
+        }
+        if (c.adjacent() && dy > 0) {
+            return null;
+        }
+        if (dy == 0) {
+            // A road from the gate to the building's front, gravel elsewhere
+            return v < b.front() && Math.abs(u - 0.5 * w) < 4.0 ? Part.PAVING : Part.GRAVEL;
+        }
+        return Part.NONE;
+    }
+
+    /** A piece of equipment at a column and height, or null off it. */
+    static Part equipPart(Equip e, double u, double v, int dy) {
+        double du = u - e.u();
+        double dv = v - e.v();
+        double d = Math.sqrt(du * du + dv * dv);
+        double r = e.r();
+        int h = e.h();
+        switch (e.kind()) {
+            case TANK -> {
+                if (d >= r + 1.0) {
+                    return null;
+                }
+                if (dy == 0) {
+                    return Part.PAVING;
+                }
+                if (d >= r || dy > h) {
+                    return Part.NONE;
+                }
+                return dy == h || d >= r - 1.0 ? Part.TANK_SHELL : Part.AIR;
+            }
+            case SPHERE -> {
+                int cy = (int) Math.ceil(r) + 2;
+                double s = Math.sqrt(du * du + dv * dv + (dy - cy) * (dy - cy));
+                if (d >= r + 1.0) {
+                    return null;
+                }
+                if (dy == 0) {
+                    return Part.PAVING;
+                }
+                if (Math.abs(s - r) < 0.7) {
+                    return Part.TANK_SHELL;
+                }
+                boolean leg = d >= r - 1.2 && d < r - 0.2 && (Math.abs(du) < 0.6 || Math.abs(dv) < 0.6);
+                return leg && dy < cy ? Part.POLE : s < r ? Part.AIR : Part.NONE;
+            }
+            case COLUMN -> {
+                if (d >= r + 1.5) {
+                    return null;
+                }
+                if (dy == 0) {
+                    return Part.PAVING;
+                }
+                if (d < r && dy <= h) {
+                    return Part.TANK_SHELL;
+                }
+                return d >= r && dy < h && dy % 5 == 0 ? Part.DECK : Part.NONE;
+            }
+            case RACK -> {
+                if (Math.abs(du) >= r || Math.abs(dv) >= 1.6) {
+                    return null;
+                }
+                if (dy == 0) {
+                    return Part.GRAVEL;
+                }
+                boolean post = Math.floorMod((long) Math.floor(du + r), 4L) == 0 && Math.abs(dv) >= 1.0;
+                if (post && dy <= h) {
+                    return Part.POLE;
+                }
+                if (Math.abs(dv) < 1.0 && (dy == h || dy == h - 2)) {
+                    return Part.PIPE;
+                }
+                return Part.NONE;
+            }
+            case FLARE -> {
+                if (d >= r + 1.5) {
+                    return null;
+                }
+                if (dy == 0) {
+                    return Part.PAVING;
+                }
+                if (d >= r) {
+                    return Part.NONE;
+                }
+                if (dy == h) {
+                    return Part.FLARE_TOP;
+                }
+                if (dy > h) {
+                    return Part.NONE;
+                }
+                return dy >= h - 2 || Math.floorMod(dy / 4, 2) == 1 ? Part.CHIMNEY_TOP : Part.TANK_SHELL;
+            }
+            case STACK -> {
+                if (d >= r + 1.0) {
+                    return null;
+                }
+                if (dy == 0) {
+                    return Part.PAVING;
+                }
+                if (d >= r || dy > h) {
+                    return Part.NONE;
+                }
+                if (d < r - 1.0) {
+                    return dy == h ? Part.NONE : Part.AIR;
+                }
+                // Banded red at the top
+                return dy > h - 9 && Math.floorMod((h - dy) / 2, 2) == 0 ? Part.CHIMNEY_TOP : Part.STACK;
+            }
+            case BOILER -> {
+                if (Math.abs(du) >= r || Math.abs(dv) >= r) {
+                    return null;
+                }
+                if (dy == 0) {
+                    return Part.FLOOR;
+                }
+                if (dy > h) {
+                    return Part.NONE;
+                }
+                if (dy == h) {
+                    return Part.FLAT;
+                }
+                boolean edge = Math.abs(du) >= r - 1.0 || Math.abs(dv) >= r - 1.0;
+                boolean corner = Math.abs(du) >= r - 1.0 && Math.abs(dv) >= r - 1.0;
+                if (!edge) {
+                    return Part.AIR;
+                }
+                return !corner && Math.floorMod(dy, 4) == 2 ? Part.WINDOW : corner ? Part.TRIM : Part.WALL;
+            }
+            case COAL -> {
+                if (d >= r) {
+                    return null;
+                }
+                int top = (int) Math.floor(h * (1.0 - d / r));
+                return dy == 0 ? Part.GRAVEL : dy <= top ? Part.COAL : Part.NONE;
+            }
+            case GANTRY -> {
+                if (Math.abs(du) >= r || Math.abs(dv) >= r) {
+                    return null;
+                }
+                if (dy == 0) {
+                    return Part.GRAVEL;
+                }
+                boolean side = Math.abs(du) >= r - 1.0 || Math.abs(dv) >= r - 1.0;
+                boolean corner = Math.abs(du) >= r - 1.0 && Math.abs(dv) >= r - 1.0;
+                if (corner && dy <= h) {
+                    return Part.POLE;
+                }
+                if (side && dy == h) {
+                    return Part.STEEL;
+                }
+                // A transformer under the gantry
+                if (Math.abs(du) < 1.5 && Math.abs(dv) < 1.0 && dy <= 2) {
+                    return Part.TRANSFORMER;
+                }
+                return Part.NONE;
+            }
+            case TRANSFORMER -> {
+                if (Math.abs(du) >= r + 0.5 || Math.abs(dv) >= r) {
+                    return null;
+                }
+                if (dy == 0) {
+                    return Part.PAVING;
+                }
+                if (Math.abs(du) < r && Math.abs(dv) < 1.0 && dy <= 2) {
+                    return Part.TRANSFORMER;
+                }
+                return Math.abs(du) < r && Math.abs(dv) < 1.0 && dy == 3 && Math.floorMod((long) Math.floor(du + r), 2L) == 0
+                        ? Part.POLE : Part.NONE;
+            }
+            default -> {
+                return null;
+            }
+        }
+    }
 
     /**
      * A works' ring: the front yard paved, a mesh fence along the street with a wide gate, pallets stacked by the
@@ -2626,7 +3015,7 @@ public final class BuildingLayer {
         double u = c.u();
         double w = b.width();
         boolean top = row == height - 1;
-        if (b.program() != null && face == Face.FRONT) {
+        if (b.program() != null && !b.program().plant() && face == Face.FRONT) {
             // A program's front: glass to the street under its brand's band, the door in the middle
             if (corner) {
                 return Part.TRIM;
@@ -2639,7 +3028,7 @@ public final class BuildingLayer {
             }
             return Part.SHOPFRONT;
         }
-        if (b.program() != null && behind && row == 1 && !c.door() && b.composition().is(Slot.DISPLAY, "goods")) {
+        if (b.program() != null && !b.program().plant() && behind && row == 1 && !c.door() && b.composition().is(Slot.DISPLAY, "goods")) {
             // Shelves behind the glass
             return Part.DISPLAY;
         }
@@ -2761,6 +3150,12 @@ public final class BuildingLayer {
      * cornices, fins and ledges; a shop's sign and awning and an office's canopy over the pavement; outdoor units.
      */
     private static Part ringPart(Building b, Column c, int dy) {
+        if (plant(b)) {
+            Part yard = plantYard(b, c, dy);
+            if (yard != null) {
+                return yard;
+            }
+        }
         if (b.type() == Building.Type.WORKS) {
             Part works = worksRing(b, c, dy);
             if (works != null) {

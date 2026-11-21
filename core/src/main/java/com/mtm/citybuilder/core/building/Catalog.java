@@ -224,7 +224,8 @@ public final class Catalog {
             "brandFastfood", "brandPost", "postbox", "line", "pole", "ad", "baseWall", "upperWall", "step", "tenantSign", "shoki", "bank", "water", "blackBoard", "arcadePost", "arcadeRoof", "arcadePaving", "tactile", "arcadeGlass", "louvre", "rust", "andon", "tobukuro", "gatepost", "gateLight", "futon",
             "solar", "antenna", "heater", "oni", "yago", "tatami", "earth", "partition", "fusuma", "stairs", "shelf", "table",
             "kitchen", "counter", "desk", "storage", "outerStairs", "mesh", "chimney", "chimneyTop",
-            "danchiNumber", "crest");
+            "danchiNumber", "crest", "tankShell", "pipe", "deck", "stack", "coal", "steel",
+            "transformer", "flareTop");
 
     /** Gson is used here only. */
     private static final class Json {

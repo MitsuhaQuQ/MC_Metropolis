@@ -422,6 +422,77 @@ class BuildingLayerTest {
         return floor && open(BuildingLayer.part(c, b.base() + dy)) && open(BuildingLayer.part(c, b.base() + dy + 1));
     }
 
+    @Test
+    void plantsFillTheirLotsWithTheirEquipment() {
+        CityLogic logic = logic();
+        Settlement city = city(logic);
+        CityExtent extent = logic.extent(city);
+        TownPlots plots = logic.plots().town(city);
+        BuildingLayer layer = logic.buildings();
+        // Big lots get plants, in turn
+        layer.quarters(new QuarterMap() {
+            @Override
+            public Quarter at(Plot plot) {
+                return Quarter.ORDINARY;
+            }
+
+            @Override
+            public Program program(Plot plot) {
+                if (plot.frontage() < 24.0 || plot.maxDepth() < 26.0) {
+                    return null;
+                }
+                int k = (int) Math.floorMod(plot.id(), 3L);
+                return k == 0 ? Program.PETROCHEMICAL : k == 1 ? Program.POWER_PLANT : Program.SUBSTATION;
+            }
+        });
+        Map<Program, Building> found = new EnumMap<>(Program.class);
+        for (double x = extent.coreX() - 2500; x < extent.coreX() + 2500 && found.size() < 3; x += 8) {
+            for (double z = extent.coreZ() - 2500; z < extent.coreZ() + 2500 && found.size() < 3; z += 8) {
+                Plot plot = plots.at(x, z);
+                Building b = layer.building(plots, plot);
+                if (b != null && BuildingLayer.plant(b) && !BuildingLayer.plantEquipment(b).isEmpty()) {
+                    found.putIfAbsent(b.program(), b);
+                }
+            }
+        }
+        assertTrue(found.size() == 3, "plants found: " + found.keySet());
+        for (Building b : found.values()) {
+            assertEquals(Building.Type.WORKS, b.type());
+            java.util.List<BuildingLayer.Equip> kit = BuildingLayer.plantEquipment(b);
+            for (BuildingLayer.Equip e : kit) {
+                // Every piece stays on the lot and off the building
+                assertTrue(e.u() - e.r() >= b.lotFrom() && e.u() + e.r() <= b.lotTo() && e.v() + e.r() <= b.lotDepth(), "off the lot: " + e);
+                boolean clear = e.u() + e.r() <= 0.0 || e.u() - e.r() >= b.width() || e.v() + e.r() <= b.front() || e.v() - e.r() >= b.back();
+                assertTrue(clear, "on the building: " + e);
+            }
+        }
+        // Drawn: the chunks round the power station hold its stack's shell
+        Building power = found.get(Program.POWER_PLANT);
+        java.util.Map<BuildingLayer.Part, Integer> seen = new java.util.EnumMap<>(BuildingLayer.Part.class);
+        int cx = (int) Math.floor(power.ox()) >> 4;
+        int cz = (int) Math.floor(power.oz()) >> 4;
+        for (int i = cx - 3; i <= cx + 3; i++) {
+            for (int k = cz - 3; k <= cz + 3; k++) {
+                for (BuildingLayer.Column col : layer.columns(i, k)) {
+                    if (col.building() == null || col.building().id() != power.id()) {
+                        continue;
+                    }
+                    for (int y = col.building().base(); y <= BuildingLayer.top(col); y++) {
+                        seen.merge(BuildingLayer.part(col, y), 1, Integer::sum);
+                    }
+                }
+            }
+        }
+        assertTrue(seen.getOrDefault(BuildingLayer.Part.STACK, 0) > 100, "stack drawn: " + seen);
+        // A power station's stack stands sixty blocks and more
+        BuildingLayer.Equip stack = BuildingLayer.plantEquipment(found.get(Program.POWER_PLANT)).stream()
+                .filter(e -> e.kind() == BuildingLayer.Equipment.STACK).findFirst().orElse(null);
+        assertNotNull(stack, "no stack");
+        assertEquals(BuildingLayer.Part.STACK, BuildingLayer.equipPart(stack, stack.u() + stack.r() - 0.5, stack.v(), 60));
+        assertTrue(BuildingLayer.plantEquipment(found.get(Program.PETROCHEMICAL)).stream()
+                .anyMatch(e -> e.kind() == BuildingLayer.Equipment.FLARE), "no flare");
+    }
+
     /** Whether a point in a building's frame lies on its back corridor. */
     private static boolean corridor(Building b, double[] l) {
         return l[1] >= b.back() && l[1] < b.back() + BuildingLayer.CORRIDOR && l[0] >= 0.0 && l[0] < b.width() + BuildingLayer.STAIR_SIDE;

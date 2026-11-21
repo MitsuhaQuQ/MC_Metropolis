@@ -63,6 +63,7 @@ package com.mtm.citybuilder.core.building;
  * @param waterside  whether the lot's back runs along water
  * @param age        how weathered it is, 0 new to 1 old: stains, grime, moss, rust in its materials
  * @param street     the width of the street its lot fronts
+ * @param equipment  an industrial plant's equipment over its lot; empty for anything else
  */
 public record Building(long id, Type type, int storeys, int ground, int upper, Roof roof, boolean ridgeAlong,
                        double slope, double from, double to, double front, double back, int step, double stepBack,
@@ -71,7 +72,13 @@ public record Building(long id, Type type, int storeys, int ground, int upper, R
                        int layout, double lotFrom, double lotTo, double lotDepth, double parkFrom, double parkTo,
                        double parkBack, boolean carport, int base, double ox, double oz, double tx, double tz, double nx, double nz, double door,
                        Quarter quarter, Region region, Composition composition, Program program, boolean standalone,
-                       int palette, long variant, boolean waterside, double age, double street) {
+                       int palette, long variant, boolean waterside, double age, double street,
+                       java.util.List<BuildingLayer.Equip> equipment) {
+    /** The same building with a plant's equipment. */
+    public Building withEquipment(java.util.List<BuildingLayer.Equip> equipment) {
+        return new Building(id, type, storeys, ground, upper, roof, ridgeAlong, slope, from, to, front, back, step, stepBack, upFrom, upTo, upBack, wingFrom, wingTo, wingBack, chamferLeft, chamferRight, layout, lotFrom, lotTo, lotDepth, parkFrom, parkTo, parkBack, carport, base, ox, oz, tx, tz, nx, nz, door, quarter, region, composition, program, standalone, palette, variant, waterside, age, street, equipment);
+    }
+
     /** Kinds of buildings of the first version, Japanese. */
     public enum Type {
         /** A detached house, set back with a small garden, gable or hipped. */

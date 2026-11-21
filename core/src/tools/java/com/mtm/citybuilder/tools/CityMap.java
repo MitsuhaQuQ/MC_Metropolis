@@ -144,9 +144,10 @@ public final class CityMap {
                 // them; where they really are is for the layers before to say
                 // preview:FLATS, WORKS, DANCHI look for the nearest block of flats with open corridors, works, danchi
                 // (built the Kanto way), and centre on it
-                String find = "FLATS".equals(quarter) || "WORKS".equals(quarter) || "DANCHI".equals(quarter) ? quarter : null;
+                String find = "FLATS".equals(quarter) || "WORKS".equals(quarter) || "DANCHI".equals(quarter)
+                        || "PLANTS".equals(quarter) ? quarter : null;
                 boolean flats = find != null;
-                if (flats) {
+                if (flats && !"PLANTS".equals(find)) {
                     quarter = "DANCHI".equals(find) ? "KANTO" : null;
                 }
                 if (quarter != null && quarter.endsWith("_CUT")) {
@@ -198,6 +199,26 @@ public final class CityMap {
                             return plot.side() > 0 && !plot.interior();
                         }
                     });
+                } else if (quarter != null && quarter.equals("PLANTS")) {
+                    // preview:PLANTS gives big lots a plant (refinery, power station, substation in turn), to see them;
+                    // where plants really are is for the layers before to say
+                    logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
+                        @Override
+                        public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Quarter.ORDINARY;
+                        }
+
+                        @Override
+                        public com.mtm.citybuilder.core.building.Program program(com.mtm.citybuilder.core.plot.Plot plot) {
+                            if (plot.frontage() < 24.0 || plot.maxDepth() < 26.0) {
+                                return null;
+                            }
+                            int k = (int) Math.floorMod(plot.id(), 3L);
+                            return k == 0 ? com.mtm.citybuilder.core.building.Program.PETROCHEMICAL
+                                    : k == 1 ? com.mtm.citybuilder.core.building.Program.POWER_PLANT
+                                    : com.mtm.citybuilder.core.building.Program.SUBSTATION;
+                        }
+                    });
                 } else if (quarter != null && quarter.equals("HOKURIKU")) {
                     logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
                         @Override
@@ -234,6 +255,8 @@ public final class CityMap {
                             com.mtm.citybuilder.core.building.Building b = p == null ? null : logic.buildings().building(town, p);
                             boolean wanted = b != null && switch (find) {
                                 case "WORKS" -> b.type() == com.mtm.citybuilder.core.building.Building.Type.WORKS;
+                                case "PLANTS" -> b.program() != null && b.program().plant()
+                                        && com.mtm.citybuilder.core.building.BuildingLayer.plantEquipment(b).size() >= 4;
                                 case "DANCHI" -> b.type() == com.mtm.citybuilder.core.building.Building.Type.APARTMENT
                                         && b.composition().is(com.mtm.citybuilder.core.building.Slot.ACCESS, "stairwell");
                                 default -> b.type() == com.mtm.citybuilder.core.building.Building.Type.APARTMENT
