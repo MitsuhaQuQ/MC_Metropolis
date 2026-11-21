@@ -21,4 +21,12 @@ public interface QuarterMap {
     default Program program(Plot plot) {
         return null;
     }
+
+    /**
+     * Whether the lot's back runs along water (a canal, a stream): its building then turns a face to the water and its
+     * back line is a stone bank's top. The water and the bank's foot are the town's layers' own.
+     */
+    default boolean waterside(Plot plot) {
+        return false;
+    }
 }

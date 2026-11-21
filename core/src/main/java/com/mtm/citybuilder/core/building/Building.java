@@ -60,6 +60,7 @@ package com.mtm.citybuilder.core.building;
  *                   building's ground floor
  * @param palette    which palette of materials
  * @param variant    a hash for the building's details (rooftop, units, balconies)
+ * @param waterside  whether the lot's back runs along water
  */
 public record Building(long id, Type type, int storeys, int ground, int upper, Roof roof, boolean ridgeAlong,
                        double slope, double from, double to, double front, double back, int step, double stepBack,
@@ -68,7 +69,7 @@ public record Building(long id, Type type, int storeys, int ground, int upper, R
                        int layout, double lotFrom, double lotTo, double lotDepth, double parkFrom, double parkTo,
                        double parkBack, boolean carport, int base, double ox, double oz, double tx, double tz, double nx, double nz, double door,
                        Quarter quarter, Region region, Composition composition, Program program, boolean standalone,
-                       int palette, long variant) {
+                       int palette, long variant, boolean waterside) {
     /** Kinds of buildings of the first version, Japanese. */
     public enum Type {
         /** A detached house, set back with a small garden, gable or hipped. */

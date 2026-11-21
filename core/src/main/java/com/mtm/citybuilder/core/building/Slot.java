@@ -117,7 +117,12 @@ public enum Slot {
     /** A storehouse's namako wall: diagonal joints, a square grid, or up the whole wall. */
     NAMAKO("diagonal", "grid", "tall"),
     /** A small tiled hood over a storehouse's door. */
-    ENTRY_HOOD("none", "hood");
+    ENTRY_HOOD("none", "hood"),
+    /**
+     * A back on the water (a canal, a stream, as Gion's Shirakawa): plain over its bank, bamboo blinds hung down both
+     * storeys under a pent roof, or a wooden balcony over the water with blinds above it.
+     */
+    WATERSIDE("plain", "sudare", "balcony");
 
     private final List<String> options;
 

@@ -170,6 +170,22 @@ public final class CityMap {
                             return com.mtm.citybuilder.core.building.Region.KANTO;
                         }
                     });
+                } else if (quarter != null && quarter.equals("WATERSIDE")) {
+                    // preview:WATERSIDE: the old town as a pleasure quarter, the lots on one side of each street
+                    // backing on water (there is none in the picture: where the water runs is for the layers before)
+                    logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
+                        @Override
+                        public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return plot.district() == com.mtm.citybuilder.core.street.District.OLD_TOWN
+                                    ? com.mtm.citybuilder.core.building.Quarter.HANAMACHI
+                                    : com.mtm.citybuilder.core.building.Quarter.ORDINARY;
+                        }
+
+                        @Override
+                        public boolean waterside(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return plot.side() > 0 && !plot.interior();
+                        }
+                    });
                 } else if (quarter != null && quarter.equals("HOKURIKU")) {
                     logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
                         @Override

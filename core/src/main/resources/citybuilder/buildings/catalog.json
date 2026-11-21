@@ -278,6 +278,11 @@
   "ENTRY_HOOD": [
    "none",
    "hood"
+  ],
+  "WATERSIDE": [
+   "plain",
+   "sudare",
+   "balcony"
   ]
  },
  "palettes": {
@@ -2163,6 +2168,13 @@
   "shoki": [
    "minecraft:decorated_pot"
   ],
+  "bank": [
+   "minecraft:stone_bricks",
+   "minecraft:mossy_stone_bricks",
+   "minecraft:cobblestone",
+   "minecraft:mossy_cobblestone",
+   "minecraft:stone_bricks"
+  ],
   "tenantSign": [
    "minecraft:white_concrete",
    "minecraft:yellow_concrete",
@@ -2548,6 +2560,11 @@
     "RIDGE_HEAVY": {
      "none": 0.8,
      "heavy": 0.2
+    },
+    "WATERSIDE": {
+     "plain": 0.3,
+     "sudare": 0.45,
+     "balcony": 0.25
     }
    }
   },
@@ -2626,6 +2643,11 @@
     "RIDGE_HEAVY": {
      "none": 0.8,
      "heavy": 0.2
+    },
+    "WATERSIDE": {
+     "sudare": 0.55,
+     "balcony": 0.4,
+     "plain": 0.05
     }
    }
   },
@@ -2698,6 +2720,11 @@
     "RIDGE_HEAVY": {
      "none": 0.8,
      "heavy": 0.2
+    },
+    "WATERSIDE": {
+     "balcony": 0.4,
+     "sudare": 0.3,
+     "plain": 0.3
     }
    }
   },
@@ -2771,6 +2798,11 @@
     "RIDGE_HEAVY": {
      "none": 0.8,
      "heavy": 0.2
+    },
+    "WATERSIDE": {
+     "plain": 0.3,
+     "sudare": 0.45,
+     "balcony": 0.25
     }
    }
   },

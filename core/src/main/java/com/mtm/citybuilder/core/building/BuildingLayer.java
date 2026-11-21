@@ -155,6 +155,8 @@ public final class BuildingLayer {
         TENANT_C,
         /** A small figure on a machiya's pent roof (鍾馗さん). */
         SHOKI,
+        /** The stones of a bank along water, its top along a lot's back. */
+        BANK,
         /** A light inside, so nothing spawns there. */
         LIGHT
     }
@@ -341,6 +343,7 @@ public final class BuildingLayer {
         Quarter quarter = quarters.at(plot);
         Region region = quarters.region(plot);
         Program program = quarters.program(plot);
+        boolean waterside = quarters.waterside(plot);
         Catalog catalog = Catalog.get();
         // A quarter with styles of its own (a hanamachi, a chaya or storehouse quarter, a merchant town) builds in them;
         // elsewhere the district's kind of building, in the region's style for it (the catalogue)
@@ -433,10 +436,10 @@ public final class BuildingLayer {
                 }
             }
             case MACHIYA -> {
-                // A block's strip in front, under the pent roof
+                // A block's strip in front, under the pent roof; on the water, its back close over the bank
                 front = 1.0;
                 sideGap = 0.0;
-                backGap = 3.0;
+                backGap = waterside ? 1.0 + Math.floor(2.0 * Hash.unit(Hash.of(h, 83))) : 3.0;
                 depth = 10.0 + 6.0 * Hash.unit(Hash.of(h, 4));
             }
             case SHOP -> {
@@ -709,7 +712,7 @@ public final class BuildingLayer {
         return new Building(plot.id(), type, storeys, ground, upper, roof, ridgeAlong, slope, from, to, front, back,
                 step, stepBack, upFrom, upTo, upBack, wingFrom, wingTo, wingBack, chamferLeft, chamferRight, layout, plot.start() - from,
                 plot.end() - from, plot.maxDepth(), parkFrom, parkTo, parkBack, carport, base, ox, oz, p[2], p[3], nx, nz,
-                door, quarter, region, composition, program, standalone, palette, variant);
+                door, quarter, region, composition, program, standalone, palette, variant, waterside);
     }
 
     /** How far out in front a building's ring reaches: its whole front yard for houses and flats, else a block. */
@@ -1351,6 +1354,65 @@ public final class BuildingLayer {
         return Part.AIR;
     }
 
+    /**
+     * A lot on the water, at a column of its ring: the face its building turns to the water (blinds, a pent roof, a
+     * balcony, as its composition says), the bank's stone top along the lot's back and greenery hanging over it. Null
+     * where none of these is.
+     */
+    private static Part waterside(Building b, Column c, int dy) {
+        double u = c.u();
+        double v = c.v();
+        double w = b.width();
+        boolean facing = (b.type() == Building.Type.MACHIYA || b.type() == Building.Type.HOUSE) && c.adjacent()
+                && v >= b.back() && v < b.back() + 1.0 && u >= 0 && u < w && b.back() >= b.wingBack();
+        if (facing && dy >= 1) {
+            boolean posts = u < 1.0 || u >= w - 1.0;
+            switch (b.composition().get(Slot.WATERSIDE)) {
+                case "sudare" -> {
+                    // Blinds down the ground floor under a pent roof, and from the eaves down the upper storey
+                    if (dy == b.ground() && b.storeys() >= 2) {
+                        return Part.HOOD;
+                    }
+                    if (!posts && dy >= 2 && dy < b.wallHeight() && dy != b.ground()
+                            && (dy > b.ground() || Math.floorMod((long) Math.floor(u), 5) != 0)) {
+                        return Part.SUDARE;
+                    }
+                }
+                case "balcony" -> {
+                    if (b.storeys() >= 2) {
+                        // A wooden balcony over the water, its rail, blinds hung from the eaves behind it
+                        if (dy == b.ground()) {
+                            return Part.ENGAWA;
+                        }
+                        if (dy == b.ground() + 1 && !posts) {
+                            return Part.KOMAYOSE;
+                        }
+                        if (dy > b.ground() + 1 && dy < b.wallHeight() && !posts && Math.floorMod((long) Math.floor(u), 4) < 2) {
+                            return Part.SUDARE;
+                        }
+                    }
+                    if (!posts && dy >= 2 && dy < b.ground() && Math.floorMod((long) Math.floor(u), 5) != 0) {
+                        return Part.SUDARE;
+                    }
+                }
+                default -> {
+                }
+            }
+        }
+        if (c.lot() != Face.BACK) {
+            return null;
+        }
+        // The bank's top, and the greenery hanging over it where the building stands close
+        if (dy <= 0) {
+            return Part.BANK;
+        }
+        boolean close = b.lotDepth() - Math.max(b.back(), b.wingBack()) < 3.0;
+        if (close && !facing) {
+            return dy == 1 && detail(b, c, 84) < 0.55 ? Part.SHRUB : Part.NONE;
+        }
+        return null;
+    }
+
     /** A garden tree: {u, v of its trunk, trunk height, crown radius}. */
     private record Tree(double u, double v, int trunk, int radius) {
     }
@@ -1691,6 +1753,12 @@ public final class BuildingLayer {
      * cornices, fins and ledges; a shop's sign and awning and an office's canopy over the pavement; outdoor units.
      */
     private static Part ringPart(Building b, Column c, int dy) {
+        if (b.waterside()) {
+            Part water = waterside(b, c, dy);
+            if (water != null) {
+                return water;
+            }
+        }
         Part detail = c.adjacent() ? wallDetail(b, c, dy) : null;
         if (detail != null) {
             return detail;
@@ -2247,6 +2315,11 @@ public final class BuildingLayer {
         if (b.type() == Building.Type.MACHIYA && b.composition().is(Slot.UPPER_FRONT, "glazed") && upper && face == Face.FRONT) {
             // The upper storey glazed across in wooden frames
             return Math.floorMod(s, 3) == 0 ? Part.TRIM : Part.WINDOW;
+        }
+        if (b.waterside() && face == Face.BACK && b.type() == Building.Type.MACHIYA && !corner
+                && !b.composition().is(Slot.WATERSIDE, "plain")) {
+            // Rooms opened to the water: glazing between posts
+            return Math.floorMod(s, 4) == 0 ? Part.TRIM : Part.WINDOW;
         }
         boolean ribbon = b.composition().is(Slot.FACADE, "ribbon");
         boolean window = switch (b.type()) {
