@@ -2037,6 +2037,10 @@ public final class BuildingLayer {
         if (e.v() - rv < 1.5) {
             return false;
         }
+        // Within the lot's frontage and depth: positions past its depth are still the lot's (taken as at its back)
+        if (e.u() - r < b.lotFrom() || e.u() + r > b.lotTo() || e.v() + rv > b.lotDepth()) {
+            return false;
+        }
         for (Equip o : placed) {
             if (Math.abs(o.u() - e.u()) < r + reach(o) + 1.0 && Math.abs(o.v() - e.v()) < rv + reachAcross(o) + 1.0) {
                 return false;

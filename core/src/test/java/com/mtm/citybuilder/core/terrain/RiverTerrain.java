@@ -1,7 +1,25 @@
 package com.mtm.citybuilder.core.terrain;
 
-/** Plains at height 70 with a river 30 wide running along x = 0, its water at the plains' level. */
+/**
+ * Plains at height 70 with a river 30 wide through the origin, along z turned {@code angle} towards +x, its water at
+ * the plains' level.
+ */
 public final class RiverTerrain implements TerrainView {
+    private final double cos;
+    private final double sin;
+
+    public RiverTerrain() {
+        this(0.0);
+    }
+
+    public RiverTerrain(double angle) {
+        this.cos = Math.cos(angle);
+        this.sin = Math.sin(angle);
+    }
+
+    private double across(double x, double z) {
+        return Math.abs(x * cos - z * sin);
+    }
     @Override
     public double surfaceHeight(int x, int z) {
         return smoothHeight(x, z);
@@ -9,7 +27,7 @@ public final class RiverTerrain implements TerrainView {
 
     @Override
     public double waterLevel(double x, double z) {
-        return Math.abs(x) < 15 ? 70.0 : Double.NaN;
+        return across(x, z) < 15 ? 70.0 : Double.NaN;
     }
 
     @Override
@@ -39,7 +57,7 @@ public final class RiverTerrain implements TerrainView {
 
     @Override
     public RiverSample nearestRiver(double x, double z) {
-        return new RiverSample(Math.abs(x), 30.0);
+        return new RiverSample(across(x, z), 30.0);
     }
 
     @Override

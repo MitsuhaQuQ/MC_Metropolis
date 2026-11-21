@@ -426,17 +426,18 @@ public final class RoadLayer {
     private static final byte ZIGZAG = 2;
 
     /** The design of a road's class: least and preferred radius, grade on plain and on hard ground, width. */
-    private record Design(double minRadius, double radius, double grade, double mountainGrade, double width) {
+    private record Design(double minRadius, double radius, double grade, double mountainGrade, double width,
+                          double transition) {
     }
 
     private Design design(RoadEdge edge) {
         if (edge.roadClass() == RoadClass.TRUNK) {
             boolean wide = edge.a().tier() == SettlementTier.METROPOLIS && edge.b().tier() == SettlementTier.METROPOLIS;
             return new Design(config.trunkMinRadius, config.trunkRadius, config.trunkGrade, config.trunkMountainGrade,
-                    wide ? config.trunkWideWidth : config.trunkWidth);
+                    wide ? config.trunkWideWidth : config.trunkWidth, config.trunkTransition);
         }
         return new Design(config.localMinRadius, config.localRadius, config.localGrade, config.localMountainGrade,
-                config.localWidth);
+                config.localWidth, config.localTransition);
     }
 
     /** The grade a road may take here: steeper in hills and mountains. */
@@ -466,6 +467,9 @@ public final class RoadLayer {
             vertices.add(nodes[kept.get(v)]);
             tags.add(v + 1 < kept.size() && boreBefore[kept.get(v + 1)] ? BORE : PLAIN);
         }
+
+        // Bridges square to the rivers
+        square(w, design, vertices, tags);
 
         // Switchbacks where the profile leaves the ground up a slope too steep for the road: one climb a round, the
         // deepest first, each adding the length the road falls short by there
@@ -545,6 +549,20 @@ public final class RoadLayer {
                 length += Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]);
             }
             double climb = Math.abs(ground[e] - ground[s]);
+            // A ridge or a valley within it (ground well above both ends, or well below): a cutting, a tunnel or a
+            // bridge, not switchbacks up and down it
+            double peak = Double.NEGATIVE_INFINITY;
+            double trough = Double.POSITIVE_INFINITY;
+            for (int i = s; i <= e; i++) {
+                peak = Math.max(peak, ground[i]);
+                trough = Math.min(trough, ground[i]);
+            }
+            boolean across = peak > Math.max(ground[s], ground[e]) + 0.5 * worstDeviation
+                    || trough < Math.min(ground[s], ground[e]) - 0.5 * worstDeviation;
+            if (across) {
+                refused.add(new double[]{xs[worst], zs[worst]});
+                continue;
+            }
             // Enough to climb the ground's whole rise here, and the shortfall at its worst both ways
             double needed = 1.25 * Math.max(climb / grade[worst], length + 2.0 * worstDeviation / grade[worst]);
             double[] start = onPolyline(vertices, segmentOf[s], xs[s], zs[s]);
@@ -728,7 +746,7 @@ public final class RoadLayer {
         for (int pass = 0; pass < 4; pass++) {
             boolean changed = false;
             for (int v = 1; v < kept.size() - 1; v++) {
-                double radius = radiusAt(nodes, kept, v, design.radius());
+                double radius = radiusAt(nodes, kept, v, design);
                 if (radius >= design.minRadius()) {
                     continue;
                 }
@@ -750,21 +768,14 @@ public final class RoadLayer {
         }
     }
 
-    /** The radius {@link Alignment#fit} gives the curve at a kept vertex. */
-    private static double radiusAt(double[][] nodes, List<Integer> kept, int v, double maxRadius) {
-        double[] a = nodes[kept.get(v - 1)];
-        double[] p = nodes[kept.get(v)];
-        double[] b = nodes[kept.get(v + 1)];
-        double inLength = Math.hypot(p[0] - a[0], p[1] - a[1]);
-        double outLength = Math.hypot(b[0] - p[0], b[1] - p[1]);
-        double cos = ((p[0] - a[0]) * (b[0] - p[0]) + (p[1] - a[1]) * (b[1] - p[1])) / (inLength * outLength);
-        double turn = Math.acos(Math.max(-1.0, Math.min(1.0, cos)));
-        if (turn < 1e-3) {
-            return Double.POSITIVE_INFINITY;
+    /** The radius {@link RoadCurves#fit} gives the curve at a kept vertex, transitions and all. */
+    private static double radiusAt(double[][] nodes, List<Integer> kept, int v, Design design) {
+        List<double[]> points = new ArrayList<>(kept.size());
+        for (int k : kept) {
+            points.add(nodes[k]);
         }
-        double inShare = v == 1 ? inLength : 0.5 * inLength;
-        double outShare = v == kept.size() - 2 ? outLength : 0.5 * outLength;
-        return Math.min(maxRadius, Math.min(inShare, outShare) / Math.tan(0.5 * turn));
+        RoadCurves.Turn turn = RoadCurves.turn(points, v, design.minRadius(), design.radius(), design.transition());
+        return turn.radius() <= 0.0 ? Double.POSITIVE_INFINITY : turn.radius();
     }
 
     /**
@@ -793,7 +804,7 @@ public final class RoadLayer {
                 piece.add(vertices.get(v + 1));
             }
             if (piece.size() >= 2) {
-                Alignment.Plan fitted = Alignment.fit(piece, design.radius());
+                RoadCurves.Plan fitted = RoadCurves.fit(piece, design.minRadius(), design.radius(), design.transition());
                 List<double[]> points = fitted.line();
                 points = points.subList(fromSwitchbacks ? 1 : 0, points.size() - (intoSwitchbacks ? 1 : 0));
                 line.addAll(points);
@@ -889,6 +900,221 @@ public final class RoadLayer {
         return false;
     }
 
+    /**
+     * Bridges square to the rivers they cross: where the line crosses a river (not a lake) at more than
+     * {@code bridgeSkew} off square, the crossing is replaced by a straight square to the river, through the crossing's
+     * middle, reaching onto either bank far enough that the curves into it begin on land, and the line rejoined beyond
+     * them. The river's direction is square to the gradient of the distance to it. Kept as it was where the new line
+     * would leave dry land or cross other water.
+     */
+    private void square(Window w, Design design, List<double[]> vertices, List<Byte> tags) {
+        double step = 8.0;
+        double[] cumulative = cumulative(vertices);
+        double total = cumulative[vertices.size() - 1];
+        int n = (int) Math.floor(total / step) + 1;
+        if (n < 4) {
+            return;
+        }
+        boolean[] river = new boolean[n];
+        double[] width = new double[n];
+        double[][] points = new double[n][];
+        int segment = 0;
+        int[] segmentOf = new int[n];
+        for (int i = 0; i < n; i++) {
+            double at = i * step;
+            while (segment + 2 < vertices.size() && cumulative[segment + 1] < at) {
+                segment++;
+            }
+            segmentOf[i] = segment;
+            points[i] = pointAt(vertices, cumulative, at);
+            RiverSample sample = terrain.nearestRiver(points[i][0], points[i][1]);
+            river[i] = sample != null && sample.inWater() && Double.isNaN(terrain.lakeLevel(points[i][0], points[i][1]));
+            width[i] = sample == null ? 0.0 : sample.width();
+        }
+        // Crossings: runs of river samples, last first so earlier positions stay as they are
+        List<int[]> crossings = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            if (!river[i]) {
+                continue;
+            }
+            int e = i;
+            while (e + 1 < n && river[e + 1]) {
+                e++;
+            }
+            crossings.add(new int[]{i, e});
+            i = e;
+        }
+        double floor = Double.POSITIVE_INFINITY;
+        for (int c = crossings.size() - 1; c >= 0; c--) {
+            int s = crossings.get(c)[0];
+            int e = crossings.get(c)[1];
+            boolean plain = true;
+            for (int i = s; i <= e; i++) {
+                plain &= tags.get(segmentOf[i]) == PLAIN;
+            }
+            if (!plain) {
+                continue;
+            }
+            double[] entry = points[Math.max(0, s - 1)];
+            double[] exit = points[Math.min(n - 1, e + 1)];
+            double cx = exit[0] - entry[0];
+            double cz = exit[1] - entry[1];
+            double crossing = Math.hypot(cx, cz);
+            if (crossing < 1e-6) {
+                continue;
+            }
+            cx /= crossing;
+            cz /= crossing;
+            double mx = 0.5 * (entry[0] + exit[0]);
+            double mz = 0.5 * (entry[1] + exit[1]);
+            // The river's normal: the distance to it grows fastest across it, taken on the banks (on its middle line
+            // the distance has no gradient), the far bank's turned round
+            double[] normal = riverNormal(entry, exit);
+            double gx = normal[0];
+            double gz = normal[1];
+            double norm = Math.hypot(gx, gz);
+            if (norm < 1e-6) {
+                continue;
+            }
+            gx /= norm;
+            gz /= norm;
+            if (gx * cx + gz * cz < 0) {
+                gx = -gx;
+                gz = -gz;
+            }
+            double skew = Math.acos(Math.min(1.0, gx * cx + gz * cz));
+            if (skew <= Math.toRadians(config.bridgeSkew)) {
+                continue;
+            }
+            // Nearly along the river, or wet for far longer than the river is wide: not a crossing to square but a road
+            // running down the water, left to the route
+            if (skew > Math.toRadians(config.bridgeAlong) || (e - s + 1) * step > 3.0 * Math.max(8.0, width[(s + e) / 2])) {
+                continue;
+            }
+            // The bridge square across, straight from bank to bank: a point on each bank, a hair off the line so the
+            // fit keeps them (a turn may take only half the straight beside it, so the curves stay on land); beyond
+            // them room for the curves into it, at the least radius with its transitions
+            double half = 0.5 * Math.max(width[s], width[(s + e) / 2]);
+            double bank = half + 10.0;
+            boolean done = false;
+            // The room for the curves: at the least radius with its transitions, less where the river bends back
+            for (double share : new double[]{1.0, 0.6, 0.35}) {
+                double curve = share * 2.0 * (design.minRadius() * Math.tan(0.5 * skew) + design.transition());
+                double reach = bank + curve;
+                double[] near = {mx - gx * reach, mz - gz * reach};
+                double[] nearBank = {mx - gx * bank + gz * 0.01, mz - gz * bank - gx * 0.01};
+                double[] farBank = {mx + gx * bank, mz + gz * bank};
+                double[] far = {mx + gx * reach, mz + gz * reach};
+                if (!crossesOnce(near, far)) {
+                    continue;
+                }
+                // Rejoined beyond the curves either side: as near as will do, further where the nearer would get wet
+                for (double back : new double[]{2.0 * reach + 60.0, 3.0 * reach + 100.0, 1.4 * reach + 30.0}) {
+                    double from = Math.max(0.0, s * step - back);
+                    double to = Math.min(total, e * step + back);
+                    if (to > floor) {
+                        continue;
+                    }
+                    // Only plain line replaced: never a tunnel or switchbacks
+                    boolean plainStretch = true;
+                    for (int v = 0; v + 1 < vertices.size(); v++) {
+                        if (cumulative[v + 1] > from && cumulative[v] < to && tags.get(v) != PLAIN) {
+                            plainStretch = false;
+                            break;
+                        }
+                    }
+                    if (!plainStretch) {
+                        continue;
+                    }
+                    double[] start = pointAt(vertices, cumulative, from);
+                    double[] end = pointAt(vertices, cumulative, to);
+                    if (!dry(w, start, near) || !dry(w, far, end)) {
+                        continue;
+                    }
+                    spliceTagged(vertices, tags, from, to, start, end, List.of(near, nearBank, farBank, far), PLAIN);
+                    cumulative = cumulative(vertices);
+                    floor = from;
+                    done = true;
+                    break;
+                }
+                if (done) {
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * A river's normal where a line from {@code entry} to {@code exit}, both on its banks, crosses it: the distance's
+     * gradient at the near bank, and the far bank's turned round, added; unnormalised, zero where none is found.
+     */
+    public static double[] riverNormal(TerrainView terrain, double[] entry, double[] exit) {
+        double[] near = gradient(terrain, entry[0], entry[1]);
+        double[] far = gradient(terrain, exit[0], exit[1]);
+        return new double[]{-near[0] + far[0], -near[1] + far[1]};
+    }
+
+    private double[] riverNormal(double[] entry, double[] exit) {
+        return riverNormal(terrain, entry, exit);
+    }
+
+    private static double[] gradient(TerrainView terrain, double x, double z) {
+        double dx = distance(terrain, x + 4, z) - distance(terrain, x - 4, z);
+        double dz = distance(terrain, x, z + 4) - distance(terrain, x, z - 4);
+        double norm = Math.hypot(dx, dz);
+        return norm < 1e-9 ? new double[]{0, 0} : new double[]{dx / norm, dz / norm};
+    }
+
+    private static double distance(TerrainView terrain, double x, double z) {
+        RiverSample sample = terrain.nearestRiver(x, z);
+        return sample == null ? 1e6 : sample.distance();
+    }
+
+    /** The distance to the nearest river's middle, or far where there is none. */
+    private double distanceTo(double x, double z) {
+        RiverSample sample = terrain.nearestRiver(x, z);
+        return sample == null ? 1e6 : sample.distance();
+    }
+
+    /**
+     * Whether a straight between two points stays on dry land (the window's, and out of rivers and lakes) and on ground
+     * no more than {@code alignRelief} off the line between its ends' ground: an approach that climbs no hill the
+     * route did not.
+     */
+    private boolean dry(Window w, double[] a, double[] b) {
+        double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        int steps = Math.max(1, (int) Math.ceil(length / 8.0));
+        double ga = w.groundAt(a[0], a[1]);
+        double gb = w.groundAt(b[0], b[1]);
+        for (int q = 0; q <= steps; q++) {
+            double t = (double) q / steps;
+            double x = a[0] + (b[0] - a[0]) * t;
+            double z = a[1] + (b[1] - a[1]) * t;
+            RiverSample sample = terrain.nearestRiver(x, z);
+            if (w.kindAt(x, z) == BLOCKED || sample != null && sample.inWater() || !Double.isNaN(terrain.lakeLevel(x, z))
+                    || Math.abs(w.groundAt(x, z) - (ga + (gb - ga) * t)) > config.alignRelief) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Whether a straight crosses water in one stretch: a single river, not a bend of it or another beside it. */
+    private boolean crossesOnce(double[] a, double[] b) {
+        double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        int steps = Math.max(1, (int) Math.ceil(length / 4.0));
+        int runs = 0;
+        boolean wet = false;
+        for (int q = 0; q <= steps; q++) {
+            double t = (double) q / steps;
+            RiverSample sample = terrain.nearestRiver(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t);
+            boolean now = sample != null && sample.inWater();
+            runs += now && !wet ? 1 : 0;
+            wet = now;
+        }
+        return runs == 1;
+    }
+
     /** Distances along a polyline to each of its vertices. */
     private static double[] cumulative(List<double[]> vertices) {
         double[] cumulative = new double[vertices.size()];
@@ -906,6 +1132,12 @@ public final class RoadLayer {
      */
     private static void splice(List<double[]> vertices, List<Byte> tags, double from, double to, double[] start,
                                double[] end, List<double[]> legs) {
+        spliceTagged(vertices, tags, from, to, start, end, legs, ZIGZAG);
+    }
+
+    /** As {@link #splice}, the new stretch's segments tagged {@code tag}. */
+    private static void spliceTagged(List<double[]> vertices, List<Byte> tags, double from, double to, double[] start,
+                                     double[] end, List<double[]> legs, byte tag) {
         double[] cumulative = cumulative(vertices);
         List<double[]> spliced = new ArrayList<>();
         List<Byte> splicedTags = new ArrayList<>();
@@ -916,10 +1148,10 @@ public final class RoadLayer {
             v++;
         }
         spliced.add(start);
-        splicedTags.add(ZIGZAG);
+        splicedTags.add(tag);
         for (double[] leg : legs) {
             spliced.add(leg);
-            splicedTags.add(ZIGZAG);
+            splicedTags.add(tag);
         }
         spliced.add(end);
         int after = v;

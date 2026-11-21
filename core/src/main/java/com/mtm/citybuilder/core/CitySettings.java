@@ -434,6 +434,9 @@ public final class CitySettings {
         public double localGrade = 0.07;
         public double localMountainGrade = 0.09;
         public double localWidth = 8.0;
+        /** Each transition curve's length (the ordinance's least 緩和区間 at the design speed), trunk and local. */
+        public double trunkTransition = 50.0;
+        public double localTransition = 35.0;
         /** Straightening the routed line may move it at most this far from the route, nor onto ground this much higher or lower. */
         public double alignShift = 160.0;
         public double alignRelief = 12.0;
@@ -450,6 +453,10 @@ public final class CitySettings {
         /** Shorter tunnels are cuttings, shorter dry bridges embankments. */
         /** How high a bridge's deck stands over the water it crosses: room under it for boats and floods. */
         public double bridgeClearance = 6.0;
+        /** How far off square to a river a bridge may cross it, in degrees (the ordinance's guidance: at least 60 degrees between them). */
+        public double bridgeSkew = 30.0;
+        /** Past this many degrees off square a road runs down a river rather than across it, and is not squared. */
+        public double bridgeAlong = 65.0;
         public double tunnelMinLength = 64.0;
         public double bridgeMinLength = 24.0;
         /** Vertical curves: passes of a five-sample moving average over the heights. */

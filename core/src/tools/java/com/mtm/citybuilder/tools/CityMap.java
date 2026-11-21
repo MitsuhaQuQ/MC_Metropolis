@@ -1069,6 +1069,10 @@ public final class CityMap {
             int[] radii = new int[5];
             double[] bounds = {30, 60, 100, 150, 200.5};
             int hairpins = 0;
+            int eased = 0;
+            int crossings = 0;
+            int skewed = 0;
+            double worstSkew = 0;
             double steepest = 0;
             double viaduct = 0;
             start = System.nanoTime();
@@ -1096,6 +1100,7 @@ public final class CityMap {
                         }
                         continue;
                     }
+                    eased += arc.length > 5 && arc[5] > 0 ? 1 : 0;
                     for (int b = 0; b < bounds.length; b++) {
                         if (arc[4] < bounds[b]) {
                             radii[b]++;
@@ -1107,6 +1112,38 @@ public final class CityMap {
                     if (route.kind(i) == RoadKind.BRIDGE && route.road(i) - route.ground(i) > 8) {
                         viaduct += Math.hypot(route.x(i) - route.x(i - 1), route.z(i) - route.z(i - 1));
                     }
+                }
+                // River crossings: how far off square to the river each runs (its normal from the distance's gradient)
+                com.mtm.citybuilder.core.terrain.TerrainView ground = logic.terrain();
+                for (int i = 1; i < route.samples() - 1; i++) {
+                    com.mtm.citybuilder.core.terrain.RiverSample here = ground.nearestRiver(route.x(i), route.z(i));
+                    if (here == null || !here.inWater() || !Double.isNaN(ground.lakeLevel(route.x(i), route.z(i)))) {
+                        continue;
+                    }
+                    int e = i;
+                    while (e + 1 < route.samples() - 1) {
+                        com.mtm.citybuilder.core.terrain.RiverSample next = ground.nearestRiver(route.x(e + 1), route.z(e + 1));
+                        if (next == null || !next.inWater()) {
+                            break;
+                        }
+                        e++;
+                    }
+                    double cx = route.x(e + 1) - route.x(i - 1);
+                    double cz = route.z(e + 1) - route.z(i - 1);
+                    double mx = 0.5 * (route.x(e + 1) + route.x(i - 1));
+                    double mz = 0.5 * (route.z(e + 1) + route.z(i - 1));
+                    double[] normal = com.mtm.citybuilder.core.road.RoadLayer.riverNormal(ground,
+                            new double[]{route.x(i - 1), route.z(i - 1)}, new double[]{route.x(e + 1), route.z(e + 1)});
+                    double gx = normal[0];
+                    double gz = normal[1];
+                    double norm = Math.hypot(gx, gz) * Math.hypot(cx, cz);
+                    if (norm > 1e-9) {
+                        double skew = Math.toDegrees(Math.acos(Math.min(1.0, Math.abs(gx * cx + gz * cz) / norm)));
+                        crossings++;
+                        skewed += skew > 30.5 ? 1 : 0;
+                        worstSkew = Math.max(worstSkew, skew);
+                    }
+                    i = e;
                 }
                 double[] along = new double[route.samples()];
                 for (int i = 1; i < along.length; i++) {
@@ -1124,13 +1161,19 @@ public final class CityMap {
             System.out.printf("L4 %-5s %3d roads (%d not found) in %.1f s, the slowest %.1f s: %.0f km, %.2f times the straight line%n",
                     roadClass, count, missing, (System.nanoTime() - start) / 1e9, slowest, length / 1000,
                     straight == 0 ? 0.0 : length / straight);
-            System.out.printf("  curves by radius: <30 %d, 30-60 %d, 60-100 %d, 100-150 %d, 150-200 %d; hairpins %d; steepest %.1f%% over 48 blocks%n",
-                    radii[0], radii[1], radii[2], radii[3], radii[4], hairpins, 100 * steepest);
+            System.out.printf("  curves by radius: <30 %d, 30-60 %d, 60-100 %d, 100-150 %d, 150-200 %d; hairpins %d; steepest %.1f%% over 48 blocks; %d curves eased by transitions%n",
+                    radii[0], radii[1], radii[2], radii[3], radii[4], hairpins, 100 * steepest, eased);
+            System.out.printf("  river crossings %d, %d more than 30 degrees off square (the most %.0f)%n", crossings, skewed, worstSkew);
             System.out.printf("  bridges standing over 8 above the ground (viaducts, not over water): %.1f%%%n", 100 * viaduct / Math.max(1, length));
             double all = Math.max(1, length);
             kinds.forEach((kind, value) -> System.out.printf("  %-10s %5.1f%%%n", kind, 100 * value / all));
         }
         return edges;
+    }
+
+    private static double distance(com.mtm.citybuilder.core.terrain.TerrainView ground, double x, double z) {
+        com.mtm.citybuilder.core.terrain.RiverSample sample = ground.nearestRiver(x, z);
+        return sample == null ? 1e6 : sample.distance();
     }
 
     /**

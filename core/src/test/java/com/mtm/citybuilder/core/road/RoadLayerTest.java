@@ -97,7 +97,7 @@ class RoadLayerTest {
             }
         }
         double deepest = worst;
-        assertTrue(deepest < SETTINGS.roads.switchbackTrigger + 3, () -> "off the ground by " + deepest);
+        assertTrue(deepest < SETTINGS.roads.tunnelDepth, () -> "off the ground by " + deepest);
         assertTrue(route.width() == SETTINGS.roads.localWidth, () -> "width " + route.width());
     }
 
@@ -125,6 +125,32 @@ class RoadLayerTest {
             }
         }
         assertTrue(over > 0, "crosses the river");
+    }
+
+    @Test
+    void aSkewedRiverIsBridgedNearSquare() {
+        // The river 50 degrees off square to the road's way: the bridge turns to cross it within 30
+        RiverTerrain terrain = new RiverTerrain(Math.toRadians(50));
+        CityLogic logic = new CityLogic(5L, SETTINGS, terrain);
+        Settlement west = new Settlement(1, SettlementTier.TOWN, 0, 0, -3000, 0, Style.ASIA, 0.6);
+        Settlement east = new Settlement(2, SettlementTier.TOWN, 0, 0, 3000, 0, Style.ASIA, 0.6);
+        RoadRoute route = logic.route(new RoadEdge(west, east, RoadClass.LOCAL));
+        assertTrue(route.exists(), "a route");
+        int first = -1;
+        int last = -1;
+        for (int i = 0; i < route.samples(); i++) {
+            if (terrain.nearestRiver(route.x(i), route.z(i)).inWater()) {
+                first = first < 0 ? i : first;
+                last = i;
+            }
+        }
+        assertTrue(first > 0 && last < route.samples() - 1, "crosses the river");
+        double[] normal = RoadLayer.riverNormal(terrain, new double[]{route.x(first - 1), route.z(first - 1)},
+                new double[]{route.x(last + 1), route.z(last + 1)});
+        double cx = route.x(last + 1) - route.x(first - 1);
+        double cz = route.z(last + 1) - route.z(first - 1);
+        double skew = Math.toDegrees(Math.acos(Math.abs(normal[0] * cx + normal[1] * cz) / (Math.hypot(normal[0], normal[1]) * Math.hypot(cx, cz))));
+        assertTrue(skew <= SETTINGS.roads.bridgeSkew + 1, () -> "crosses " + skew + " degrees off square");
     }
 
     @Test

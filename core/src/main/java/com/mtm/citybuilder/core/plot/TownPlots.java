@@ -68,6 +68,9 @@ public final class TownPlots {
     /** The cuts of each row of back lots, by chain, side and row. */
     private final Map<Long, double[]> backCuts = new java.util.concurrent.ConcurrentHashMap<>();
 
+    /** The street each lot faces, as it runs past the middle of its frontage, by chain, side and index. */
+    private final Map<Long, Object[]> lotStreets = new java.util.concurrent.ConcurrentHashMap<>();
+
     /** The footpaths' pieces, which front no lots. */
     private final List<StreetSegment> paths = new ArrayList<>();
 
@@ -413,9 +416,9 @@ public final class TownPlots {
         if (here == null || here.interior() || here.remnant()) {
             return here;
         }
-        // A back lot's pole running through here to the street
+        // A back lot's pole running through here to the street: a strip of way, along the street as it runs here
         Plot pole = pole(here);
-        return pole != null ? pole : here;
+        return pole != null ? headed(pole, plot.heading()) : here;
     }
 
     /** A position on a lot along the street, as built: joined to a neighbour, a remnant, or part of a parcel. */
@@ -441,6 +444,11 @@ public final class TownPlots {
             return Math.max(lot.maxDepth(), backDepth(nominal));
         }
         return lot.maxDepth();
+    }
+
+    private static Plot headed(Plot p, double heading) {
+        return new Plot(p.id(), p.chain(), p.side(), p.index(), p.start(), p.end(), p.along(), p.depth(), p.maxDepth(),
+                p.district(), p.street(), p.streetWidth(), heading, p.interior(), p.remnant(), p.row(), p.use(), p.pole());
     }
 
     private static Plot deepened(Plot p, double maxDepth) {
@@ -725,9 +733,48 @@ public final class TownPlots {
             end = starts[target + 2];
         }
         Plot lot = nominal(position, target);
+        // The street as it runs past the middle of the lot's frontage: the same wherever on the lot it is asked, as a
+        // lot has one building facing one way
+        double mid = 0.5 * (start + end);
+        Object[] facing = lotStreets.computeIfAbsent(Hash.of(0x5713EL, position.chain(), position.side(), target), k -> {
+            StreetSegment street = streetAt(position.chain(), mid);
+            return street == null ? new Object[0]
+                    : new Object[]{street.streetClass(), street.width(), headingOf(position.chain(), street)};
+        });
+        com.mtm.citybuilder.core.street.StreetClass streetClass = facing.length == 0 ? position.street()
+                : (com.mtm.citybuilder.core.street.StreetClass) facing[0];
+        double streetWidth = facing.length == 0 ? position.streetWidth() : (Double) facing[1];
+        double heading = facing.length == 0 ? position.heading() : (Double) facing[2];
         return new Plot(lot.id(), position.chain(), position.side(), target, start, end, position.along(),
-                position.depth(), lot.maxDepth(), lot.district(), position.street(), position.streetWidth(),
-                position.heading(), position.depth() > lot.maxDepth(), false);
+                position.depth(), lot.maxDepth(), lot.district(), streetClass, streetWidth, heading,
+                position.depth() > lot.maxDepth(), false);
+    }
+
+    /** The piece of a chain at a distance along it (the nearest end's piece past its ends), or null. */
+    private StreetSegment streetAt(int chain, double along) {
+        StreetSegment best = null;
+        double bestOff = Double.POSITIVE_INFINITY;
+        for (int p : chains.get(chain)) {
+            StreetSegment g = pieces.get(p);
+            double off = Math.max(0.0, Math.max(offset[p] - along, along - (offset[p] + g.length())));
+            if (off < bestOff) {
+                bestOff = off;
+                best = g;
+            }
+        }
+        return best;
+    }
+
+    /** A chain's piece's direction, as the chain runs. */
+    private double headingOf(int chain, StreetSegment g) {
+        for (int p : chains.get(chain)) {
+            if (pieces.get(p) == g) {
+                double ux = (reversed[p] ? g.x1() - g.x2() : g.x2() - g.x1()) / g.length();
+                double uz = (reversed[p] ? g.z1() - g.z2() : g.z2() - g.z1()) / g.length();
+                return Math.atan2(uz, ux);
+            }
+        }
+        return 0.0;
     }
 
     /**
