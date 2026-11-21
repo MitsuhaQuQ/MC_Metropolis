@@ -48,7 +48,7 @@ class PromenadeTest {
                 }
                 river++;
                 // On the bank, between the water and the bank road
-                assertTrue(fromBank > 0 && fromBank < settings.streets.bankOffset, "from the bank " + fromBank);
+                assertTrue(fromBank > 0 && fromBank < settings.streets.bankOffset, () -> "from the bank " + fromBank);
                 // No lot on the path, nor between it and the water
                 assertNull(plots.at(q[0], q[1]));
                 double towardWater = Math.signum(RIVER_X - q[0]) * 0.5 * fromBank;
@@ -77,7 +77,7 @@ class PromenadeTest {
                     && Math.abs(g.z1() - city.z()) < 3000) {
                 steps++;
                 double end = Math.min(Math.abs(g.x1() - RIVER_X), Math.abs(g.x2() - RIVER_X)) - 0.5 * RIVER_WIDTH;
-                assertTrue(end >= -1 && end < 3, "steps end at the water " + end);
+                assertTrue(end >= -1 && end < 3, () -> "steps end at the water " + end);
             }
         }
         assertTrue(steps > 0, "no steps down to the water");
@@ -171,7 +171,7 @@ class PromenadeTest {
             assertTrue((p.points().size() - 1) * settings.streets.step >= settings.streets.hillMin - 1e-6);
             for (double[] q : p.points()) {
                 // At the foot of the slope, out of the built land: no lots on it
-                assertTrue(Math.abs(q[1] - foot) < 300, "at the foot " + (q[1] - foot));
+                assertTrue(Math.abs(q[1] - foot) < 300, () -> "at the foot " + (q[1] - foot));
                 assertNull(plots.at(q[0], q[1]));
             }
         }

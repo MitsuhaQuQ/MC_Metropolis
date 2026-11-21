@@ -33,21 +33,21 @@ class SanctuaryLayerTest {
         for (Sanctuary s : found) {
             assertEquals(city.id(), s.town());
             double[] radii = s.kind() == Sanctuary.Kind.TEMPLE ? settings.sanctuaries.templeRadius : settings.sanctuaries.shrineRadius;
-            assertTrue(s.radius() >= radii[0] * settings.sanctuaries.minScale - 1e-6 && s.radius() <= radii[1], s.toString());
-            assertTrue(s.elevation() - base >= settings.sanctuaries.minRise, "above the town " + s);
+            assertTrue(s.radius() >= radii[0] * settings.sanctuaries.minScale - 1e-6 && s.radius() <= radii[1], s::toString);
+            assertTrue(s.elevation() - base >= settings.sanctuaries.minRise, () -> "above the town " + s);
             double distance = Math.hypot(s.x() - city.x(), s.z() - city.z());
-            assertTrue(distance > edge && distance <= edge + settings.sanctuaries.reach[1] + 1, "out of town " + s);
+            assertTrue(distance > edge && distance <= edge + settings.sanctuaries.reach[1] + 1, () -> "out of town " + s);
             // The hill kept: little earth moved, the precinct smaller rather than the hill cut
-            assertTrue(s.cut() <= settings.sanctuaries.maxCut, "cut " + s);
+            assertTrue(s.cut() <= settings.sanctuaries.maxCut, () -> "cut " + s);
             // Out of every other town, and its approach comes down towards its own
             for (Settlement other : towns) {
                 if (other.id() != city.id()) {
-                    assertTrue(Math.hypot(s.x() - other.x(), s.z() - other.z()) > logic.targetRadius(other), "in " + other);
+                    assertTrue(Math.hypot(s.x() - other.x(), s.z() - other.z()) > logic.targetRadius(other), () -> "in " + other);
                 }
             }
             double[] first = s.approach().get(0);
             double[] last = s.approach().get(s.approach().size() - 1);
-            assertTrue(last[2] <= first[2], "the approach comes down " + s);
+            assertTrue(last[2] <= first[2], () -> "the approach comes down " + s);
             assertTrue(Math.hypot(last[0] - city.x(), last[1] - city.z()) < Math.hypot(first[0] - city.x(), first[1] - city.z()));
             for (Sanctuary t : found) {
                 if (t != s) {

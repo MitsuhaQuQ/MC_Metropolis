@@ -25,7 +25,7 @@ class CatalogTest {
             }
         }
         for (Quarter q : new Quarter[]{Quarter.HANAMACHI, Quarter.CHAYA, Quarter.STOREHOUSE, Quarter.JINAIMACHI}) {
-            assertNotNull(c.forQuarter(q, 0.5), q.toString());
+            assertNotNull(c.forQuarter(q, 0.5), q::toString);
         }
         assertEquals(null, c.forQuarter(Quarter.ORDINARY, 0.5));
         for (Program p : Program.values()) {
@@ -51,7 +51,7 @@ class CatalogTest {
             for (Map.Entry<Slot, Map<String, Double>> e : style.options().entrySet()) {
                 for (Map.Entry<String, Double> o : e.getValue().entrySet()) {
                     if (o.getValue() > 0.05) {
-                        assertTrue(seen.get(e.getKey()).contains(o.getKey()), style.name() + " " + e.getKey() + " never " + o.getKey());
+                        assertTrue(seen.get(e.getKey()).contains(o.getKey()), () -> style.name() + " " + e.getKey() + " never " + o.getKey());
                     }
                 }
             }

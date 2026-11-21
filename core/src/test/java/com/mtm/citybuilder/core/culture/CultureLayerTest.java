@@ -62,7 +62,7 @@ class CultureLayerTest {
         assertEquals(4000, flat, 100, "border on flat land");
         // With a ridge in the band, east of the crossing, the border moves onto it
         double onRidge = border(ridge(settings), settings);
-        assertTrue(onRidge >= 4500 && onRidge <= 4900, "border at " + onRidge);
+        assertTrue(onRidge >= 4500 && onRidge <= 4900, () -> "border at " + onRidge);
     }
 
     @Test
@@ -99,7 +99,7 @@ class CultureLayerTest {
         CultureLayer layer = ridge(settings);
         double atBorder = sample(layer, settings, 4560, 2048).margin();
         double inside = sample(layer, settings, 2500, 2048).margin();
-        assertTrue(inside > atBorder + 2000, inside + " inside against " + atBorder + " at the border");
+        assertTrue(inside > atBorder + 2000, () -> inside + " inside against " + atBorder + " at the border");
     }
 
     @Test
@@ -141,7 +141,7 @@ class CultureLayerTest {
             }
         }
         double share = asia / (double) total;
-        assertTrue(share > 0.4 && share < 0.6, "Asian share " + share);
+        assertTrue(share > 0.4 && share < 0.6, () -> "Asian share " + share);
         // Samples an eighth of a wavelength apart mostly agree: cultures cover wide areas, not a patchwork
         assertTrue(samePairs > 0.8 * pairs, samePairs + " of " + pairs + " neighbouring samples share a style");
     }

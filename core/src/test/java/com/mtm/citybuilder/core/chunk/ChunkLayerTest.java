@@ -59,8 +59,8 @@ class ChunkLayerTest {
         int cz = Math.floorDiv((int) Math.floor(mz), 16);
         ChunkLayer.Column[] columns = layer.columns(cx, cz);
         ChunkLayer.Column at = columns[((int) Math.floor(mx) - cx * 16) * 16 + (int) Math.floor(mz) - cz * 16];
-        assertTrue(at.surface() == ChunkLayer.Surface.ARTERIAL, "column " + at);
-        assertTrue(Math.abs(at.across()) <= 0.5 * arterial.width() + 1e-9, "offset " + at.across());
+        assertTrue(at.surface() == ChunkLayer.Surface.ARTERIAL, () -> "column " + at);
+        assertTrue(Math.abs(at.across()) <= 0.5 * arterial.width() + 1e-9, () -> "offset " + at.across());
         // The same chunk asked again gives the same columns
         assertArrayEquals(columns, layer.columns(cx, cz));
         // Round the bends of arterials, the centre line keeps to the centre: it does not run on along a piece's
@@ -92,7 +92,7 @@ class ChunkLayerTest {
                         double x = (jx + ox) * 16 + c / 16 + 0.5;
                         double z = (jz + oz) * 16 + c % 16 + 0.5;
                         double nearest = marked.stream().mapToDouble(g -> distance(g, x, z)).min().orElse(1e9);
-                        assertTrue(nearest <= 1.0, "a centre line " + nearest + " off the centre at " + x + " " + z);
+                        assertTrue(nearest <= 1.0, () -> "a centre line " + nearest + " off the centre at " + x + " " + z);
                     }
                 }
             }
@@ -107,7 +107,7 @@ class ChunkLayerTest {
             int bcz = Math.floorDiv((int) Math.floor(bz), 16);
             ChunkLayer.Column column = layer.columns(bcx, bcz)[((int) Math.floor(bx) - bcx * 16) * 16 + (int) Math.floor(bz) - bcz * 16];
             if (column.bridge()) {
-                assertTrue(column.deck() > SyntheticTerrain.SEA, "deck " + column.deck());
+                assertTrue(column.deck() > SyntheticTerrain.SEA, () -> "deck " + column.deck());
             }
         }
         // No trees at the heart of the town; trees outside it

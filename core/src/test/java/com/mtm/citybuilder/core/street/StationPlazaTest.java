@@ -41,13 +41,13 @@ class StationPlazaTest {
         assertEquals(1, metropolis.taxiPools().size());
         assertEquals(2, metropolis.loops().size());
         // Round loops, not long ones: along the platforms hardly wider than deep (Toyama's square is about 90 by 90)
-        assertTrue(town.to() - town.from() < 70, "town " + (town.to() - town.from()));
-        assertTrue(busy.to() - busy.from() < 110, "city " + (busy.to() - busy.from()));
-        assertTrue(busy.depth() < 100, "city " + busy.depth());
-        assertTrue(metropolis.to() - metropolis.from() < 260, "metropolis " + (metropolis.to() - metropolis.from()));
+        assertTrue(town.to() - town.from() < 70, () -> "town " + (town.to() - town.from()));
+        assertTrue(busy.to() - busy.from() < 110, () -> "city " + (busy.to() - busy.from()));
+        assertTrue(busy.depth() < 100, () -> "city " + busy.depth());
+        assertTrue(metropolis.to() - metropolis.from() < 260, () -> "metropolis " + (metropolis.to() - metropolis.from()));
         for (StationPlaza plaza : List.of(town, city, busy, metropolis)) {
             for (StationPlaza.Loop loop : plaza.loops()) {
-                assertTrue(loop.half() <= loop.radius() + 1, "a long loop: straights " + 2 * loop.half() + ", radius " + loop.radius());
+                assertTrue(loop.half() <= loop.radius() + 1, () -> "a long loop: straights " + 2 * loop.half() + ", radius " + loop.radius());
             }
             assertEquals(plaza.depth(), StationPlaza.depth(plaza.template(), CONFIG), 1e-9, "the depth the avenue was laid for");
         }

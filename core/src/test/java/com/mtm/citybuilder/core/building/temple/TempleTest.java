@@ -52,7 +52,7 @@ class TempleTest {
                 halves[1]++;
             }
         });
-        assertTrue(halves[1] >= 0.85 * halves[0], halves[1] + " of " + halves[0] + " tatami halves in a mat");
+        assertTrue(halves[1] >= 0.85 * halves[0], () -> halves[1] + " of " + halves[0] + " tatami halves in a mat");
     }
 
     @Test
@@ -68,13 +68,13 @@ class TempleTest {
         for (int i = 1; i < n; i++) {
             assertTrue(Math.abs(lv[i] - lv[i - 1]) <= 1, "a step at a time at " + i);
         }
-        assertTrue(Math.abs(lv[n - 1] - g.height(0, n - 1)) <= 1, "meets the street: " + lv[n - 1]);
+        assertTrue(Math.abs(lv[n - 1] - g.height(0, n - 1)) <= 1, () -> "meets the street: " + lv[n - 1]);
         // Rises per block over the top (steep) and the foot (gentle) of the climb.
         double steep = Math.abs(lv[30] - lv[0]) / 30.0, gentle = Math.abs(lv[95] - lv[70]) / 25.0;
         // Steeper than 1:1 above: a step every block; lower down about as steep as the ground there (0.4).
-        assertTrue(steep >= 0.9 && gentle > 0.2 && gentle < 0.7, "steep " + steep + ", gentle " + gentle);
+        assertTrue(steep >= 0.9 && gentle > 0.2 && gentle < 0.7, () -> "steep " + steep + ", gentle " + gentle);
         double foot = Math.abs(lv[99] - lv[88]) / 11.0;
-        assertTrue(foot < gentle, "gentler still at the very foot: " + foot);
+        assertTrue(foot < gentle, () -> "gentler still at the very foot: " + foot);
         assertTrue(!landings.isEmpty(), "landings on the steep flights");
         for (int lz : landings) {
             assertEquals(lv[lz - 1], lv[lz]);
@@ -167,7 +167,7 @@ class TempleTest {
     void gardens() {
         Model m = new Model();
         List<int[]> rocks = Garden.karesansui(m, new Rect(0, 0, 21, 13), 1, 3);
-        assertTrue(rocks.size() >= 2, "rock groups: " + rocks.size());
+        assertTrue(rocks.size() >= 2, () -> "rock groups: " + rocks.size());
         for (int[] c : rocks) {
             // Rings all round each group, moss and a stone at its middle.
             assertTrue(m.get(c[0] + 2, 0, c[1] + 2).startsWith("citybuilder:raked_gravel_ring[facing=south"));
@@ -202,7 +202,7 @@ class TempleTest {
         });
         // The front steps stand on one side only.
         bad.removeIf(b -> b.contains("stone_brick_stairs"));
-        assertTrue(bad.isEmpty(), bad.size() + " asymmetric, e.g. " + (bad.isEmpty() ? "" : bad.get(0)));
+        assertTrue(bad.isEmpty(), () -> bad.size() + " asymmetric, e.g. " + (bad.isEmpty() ? "" : bad.get(0)));
         // Front to back only the shell: inside, the sanctum is at the back.
         Hall k = KONDO;
         Model shell = new Hall(k.width(), k.depth(), k.eave(), k.ridge(), k.roof(), k.gableInset(), k.overhang(),
@@ -212,7 +212,7 @@ class TempleTest {
             if (!s.contains("stone_brick_stairs")) {
                 String mz = shell.get(x, y, sz - z);
                 assertTrue(mz != null && base(mz).equals(base(s)) || s.contains("[facing=north,half=bottom]")
-                        || mz == null && s.contains("stone_brick_stairs"), x + "," + y + "," + z + " " + s + " / " + mz);
+                        || mz == null && s.contains("stone_brick_stairs"), () -> x + "," + y + "," + z + " " + s + " / " + mz);
             }
         });
     }
@@ -291,7 +291,7 @@ class TempleTest {
                 plaster[0]++;
             }
         });
-        assertTrue(fence[0] > 0 && plaster[0] > 0, fence[0] + " lattice, " + plaster[0] + " plaster");
+        assertTrue(fence[0] > 0 && plaster[0] > 0, () -> fence[0] + " lattice, " + plaster[0] + " plaster");
     }
 
     @Test
@@ -304,7 +304,7 @@ class TempleTest {
                 railLow[0] = Math.min(railLow[0], y);
             }
         });
-        assertTrue(railLow[0] > 11.8 && railLow[0] < 21.3, "railing at " + railLow[0]);
+        assertTrue(railLow[0] > 11.8 && railLow[0] < 21.3, () -> "railing at " + railLow[0]);
         assertEquals(29, m.maxY() - 2, 1, "ridge near the measured 29.2 m (plus the ridge tiles)");
     }
 
@@ -322,7 +322,7 @@ class TempleTest {
                 doors[0]++;
             }
         });
-        assertTrue(stairs[0] >= 2 * 2 * 5, stairs[0] + " stair blocks in the two stair houses");
+        assertTrue(stairs[0] >= 2 * 2 * 5, () -> stairs[0] + " stair blocks in the two stair houses");
         assertTrue(doors[0] > 0, "doors opened back in the passages");
         // The way through stays clear in the middle passage.
         int cx = (m.minX() + m.maxX()) / 2;
@@ -354,9 +354,9 @@ class TempleTest {
                 }
             });
             assertEquals(2, bronze[0], "the bell, two blocks");
-            assertTrue(chain[0] >= 3 && striker[0] == 2, chain[0] + " chain, " + striker[0] + " striker");
+            assertTrue(chain[0] >= 3 && striker[0] == 2, () -> chain[0] + " chain, " + striker[0] + " striker");
             // Hung clear of the floor: open to the platform, or above the gallery on a raised base.
-            assertTrue(bellLow[0] >= (skirt ? 5 : 2), "bell at " + bellLow[0]);
+            assertTrue(bellLow[0] >= (skirt ? 5 : 2), () -> "bell at " + bellLow[0]);
         }
     }
 
@@ -381,7 +381,7 @@ class TempleTest {
         Model m = h.build();
         int x = 15;
         int back = roofAt(m, x, m.minZ()), front = roofAt(m, x, m.maxZ());
-        assertTrue(front < back, "front eave " + front + " not under the back eave " + back);
+        assertTrue(front < back, () -> "front eave " + front + " not under the back eave " + back);
         assertTrue(m.maxZ() - m.minZ() + 1 >= 4 + 11 + 6, "the roof reaches over the porch");
         // The porch columns stand on the ground in front of the walls.
         assertTrue(m.get(4, 0, 4 + 11 + 6 - 1) != null && m.get(4, 0, 4 + 11 + 6 - 1).contains("orange_concrete"));
@@ -399,7 +399,7 @@ class TempleTest {
                 rail[1] = Math.max(rail[1], y);
             }
         });
-        assertTrue(rail[0] >= 5 && rail[0] <= 9, "balcony railing at " + rail[0]);
+        assertTrue(rail[0] >= 5 && rail[0] <= 9, () -> "balcony railing at " + rail[0]);
         assertEquals(15 + 2 * 7, m.maxX() - m.minX() + 1, "the gate with its corridors: LOD1's 30 m");
         int cx = (m.minX() + m.maxX()) / 2;
         for (int z = 3 + 1; z < 3 + 5 - 1; z++) {
@@ -534,7 +534,7 @@ class TempleTest {
                     Model m = new Precinct(kind, rank, w, d, 42, pal, g, false).plan(placed);
                     String what = kind + " " + rank + (g.height(0, 0) == 0 ? " flat" : " hill");
                     int cx = w / 2, stop = hallFront(placed, cx);
-                    assertTrue(stop > 0, what + ": a hall on the axis");
+                    assertTrue(stop > 0, () -> what + ": a hall on the axis");
                     int prev = Integer.MIN_VALUE;
                     for (int z = d - 1; z >= stop; z--) {
                         int top = Integer.MIN_VALUE;
@@ -580,7 +580,7 @@ class TempleTest {
                         for (int y = pl.level() - 1; y >= pl.level() - 3 && !under; y--) {
                             under = solid(m, x, y, z) || y <= g.surface(x, z);
                         }
-                        assertTrue(under, what + ": " + pl.name() + " floats at level " + pl.level());
+                        assertTrue(under, () -> what + ": " + pl.name() + " floats at level " + pl.level());
                     }
                     // No two buildings overlap, and each one is inside the plot.
                     for (int i = 0; i < placed.size(); i++) {
@@ -621,7 +621,7 @@ class TempleTest {
                 .plan(big);
         int hs = small.stream().filter(p -> p.name().equals("hondo")).findFirst().orElseThrow().area().width();
         int hb = big.stream().filter(p -> p.name().equals("hondo")).findFirst().orElseThrow().area().width();
-        assertTrue(hb > hs, "a wider plot, a wider hall: " + hs + " -> " + hb);
+        assertTrue(hb > hs, () -> "a wider plot, a wider hall: " + hs + " -> " + hb);
         Precinct a = new Precinct(Precinct.Kind.SHRINE, null, 51, 75, 7, TemplePalette.INARI, Ground.hillside(60, 0.2, 0.003), true);
         assertEquals(a.build().size(), a.build().size(), "the same seed, the same precinct");
         assertEquals(Precinct.Rank.MEDIUM, a.effectiveRank());
@@ -709,7 +709,7 @@ class TempleTest {
         for (HallInterior kind : new HallInterior[]{HallInterior.KODO, HallInterior.SHOIN}) {
             Model m = new Hall(31, 21, 9, 15, RoofType.IRIMOYA, 3, 4, 0, 0, 0, 0, 2, 4.5, false, kind,
                     TemplePalette.NATURAL).build();
-            assertTrue(tatamiReached(m, 2) >= 0.9, kind + ": every room has a way in");
+            assertTrue(tatamiReached(m, 2) >= 0.9, () -> kind + ": every room has a way in");
         }
         assertEquals(0, count(new Hall(31, 21, 9, 15, RoofType.IRIMOYA, 3, 4, 0, 0, 0, 0, 2, 4.5, false,
                 HallInterior.NONE, TemplePalette.NATURAL).build(), Interior.TATAMI), "a shell only");

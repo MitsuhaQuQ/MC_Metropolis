@@ -57,15 +57,15 @@ class SuitabilityLayerTest {
     void flatLandBeatsSteepLand() {
         double flat = logic(SyntheticTerrain.flatPlains()).suitability(3000, 3000);
         double steep = logic(new SyntheticTerrain(0.15, Double.NaN, 0, Landform.PLAINS)).suitability(3000, 300);
-        assertTrue(flat > 0.7, "flat plains far from water: " + flat);
-        assertTrue(steep < 0.05, "15% slope: " + steep);
+        assertTrue(flat > 0.7, () -> "flat plains far from water: " + flat);
+        assertTrue(steep < 0.05, () -> "15% slope: " + steep);
     }
 
     @Test
     void plainsBeatMountains() {
         double plains = logic(SyntheticTerrain.flatPlains()).suitability(3000, 3000);
         double mountains = logic(new SyntheticTerrain(0.0, Double.NaN, 0, Landform.MOUNTAINS)).suitability(3000, 3000);
-        assertTrue(plains > 4 * mountains, plains + " against " + mountains);
+        assertTrue(plains > 4 * mountains, () -> plains + " against " + mountains);
     }
 
     @Test
@@ -94,7 +94,7 @@ class SuitabilityLayerTest {
         Random random = new Random(7);
         for (int k = 0; k < 2000; k++) {
             double value = logic.suitability(random.nextDouble() * 20000 - 10000, random.nextDouble() * 20000 - 10000);
-            assertTrue(value >= 0.0 && value <= 1.0, "value " + value);
+            assertTrue(value >= 0.0 && value <= 1.0, () -> "value " + value);
         }
     }
 

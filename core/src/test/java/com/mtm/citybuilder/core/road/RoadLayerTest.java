@@ -53,15 +53,15 @@ class RoadLayerTest {
             }
         }
         assertTrue(Math.abs(atCrest - 3000) < 1500, "crosses the ridge at z " + atCrest);
-        assertTrue(route.length(RoadKind.TUNNEL) < 300, "tunnel " + route.length(RoadKind.TUNNEL));
+        assertTrue(route.length(RoadKind.TUNNEL) < 300, () -> "tunnel " + route.length(RoadKind.TUNNEL));
         assertGentle(route);
     }
 
     @Test
     void aHighRidgeWithoutAPassIsTunnelled() {
         RoadRoute route = across(new HillTerrain(500, 1000, 0, 1, 0.0));
-        assertTrue(route.length(RoadKind.TUNNEL) > 1000, "tunnel " + route.length(RoadKind.TUNNEL));
-        assertTrue(route.length() < 16000, "no long detour: " + route.length());
+        assertTrue(route.length(RoadKind.TUNNEL) > 1000, () -> "tunnel " + route.length(RoadKind.TUNNEL));
+        assertTrue(route.length() < 16000, () -> "no long detour: " + route.length());
         assertGentle(route);
     }
 
@@ -70,14 +70,14 @@ class RoadLayerTest {
         CityLogic logic = new CityLogic(3L, SETTINGS, SyntheticTerrain.flatPlains());
         List<RoadEdge> west = logic.roads(4000, -10000, 24000, 10000);
         List<RoadEdge> east = logic.roads(16000, -10000, 36000, 10000);
-        assertTrue(west.size() >= 3, "roads: " + west.size());
+        assertTrue(west.size() >= 3, () -> "roads: " + west.size());
         Set<String> eastKeys = new HashSet<>();
         east.forEach(edge -> eastKeys.add(edge.key()));
         List<Settlement> around = logic.settlements(-40000, -60000, 80000, 60000, SettlementTier.TOWN);
         for (RoadEdge edge : west) {
             double length = edge.length();
             double max = edge.roadClass() == RoadClass.TRUNK ? SETTINGS.roads.trunkMaxLength : SETTINGS.roads.localMaxLength;
-            assertTrue(length <= max, "too long: " + edge);
+            assertTrue(length <= max, () -> "too long: " + edge);
             for (Settlement c : around) {
                 if (c.id() == edge.a().id() || c.id() == edge.b().id()) {
                     continue;
@@ -87,12 +87,12 @@ class RoadLayerTest {
                 }
                 double through = Math.max(Math.hypot(c.x() - edge.a().x(), c.z() - edge.a().z()),
                         Math.hypot(c.x() - edge.b().x(), c.z() - edge.b().z()));
-                assertTrue(through >= length, c + " lies between the ends of " + edge);
+                assertTrue(through >= length, () -> c + " lies between the ends of " + edge);
             }
             // A road both areas can reach is in both lists
             double margin = SETTINGS.roads.windowMargin + SETTINGS.roads.windowFactor * length;
             if (Math.max(edge.a().x(), edge.b().x()) + margin >= 16000) {
-                assertTrue(eastKeys.contains(edge.key()), "missing from the east: " + edge);
+                assertTrue(eastKeys.contains(edge.key()), () -> "missing from the east: " + edge);
             }
         }
     }

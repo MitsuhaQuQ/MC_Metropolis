@@ -52,6 +52,6 @@ class MtrRailTest {
         double d = 1.0;
         double k0 = (eased.point(d)[2] - eased.point(0)[2]) / d;
         double kp = (plain.point(d)[2] - plain.point(0)[2]) / d;
-        assertTrue(Math.abs(k0) < Math.abs(kp) / 4 || Math.abs(kp) < 1e-9, "eased " + k0 + " plain " + kp);
+        assertTrue(Math.abs(k0) < Math.abs(kp) / 4 || Math.abs(kp) < 1e-9, () -> "eased " + k0 + " plain " + kp);
     }
 }

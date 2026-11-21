@@ -48,7 +48,7 @@ class ExtentLayerTest {
         }
         double area = core * 64.0 * 64.0;
         double target = Math.PI * radius * radius;
-        assertTrue(area > 0.8 * target && area < 1.2 * target, "core " + area + " against " + target);
+        assertTrue(area > 0.8 * target && area < 1.2 * target, () -> "core " + area + " against " + target);
         assertTrue(extent.nodes() > 1.5 * core, "suburbs beyond the core: " + extent.nodes() + " against " + core);
         // Intensity falls away from the centre along a line
         int cx = (int) Math.round(city.x() / 64);
@@ -72,7 +72,7 @@ class ExtentLayerTest {
         CityExtent extent = logic.extent(city);
         assertTrue(extent.onLake(), "centre in the lake");
         double shore = Math.hypot(extent.coreX() - lakeX, extent.coreZ() - lakeZ);
-        assertTrue(shore > lakeRadius - 1 && shore < lakeRadius + 128, "actual centre on the shore: " + shore);
+        assertTrue(shore > lakeRadius - 1 && shore < lakeRadius + 128, () -> "actual centre on the shore: " + shore);
         // Built up on every side of the lake
         int cx = (int) Math.round(lakeX / 64);
         int cz = (int) Math.round(lakeZ / 64);
@@ -95,7 +95,7 @@ class ExtentLayerTest {
         double radius = logic.targetRadius(city);
         double target = Math.PI * radius * radius * SETTINGS.extent.lakeAreaFactor;
         double area = land * 64.0 * 64.0;
-        assertTrue(area > 0.8 * target && area < 1.2 * target, "land " + area + " against " + target);
+        assertTrue(area > 0.8 * target && area < 1.2 * target, () -> "land " + area + " against " + target);
     }
 
     @Test
@@ -109,7 +109,7 @@ class ExtentLayerTest {
         assertFalse(extent.onLake());
         // Built up on the far side of the lake too, not only on the near shore
         int farX = (int) Math.round((lakeX + lakeRadius + 200) / 64);
-        assertTrue(extent.intensity(farX, 0) > 0.3, "far shore " + extent.intensity(farX, 0));
+        assertTrue(extent.intensity(farX, 0) > 0.3, () -> "far shore " + extent.intensity(farX, 0));
         // And the city takes as much more land as the lake covers
         int land = 0;
         for (int i = 0; i < extent.size(); i++) {
@@ -125,7 +125,7 @@ class ExtentLayerTest {
         double radius = logic.targetRadius(city);
         double target = Math.PI * radius * radius + Math.PI * lakeRadius * lakeRadius;
         double area = land * 64.0 * 64.0;
-        assertTrue(area > 0.85 * target && area < 1.15 * target, "land " + area + " against " + target);
+        assertTrue(area > 0.85 * target && area < 1.15 * target, () -> "land " + area + " against " + target);
     }
 
     @Test

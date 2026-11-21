@@ -37,7 +37,15 @@ dependencies {
 
 test {
     useJUnitPlatform()
-    maxHeapSize = "4g"
+    // Two test JVMs, each running its tests concurrently (src/test/resources/junit-platform.properties), with room
+    // for every test's towns in memory at once; -PtestForks=<n> to change, -PtestHeap=<size> for each one's heap
+    maxParallelForks = providers.gradleProperty("testForks").map { it as int }.getOrElse(2)
+    maxHeapSize = providers.gradleProperty("testHeap").getOrElse("16g")
+    jvmArgs "-XX:+UseParallelGC"
+    testLogging {
+        events "failed"
+        exceptionFormat "short"
+    }
 }
 
 // gradlew :core:cityMap -Pseed=12345 -Px=0 -Pz=0 -Pscale=16 [-Players=suitability|culture|settlements|extent|roads|spawn] [-Pjfr=file.jfr] [-Psize=1024] [-Pout=file.png]

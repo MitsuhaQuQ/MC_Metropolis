@@ -31,15 +31,15 @@ class PortLayerTest {
         assertTrue(terminals.stream().anyMatch(t -> t.kind() == Terminal.Kind.GENERAL), "no cargo pier");
         for (Terminal t : terminals) {
             // On the water's edge, reaching out west over the sea
-            assertTrue(Math.abs(t.x()) < 40, "base off the shore " + t);
-            assertTrue(t.outX() < -0.9, "not out to sea " + t);
+            assertTrue(Math.abs(t.x()) < 40, () -> "base off the shore " + t);
+            assertTrue(t.outX() < -0.9, () -> "not out to sea " + t);
             for (double[] c : t.corners()) {
-                assertTrue(c[0] < 5, "a corner on land " + t);
+                assertTrue(c[0] < 5, () -> "a corner on land " + t);
             }
             assertTrue(t.berths() >= 1);
             for (Terminal o : terminals) {
                 if (o != t) {
-                    assertTrue(Math.hypot(o.x() - t.x(), o.z() - t.z()) >= 0.5 * (o.width() + t.width()), "overlapping " + t + " " + o);
+                    assertTrue(Math.hypot(o.x() - t.x(), o.z() - t.z()) >= 0.5 * (o.width() + t.width()), () -> "overlapping " + t + " " + o);
                 }
             }
         }

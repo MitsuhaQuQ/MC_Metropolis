@@ -84,13 +84,13 @@ class SitePreferenceTest {
         double floodPlain = value(5200);
         double terraceEdge = value(5450);
         double openLand = value(6200);
-        assertTrue(floodPlain < 0, "flood plain " + floodPlain);
-        assertTrue(terraceEdge > 0.8, "terrace edge by the river " + terraceEdge);
-        assertTrue(Math.abs(openLand) < 1e-9, "open land " + openLand);
+        assertTrue(floodPlain < 0, () -> "flood plain " + floodPlain);
+        assertTrue(terraceEdge > 0.8, () -> "terrace edge by the river " + terraceEdge);
+        assertTrue(Math.abs(openLand) < 1e-9, () -> "open land " + openLand);
     }
 
     @Test
     void theFootOfHillsDraws() {
-        assertTrue(value(6700) > 0.8, "foot of the hills " + value(6700));
+        assertTrue(value(6700) > 0.8, () -> "foot of the hills " + value(6700));
     }
 }

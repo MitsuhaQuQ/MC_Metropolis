@@ -82,7 +82,7 @@ class TransitTest {
             for (double[] p : line.stations()) {
                 long lines = all.stream().filter(l -> l.stations().stream()
                         .anyMatch(q -> Math.hypot(p[0] - q[0], p[1] - q[1]) < 300)).count();
-                assertTrue(lines <= 2, lines + " lines' stations together at " + p[0] + " " + p[1]);
+                assertTrue(lines <= 2, () -> lines + " lines' stations together at " + p[0] + " " + p[1]);
             }
         }
         Anchor station = plan.anchors().stream().filter(a -> a.kind() == Anchor.Kind.STATION).findFirst().orElse(null);
@@ -147,11 +147,11 @@ class TransitTest {
         for (int a = 0; a < intercity.size(); a++) {
             for (int b = a + 1; b < intercity.size(); b++) {
                 double d = Math.hypot(intercity.get(a).x() - intercity.get(b).x(), intercity.get(a).z() - intercity.get(b).z());
-                assertTrue(d >= SETTINGS.transit.siteApart - 1, "intercity sites " + d + " apart");
+                assertTrue(d >= SETTINGS.transit.siteApart - 1, () -> "intercity sites " + d + " apart");
             }
         }
         List<StationSite> bus = plan.sites().stream().filter(s -> s.kind() == StationSite.Kind.BUS).toList();
-        assertTrue(bus.size() > 20, "bus stops: " + bus.size());
+        assertTrue(bus.size() > 20, () -> "bus stops: " + bus.size());
         for (int a = 0; a < bus.size(); a++) {
             for (int b = a + 1; b < bus.size(); b++) {
                 assertTrue(Math.hypot(bus.get(a).x() - bus.get(b).x(), bus.get(a).z() - bus.get(b).z()) >= SETTINGS.transit.busApart - 1);
@@ -171,7 +171,7 @@ class TransitTest {
         StationSite main = plan.sites().stream().filter(s -> s.kind() == StationSite.Kind.MAIN).findFirst().orElseThrow();
         StationPlaza square = plan.plazas().stream().filter(q -> Math.hypot(q.x() - main.x(), q.z() - main.z()) < 1.0)
                 .findFirst().orElseThrow();
-        assertTrue(square.template() == StationPlaza.Template.TERMINAL, "a metropolis's terminal: " + square.template());
+        assertTrue(square.template() == StationPlaza.Template.TERMINAL, () -> "a metropolis's terminal: " + square.template());
         assertTrue(Math.abs(square.heading() - main.heading()) < 1e-9 && Math.abs(square.depth() - main.plaza()) < 1e-9,
                 "the square along the platforms, as deep as the site says");
         // The avenue leaves its mouth straight out, as wide as the throat
@@ -195,7 +195,7 @@ class TransitTest {
         for (List<double[]> line : plan.highSpeed()) {
             for (double[] p : line) {
                 District d = plan.districts().at(p[0], p[1]);
-                assertTrue(d != District.CENTRAL && d != District.GROUNDS, "a high-speed line through " + d);
+                assertTrue(d != District.CENTRAL && d != District.GROUNDS, () -> "a high-speed line through " + d);
             }
         }
     }

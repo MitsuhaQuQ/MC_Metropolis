@@ -51,11 +51,11 @@ class DistrictsTest {
         Map<District, Integer> counts = districts.counts();
         int built = counts.entrySet().stream().filter(e -> e.getKey() != District.NONE && e.getKey() != District.GROUNDS)
                 .mapToInt(Map.Entry::getValue).sum();
-        assertTrue(built > 100, "built nodes " + built);
+        assertTrue(built > 100, () -> "built nodes " + built);
         double central = counts.getOrDefault(District.CENTRAL, 0) / (double) built;
-        assertTrue(central >= 0.03 && central <= 0.08, "downtown share " + central);
-        assertTrue(counts.getOrDefault(District.INDUSTRIAL, 0) > 0, "works: " + counts);
-        assertTrue(counts.getOrDefault(District.PORT, 0) == 0, "a port far from the sea: " + counts);
+        assertTrue(central >= 0.03 && central <= 0.08, () -> "downtown share " + central);
+        assertTrue(counts.getOrDefault(District.INDUSTRIAL, 0) > 0, () -> "works: " + counts);
+        assertTrue(counts.getOrDefault(District.PORT, 0) == 0, () -> "a port far from the sea: " + counts);
         double cx = logic.extent(city).coreX();
         double cz = logic.extent(city).coreZ();
         assertTrue(meanDistance(districts, District.CENTRAL, cx, cz, grid) < meanDistance(districts, District.OLD_TOWN, cx, cz, grid)
@@ -94,7 +94,7 @@ class DistrictsTest {
                 if (districts.node(i, j) == District.PORT) {
                     port++;
                     double x = (districts.originX() + i) * grid;
-                    assertTrue(x <= SETTINGS.streets.portDepth + grid, "port inland at " + x);
+                    assertTrue(x <= SETTINGS.streets.portDepth + grid, () -> "port inland at " + x);
                 }
             }
         }
@@ -126,7 +126,7 @@ class DistrictsTest {
         assertEquals(1, stations.size(), "one main station");
         Anchor station = stations.get(0);
         District at = plan.districts().at(station.x(), station.z());
-        assertTrue(at == District.STATION_FRONT, "the station in " + at);
+        assertTrue(at == District.STATION_FRONT, () -> "the station in " + at);
         double intensity = logic.extent(city).intensity((int) Math.round(station.x() / 64), (int) Math.round(station.z() / 64));
         assertTrue(Math.abs(intensity - SETTINGS.streets.oldTownIntensity) <= SETTINGS.streets.stationBand + 0.05,
                 "station not at the old town's edge: intensity " + intensity);
@@ -147,7 +147,7 @@ class DistrictsTest {
         // The station avenue: arterials widened from the station to the castle's gate nearest it
         List<StreetSegment> avenue = plan.segments().stream()
                 .filter(g -> g.width() >= SETTINGS.streets.stationAvenueWidth - 1e-9).toList();
-        assertTrue(!avenue.isEmpty(), "a station avenue; gates " + plan.anchors().stream()
+        assertTrue(!avenue.isEmpty(), () -> "a station avenue; gates " + plan.anchors().stream()
                 .filter(a -> a.kind() == Anchor.Kind.GATE).map(a -> Math.round(Math.hypot(a.x() - station.x(), a.z() - station.z()))).toList());
         Anchor gate = plan.anchors().stream().filter(a -> a.kind() == Anchor.Kind.GATE)
                 .min(java.util.Comparator.comparingDouble(a -> Math.hypot(a.x() - station.x(), a.z() - station.z()))).orElseThrow();
@@ -159,7 +159,7 @@ class DistrictsTest {
                 Math.hypot(g.x2() - mouth[0], g.z2() - mouth[1]))).min().orElseThrow();
         double nearGate = avenue.stream().mapToDouble(g -> Math.min(Math.hypot(g.x1() - gate.x(), g.z1() - gate.z()),
                 Math.hypot(g.x2() - gate.x(), g.z2() - gate.z()))).min().orElseThrow();
-        assertTrue(nearStation < 1.0, "the avenue starts at the station square's mouth: " + nearStation);
-        assertTrue(nearGate < 200.0, "the avenue reaches the gate: " + nearGate);
+        assertTrue(nearStation < 1.0, () -> "the avenue starts at the station square's mouth: " + nearStation);
+        assertTrue(nearGate < 200.0, () -> "the avenue reaches the gate: " + nearGate);
     }
 }

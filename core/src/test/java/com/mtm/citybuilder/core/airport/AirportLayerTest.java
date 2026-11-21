@@ -35,11 +35,11 @@ class AirportLayerTest {
         assertEquals(metropolis.id(), airport.town());
         assertEquals(SETTINGS.airports.metropolisRunway, airport.length(), 1e-9);
         double distance = Math.hypot(airport.x() - metropolis.x(), airport.z() - metropolis.z());
-        assertTrue(distance >= SETTINGS.airports.metropolisMin && distance <= SETTINGS.airports.metropolisMax + 1, "at " + distance);
+        assertTrue(distance >= SETTINGS.airports.metropolisMin && distance <= SETTINGS.airports.metropolisMax + 1, () -> "at " + distance);
         // Clear of every town round it
         for (Settlement town : logic.settlements(airport.x() - 25000, airport.z() - 25000, airport.x() + 25000, airport.z() + 25000,
                 SettlementTier.TOWN)) {
-            assertTrue(!airport.inField(town.x(), town.z()), "over " + town);
+            assertTrue(!airport.inField(town.x(), town.z()), () -> "over " + town);
         }
         // Its field fits its kind: level land, or sea all round
         for (double u = -airport.fieldHalfLength(); u <= airport.fieldHalfLength(); u += 200) {
@@ -47,9 +47,9 @@ class AirportLayerTest {
                 double[] p = airport.world(u, v);
                 double height = logic.terrain().smoothHeight(p[0], p[1]);
                 if (airport.kind() == Airport.Kind.OFFSHORE) {
-                    assertTrue(height < logic.terrain().seaLevel(), "land under an island at " + p[0] + " " + p[1]);
+                    assertTrue(height < logic.terrain().seaLevel(), () -> "land under an island at " + p[0] + " " + p[1]);
                 } else {
-                    assertTrue(Math.abs(height - airport.elevation()) <= SETTINGS.airports.landRelief + 1, "relief at " + p[0]);
+                    assertTrue(Math.abs(height - airport.elevation()) <= SETTINGS.airports.landRelief + 1, () -> "relief at " + p[0]);
                 }
             }
         }
@@ -106,7 +106,7 @@ class AirportLayerTest {
             assertTrue(slope == null, "slopes at sea");
         } else {
             assertNotNull(slope);
-            assertTrue(slope.outside() > 30 && slope.part() == Airport.Part.NONE, "slope " + slope);
+            assertTrue(slope.outside() > 30 && slope.part() == Airport.Part.NONE, () -> "slope " + slope);
         }
         // No trees on the field
         assertTrue(!logic.chunks().treeAllowed((int) airport.x(), (int) airport.z()));

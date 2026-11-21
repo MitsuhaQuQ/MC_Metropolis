@@ -45,13 +45,13 @@ class TerminalTest {
             }
             String id = base(s).substring("citybuilder:".length());
             Path file = states.resolve(id + ".json");
-            assertTrue(Files.exists(file), "no block state for " + id);
+            assertTrue(Files.exists(file), () -> "no block state for " + id);
             String json = Files.readString(file);
             if (s.contains("[")) {
                 for (String kv : s.substring(s.indexOf('[') + 1, s.length() - 1).split(",")) {
                     String key = kv.substring(0, kv.indexOf('='));
-                    assertTrue(json.contains(key + "="), id + " has no property " + key);
-                    assertTrue(json.contains(kv), id + " has no variant with " + kv);
+                    assertTrue(json.contains(key + "="), () -> id + " has no property " + key);
+                    assertTrue(json.contains(kv), () -> id + " has no variant with " + kv);
                 }
             }
         }
@@ -67,8 +67,8 @@ class TerminalTest {
                 lights[y]++;
             }
         });
-        assertTrue(lights[5] > 100, "ground floor: " + lights[5]);
-        assertTrue(lights[9] + lights[10] > 50, "gates' level and bridges: " + (lights[9] + lights[10]));
+        assertTrue(lights[5] > 100, () -> "ground floor: " + lights[5]);
+        assertTrue(lights[9] + lights[10] > 50, () -> "gates' level and bridges: " + (lights[9] + lights[10]));
     }
 
     @Test
@@ -76,10 +76,10 @@ class TerminalTest {
         Zones z = TAKAMATSU.build().zones();
         for (Zone want : List.of(Zone.CHECK_IN, Zone.ARRIVAL_LOBBY, Zone.BAGGAGE_CLAIM, Zone.BAGGAGE_HANDLING,
                 Zone.CUSTOMS, Zone.CORE)) {
-            assertTrue(z.area(0, want) > 0, "ground floor without " + want);
+            assertTrue(z.area(0, want) > 0, () -> "ground floor without " + want);
         }
         for (Zone want : List.of(Zone.LOBBY, Zone.SECURITY, Zone.IMMIGRATION, Zone.SHOPS, Zone.GATE_LOUNGE)) {
-            assertTrue(z.area(1, want) > 0, "gates' level without " + want);
+            assertTrue(z.area(1, want) > 0, () -> "gates' level without " + want);
         }
         assertTrue(z.area(2, Zone.RESTAURANTS) > 0, "no restaurants upstairs");
         assertTrue(z.area(3, Zone.DECK) > 0, "no observation deck");
@@ -89,7 +89,7 @@ class TerminalTest {
     void bridgesOpenIntoTheLounges() {
         Terminal.Built b = TAKAMATSU.build();
         Model m = b.model();
-        assertTrue(b.gates().size() >= 4, b.gates().size() + " gates");
+        assertTrue(b.gates().size() >= 4, () -> b.gates().size() + " gates");
         int y = TAKAMATSU.levels()[1];
         for (int[] g : b.gates()) {
             for (int dy = 1; dy <= 3; dy++) {
@@ -157,9 +157,9 @@ class TerminalTest {
                 Terminal t = TerminalComposer.compose(11, true, new TerminalComposer.Choice(plan, checkIn,
                         c.hallRoof(), c.palette(), c.deck(), c.international()));
                 Terminal.Built b = t.build();
-                assertTrue(b.gates().size() >= 4, plan + "/" + checkIn + ": " + b.gates().size() + " gates");
-                assertTrue(b.zones().area(checkIn.level(), Zone.CHECK_IN) > 0, plan + "/" + checkIn);
-                assertTrue(b.zones().area(1, Zone.SECURITY) > 0, plan + "/" + checkIn);
+                assertTrue(b.gates().size() >= 4, () -> plan + "/" + checkIn + ": " + b.gates().size() + " gates");
+                assertTrue(b.zones().area(checkIn.level(), Zone.CHECK_IN) > 0, () -> plan + "/" + checkIn);
+                assertTrue(b.zones().area(1, Zone.SECURITY) > 0, () -> plan + "/" + checkIn);
             }
         }
     }

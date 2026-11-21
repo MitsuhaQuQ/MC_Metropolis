@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /** Street functions, facilities and landmarks of a town. */
 class TownFunctionsTest {
@@ -45,7 +46,7 @@ class TownFunctionsTest {
             StreetClass cls = plots.chainClass(c);
             StreetFunction f = functions.function(c);
             if (cls == StreetClass.ARTERIAL || cls == StreetClass.COLLECTOR || cls == StreetClass.BOULEVARD) {
-                assertTrue(f == StreetFunction.MAIN || f == StreetFunction.OFFICE || f == StreetFunction.INDUSTRIAL, cls + " " + f);
+                assertTrue(f == StreetFunction.MAIN || f == StreetFunction.OFFICE || f == StreetFunction.INDUSTRIAL, () -> cls + " " + f);
                 continue;
             }
             if (cls != StreetClass.STREET && cls != StreetClass.LANE) {
@@ -76,10 +77,10 @@ class TownFunctionsTest {
             if (!a.kind().area() || a.landmark()) {
                 continue;
             }
-            assertEquals(a, functions.facilityAt(a.x(), a.z()), a.toString());
+            assertEquals(a, functions.facilityAt(a.x(), a.z()), a::toString);
             for (Facility b : functions.facilities()) {
                 if (b != a && b.kind().area() && !b.landmark()) {
-                    assertFalse(functions.contains(b, a.x(), a.z()), a + " on the block of " + b);
+                    assertFalse(functions.contains(b, a.x(), a.z()), () -> a + " on the block of " + b);
                 }
             }
         }
@@ -89,13 +90,13 @@ class TownFunctionsTest {
             if (f.kind() == Facility.Kind.LARGE_PARK || f.kind() == Facility.Kind.GREEN
                     || f.kind() == Facility.Kind.GRAND_TEMPLE || f.kind() == Facility.Kind.GRAND_SHRINE) {
                 grand++;
-                assertTrue(plan.estates().stream().anyMatch(e -> functions.contains(f, e[0], e[1])), f.toString());
+                assertTrue(plan.estates().stream().anyMatch(e -> functions.contains(f, e[0], e[1])), f::toString);
             }
         }
         assertTrue(grand > 0, "no large park, green or grand temple or shrine");
         // Every estate's block taken by something
         for (double[] e : plan.estates()) {
-            assertNotNull(functions.facilityAt(e[0], e[1]), "an estate left empty at " + e[0] + " " + e[1]);
+            assertNotNull(functions.facilityAt(e[0], e[1]), () -> "an estate left empty at " + e[0] + " " + e[1]);
         }
         // Paths in the grounds: inside them or out to the street at their gate; a temple's or shrine's approach up to
         // its middle
@@ -111,7 +112,7 @@ class TownFunctionsTest {
             for (int k = 0; k < walk.points().size(); k++) {
                 double[] q = walk.points().get(k);
                 boolean end = k == 0 || k == walk.points().size() - 1;
-                assertTrue(functions.contains(f, q[0], q[1]) || end, walk.kind() + " path off its grounds");
+                assertTrue(functions.contains(f, q[0], q[1]) || end, () -> walk.kind() + " path off its grounds");
             }
             if (f.kind() == Facility.Kind.TEMPLE || f.kind() == Facility.Kind.GRAND_TEMPLE) {
                 double[] end = walk.points().get(walk.points().size() - 1);
@@ -126,15 +127,16 @@ class TownFunctionsTest {
                 continue;
             }
             for (double[] e : plan.estates()) {
-                assertTrue(Math.hypot(mx - e[0], mz - e[1]) >= e[2], g.streetClass() + " in an estate");
+                if (Math.hypot(mx - e[0], mz - e[1]) < e[2]) {
+                    fail(g.streetClass() + " in an estate");
+                }
             }
             if (g.streetClass() == StreetClass.LANE) {
                 continue;
             }
-            for (Facility f : functions.facilities()) {
-                if (f.kind().area() && !f.landmark()) {
-                    assertFalse(functions.contains(f, mx, mz), g.streetClass() + " on the land of " + f);
-                }
+            Facility on = functions.facilityAt(mx, mz);
+            if (on != null && on.kind().area() && !on.landmark()) {
+                fail(g.streetClass() + " on the land of " + on);
             }
         }
         // A lot facility stands on a lot of a street it suits
@@ -143,7 +145,7 @@ class TownFunctionsTest {
                 assertEquals(plots.lotId(f.chain(), f.side(), f.index()), f.id());
                 StreetFunction street = functions.function(f.chain());
                 if (f.kind() == Facility.Kind.POLICE_BOX || f.kind() == Facility.Kind.FIRE_STATION) {
-                    assertEquals(StreetFunction.MAIN, street, f.toString());
+                    assertEquals(StreetFunction.MAIN, street, f::toString);
                 }
             }
         }
@@ -169,7 +171,7 @@ class TownFunctionsTest {
         for (Hanamachi h : functions.hanamachi()) {
             assertEquals(Hanamachi.Style.KANAZAWA, h.style());
             assertEquals(StreetFunction.HANAMACHI, functions.function(h.spine()));
-            assertTrue(h.length() >= config.hanamachiLength[0] && h.length() <= config.hanamachiLength[1], h.toString());
+            assertTrue(h.length() >= config.hanamachiLength[0] && h.length() <= config.hanamachiLength[1], h::toString);
             assertTrue(plots.chainClass(h.spine()) != StreetClass.ARTERIAL && plots.chainClass(h.spine()) != StreetClass.COLLECTOR);
             assertTrue(plots.lotCount(h.spine(), 1) + plots.lotCount(h.spine(), -1) > 10, "lots along the spine");
             assertEquals(com.mtm.citybuilder.core.street.District.OLD_TOWN, plan.districts().at(h.x(), h.z()));
@@ -183,7 +185,7 @@ class TownFunctionsTest {
         assertEquals(quarter, marked);
         // Its lots kept for the quarter: no clinic or police box on them, no facility's land over them
         for (Facility f : functions.facilities()) {
-            assertTrue(!f.onLot() || functions.function(f.chain()) != StreetFunction.HANAMACHI, f.toString());
+            assertTrue(!f.onLot() || functions.function(f.chain()) != StreetFunction.HANAMACHI, f::toString);
             if (!f.kind().area() || f.landmark()) {
                 continue;
             }
@@ -215,8 +217,8 @@ class TownFunctionsTest {
         for (int c = 0; c < plots.chainCount(); c++) {
             kinds.merge(functions.function(c), 1, Integer::sum);
         }
-        assertTrue(kinds.getOrDefault(StreetFunction.SAMURAI, 0) > 0, "no samurai street " + kinds);
-        assertTrue(kinds.getOrDefault(StreetFunction.TEMPLE, 0) > 0, "no temple street " + kinds);
+        assertTrue(kinds.getOrDefault(StreetFunction.SAMURAI, 0) > 0, () -> "no samurai street " + kinds);
+        assertTrue(kinds.getOrDefault(StreetFunction.TEMPLE, 0) > 0, () -> "no temple street " + kinds);
         // At most one keep, and only on the castle (it stands by its chance)
         assertTrue(functions.facilities().stream().filter(f -> f.kind() == Facility.Kind.CASTLE_KEEP).count() <= 1);
     }

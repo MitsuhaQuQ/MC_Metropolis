@@ -71,30 +71,30 @@ class BuildingLayerTest {
                 }
                 assertEquals(plot.id(), b.id());
                 // Within its lot: frontage, depth
-                assertTrue(b.from() >= plot.start() - 1e-9 && b.to() <= plot.end() + 1e-9, "frontage " + b + " " + plot);
-                assertTrue(b.front() >= 0 && b.back() <= plot.maxDepth() + 1e-9, "depth " + b + " " + plot);
-                assertTrue(b.wingBack() <= plot.maxDepth() + 1e-9, "annex " + b + " " + plot);
+                assertTrue(b.from() >= plot.start() - 1e-9 && b.to() <= plot.end() + 1e-9, () -> "frontage " + b + " " + plot);
+                assertTrue(b.front() >= 0 && b.back() <= plot.maxDepth() + 1e-9, () -> "depth " + b + " " + plot);
+                assertTrue(b.wingBack() <= plot.maxDepth() + 1e-9, () -> "annex " + b + " " + plot);
                 // The footprint and the parking space lie within the lot's frontage, and apart
-                assertTrue(b.lotFrom() <= 1e-9 && b.lotTo() >= b.width() - 1e-9, "lot " + b + " " + plot);
+                assertTrue(b.lotFrom() <= 1e-9 && b.lotTo() >= b.width() - 1e-9, () -> "lot " + b + " " + plot);
                 assertTrue(b.parkTo() <= b.parkFrom() || b.parkTo() <= 1e-9 || b.parkFrom() >= b.width() - 1e-9
-                        || b.parkBack() <= b.front() + 1e-9, "parking " + b);
+                        || b.parkBack() <= b.front() + 1e-9, () -> "parking " + b);
                 // Set-back upper storeys only on flat-roofed blocks, behind a terrace that leaves room inside
                 assertTrue(b.step() == b.storeys() || b.type() == Building.Type.HOUSE
                         || b.roof() == Building.Roof.FLAT && b.depth() - b.stepBack() - b.upBack() >= 6);
                 // The upper volume lies within the footprint
-                assertTrue(b.upFrom() >= 0 && b.upTo() <= b.width() + 1e-9 && b.upFrom() < b.upTo(), "upper " + b);
-                assertTrue(b.width() >= 4 - 1e-9 && b.depth() >= 4 - 1e-9, "size " + b);
+                assertTrue(b.upFrom() >= 0 && b.upTo() <= b.width() + 1e-9 && b.upFrom() < b.upTo(), () -> "upper " + b);
+                assertTrue(b.width() >= 4 - 1e-9 && b.depth() >= 4 - 1e-9, () -> "size " + b);
                 // The road slant line, two storeys always allowed
                 // A corner lot, on two streets, may rise a storey more
                 double allowed = config.slant * (plot.streetWidth() + 2.0 * b.front())
                         + (b.chamferLeft() > 0 || b.chamferRight() > 0 ? b.upper() : 0);
                 int belowLine = b.step();
-                assertTrue(belowLine <= 2 || b.floorOf(belowLine) <= allowed + 1e-9, "slant " + b + " on " + plot.streetWidth());
+                assertTrue(belowLine <= 2 || b.floorOf(belowLine) <= allowed + 1e-9, () -> "slant " + b + " on " + plot.streetWidth());
                 storeys.computeIfAbsent(plot.street(), k -> new int[40])[b.storeys()]++;
                 built++;
             }
         }
-        assertTrue(seen.size() > 500, "buildings " + seen.size());
+        assertTrue(seen.size() > 500, () -> "buildings " + seen.size());
         // Most lots are built on
         assertTrue(built > 0.8 * seen.size());
         // Lanes stay low; arterials have the tall ones
@@ -136,7 +136,7 @@ class BuildingLayerTest {
                     int top = BuildingLayer.top(column);
                     assertTrue(top >= b.base() + Math.min(b.wallHeight(), b.floorOf(b.step())));
                     assertEquals(BuildingLayer.Part.AIR, BuildingLayer.part(column, top + 1));
-                    assertTrue(BuildingLayer.part(column, top) != BuildingLayer.Part.AIR, "top of " + column);
+                    assertTrue(BuildingLayer.part(column, top) != BuildingLayer.Part.AIR, () -> "top of " + column);
                 }
             }
         }
@@ -224,11 +224,11 @@ class BuildingLayerTest {
                 if (b.standalone()) {
                     standalone++;
                     assertEquals(1, b.storeys());
-                    assertTrue(b.front() >= 7.0, "parking in front " + b);
+                    assertTrue(b.front() >= 7.0, () -> "parking in front " + b);
                 } else {
                     tenant++;
                     assertTrue(b.type() == Building.Type.SHOP || b.type() == Building.Type.OFFICE
-                            || b.type() == Building.Type.APARTMENT, "tenant in " + b.type());
+                            || b.type() == Building.Type.APARTMENT, () -> "tenant in " + b.type());
                 }
             }
         }
@@ -310,7 +310,7 @@ class BuildingLayerTest {
                     }
                 }
             }
-            assertNotNull(start, "no ground corridor for flats " + b.id());
+            assertNotNull(start, () -> "no ground corridor for flats " + b.id());
             queue.add(start);
             while (!queue.isEmpty()) {
                 int[] at = queue.poll();
@@ -384,7 +384,7 @@ class BuildingLayerTest {
                     }
                 }
             }
-            assertTrue(!queue.isEmpty(), "no stairwell floor in danchi " + b.id());
+            assertTrue(!queue.isEmpty(), () -> "no stairwell floor in danchi " + b.id());
             while (!queue.isEmpty()) {
                 int[] at = queue.poll();
                 long key = ((long) at[0] << 40) ^ ((long) (at[1] & 0xFFFFF) << 12) ^ at[2];
@@ -455,7 +455,7 @@ class BuildingLayerTest {
                 }
             }
         }
-        assertTrue(found.size() == 3, "plants found: " + found.keySet());
+        assertTrue(found.size() == 3, () -> "plants found: " + found.keySet());
         for (Building b : found.values()) {
             assertEquals(Building.Type.WORKS, b.type());
             java.util.List<BuildingLayer.Equip> kit = BuildingLayer.plantEquipment(b);
@@ -463,9 +463,9 @@ class BuildingLayerTest {
                 // Every piece stays on the lot and off the building
                 // A rack or a lorry is narrow across the frontage's direction
                 double rv = e.kind() == BuildingLayer.Equipment.RACK ? 1.6 : e.kind() == BuildingLayer.Equipment.TRUCK ? 1.0 : e.r();
-                assertTrue(e.u() - e.r() >= b.lotFrom() && e.u() + e.r() <= b.lotTo() && e.v() + rv <= b.lotDepth(), "off the lot: " + e);
+                assertTrue(e.u() - e.r() >= b.lotFrom() && e.u() + e.r() <= b.lotTo() && e.v() + rv <= b.lotDepth(), () -> "off the lot: " + e);
                 boolean clear = e.u() + e.r() <= 0.0 || e.u() - e.r() >= b.width() || e.v() + rv <= b.front() || e.v() - rv >= b.back();
-                assertTrue(clear, "on the building: " + e);
+                assertTrue(clear, () -> "on the building: " + e);
             }
         }
         // Drawn: the chunks round the power station hold its stack's shell
@@ -485,7 +485,7 @@ class BuildingLayerTest {
                 }
             }
         }
-        assertTrue(seen.getOrDefault(BuildingLayer.Part.STACK, 0) > 100, "stack drawn: " + seen);
+        assertTrue(seen.getOrDefault(BuildingLayer.Part.STACK, 0) > 100, () -> "stack drawn: " + seen);
         // A power station's stack stands sixty blocks and more
         BuildingLayer.Equip stack = BuildingLayer.plantEquipment(found.get(Program.POWER_PLANT)).stream()
                 .filter(e -> e.kind() == BuildingLayer.Equipment.STACK).findFirst().orElse(null);
@@ -535,7 +535,7 @@ class BuildingLayerTest {
                 }
             }
         }
-        assertTrue(found.size() == kinds.length, "found: " + found.keySet() + " of lots " + lots);
+        assertTrue(found.size() == kinds.length, () -> "found: " + found.keySet() + " of lots " + lots);
     }
 
     /** Whether a point in a building's frame lies on its back corridor. */

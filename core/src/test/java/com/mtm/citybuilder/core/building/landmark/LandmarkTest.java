@@ -64,7 +64,7 @@ class LandmarkTest {
                     bad.add(s);
                 }
             });
-            assertTrue(bad.isEmpty(), bad.size() + " unknown states, e.g. " + (bad.isEmpty() ? "" : bad.get(0)));
+            assertTrue(bad.isEmpty(), () -> bad.size() + " unknown states, e.g. " + (bad.isEmpty() ? "" : bad.get(0)));
         }
     }
 
@@ -79,7 +79,7 @@ class LandmarkTest {
                     assertTrue(s.contains("north=") && s.contains("west="), s);
                 }
                 if (b.endsWith("glass_pane") || b.equals("minecraft:iron_bars")) {
-                    assertTrue(s.contains("=true"), x + "," + y + "," + z + " " + s);
+                    assertTrue(s.contains("=true"), () -> x + "," + y + "," + z + " " + s);
                 }
             });
         }
@@ -89,7 +89,7 @@ class LandmarkTest {
     void capeLighthouseProportions() {
         Model m = CAPE.build();
         int h = height(m);
-        assertTrue(h >= 15 && h <= 35, "height " + h);
+        assertTrue(h >= 15 && h <= 35, () -> "height " + h);
         // Tapering: the shaft is wider at the foot than under the gallery.
         assertTrue(radiusAt(m, 3) > radiusAt(m, 20), radiusAt(m, 3) + " / " + radiusAt(m, 20));
         // The ladder goes all the way up to the gallery, the light is in a glazed room above it.
@@ -110,8 +110,8 @@ class LandmarkTest {
     void harbourLightProportions() {
         Model m = HARBOUR.build();
         int h = height(m);
-        assertTrue(h >= 8 && h <= 12, "height " + h);
-        assertTrue(m.width() <= 7 && m.depth() <= 7, m.width() + " x " + m.depth());
+        assertTrue(h >= 8 && h <= 12, () -> "height " + h);
+        assertTrue(m.width() <= 7 && m.depth() <= 7, () -> m.width() + " x " + m.depth());
     }
 
     private static int radiusAt(Model m, int y) {
@@ -162,8 +162,8 @@ class LandmarkTest {
             double cx = (m.minX() + m.maxX()) / 2.0, cz = (m.minZ() + m.maxZ()) / 2.0;
             double[] far = {0};
             m.forEach((x, y, z, s) -> far[0] = Math.max(far[0], Math.hypot(x - cx, z - cz)));
-            assertTrue(far[0] <= 130, "reaches " + far[0]);
-            assertTrue(height(m) <= 45, "height " + height(m));
+            assertTrue(far[0] <= 130, () -> "reaches " + far[0]);
+            assertTrue(height(m) <= 45, () -> "height " + height(m));
         }
     }
 
@@ -184,8 +184,8 @@ class LandmarkTest {
                     bad.add(x + "," + y + "," + z + " " + s);
                 }
             });
-            assertTrue(seats[0] > 500, seats[0] + " seats");
-            assertTrue(bad.size() < seats[0] / 100, bad.size() + " seats face the wrong way, e.g. "
+            assertTrue(seats[0] > 500, () -> seats[0] + " seats");
+            assertTrue(bad.size() < seats[0] / 100, () -> bad.size() + " seats face the wrong way, e.g. "
                     + (bad.isEmpty() ? "" : bad.get(0)));
         }
     }

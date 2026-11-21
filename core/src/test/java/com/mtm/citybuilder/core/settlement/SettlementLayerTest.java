@@ -49,14 +49,14 @@ class SettlementLayerTest {
                 }
                 double distance = Math.hypot(a.x() - b.x(), a.z() - b.z());
                 if (b.tier() == a.tier()) {
-                    assertTrue(distance >= own.spacing, a + " and " + b + " closer than the spacing");
+                    assertTrue(distance >= own.spacing, () -> a + " and " + b + " closer than the spacing");
                 } else if (b.tier().ordinal() < a.tier().ordinal()) {
                     double clearance = own.radius + b.tier().of(SETTINGS.settlements).radius;
                     if (b.tier().lowlandOnly() && !a.tier().lowlandOnly()) {
                         // Towns and villages keep out of big cities' suburbs too
                         clearance = own.radius + SETTINGS.extent.suburbTail * b.tier().of(SETTINGS.settlements).radius;
                     }
-                    assertTrue(distance >= clearance, a + " within the clearance of " + b);
+                    assertTrue(distance >= clearance, () -> a + " within the clearance of " + b);
                 }
             }
         }
@@ -69,7 +69,7 @@ class SettlementLayerTest {
         assertTrue(count(settlements, SettlementTier.TOWN) >= 1, "towns");
         assertTrue(count(settlements, SettlementTier.VILLAGE) >= 10, "villages");
         for (Settlement settlement : settlements) {
-            assertTrue(settlement.x() >= 0, "no settlement at sea: " + settlement);
+            assertTrue(settlement.x() >= 0, () -> "no settlement at sea: " + settlement);
         }
         assertRules(settlements);
     }
@@ -136,7 +136,7 @@ class SettlementLayerTest {
                 .settlements(2000, 2000, 14000, 14000);
         assertFalse(settlements.isEmpty(), "settlements around the map");
         for (Settlement settlement : settlements) {
-            assertFalse(mask.covers(settlement.x(), settlement.z()), "in the merged-in map: " + settlement);
+            assertFalse(mask.covers(settlement.x(), settlement.z()), () -> "in the merged-in map: " + settlement);
         }
     }
 }

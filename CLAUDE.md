@@ -52,6 +52,9 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 ```
 
 - 建筑数据（2026-11-20）：PLATEAU 京都市 2025 年度 CityGML 在 `F:\MC\citybuilder\core\build\plateau\`（2.7 GB，用户同意下载；授权见设计文档"素材来源"）；姬路、金泽、东京台东区和中央区、横滨关内、さいたま新都心的局部数据（`plateau_fetch.py` 取的 `<城市>.zip` 和 `<城市>-buildings.csv`，没有贴图）也在那里，OSM 建筑在 `core/build/osm/*-bld.json`；都不进仓库，只把统计结果写进设计文档。脚本在 `tools/assets/`，纯 Python 标准库，用 `python -I` 运行；只有 `plateau_voxel.py` 要 Pillow（`pip install --user pillow`，脚本自己把用户 site-packages 加进路径，因为 `-I` 不带它），还从 Loom 缓存里的 1.20.1 客户端 jar 读方块贴图算平均色（只在本地用，缓存成 `block_colours.json`，不复制贴图）
+- **单元测试并行**（2026-11-21）：`:core:test` 开 2 个测试 JVM（`-PtestForks=<n>`），每个 16 GB 堆（`-PtestHeap=<大小>`）、ParallelGC，JUnit 在每个 JVM 里让类和方法都并发（`core/src/test/resources/junit-platform.properties`，线程数为核数的一半）；全部测试约 2.5 分钟（串行时约 17 分钟）。两条经验：
+  - 每个测试用自己新建的 `CityLogic`，不要在测试之间共享一个世界：L2 按需要的先后规划、L3 看周围已有的聚落，共享时谁先跑、几个同时跑都会让同一座城规划得不一样（试过，加大预规划范围也不行，还更慢）
+  - 循环里的断言用延迟生成的失败信息（`assertTrue(条件, () -> "..." + x)`），不要直接拼字符串：失败信息每次都会先拼好，大都市的几百万次检查曾因此多花 100 多秒；查设施用地用 `TownFunctions.facilityAt`（按格索引），不要对每个设施调 `contains`
 - 性能测量（2026-11-20 第一轮优化用的）：`gradlew :core:cityMap -Players=spawn -Px=-10232 -Pz=-10272` 冷启动计时新世界第一个区块要的全部规划（逐层计时、统计碰到的 worldgen 区域数），`-Pjfr=<文件>` 记录 Flight Recorder 采样（`jfr print --events jdk.ExecutionSample`），`-PworldgenCache=<N>` 改 worldgen 的区域缓存大小做对照、`-Pthreads=<N>` 限制公共线程池；`gradlew :core:terrainCost` 计时 worldgen 各查询第一次进入一个区域和之后每点的开销
 - `cityMap` 还接受 `-Psize=<像素>`、`-Pout=<文件>`；它会打印统计：L1 是每个逻辑区域的耗时、各地貌的平均适宜度和海拔；L1.5 是每个文化单元的耗时、亚洲风格的面积比例、边界落在各地貌上的比例、洪泛未到达的边界节点比例。调参后先出图看效果，再看测试
 - 只要统计、不要大图时，用小尺寸覆盖同样的范围，比如 `-Pscale=2048 -Psize=64`

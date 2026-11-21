@@ -48,13 +48,13 @@ class StreetLayerTest {
         double[] c = capital.capital();
         assertNotNull(c, "a capital's planned city");
         // Heian-kyo's size, in whole avenue spacings
-        assertTrue(Math.abs(c[2] - c[0] - SETTINGS.streets.capitalWidth) <= SETTINGS.streets.joriSpacing, "width " + (c[2] - c[0]));
-        assertTrue(Math.abs(c[3] - c[1] - SETTINGS.streets.capitalHeight) <= SETTINGS.streets.joriSpacing, "height " + (c[3] - c[1]));
+        assertTrue(Math.abs(c[2] - c[0] - SETTINGS.streets.capitalWidth) <= SETTINGS.streets.joriSpacing, () -> "width " + (c[2] - c[0]));
+        assertTrue(Math.abs(c[3] - c[1] - SETTINGS.streets.capitalHeight) <= SETTINGS.streets.joriSpacing, () -> "height " + (c[3] - c[1]));
         // The grid within the planned city; beyond it the town is laid out by the terrain
         double jori = StreetMetrics.orientationOrder(inside(arterials(capital), c));
         double castle = StreetMetrics.orientationOrder(arterials(logic.streetPlan(city, Formation.CASTLE_TOWN)));
-        assertTrue(jori >= 0.7, "capital grid order " + jori);
-        assertTrue(castle < jori - 0.2, "castle town order " + castle + " against the capital's " + jori);
+        assertTrue(jori >= 0.7, () -> "capital grid order " + jori);
+        assertTrue(castle < jori - 0.2, () -> "castle town order " + castle + " against the capital's " + jori);
     }
 
     @Test
@@ -66,7 +66,7 @@ class StreetLayerTest {
         assertTrue(plan.moats().size() >= 2, "an outer and an inner moat, and maybe a middle one");
         assertTrue(plan.moats().stream().allMatch(Moat::wet), "a flatland castle has wet moats");
         long gates = plan.anchors().stream().filter(a -> a.kind() == Anchor.Kind.GATE).count();
-        assertTrue(gates >= 2 && gates <= SETTINGS.streets.gates, "gates: " + gates);
+        assertTrue(gates >= 2 && gates <= SETTINGS.streets.gates, () -> "gates: " + gates);
         for (StreetSegment segment : plan.segments()) {
             if (segment.width() == SETTINGS.streets.approachWidth) {
                 continue;
@@ -160,7 +160,7 @@ class StreetLayerTest {
         assertNotNull(city);
         StreetPlan plan = logic.streetPlan(city, Formation.CASTLE_TOWN);
         List<StreetSegment> arterials = arterials(plan);
-        assertTrue(arterials.size() > 100, "arterial pieces: " + arterials.size());
+        assertTrue(arterials.size() > 100, () -> "arterial pieces: " + arterials.size());
         CityExtent extent = logic.extent(city);
         for (StreetSegment segment : arterials) {
             if (segment.era() == Era.MODERN && segment.width() == SETTINGS.streets.stationAvenueWidth) {
@@ -168,7 +168,7 @@ class StreetLayerTest {
             }
             int nodeX = (int) Math.round(0.5 * (segment.x1() + segment.x2()) / 64);
             int nodeZ = (int) Math.round(0.5 * (segment.z1() + segment.z2()) / 64);
-            assertTrue(extent.intensity(nodeX, nodeZ) > 0.0, "off built land: " + segment);
+            assertTrue(extent.intensity(nodeX, nodeZ) > 0.0, () -> "off built land: " + segment);
         }
         // Asked in the same order, a fresh logic plans the same blocks and lays out the same streets
         CityLogic fresh = new CityLogic(3L, SETTINGS, SyntheticTerrain.flatPlains());

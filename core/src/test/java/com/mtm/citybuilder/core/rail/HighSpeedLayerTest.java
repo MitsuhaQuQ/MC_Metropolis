@@ -21,9 +21,9 @@ class HighSpeedLayerTest {
     void spineNodesKeepTheirSpacingAndAreTheSameFromEveryArea() {
         CityLogic logic = new CityLogic(3L, SETTINGS, SyntheticTerrain.flatPlains());
         List<SpineNode> wide = logic.spineNodes(0, -200000, 400000, 200000);
-        assertTrue(wide.size() >= 8, "nodes: " + wide.size());
+        assertTrue(wide.size() >= 8, () -> "nodes: " + wide.size());
         for (SpineNode a : wide) {
-            assertTrue(a.x() > 0, "no node at sea: " + a);
+            assertTrue(a.x() > 0, () -> "no node at sea: " + a);
             for (SpineNode b : wide) {
                 if (a != b) {
                     assertTrue(Math.hypot(a.x() - b.x(), a.z() - b.z()) >= SETTINGS.highSpeed.nodeSpacing,
@@ -46,9 +46,9 @@ class HighSpeedLayerTest {
                 new SpineNode(2, 1, 0, 40000, 8000, 1.0), null, null);
         RailRoute route = logic.highSpeedRoute(line);
         assertTrue(route.exists(), "a route");
-        assertTrue(route.length(RailKind.TUNNEL) > 1000, "tunnel " + route.length(RailKind.TUNNEL));
+        assertTrue(route.length(RailKind.TUNNEL) > 1000, () -> "tunnel " + route.length(RailKind.TUNNEL));
         for (RailCurve curve : route.curves()) {
-            assertTrue(curve.radius() >= SETTINGS.highSpeed.minRadius - 1e-6, "radius " + curve.radius());
+            assertTrue(curve.radius() >= SETTINGS.highSpeed.minRadius - 1e-6, () -> "radius " + curve.radius());
         }
         for (int i = 1; i < route.samples(); i++) {
             double horizontal = Math.hypot(route.x(i) - route.x(i - 1), route.z(i) - route.z(i - 1));

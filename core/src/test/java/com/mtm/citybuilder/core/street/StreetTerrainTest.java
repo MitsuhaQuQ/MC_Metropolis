@@ -46,7 +46,7 @@ class StreetTerrainTest {
         for (StreetSegment segment : plan.segments()) {
             boolean crosses = Math.min(segment.x1(), segment.x2()) < 20000 && Math.max(segment.x1(), segment.x2()) > 20000;
             if (crosses) {
-                assertTrue(segment.structure() == StreetStructure.BRIDGE, "crosses the river not on a bridge: " + segment);
+                assertTrue(segment.structure() == StreetStructure.BRIDGE, () -> "crosses the river not on a bridge: " + segment);
                 assertTrue(segment.streetClass() != StreetClass.STREET && segment.streetClass() != StreetClass.LANE,
                         "a street bridges the river: " + segment);
             }
@@ -71,7 +71,7 @@ class StreetTerrainTest {
                 double longer = Math.max(Math.hypot(p[2] - p[0], p[3] - p[1]), Math.hypot(q[2] - q[0], q[3] - q[1]));
                 double keep = SETTINGS.streets.bridgeSpacing * Math.max(1.0, longer / SETTINGS.streets.bridgeLength);
                 double apart = Math.hypot(0.5 * (p[0] + p[2] - q[0] - q[2]), 0.5 * (p[1] + p[3] - q[1] - q[3]));
-                assertTrue(apart >= keep - 2 * SETTINGS.streets.step, "bridges too close: " + apart + " < " + keep);
+                assertTrue(apart >= keep - 2 * SETTINGS.streets.step, () -> "bridges too close: " + apart + " < " + keep);
             }
         }
     }
@@ -106,7 +106,7 @@ class StreetTerrainTest {
                 boolean across = Math.abs(segment.x2() - segment.x1()) > Math.abs(segment.z2() - segment.z1());
                 if (degree.get(Math.round(end[0] * 10) * 1_000_003L + Math.round(end[1] * 10)) == 1 && !onAnother && across) {
                     // The river's banks are 40 either side of x = 20000; the grid reads water to its nearest node
-                    assertTrue(Math.abs(end[0] - 20000) > 40 + 64, "an arterial ends at the river: " + segment);
+                    assertTrue(Math.abs(end[0] - 20000) > 40 + 64, () -> "an arterial ends at the river: " + segment);
                 }
             }
         }
@@ -142,11 +142,11 @@ class StreetTerrainTest {
         assertTrue(plan.embankments().isEmpty(), "no bank roads along a narrow river");
         long bridges = plan.segments().stream().filter(s -> s.structure() == StreetStructure.BRIDGE
                 && Math.min(s.x1(), s.x2()) < 20000 && Math.max(s.x1(), s.x2()) > 20000).count();
-        assertTrue(bridges > 5, "bridges over the narrow river: " + bridges);
+        assertTrue(bridges > 5, () -> "bridges over the narrow river: " + bridges);
         for (StreetSegment segment : plan.segments()) {
             boolean crosses = Math.min(segment.x1(), segment.x2()) < 20000 && Math.max(segment.x1(), segment.x2()) > 20000;
             if (crosses && segment.streetClass() != StreetClass.LANE) {
-                assertTrue(segment.structure() == StreetStructure.BRIDGE, "crosses the river not on a bridge: " + segment);
+                assertTrue(segment.structure() == StreetStructure.BRIDGE, () -> "crosses the river not on a bridge: " + segment);
             }
         }
     }
@@ -159,18 +159,18 @@ class StreetTerrainTest {
         Canal canal = plan.canals().get(0);
         // Drawn from the river and returned to it: the river is 80 wide along x = 20000
         for (double[] end : new double[][]{canal.points().get(0), canal.points().get(canal.points().size() - 1)}) {
-            assertTrue(Math.abs(end[0] - 20000) < 45, "an end away from the water: " + end[0] + " " + end[1]);
+            assertTrue(Math.abs(end[0] - 20000) < 45, () -> "an end away from the water: " + end[0] + " " + end[1]);
         }
-        assertTrue(canal.length() >= SETTINGS.streets.canalMinRun, "length " + canal.length());
+        assertTrue(canal.length() >= SETTINGS.streets.canalMinRun, () -> "length " + canal.length());
         // A street along it, beyond its wall, for much of its way
         double along = plan.segments().stream().filter(g -> g.streetClass() == StreetClass.STREET
                         && Math.abs(canal.distance(0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2())) - 5.5) < 1.5)
                 .mapToDouble(StreetSegment::length).sum();
-        assertTrue(along > 0.3 * canal.length(), "street along it " + along + " of " + canal.length());
+        assertTrue(along > 0.3 * canal.length(), () -> "street along it " + along + " of " + canal.length());
         // What crosses it passes over at ground level
         for (StreetSegment g : plan.segments()) {
             if (canal.crosses(g.x1(), g.z1(), g.x2(), g.z2())) {
-                assertTrue(g.structure() != StreetStructure.GROUND, "crosses on the ground: " + g);
+                assertTrue(g.structure() != StreetStructure.GROUND, () -> "crosses on the ground: " + g);
             }
         }
     }
@@ -184,7 +184,7 @@ class StreetTerrainTest {
         double water = SyntheticTerrain.SEA + 4.0;
         for (Embankment embankment : plan.embankments()) {
             for (double[] point : embankment.points()) {
-                assertTrue(Math.abs(point[2] - (water + SETTINGS.streets.leveeHeight)) < 1e-6, "crest " + point[2]);
+                assertTrue(Math.abs(point[2] - (water + SETTINGS.streets.leveeHeight)) < 1e-6, () -> "crest " + point[2]);
             }
         }
     }
@@ -197,7 +197,7 @@ class StreetTerrainTest {
         long crossings = plan.segments().stream().filter(s -> s.streetClass() == StreetClass.STREET
                 && Math.min(s.x1(), s.x2()) < 20000 && Math.max(s.x1(), s.x2()) > 20000).count();
         assertTrue(culverts > 0, "culverts");
-        assertTrue(crossings > 10, "streets crossing the stream: " + crossings);
+        assertTrue(crossings > 10, () -> "streets crossing the stream: " + crossings);
     }
 
     @Test
@@ -216,9 +216,9 @@ class StreetTerrainTest {
             double rise = Math.abs(gridHeight(terrain, segment.x2(), segment.z2()) - gridHeight(terrain, segment.x1(), segment.z1()));
             double grade = rise / Math.max(1e-6, segment.length());
             if (segment.streetClass() == StreetClass.ARTERIAL && segment.structure() != StreetStructure.BRIDGE) {
-                assertTrue(grade <= SETTINGS.streets.maxGrade + 1e-6, "steep arterial: " + grade + " " + segment);
+                assertTrue(grade <= SETTINGS.streets.maxGrade + 1e-6, () -> "steep arterial: " + grade + " " + segment);
             }
-            assertTrue(grade <= SETTINGS.streets.stairsGrade + 1e-6, "steeper than stairs: " + grade + " " + segment);
+            assertTrue(grade <= SETTINGS.streets.stairsGrade + 1e-6, () -> "steeper than stairs: " + grade + " " + segment);
             if (segment.structure() == StreetStructure.RAMP) {
                 ramps++;
             } else if (segment.structure() == StreetStructure.STAIRS) {

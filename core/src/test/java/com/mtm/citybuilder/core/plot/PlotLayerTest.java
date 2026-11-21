@@ -73,8 +73,8 @@ class PlotLayerTest {
                 samples.merge(plot.id(), 1, Integer::sum);
                 // Along its street within the lot's frontage; a strip joined from across, measured from the lot's
                 // street, may reach a little past it
-                assertTrue(plot.along() >= plot.start() - 30 && plot.along() <= plot.end() + 30, "along " + plot);
-                assertTrue(plot.depth() >= 0 && plot.depth() <= plot.maxDepth(), "depth " + plot);
+                assertTrue(plot.along() >= plot.start() - 30 && plot.along() <= plot.end() + 30, () -> "along " + plot);
+                assertTrue(plot.depth() >= 0 && plot.depth() <= plot.maxDepth(), () -> "depth " + plot);
                 Plot before = seen.putIfAbsent(plot.id(), plot);
                 if (before != null) {
                     // One lot, one frontage on one street
@@ -97,7 +97,7 @@ class PlotLayerTest {
         // lot with one or two of them is under about 20 square blocks; the window's edge cuts a few lots short)
         assertTrue(remnant < 0.08 * all, report);
         int tiny = samples.values().stream().filter(n -> n <= 2).mapToInt(Integer::intValue).sum();
-        assertTrue(tiny < 0.02 * lots, report + ", in tiny lots " + tiny);
+        assertTrue(tiny < 0.02 * lots, () -> report + ", in tiny lots " + tiny);
         // Lot by lot within their district's range (the last on a street takes what is left, up to half again)
         for (Plot plot : seen.values()) {
             if (plot.street() == StreetClass.LANE) {
@@ -113,7 +113,7 @@ class PlotLayerTest {
             };
             // A lot is cut to its district's range (the last on a street taking what is left, up to half again) and
             // may take in a small neighbour either side
-            assertTrue(plot.frontage() <= 3 * 1.5 * range[4] + 1e-6 && plot.frontage() > 0, "frontage " + plot + " " + range[4]);
+            assertTrue(plot.frontage() <= 3 * 1.5 * range[4] + 1e-6 && plot.frontage() > 0, () -> "frontage " + plot + " " + range[4]);
         }
         // The old town's machiya are narrower than the houses of the modern town
         if (frontage.containsKey(District.OLD_TOWN) && frontage.containsKey(District.RESIDENTIAL)) {
@@ -196,12 +196,12 @@ class PlotLayerTest {
                     back++;
                     assertNotNull(plot.use(), "a back lot's use");
                     built += plot.use().built() ? 1 : 0;
-                    assertTrue(plot.depth() <= plot.maxDepth() + 1e-6, "depth " + plot);
+                    assertTrue(plot.depth() <= plot.maxDepth() + 1e-6, () -> "depth " + plot);
                 }
                 if (plot.pole()) {
                     poles++;
                     // The pole runs to the street: straight out towards it, the same lot
-                    assertTrue(plot.use().built() || plot.use() == Plot.Use.PARKING, "a pole to open land " + plot);
+                    assertTrue(plot.use().built() || plot.use() == Plot.Use.PARKING, () -> "a pole to open land " + plot);
                     double heading = plot.heading();
                     double nx = Math.sin(heading) * plot.side();
                     double nz = -Math.cos(heading) * plot.side();
@@ -210,7 +210,7 @@ class PlotLayerTest {
                     // The same pole, or one it shares out to the street (two back lots' first edges close together)
                     // (a lane doubling back may bring its other side near: only along the pole's own side)
                     assertTrue(toward == null || toward.chain() != plot.chain() || toward.side() != plot.side()
-                            || toward.id() == plot.id() || toward.pole(), "a pole broken " + plot + " at " + toward);
+                            || toward.id() == plot.id() || toward.pole(), () -> "a pole broken " + plot + " at " + toward);
                 }
             }
         }

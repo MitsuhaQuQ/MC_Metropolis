@@ -57,7 +57,7 @@ class RailStructureTest {
                 List<Spans.Span> spans = Spans.layout(160, Spans.Limits.RAIL, List.of(new int[] {a, b}), pier);
                 for (int i = 1; i < spans.size(); i++) {
                     int x = spans.get(i).from(), x0 = x - pier / 2, x1 = x0 + pier - 1;
-                    assertTrue(x1 < a || x0 >= b, "pier at " + x + " in [" + a + ", " + b + ")");
+                    assertTrue(x1 < a || x0 >= b, () -> "pier at " + x + " in [" + a + ", " + b + ")");
                 }
                 Spans.Span over = spans.stream().filter(s -> s.from() < a && s.to() > b - 1).findFirst().orElseThrow();
                 assertEquals(Spans.kind(over.length(), Spans.Limits.RAIL), over.kind());
@@ -102,7 +102,7 @@ class RailStructureTest {
                     }
                     // Every bent reaches the terrain
                     for (int x : v.bents()) {
-                        assertTrue(m.has(x, g.at(x, 0), v.columnZ()[0]), "footing at " + x);
+                        assertTrue(m.has(x, g.at(x, 0), v.columnZ()[0]), () -> "footing at " + x);
                     }
                     assertStates(m);
                 }
@@ -137,8 +137,8 @@ class RailStructureTest {
                         joints += b != null && base(b).equals(P.joint()) ? 1 : 0;
                     }
                 }
-                assertTrue(bearings >= 2, gap + ": bearings at " + x);
-                assertTrue(joints >= 2, gap + ": joint at " + x);
+                assertTrue(bearings >= 2, () -> gap + ": bearings at " + x);
+                assertTrue(joints >= 2, () -> gap + ": joint at " + x);
             }
             int h = v.halfWidth();
             assertEquals(P.parapet() + "[facing=north]", m.get(70, 10, -h));
@@ -205,7 +205,7 @@ class RailStructureTest {
                             kinds.add(v.bay(s.from()));
                             int mid = (s.from() + s.to()) / 2;
                             int floor = g.at(mid, 0);
-                            assertTrue(m.has(mid, floor, 0), "floor in the vault at " + mid);
+                            assertTrue(m.has(mid, floor, 0), () -> "floor in the vault at " + mid);
                             assertFalse(m.has(mid, floor + 2, 0), "room in the vault at " + mid);
                         } else {
                             assertFalse(s.from() < 62 && s.to() > 40 && s.kind() == Spans.Kind.CONCRETE);
@@ -218,7 +218,7 @@ class RailStructureTest {
                         }
                     }
                     if (length >= 137) {
-                        assertTrue(kinds.size() >= 3, "bays vary: " + kinds);
+                        assertTrue(kinds.size() >= 3, () -> "bays vary: " + kinds);
                     }
                     for (int tc : v.trackCentres()) {
                         assertClear(m, 1, length - 1, 9, 13, tc - 1, tc + 1, "train on the brick viaduct");
@@ -240,7 +240,7 @@ class RailStructureTest {
                     for (int i = 0; i < v.spans().size(); i++) {
                         Spans.Span s = v.spans().get(i);
                         if (s.kind() != Spans.Kind.CONCRETE) {
-                            assertTrue(s.from() < 70 && s.to() >= 96, "steel only over the road: " + s);
+                            assertTrue(s.from() < 70 && s.to() >= 96, () -> "steel only over the road: " + s);
                             run = 0;
                         } else if (v.gap(i)) {
                             int mid = (s.from() + s.to()) / 2;
@@ -349,14 +349,14 @@ class RailStructureTest {
                 }
             }
             // As many steps as straight; a row is a block wider where the flight shifts sideways along the curve
-            assertTrue(counted[0] >= expected && counted[0] <= expected + expected / 3, radius + ": steps " + counted[0]);
+            assertTrue(counted[0] >= expected && counted[0] <= expected + expected / 3, () -> radius + ": steps " + counted[0]);
             assertEquals(counted[0], counted[1], radius + ": climbable steps");
             // Trains pass along the arc
             for (double s = start + 2; s < c.start() + c.length() - 2; s += 0.5) {
                 for (int t : tracks) {
                     double[] pt = c.place(s, t + 0.5);
                     for (int y = 9; y <= 13; y++) {
-                        assertFalse(m.has((int) Math.floor(pt[0]), y, (int) Math.floor(pt[1])), radius + ": train");
+                        assertFalse(m.has((int) Math.floor(pt[0]), y, (int) Math.floor(pt[1])), () -> radius + ": train");
                     }
                 }
             }
@@ -374,7 +374,7 @@ class RailStructureTest {
             Viaduct v = Viaduct.builder(Viaduct.Deck.RAIL, (int) reference.length(), 9).tracks(2).catenary(false).build();
             Model m = c.apply(v.build());
             for (MtrAlignment.Track t : MtrAlignment.tracks(reference, v.trackCentres(), n[0], n[1], 9)) {
-                assertTrue(MtrAlignment.stray(c, t) < 0.75, k[0] + ": track " + t.z() + " strays "
+                assertTrue(MtrAlignment.stray(c, t) < 0.75, () -> k[0] + ": track " + t.z() + " strays "
                         + MtrAlignment.stray(c, t));
                 // Under every point of the track's own MTR rail, its bed; over it, room for the train
                 for (double s = 2; s < t.rail().length() - 2; s += 0.5) {  // not the abutments
@@ -409,11 +409,11 @@ class RailStructureTest {
                 for (MtrAlignment.Track t : tracks) {
                     isNode |= nx == t.start().x() && nz == t.start().z() || nx == t.end().x() && nz == t.end().z();
                 }
-                assertTrue(isNode, k[0] + ": marker " + s + " points at a node");
+                assertTrue(isNode, () -> k[0] + ": marker " + s + " points at a node");
                 assertTrue(s.contains("Transition:" + String.format(java.util.Locale.ROOT, "%.1f", k[2]) + "f"), s);
                 for (MtrAlignment.Track t : tracks) {
                     double[] sd = Curve.along(t.rail(), 0, 0).project(at[0] + 0.5, at[2] + 0.5);
-                    assertTrue(Math.abs(sd[1]) >= 1.5, k[0] + ": marker clear of track " + t.z() + " " + sd[1]);
+                    assertTrue(Math.abs(sd[1]) >= 1.5, () -> k[0] + ": marker clear of track " + t.z() + " " + sd[1]);
                 }
             }
         }
@@ -600,7 +600,7 @@ class RailStructureTest {
                 }
             }
         });
-        assertTrue(leaks.isEmpty(), what + ": air against the ground at " + leaks);
+        assertTrue(leaks.isEmpty(), () -> what + ": air against the ground at " + leaks);
     }
 
     @Test
@@ -630,7 +630,7 @@ class RailStructureTest {
                 }
                 surface(m, Ground.FLAT);
                 int[] counted = steps(m);
-                assertTrue(counted[0] > (st.concourseFloor() - lv) * 3, "a long stair up: " + counted[0]);
+                assertTrue(counted[0] > (st.concourseFloor() - lv) * 3, () -> "a long stair up: " + counted[0]);
                 assertEquals(counted[0], counted[1], pw + ": climbable steps");
                 // The long flights reach the concourse floor
                 boolean reached = false;
@@ -692,7 +692,7 @@ class RailStructureTest {
                 }
                 surface(m, Ground.FLAT);
                 int[] counted = steps(m);
-                assertTrue(counted[0] > (st.concourseFloor() - lv) * 3, "a long stair up: " + counted[0]);
+                assertTrue(counted[0] > (st.concourseFloor() - lv) * 3, () -> "a long stair up: " + counted[0]);
                 assertEquals(counted[0], counted[1], pw + ": climbable steps");
                 assertWatertight(m, Ground.FLAT, 0, st.length(), "twin-tube station " + pw + " " + k[0]);
                 assertStates(m);
@@ -737,7 +737,7 @@ class RailStructureTest {
                 }
             }
         });
-        assertTrue(leaks.isEmpty(), what + ": air against the ground at " + leaks);
+        assertTrue(leaks.isEmpty(), () -> what + ": air against the ground at " + leaks);
     }
 
     @Test
@@ -765,7 +765,7 @@ class RailStructureTest {
         for (Interchanges.Interchange ic : all) {
             String what = "interchange " + n++;
             Model m = ic.complex().build(Ground.FLAT);
-            assertTrue(walkable(m, ic.concourseA(), ic.concourseB()), what + ": from A's concourse to B's");
+            assertTrue(walkable(m, ic.concourseA(), ic.concourseB()), () -> what + ": from A's concourse to B's");
             surface(m, Ground.FLAT);
             int[] counted = steps(m);
             assertEquals(counted[0], counted[1], what + ": climbable steps");
@@ -804,7 +804,7 @@ class RailStructureTest {
             for (int x = 1; x < 140; x++) {
                 double rail = v.railY(x);
                 double top = v.levelAt(x) + (v.halfStep(x) ? 0.5 : 0);
-                assertTrue(top <= rail + 1e-6 && top > rail - 0.5 - 1e-6, "deck at " + top + " under a rail at " + rail);
+                assertTrue(top <= rail + 1e-6 && top > rail - 0.5 - 1e-6, () -> "deck at " + top + " under a rail at " + rail);
                 String surface = m.get(x, v.halfStep(x) ? v.levelAt(x) : v.levelAt(x) - 1, 0);
                 assertTrue(surface != null, "deck under the rail at " + x);
             }
@@ -869,8 +869,8 @@ class RailStructureTest {
                     int length = road + 2 * a;
                     String first = m.get(-f.stairLength(), g.at(0, 0) + 1, 0);
                     String last = m.get(length + f.stairLengthEnd(), g.at(length, 0) + 1, 0);
-                    assertTrue(first != null && base(first).endsWith("_stairs"), "first step, road " + road);
-                    assertTrue(last != null && base(last).endsWith("_stairs"), "last step, road " + road);
+                    assertTrue(first != null && base(first).endsWith("_stairs"), () -> "first step, road " + road);
+                    assertTrue(last != null && base(last).endsWith("_stairs"), () -> "last step, road " + road);
                     assertStates(m);
                 }
             }
@@ -886,7 +886,7 @@ class RailStructureTest {
                 assertEquals(layout.chars().filter(c -> c == 'P').count(), s.platforms().size());
                 for (CrossSection.Platform p : s.platforms()) {
                     if (p.trackLow()) {
-                        assertTrue(contains(s.tracks(), p.z0() - StationParts.EDGE), layout + " " + p);
+                        assertTrue(contains(s.tracks(), p.z0() - StationParts.EDGE), () -> layout + " " + p);
                     }
                     if (p.trackHigh()) {
                         assertTrue(contains(s.tracks(), p.z1() + StationParts.EDGE), layout + " " + p);
@@ -897,7 +897,7 @@ class RailStructureTest {
                     assertTrue(t[i] - t[i - 1] >= Viaduct.TRACK_SPACING, layout);
                 }
                 assertTrue(t[0] - s.zMin() >= 2 && s.zMax() - t[t.length - 1] >= 2, layout);
-                assertTrue(Math.abs(s.zMin() + s.zMax()) <= 1, layout + " centred");
+                assertTrue(Math.abs(s.zMin() + s.zMax()) <= 1, () -> layout + " centred");
             }
         }
     }
@@ -955,7 +955,7 @@ class RailStructureTest {
                             assertClear(m, 0, s.length(), 1, 5, tc - 1, tc + 1, house + " " + layout + " train");
                             assertEquals(P.ballast(), m.get(10, 0, tc));
                             if (tc > bz[0] && tc < bz[1] && (house == GroundStation.House.OVER || bz[0] < bz[1])) {
-                                assertTrue(m.has(s.bridgeX() + 1, s.bridgeFloor(), tc), "the bridge over " + tc);
+                                assertTrue(m.has(s.bridgeX() + 1, s.bridgeFloor(), tc), () -> "the bridge over " + tc);
                             }
                             assertTrue(m.has(s.platformStart() + 2, 1, tc + StationParts.EDGE)
                                     || m.has(s.platformStart() + 2, 1, tc - StationParts.EDGE), "platform by " + tc);
@@ -990,7 +990,7 @@ class RailStructureTest {
                 }
             }
         }
-        assertTrue(found.isEmpty(), what + ": " + found);
+        assertTrue(found.isEmpty(), () -> what + ": " + found);
     }
 
     private static void assertStates(Model m) {

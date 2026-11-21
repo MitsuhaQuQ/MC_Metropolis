@@ -34,8 +34,8 @@ class RailLayerTest {
     /** No curve tighter than the class allows, and no stretch steeper than its grade. */
     private static void assertBuildable(RailRoute route) {
         for (RailCurve curve : route.curves()) {
-            assertTrue(curve.radius() >= SETTINGS.rail.trunkMinRadius - 1e-6, "radius " + curve.radius());
-            assertTrue(curve.radius() <= SETTINGS.rail.maxRadius + 1e-6, "radius " + curve.radius());
+            assertTrue(curve.radius() >= SETTINGS.rail.trunkMinRadius - 1e-6, () -> "radius " + curve.radius());
+            assertTrue(curve.radius() <= SETTINGS.rail.maxRadius + 1e-6, () -> "radius " + curve.radius());
         }
         for (int i = 1; i < route.samples(); i++) {
             double horizontal = Math.hypot(route.x(i) - route.x(i - 1), route.z(i) - route.z(i - 1));
@@ -47,7 +47,7 @@ class RailLayerTest {
     @Test
     void aLineThroughAHighRidgeTunnelsAndKeepsItsCurvesAndGrades() {
         RailRoute route = line(new HillTerrain(400, 1500, 0, 1, 0.0), 0);
-        assertTrue(route.length(RailKind.TUNNEL) > 1000, "tunnel " + route.length(RailKind.TUNNEL));
+        assertTrue(route.length(RailKind.TUNNEL) > 1000, () -> "tunnel " + route.length(RailKind.TUNNEL));
         assertBuildable(route);
     }
 
@@ -65,25 +65,25 @@ class RailLayerTest {
         CityLogic logic = new CityLogic(3L, SETTINGS, SyntheticTerrain.flatPlains());
         List<RailEdge> west = logic.railLines(4000, -15000, 34000, 15000);
         List<RailEdge> east = logic.railLines(26000, -15000, 56000, 15000);
-        assertTrue(west.size() >= 2, "lines: " + west.size());
+        assertTrue(west.size() >= 2, () -> "lines: " + west.size());
         Set<String> eastKeys = new HashSet<>();
         east.forEach(edge -> eastKeys.add(edge.key()));
         List<Settlement> around = logic.settlements(-60000, -80000, 120000, 80000, SettlementTier.CITY);
         for (RailEdge edge : west) {
             double length = edge.length();
-            assertTrue(length <= SETTINGS.rail.maxLength, "too long: " + edge);
+            assertTrue(length <= SETTINGS.rail.maxLength, () -> "too long: " + edge);
             double midX = 0.5 * (edge.a().x() + edge.b().x());
             double midZ = 0.5 * (edge.a().z() + edge.b().z());
             for (Settlement c : around) {
                 if (c.id() != edge.a().id() && c.id() != edge.b().id()) {
-                    assertTrue(Math.hypot(c.x() - midX, c.z() - midZ) >= 0.5 * length, c + " within the circle of " + edge);
+                    assertTrue(Math.hypot(c.x() - midX, c.z() - midZ) >= 0.5 * length, () -> c + " within the circle of " + edge);
                 }
             }
             boolean metropolis = edge.a().tier() == SettlementTier.METROPOLIS || edge.b().tier() == SettlementTier.METROPOLIS;
             assertEquals(metropolis ? RailClass.TRUNK : RailClass.BRANCH, edge.railClass());
             double margin = SETTINGS.rail.windowMargin + SETTINGS.rail.windowFactor * length;
             if (Math.max(edge.a().x(), edge.b().x()) + margin >= 26000) {
-                assertTrue(eastKeys.contains(edge.key()), "missing from the east: " + edge);
+                assertTrue(eastKeys.contains(edge.key()), () -> "missing from the east: " + edge);
             }
         }
     }
