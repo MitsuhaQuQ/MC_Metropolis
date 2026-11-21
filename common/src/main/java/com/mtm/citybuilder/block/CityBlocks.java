@@ -105,6 +105,7 @@ public final class CityBlocks {
     public static void register() {
         Platform platform = Platform.get();
         AirportBlocks.register();
+        BuildingBlocks.register();
         ASPHALT = platform.registerBlock("asphalt", () -> new PavingBlock(properties()));
         ASPHALT_LINE_WHITE = platform.registerBlock("asphalt_line_white", () -> new MarkingBlock(properties()));
         ASPHALT_LINE_YELLOW = platform.registerBlock("asphalt_line_yellow", () -> new MarkingBlock(properties()));

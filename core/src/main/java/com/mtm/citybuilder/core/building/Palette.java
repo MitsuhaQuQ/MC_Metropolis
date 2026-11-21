@@ -24,9 +24,31 @@ import java.util.List;
 public record Palette(String wall, String accent, String trim, String window, String shopfront, String lattice,
                       String door, String floor, String roofSlab, String roofBlock, String flat, String parapet,
                       String foundation) {
-    /** A window's glass as panes, set in the middle of their blocks and joined along the wall; anything else as it is. */
-    private static String pane(String id) {
-        return id.endsWith("glass") ? id + "_pane" : id;
+    /**
+     * A window's glazing as this mod's window blocks (a whole block of glass, its frame along the top and bottom and a
+     * mullion down one edge, joining round corners and on walls at an angle to the blocks as panes cannot): the glass's
+     * tint from the palette's glass, the frame from the building (an office's dark, timber trim's wood, a white house's
+     * white, else the usual aluminium sash); bars and anything else as they are.
+     */
+    private String glazing(String id, Building building) {
+        if (!id.endsWith("glass")) {
+            return id;
+        }
+        String glass = id.contains("blue") || id.contains("cyan") ? "blue"
+                : id.contains("gray") || id.contains("brown") || id.contains("black") ? "gray" : "clear";
+        String frame;
+        if (building.type() == Building.Type.OFFICE) {
+            frame = "dark";
+        } else if (trim.endsWith("_planks") || trim.endsWith("_log") || trim.endsWith("_wood")
+                || building.type() == Building.Type.MACHIYA) {
+            frame = "wood";
+        } else if (building.type() == Building.Type.HOUSE
+                && (wall.contains("white") || wall.contains("calcite") || wall.contains("quartz"))) {
+            frame = "white";
+        } else {
+            frame = "aluminum";
+        }
+        return "citybuilder:window_" + frame + "_" + glass;
     }
 
     /**
@@ -99,8 +121,8 @@ public record Palette(String wall, String accent, String trim, String window, St
             case WALL -> wall;
             case ACCENT -> accent;
             case TRIM -> trim;
-            case WINDOW -> pane(window);
-            case SHOPFRONT -> pane(shopfront);
+            case WINDOW -> glazing(window, building);
+            case SHOPFRONT -> glazing(shopfront, building);
             case LATTICE -> switch (composition.get(Slot.LATTICE_WOOD)) {
                 case "spruce" -> c.material("latticeSpruce", variant);
                 case "mangrove" -> c.material("latticeMangrove", variant);

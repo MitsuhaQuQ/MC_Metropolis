@@ -86,5 +86,17 @@
   "block.citybuilder.catenary_arm": "Catenary Cantilever Arm",
   "block.citybuilder.catenary_hanger": "Catenary Drop Hanger",
   "block.citybuilder.curve_marker": "Curve Marker",
-  "block.citybuilder.curve_marker.describe": "Curve marker, track %s: MTR node at %s %s %s, angle %s°, transition %s, grade %s‰, radius %s"
+  "block.citybuilder.curve_marker.describe": "Curve marker, track %s: MTR node at %s %s %s, angle %s°, transition %s, grade %s‰, radius %s",
+  "block.citybuilder.window_aluminum_clear": "Aluminium Window (Clear)",
+  "block.citybuilder.window_aluminum_blue": "Aluminium Window (Blue)",
+  "block.citybuilder.window_aluminum_gray": "Aluminium Window (Grey)",
+  "block.citybuilder.window_dark_clear": "Dark Window (Clear)",
+  "block.citybuilder.window_dark_blue": "Dark Window (Blue)",
+  "block.citybuilder.window_dark_gray": "Dark Window (Grey)",
+  "block.citybuilder.window_wood_clear": "Wooden Window (Clear)",
+  "block.citybuilder.window_wood_blue": "Wooden Window (Blue)",
+  "block.citybuilder.window_wood_gray": "Wooden Window (Grey)",
+  "block.citybuilder.window_white_clear": "White Window (Clear)",
+  "block.citybuilder.window_white_blue": "White Window (Blue)",
+  "block.citybuilder.window_white_gray": "White Window (Grey)"
 }
