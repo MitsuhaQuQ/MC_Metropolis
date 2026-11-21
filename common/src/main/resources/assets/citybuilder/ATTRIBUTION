@@ -1,4 +1,27 @@
 City Builder assets and where they come from.
 
-textures/block/asphalt.png, asphalt_line_white.png, asphalt_line_yellow.png, sidewalk.png
-  Drawn for this mod by tools/textures/road_textures.py (no outside sources); the mod's own licence.
+Every asset shipped with the mod is listed here with its source, author, licence and whether it was changed. Assets
+whose source or licence is unknown are not added.
+
+Made for this mod (no outside sources), under the mod's licence (MIT, see LICENSE):
+
+textures/block/asphalt.png, sidewalk.png, sidewalk_side.png (the kerb)
+textures/block/line/<colour>_<angle>_<offset>.png (the road markings, white and yellow, at 16 angles and 8 offsets:
+256 in all)
+  Drawn by tools/textures/road_textures.py.
+
+blockstates/*.json, models/block/*.json, models/item/*.json (the paving and marking blocks, and their sunken _low
+models)
+  Written by tools/textures/road_models.py.
+
+lang/*.json, and everything under data/citybuilder
+  Written for this mod.
+
+Data used for statistics only (nothing of it is shipped):
+
+PLATEAU (Japan's Ministry of Land, Infrastructure, Transport and Tourism, and the cities; the cities' site policies,
+compatible with CC BY 4.0): building footprints, heights and uses of Kyoto, Kanazawa, Himeji, Tokyo's Taito and Chuo,
+measured by tools/assets/plateau_*.py for the lots' sizes, the streets' uses and the blocks' insides.
+
+OpenStreetMap (OpenStreetMap contributors, ODbL 1.0): streets of Kyoto, Kanazawa, Takayama, Hida-Furukawa, Shimoda,
+Karuizawa, Nikko, Himeji and Tokyo, measured by the cityMap and osmStats tools for the street network's targets.

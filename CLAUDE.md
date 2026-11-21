@@ -128,7 +128,7 @@ gradlew :fabric:runClient / :forge:runClient    # 开发环境客户端（未验
 ## 已定与待定
 
 - 已采用（2026-11-19 搭骨架时按默认值）：Minecraft 1.20.1（MTR 只构建 1.20.1，以后随 MTM_worldgen 的版本链扩展）；Fabric + Forge；对兄弟 mod 软依赖；mod id `citybuilder`、包 `com.mtm.citybuilder`、显示名 City Builder
-- 【待决定】许可证（元数据暂写 MIT，与 MTM_worldgen 一致；仓库里还没有 LICENSE 文件）
+- 许可证：代码 MIT（2026-11-21 写了 `LICENSE`，与 MTM_worldgen 一致，署名"City Builder contributors"）；素材各按 `ATTRIBUTION` 所列的许可证。`README.md` 英文为主、附中文简介，功能或依赖变了要同步改
 - 地形与 MTR 接入：都直接依赖对方构建好的 jar，不绑定版本（见"代码结构"）
 
 ## 建筑素材的授权
