@@ -646,6 +646,60 @@ class RailStructureTest {
     }
 
     @Test
+    void twinTubeStationsHoldTrainsAndPlatformsAndJoinThem() {
+        for (int pw : new int[] {3, 4, 6}) {
+            for (int[] k : new int[][] {{80, -28}, {140, -36}}) {
+                TwinTubeStation st = new TwinTubeStation(k[0], pw, 14, k[1], 0, 3.5, 12, 15, 3, 4, 0, List.of(), P,
+                        Ground.FLAT);
+                Model m = st.build();
+                int lv = st.level();
+                int[] tracks = st.trackCentres();
+                assertEquals(-tracks[0], tracks[1], "mirrored");
+                for (int tc : tracks) {
+                    for (int x = 1; x < st.length(); x++) {
+                        assertEquals("minecraft:smooth_stone", m.get(x, lv - 1, tc), "slab track at " + x);
+                        for (int y = lv; y <= lv + 4; y++) {
+                            for (int z = tc - 1; z <= tc + 1; z++) {
+                                assertFalse(solid(m, x, y, z), pw + " train at " + x + "," + y + "," + z);
+                            }
+                        }
+                    }
+                }
+                for (CrossSection.Platform pl : st.section().platforms()) {
+                    assertEquals(Math.max(3, pw), pl.width());
+                    for (int x = st.platformStart() + 1; x < st.platformEnd(); x++) {
+                        for (int z = pl.z0(); z <= pl.z1(); z++) {
+                            assertTrue(solid(m, x, lv, z), "platform at " + x + "," + z);
+                            for (int y = lv + 1; y <= lv + 3; y++) {
+                                if (pl.trackLow() && z == pl.z0() || pl.trackHigh() && z == pl.z1()) {
+                                    continue;
+                                }
+                                assertFalse(solid(m, x, y, z), pw + " standing room at " + x + "," + y + "," + z);
+                            }
+                        }
+                    }
+                }
+                // Ground between the tubes away from the passages; a cross passage from platform to platform
+                int between = st.platformStart() + 1;
+                assertFalse(m.has(between, lv + 2, 0), "ground between the tubes at " + between);
+                int c = st.crossPassages().get(0);
+                for (int z = -st.platformInner(); z <= st.platformInner(); z++) {
+                    for (int y = lv + 1; y <= lv + 3; y++) {
+                        assertEquals(Flights.AIR, m.get(c, y, z), "cross passage at " + z + "," + y);
+                    }
+                    assertTrue(solid(m, c, lv, z), "cross passage floor at " + z);
+                }
+                surface(m, Ground.FLAT);
+                int[] counted = steps(m);
+                assertTrue(counted[0] > (st.concourseFloor() - lv) * 3, "a long stair up: " + counted[0]);
+                assertEquals(counted[0], counted[1], pw + ": climbable steps");
+                assertWatertight(m, Ground.FLAT, 0, st.length(), "twin-tube station " + pw + " " + k[0]);
+                assertStates(m);
+            }
+        }
+    }
+
+    @Test
     void shieldTunnelsAreRoundAndWatertight() {
         for (int[] lv : new int[][] {{-30, -30}, {-26, -34}}) {
             ShieldTunnel t = new ShieldTunnel(120, new int[] {-6, 6}, 3.5, lv[0], lv[1], P);

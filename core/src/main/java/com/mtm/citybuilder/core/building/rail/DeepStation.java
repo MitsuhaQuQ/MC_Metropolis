@@ -208,13 +208,16 @@ public final class DeepStation implements BuriedStation {
         int zr = trackZ + (int) Math.ceil(trackRadius) + 2;
         Tube.build(m, p, this::inside, 0, length(), -zr, zr, level - 6, (int) Math.ceil(centreY() + middleRadius) + 2,
                 (x, z) -> level);
-        concourse(m);
+        concourse(m, p, boxX0, boxX1, concourseHalf, floor1, topSlab, exits);
         return m;
     }
 
-    /** The shallow box under the road: the concourse the flights come up into, and the exits' passages. */
-    private void concourse(Model m) {
-        int h = concourseHalf;
+    /**
+     * The shallow box under the road (x in [boxX0, boxX1], z within {@code h}, floor at {@code floor1}, roof slab at
+     * {@code topSlab}): the concourse a deep station's flights come up into, and the exits' passages.
+     */
+    static void concourse(Model m, RailPalette p, int boxX0, int boxX1, int h, int floor1, int topSlab,
+                          List<UndergroundStation.Exit> exits) {
         for (int x = boxX0; x <= boxX1; x++) {
             for (int z = -h; z <= h; z++) {
                 for (int y = floor1; y <= topSlab; y++) {

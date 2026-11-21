@@ -80,6 +80,18 @@ public final class CrossSection {
         zMax = end + shift;
     }
 
+    /**
+     * A cross-section laid out by the structure itself (the tracks and platforms of two separate tubes, with ground
+     * between them): {@code layout} only describes it.
+     */
+    CrossSection(String layout, int[] tracks, List<Platform> platforms, int zMin, int zMax) {
+        this.layout = layout;
+        this.tracks = tracks.clone();
+        this.platforms = List.copyOf(platforms);
+        this.zMin = zMin;
+        this.zMax = zMax;
+    }
+
     public String layout() {
         return layout;
     }

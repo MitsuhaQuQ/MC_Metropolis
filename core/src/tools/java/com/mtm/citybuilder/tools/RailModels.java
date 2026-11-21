@@ -12,6 +12,7 @@ import com.mtm.citybuilder.core.building.rail.CurveMarker;
 import com.mtm.citybuilder.core.building.rail.CutCoverTunnel;
 import com.mtm.citybuilder.core.building.rail.DeepStation;
 import com.mtm.citybuilder.core.building.rail.ShieldTunnel;
+import com.mtm.citybuilder.core.building.rail.TwinTubeStation;
 import com.mtm.citybuilder.core.building.rail.UndergroundStation;
 import com.mtm.citybuilder.core.building.rail.CurvedStation;
 import com.mtm.citybuilder.core.building.rail.ElevatedStation;
@@ -213,6 +214,33 @@ public final class RailModels {
                 meta.addProperty("platformStart", s.platformStart());
                 meta.addProperty("platformEnd", s.platformEnd());
                 meta.addProperty("concourseFloor", s.concourseFloor());
+                Plan pl = plan(o, s.length(), s.trackCentres(), s.level(), s.level(), meta);
+                if (pl != null) {
+                    return pl.mark(CurvedStation.underground(s, pl.curve(), pl.rails(),
+                            i(o, "carSpacing", CurvedStation.CAR_SPACING), CurvedStation.CAR_WIDTH, p));
+                }
+                return s.build();
+            }
+            case "twin_tube_station" -> {
+                List<UndergroundStation.Exit> exits = new ArrayList<>();
+                if (o.has("exits")) {
+                    for (JsonElement e : o.getAsJsonArray("exits")) {
+                        JsonArray a = e.getAsJsonArray();
+                        exits.add(new UndergroundStation.Exit(a.get(0).getAsInt(), a.get(1).getAsInt(),
+                                a.get(2).getAsInt(), a.get(3).getAsInt(), a.size() > 4 ? a.get(4).getAsInt() : 3));
+                    }
+                }
+                TwinTubeStation s = new TwinTubeStation(i(o, "platformLength"), i(o, "platformWidth", 4),
+                        i(o, "approach", 14), i(o, "level", -30),
+                        o.has("stationRadius") ? o.get("stationRadius").getAsDouble() : 0,
+                        o.has("runningRadius") ? o.get("runningRadius").getAsDouble() : 3.5, i(o, "pillar", 12),
+                        i(o, "crossSpacing", 15), i(o, "cover", 3), i(o, "concourseHeight", 4),
+                        i(o, "concourseLength", 0), exits, p, ground);
+                describe(meta, List.of(), s.trackCentres(), s.level());
+                meta.addProperty("platformStart", s.platformStart());
+                meta.addProperty("platformEnd", s.platformEnd());
+                meta.addProperty("concourseFloor", s.concourseFloor());
+                meta.addProperty("stationRadius", s.stationRadius());
                 Plan pl = plan(o, s.length(), s.trackCentres(), s.level(), s.level(), meta);
                 if (pl != null) {
                     return pl.mark(CurvedStation.underground(s, pl.curve(), pl.rails(),

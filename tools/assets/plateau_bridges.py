@@ -525,6 +525,11 @@ SPECS = [
     {'slug': 'deep_station_curve', 'name': '深層駅・曲線（半径800、MTRの軌道どおり）', 'kind': 'deep_station',
      'platformLength': 100, 'platformWidth': 11, 'level': -36,
      'mtr': {'before': 30, 'radius': 800, 'turn': 5, 'transition': 20}},
+    {'slug': 'twin_tube_station', 'name': '深層駅・単線シールド二本（相対式、中通路と連絡通路、長い階段で浅い改札階へ）',
+     'kind': 'twin_tube_station', 'platformLength': 120, 'platformWidth': 4, 'level': -32},
+    {'slug': 'twin_tube_station_curve', 'name': '深層駅・単線シールド二本・曲線（半径600）', 'kind': 'twin_tube_station',
+     'platformLength': 100, 'platformWidth': 5, 'level': -30,
+     'mtr': {'before': 30, 'radius': 600, 'turn': 6, 'transition': 20}},
     {'slug': 'shield_tunnel', 'name': 'シールドトンネル（単線2本、勾配と曲線）', 'kind': 'shield_tunnel', 'length': 160,
      'level': -30, 'levelEnd': -34, 'mtr': {'before': 30, 'radius': 400, 'turn': 15, 'transition': 30}},
     {'slug': 'ground_single', 'name': '地上駅・単線1面', 'kind': 'ground_station', 'section': 'TP', 'platformWidth': 5,
@@ -705,7 +710,7 @@ def build(out):
         write_nbt(os.path.join(out, slug + '.nbt'), blocks, size)
         # The catenary's thin steel drawn as posts (the renderer takes names ending in _fence for those)
         thin = {}
-        underground = spec.get('kind') in ('underground_station', 'cut_cover_tunnel', 'deep_station', 'shield_tunnel')
+        underground = spec.get('kind') in ('underground_station', 'cut_cover_tunnel', 'deep_station', 'shield_tunnel', 'twin_tube_station')
         for k, (name, props) in blocks.items():
             if name == 'air':  # the ground taken away: nothing to draw
                 continue
