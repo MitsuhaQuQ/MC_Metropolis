@@ -31,6 +31,9 @@ public interface Platform {
      */
     Supplier<Block> registerBlock(String name, Supplier<Block> factory);
 
+    /** Registers an item of this mod under {@code citybuilder:<name>}; the item once it is registered. */
+    Supplier<net.minecraft.world.item.Item> registerItem(String name, Supplier<net.minecraft.world.item.Item> factory);
+
     /**
      * Registers a block entity type of {@code block} under {@code citybuilder:<name>} (built on the loader's side, where
      * the type's factory interface is open); the type once it is registered.

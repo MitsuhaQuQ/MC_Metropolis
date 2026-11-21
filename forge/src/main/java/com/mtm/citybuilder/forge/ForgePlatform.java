@@ -55,6 +55,11 @@ public final class ForgePlatform implements Platform {
     }
 
     @Override
+    public Supplier<Item> registerItem(String name, Supplier<Item> factory) {
+        return ITEMS.register(name, factory);
+    }
+
+    @Override
     public <T extends BlockEntity> Supplier<BlockEntityType<T>> registerBlockEntity(String name,
                                                                                     BiFunction<BlockPos, BlockState, T> factory,
                                                                                     Supplier<Block> block) {

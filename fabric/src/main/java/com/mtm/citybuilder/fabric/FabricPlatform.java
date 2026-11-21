@@ -50,6 +50,12 @@ public final class FabricPlatform implements Platform {
     }
 
     @Override
+    public Supplier<Item> registerItem(String name, Supplier<Item> factory) {
+        Item item = Registry.register(BuiltInRegistries.ITEM, new ResourceLocation(CityBuilder.MOD_ID, name), factory.get());
+        return () -> item;
+    }
+
+    @Override
     public <T extends BlockEntity> Supplier<BlockEntityType<T>> registerBlockEntity(String name,
                                                                                     BiFunction<BlockPos, BlockState, T> factory,
                                                                                     Supplier<Block> block) {

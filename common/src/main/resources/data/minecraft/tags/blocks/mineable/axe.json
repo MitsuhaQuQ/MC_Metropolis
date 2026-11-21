@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "citybuilder:thin_birch_planks",
+    "citybuilder:thin_dark_oak_planks",
+    "citybuilder:thin_mangrove_planks",
+    "citybuilder:thin_spruce_planks",
+    "citybuilder:thin_stripped_dark_oak_log",
+    "citybuilder:thin_stripped_spruce_log"
+  ]
+}

@@ -28,4 +28,7 @@ test('the town centre is built up', async () => {
   // Kerbs at an angle cut along their line
   console.log('kerb edges', blocks.top['citybuilder:curb_edge'] ?? 0);
   expect(blocks.top['citybuilder:curb_edge'] ?? 0).toBeGreaterThan(20);
+  // The walls of buildings square to the blocks are thin walls, straight runs and corners
+  console.log('thin walls', JSON.stringify(blocks.thinWalls));
+  expect(blocks.thinWalls?.straight ?? 0).toBeGreaterThan(1000);
 });

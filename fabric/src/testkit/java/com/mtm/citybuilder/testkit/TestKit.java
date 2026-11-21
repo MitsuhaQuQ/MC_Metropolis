@@ -243,6 +243,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             Map<Integer, Integer> paved = new TreeMap<>();
             int covered = 0;
             int unloaded = 0;
+            Map<String, Integer> thin = new TreeMap<>();
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
             for (int x = x1; x <= x2; x++) {
                 for (int z = z1; z <= z2; z++) {
@@ -260,6 +261,13 @@ public final class TestKit implements DedicatedServerModInitializer {
                     }
                     top.merge(BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(), 1, Integer::sum);
                     surface = Math.max(surface, y);
+                    // This mod's thin walls down the column, by shape
+                    for (int ty = surface; ty > surface - 80 && ty > level.getMinBuildHeight(); ty--) {
+                        BlockState t = chunk.getBlockState(pos.set(x, ty, z));
+                        if (t.getBlock() instanceof com.mtm.citybuilder.block.ThinWallBlock) {
+                            thin.merge(t.getValue(com.mtm.citybuilder.block.ThinWallBlock.SHAPE).getSerializedName(), 1, Integer::sum);
+                        }
+                    }
                     // This mod's paving anywhere in the top 24 blocks of the column
                     for (int py = surface; py > surface - 24; py--) {
                         if (ours(chunk.getBlockState(pos.set(x, py, z)).getBlock())) {
@@ -280,6 +288,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             result.put("pavedHeights", paved);
             result.put("pavedCovered", covered);
             result.put("unloaded", unloaded);
+            result.put("thinWalls", thin);
             return result;
         });
     }

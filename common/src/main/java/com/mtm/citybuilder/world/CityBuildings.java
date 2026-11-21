@@ -5,6 +5,8 @@ import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.building.Building;
 import com.mtm.citybuilder.core.building.BuildingLayer;
 import com.mtm.citybuilder.core.building.Palette;
+import com.mtm.citybuilder.core.building.ThinWall;
+import com.mtm.citybuilder.block.ThinWallBlock;
 import com.mtm.citybuilder.core.noise.Hash;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -73,6 +75,7 @@ public final class CityBuildings {
         int baseZ = chunk.getPos().getMinBlockZ();
         int min = chunk.getMinBuildHeight();
         int max = chunk.getMaxBuildHeight() - 1;
+        CityLogic logic = CityWorlds.of(level.getLevel());
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         java.util.List<BlockPos> panes = new java.util.ArrayList<>();
         for (int x = 0; x < 16; x++) {
@@ -99,6 +102,7 @@ public final class CityBuildings {
                 long position = Hash.of(b.variant(), baseX + x, baseZ + z);
                 double[] out = BuildingLayer.outward(column);
                 Direction outward = Direction.getNearest(out[0], 0.0, out[1]);
+                ThinWall.Shape thin = thin(logic, columns, b, column, baseX + x, baseZ + z, baseX, baseZ);
                 for (int y = Math.max(min, Math.min(floor + 1, BuildingLayer.bottom(column))); y <= top; y++) {
                     BuildingLayer.Part part = BuildingLayer.part(column, y);
                     if (part == BuildingLayer.Part.FOUNDATION && y <= floor) {
@@ -107,6 +111,9 @@ public final class CityBuildings {
                     String id = palette.id(part, b, position, y);
                     if (id != null) {
                         BlockState placed = state(block(id), part, facing, outward);
+                        if (thin != null && THIN_PARTS.contains(part) && thinOf(id) instanceof ThinWallBlock wall) {
+                            placed = wall.state(thin);
+                        }
                         chunk.setBlockState(pos.set(baseX + x, y, baseZ + z), placed, false);
                         if (placed.getBlock() instanceof IronBarsBlock) {
                             panes.add(pos.immutable());
@@ -126,6 +133,59 @@ public final class CityBuildings {
         bridge(chunk, columns, panes);
         join(level, panes);
         tidy(level, chunk, columns);
+    }
+
+    /** The parts laid as thin walls where their material comes as one: the walls' faces, not trim or parapets. */
+    private static final java.util.Set<BuildingLayer.Part> THIN_PARTS = java.util.EnumSet.of(BuildingLayer.Part.WALL,
+            BuildingLayer.Part.ACCENT, BuildingLayer.Part.WALL_ALT);
+    private static final Map<String, java.util.Optional<Block>> THIN = new ConcurrentHashMap<>();
+
+    /** The thin wall of a material (citybuilder:thin_<name> for minecraft:<name>), null where it has none. */
+    private static Block thinOf(String id) {
+        return THIN.computeIfAbsent(id, key -> {
+            if (!key.startsWith("minecraft:")) {
+                return java.util.Optional.empty();
+            }
+            ResourceLocation thin = new ResourceLocation(CityBuilder.MOD_ID, "thin_" + key.substring("minecraft:".length()));
+            return BuiltInRegistries.BLOCK.containsKey(thin) ? java.util.Optional.of(BuiltInRegistries.BLOCK.get(thin))
+                    : java.util.Optional.empty();
+        }).orElse(null);
+    }
+
+    /**
+     * The shape of the thin walls in a column of a building's footprint, from which of the eight cells round it lie
+     * outside the footprint (core's {@link ThinWall#fromOutside}); null where the walls stay whole blocks: in the ring
+     * round it, inside, on a building at an angle to the blocks (its walls step across them, whole blocks joining), or
+     * where a thin wall does not fit.
+     */
+    private static ThinWall.Shape thin(CityLogic logic, BuildingLayer.Column[] columns, Building b,
+                                       BuildingLayer.Column column, int wx, int wz, int baseX, int baseZ) {
+        if (column.ring() || Math.abs(b.tx() * b.tz()) > 1e-3) {
+            return null;
+        }
+        int sides = 0;
+        int corners = 0;
+        for (int d = 0; d < 4; d++) {
+            int e = ThinWall.clockwise(d);
+            if (!indoor(logic, columns, b, wx + ThinWall.dx(d), wz + ThinWall.dz(d), baseX, baseZ)) {
+                sides |= 1 << d;
+            }
+            if (!indoor(logic, columns, b, wx + ThinWall.dx(d) + ThinWall.dx(e), wz + ThinWall.dz(d) + ThinWall.dz(e), baseX, baseZ)) {
+                corners |= 1 << d;
+            }
+        }
+        return sides == 0 && corners == 0 ? null : ThinWall.fromOutside(sides, corners);
+    }
+
+    /** Whether a cell lies in a building's own footprint: off the chunk, as the building layer finds it there. */
+    private static boolean indoor(CityLogic logic, BuildingLayer.Column[] columns, Building b, int wx, int wz,
+                                  int baseX, int baseZ) {
+        if (wx >= baseX && wx < baseX + 16 && wz >= baseZ && wz < baseZ + 16) {
+            BuildingLayer.Column c = columns[(wx - baseX) * 16 + (wz - baseZ)];
+            return c.building() != null && c.building().id() == b.id() && !c.ring();
+        }
+        Building there = logic.buildings().at(wx + 0.5, wz + 0.5);
+        return there != null && there.id() == b.id();
     }
 
     /** Ground left wild by the biome, made a lawn in town. */
