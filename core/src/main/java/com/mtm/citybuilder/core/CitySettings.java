@@ -32,6 +32,7 @@ public final class CitySettings {
     public Plots plots = new Plots();
     public Airports airports = new Airports();
     public Functions functions = new Functions();
+    public Sanctuaries sanctuaries = new Sanctuaries();
 
     /**
      * What a town's streets and facilities are for (see core.function and the design document, "城市细部功能"),
@@ -49,6 +50,46 @@ public final class CitySettings {
      * within 30 m of each other) has 17 school sites a km2 (kindergartens and crammers included), 14 clinics and
      * hospitals, 29 temples and shrines (most small), 9 government (police boxes too), 1.8 bathhouses.
      */
+    /**
+     * The temples and shrines on the mountains out of town (Enryakuji on Hiei, Kurama, Atago, Fushimi Inari's mountain,
+     * Kiyomizu on its slope): each town's, on the hills and mountains round it, larger than the town's own.
+     */
+    public static final class Sanctuaries {
+        /** How many a metropolis and a city have; a town has one at the chance {@code town}. */
+        public int metropolis = 5;
+        public int city = 3;
+        public double town = 0.5;
+        /** The share that are temples; the rest are shrines. */
+        public double templeShare = 0.55;
+        /** Precinct radius {min, max} (mostly near the least) of a mountain temple and a mountain shrine. */
+        public double[] templeRadius = {150.0, 350.0};
+        public double[] shrineRadius = {100.0, 250.0};
+        /** Searched on rings from the town's edge out ({min, max} beyond its radius), {@code ringStep} apart. */
+        public double[] reach = {300.0, 6000.0};
+        public double ringStep = 200.0;
+        public int angles = 64;
+        /** At least this far above the town's ground; best near {@code bestRise}. */
+        public double minRise = 60.0;
+        public double bestRise = 250.0;
+        /**
+         * The hill is kept, not cut away: a precinct is laid in terraces {@code terraceWidth} deep along the contours,
+         * and may cut and fill at most {@code maxCut} on average (a quarter of a terrace's step, plus the ground's bulge
+         * off its plane); where it would cut more it shrinks, down to {@code minScale} of its least radius. Slopes
+         * steeper than {@code stiltSlope} take no deeper terraces: the halls stand out on pillars (kakezukuri).
+         */
+        public double terraceWidth = 24.0;
+        public double maxCut = 2.5;
+        public double minScale = 0.6;
+        public double stiltSlope = 0.35;
+        /** Least distance between two of a town's sanctuaries. */
+        public double spacing = 800.0;
+        /** The approach (sando) followed down towards the town, in steps of {@code approachStep}, at most this long. */
+        public double approachStep = 10.0;
+        public double approachMax = 3000.0;
+        /** Where the approach is steeper than this, it climbs by steps. */
+        public double stairGrade = 0.12;
+    }
+
     public static final class Functions {
         public double[] shoppingStreet = {0.4, 0.10, 0.03, 0.01};
         public double[] shoppingLane = {0.35, 0.15, 0.07, 0.03};
@@ -87,6 +128,16 @@ public final class CitySettings {
         public double departmentStoreCity = 0.6;
         public double lighthouse = 0.7;
         public double greatTorii = 0.4;
+
+        /**
+         * What the grand grounds (street layer {@code grandEstate*}) become, and the larger estates (radius at least
+         * {@code largeEstate}) at the chance {@code largeEstateChance}: weights of {large park, green, grand temple,
+         * grand shrine}, in the old town and elsewhere; the rest of the estates are left to schools and hospitals.
+         */
+        public double[] grandOldTown = {0.2, 0.1, 0.4, 0.3};
+        public double[] grandElsewhere = {0.45, 0.2, 0.15, 0.2};
+        public double largeEstate = 110.0;
+        public double largeEstateChance = 0.4;
 
         /**
          * Historic pleasure quarters (hanamachi, chaya-gai) of the old town, each laid along one street that its
@@ -691,6 +742,14 @@ public final class CitySettings {
         public double estateCell = 300.0;
         public double estateChance = 0.9;
         public double estateRadius = 70.0;
+        /**
+         * The grand grounds, laid before the estates the same way: a great shrine's forest (Shimogamo's Tadasu no Mori),
+         * a head temple (Higashi Honganji, Myoshinji), a large park (Okazaki, Kenrokuen): one candidate every
+         * {@code grandEstateCell}, kept with chance {@code grandEstateChance}, radius {min, max} (mostly near the least).
+         */
+        public double grandEstateCell = 1000.0;
+        public double grandEstateChance = 0.6;
+        public double[] grandEstateRadius = {130.0, 260.0};
         public double streetWidth = 6.0;
         /**
          * Outside a capital, the share of crossings of two streets where one of them ends instead, by the crossing's

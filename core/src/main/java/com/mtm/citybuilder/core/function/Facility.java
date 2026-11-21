@@ -34,6 +34,14 @@ public record Facility(Kind kind, long id, double x, double z, double radius, in
         SPORTS_PARK(true),
         TEMPLE(true),
         SHRINE(true),
+        /** A large park on grand grounds (Okazaki, Maruyama, Kenrokuen). */
+        LARGE_PARK(true),
+        /** A green tract left wooded or open (a river's green, a hill's grove, Tadasu no Mori). */
+        GREEN(true),
+        /** A head temple's grounds (Higashi and Nishi Honganji, Myoshinji, Tofukuji). */
+        GRAND_TEMPLE(true),
+        /** A great shrine and its forest (Shimogamo, Kitano Tenmangu, Oyama). */
+        GRAND_SHRINE(true),
         CLINIC(false),
         POLICE_BOX(false),
         FIRE_STATION(false),

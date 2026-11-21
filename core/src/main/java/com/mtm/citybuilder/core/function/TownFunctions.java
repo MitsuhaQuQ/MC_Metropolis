@@ -233,8 +233,15 @@ public final class TownFunctions {
      * Places {@code count} sites of a kind among the candidates, each the best of a few drawn by the hash: as far as
      * may be from the others of its kind (up to {@code spacing}), on land that suits it ({@code suits}, 0 to 1).
      */
-    private void placeAreas(Facility.Kind kind, int count, double[] spec, double spacing, List<double[]> candidates,
+    private void placeAreas(Facility.Kind kind, int count, double[] spec, double spacing, List<double[]> all,
                             java.util.function.ToDoubleFunction<double[]> suits) {
+        // Only where the least of its kind fits: a sports park's few places are not lost among the many small
+        List<double[]> candidates = new ArrayList<>();
+        for (double[] c : all) {
+            if (c[2] >= spec[1]) {
+                candidates.add(c);
+            }
+        }
         for (int n = 0; n < count && !candidates.isEmpty(); n++) {
             double[] best = null;
             double bestScore = Double.NEGATIVE_INFINITY;
@@ -304,6 +311,7 @@ public final class TownFunctions {
                         c -> 0.3 + fromCentre(c[0], c[1]) / townRadius);
             }
         }
+        grandGrounds();
         // Schools among the houses, away from the main roads; hospitals by them
         placeAreas(Facility.Kind.HIGH_SCHOOL, Math.max(city ? 1 : 0, count(config.highSchool)), config.highSchool,
                 1000 / Math.sqrt(Math.max(1e-6, config.highSchool[0])), candidates, houses);
@@ -343,6 +351,39 @@ public final class TownFunctions {
                             -1, 0, 0, false));
                 }
             }
+        }
+    }
+
+    /**
+     * The grand grounds become large parks, green tracts, head temples and great shrines, by their district's weights;
+     * so do some of the larger estates. Whole estates, as the street layer left them, where nothing stands yet.
+     */
+    private void grandGrounds() {
+        Facility.Kind[] kinds = {Facility.Kind.LARGE_PARK, Facility.Kind.GREEN, Facility.Kind.GRAND_TEMPLE,
+                Facility.Kind.GRAND_SHRINE};
+        for (double[] estate : plan.estates()) {
+            boolean grand = estate.length > 3 && estate[3] > 0;
+            long hash = Hash.of(seed ^ 0x6A7DL, Double.doubleToLongBits(estate[0]), Double.doubleToLongBits(estate[1]));
+            if (!grand && (estate[2] < config.largeEstate || Hash.unit(hash) >= config.largeEstateChance)) {
+                continue;
+            }
+            if (overlaps(estate[0], estate[1], estate[2])) {
+                continue;
+            }
+            District district = plan.districts().at(estate[0], estate[1]);
+            double[] weights = district == District.OLD_TOWN ? config.grandOldTown : config.grandElsewhere;
+            double total = 0;
+            for (double w : weights) {
+                total += w;
+            }
+            double pick = Hash.unit(Hash.mix(hash)) * total;
+            int k = 0;
+            while (k < weights.length - 1 && pick >= weights[k]) {
+                pick -= weights[k];
+                k++;
+            }
+            facilities.add(new Facility(kinds[k], Hash.of(seed ^ 0xFAC1L, facilities.size()), estate[0], estate[1], estate[2],
+                    -1, 0, 0, false));
         }
     }
 
@@ -435,7 +476,8 @@ public final class TownFunctions {
             for (double along : new double[]{0, length}) {
                 double[] p = plots.chainPoint(c, along);
                 for (Facility f : facilities) {
-                    if (f.kind() == Facility.Kind.TEMPLE || f.kind() == Facility.Kind.SHRINE) {
+                    if (f.kind() == Facility.Kind.TEMPLE || f.kind() == Facility.Kind.SHRINE
+                            || f.kind() == Facility.Kind.GRAND_TEMPLE || f.kind() == Facility.Kind.GRAND_SHRINE) {
                         gate = Math.min(gate, Math.hypot(f.x() - p[0], f.z() - p[1]) - f.radius());
                     }
                 }
@@ -621,7 +663,10 @@ public final class TownFunctions {
         }
         // A pagoda at one of the old town's large temples
         if (plan.formation() != Formation.TEMPLE_TOWN && chance(config.pagoda, 3)) {
-            Facility temple = largest(Facility.Kind.TEMPLE);
+            Facility temple = largest(Facility.Kind.GRAND_TEMPLE);
+            if (temple == null) {
+                temple = largest(Facility.Kind.TEMPLE);
+            }
             if (temple != null) {
                 facilities.add(landmark(Facility.Kind.PAGODA, temple.x(), temple.z(), 10));
             }
@@ -658,7 +703,10 @@ public final class TownFunctions {
                 facilities.add(landmark(Facility.Kind.LIGHTHOUSE, far[0], far[1], 6));
             }
         }
-        Facility shrine = largest(Facility.Kind.SHRINE);
+        Facility shrine = largest(Facility.Kind.GRAND_SHRINE);
+        if (shrine == null) {
+            shrine = largest(Facility.Kind.SHRINE);
+        }
         if (shrine != null && chance(config.greatTorii, 10)) {
             facilities.add(landmark(Facility.Kind.GREAT_TORII, shrine.x(), shrine.z(), 8));
         }

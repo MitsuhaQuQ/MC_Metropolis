@@ -47,6 +47,10 @@ public final class FunctionMap {
             case SPORTS_PARK -> "Sport";
             case TEMPLE -> "T";
             case SHRINE -> "S";
+            case LARGE_PARK -> "BigPark";
+            case GREEN -> "Green";
+            case GRAND_TEMPLE -> "GrandT";
+            case GRAND_SHRINE -> "GrandS";
             case CLINIC -> "c";
             case POLICE_BOX -> "k";
             case FIRE_STATION -> "F";

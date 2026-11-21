@@ -151,6 +151,25 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = com.mtm.citybuilder.core.debug.AirportMap.render(logic, airports, towns, centerX, centerZ, scale, size);
             }
+            case "sanctuaries" -> {
+                long t0 = System.nanoTime();
+                List<com.mtm.citybuilder.core.sacred.Sanctuary> found = logic.sanctuaries().sanctuaries(centerX - half,
+                        centerZ - half, centerX + half, centerZ + half);
+                List<Settlement> towns = logic.settlements(centerX - half, centerZ - half, centerX + half, centerZ + half,
+                        com.mtm.citybuilder.core.settlement.SettlementTier.TOWN);
+                System.out.printf("Mountain sanctuaries: %d, sited in %.1f s; %d towns in the area%n", found.size(),
+                        (System.nanoTime() - t0) / 1e9, towns.size());
+                for (var s : found) {
+                    Settlement of = towns.stream().filter(t -> t.id() == s.town()).findFirst().orElse(null);
+                    System.out.printf("  %-6s %-6s at %.0f %.0f, ground %.0f (%s), radius %.0f, relief %.0f, slope %.2f, cut %.1f%s, approach %.0f m (%.0f%% steps), %s%n",
+                            s.kind(), s.setting(), s.x(), s.z(), s.elevation(),
+                            of == null ? "town outside" : String.format("%+.0f over its town", s.elevation() - logic.terrain().smoothHeight(of.x(), of.z())),
+                            s.radius(), s.relief(), s.slope(), s.cut(), s.stilts() ? " on stilts" : "", s.approachLength(), 100 * s.stairs(),
+                            of == null ? "for a town outside the area" : String.format("%.1f km from its %s", Math.hypot(s.x() - of.x(), s.z() - of.z()) / 1000, of.tier()));
+                }
+                start = System.nanoTime();
+                image = com.mtm.citybuilder.core.debug.SanctuaryMap.render(logic, found, towns, centerX, centerZ, scale, size);
+            }
             case "highspeed" -> {
                 List<HighSpeedLine> lines = highSpeedStats(logic, centerX, centerZ, half);
                 start = System.nanoTime();
@@ -166,7 +185,7 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = RoadMap.render(logic, edges, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed, streets, districts, plots, functions or airports");
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed, streets, districts, plots, functions, airports or sanctuaries");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();
@@ -214,6 +233,14 @@ public final class CityMap {
             line.append(String.format(" %s %d (%.2f)", e.getKey(), e.getValue(), e.getValue() / km2));
         }
         System.out.println(line);
+        int grand = 0;
+        int large = 0;
+        for (double[] e : plan.estates()) {
+            grand += e.length > 3 && e[3] > 0 ? 1 : 0;
+            large += e[2] >= logic.settings().functions.largeEstate ? 1 : 0;
+        }
+        System.out.printf("Estates %d, grand %d, radius %.0f or more %d%n", plan.estates().size(), grand,
+                logic.settings().functions.largeEstate, large);
         for (var h : functions.hanamachi()) {
             double branches = 0;
             for (int b : h.branches()) {

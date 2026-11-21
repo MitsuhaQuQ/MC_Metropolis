@@ -486,6 +486,18 @@ public final class CityLogic {
 
     private com.mtm.citybuilder.core.function.FunctionLayer functions;
 
+    /** The temples and shrines on the mountains round the towns. */
+    public com.mtm.citybuilder.core.sacred.SanctuaryLayer sanctuaries() {
+        synchronized (this) {
+            if (sanctuaries == null) {
+                sanctuaries = new com.mtm.citybuilder.core.sacred.SanctuaryLayer(this);
+            }
+            return sanctuaries;
+        }
+    }
+
+    private com.mtm.citybuilder.core.sacred.SanctuaryLayer sanctuaries;
+
     private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {
     }
 }

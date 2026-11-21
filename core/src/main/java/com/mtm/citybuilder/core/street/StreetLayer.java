@@ -600,43 +600,61 @@ public final class StreetLayer {
      * do (OpenStreetMap: a tenth of Kyoto's blocks over 2 ha): temples, schools, mansions. On a grid of
      * {@code estateCell}, one candidate a cell by the town's hash, kept with the chance {@code estateChance} where it
      * lies in houses, the old town or downtown, clear of the arterials and other estates; its radius from
-     * {@code estateRadius} to three times that, mostly near the least (by the cube of the hash). None in a capital's
+     * {@code estateRadius} to three times that, mostly near the least (by the cube of the hash). Before them the grand
+     * grounds, the same way on a coarser grid ({@code grandEstateCell}, {@code grandEstateRadius}). None in a capital's
      * planned grid.
      */
     private void estates(Settlement settlement, Window window, Districts districts, List<StreetSegment> segments) {
         Sounding laid = new Sounding(segments);
+        // The grand grounds first, few and far between (a great shrine's forest, a head temple, a large park), then
+        // the many smaller
+        estates(settlement, window, districts, laid, config.grandEstateCell, config.grandEstateChance,
+                config.grandEstateRadius[0], config.grandEstateRadius[1], 0x6A7E57L, true);
+        estates(settlement, window, districts, laid, config.estateCell, config.estateChance, config.estateRadius,
+                3.0 * config.estateRadius, 0xE57A7EL, false);
+    }
+
+    private void estates(Settlement settlement, Window window, Districts districts, Sounding laid, double cell,
+                         double chance, double least, double most, long salt, boolean grand) {
         double minX = (double) window.originX * grid;
         double minZ = (double) window.originZ * grid;
         double maxX = minX + (window.size - 1) * grid;
         double maxZ = minZ + (window.size - 1) * grid;
-        double cell = config.estateCell;
         for (long i = (long) Math.floor(minX / cell); i <= (long) Math.floor(maxX / cell); i++) {
             for (long j = (long) Math.floor(minZ / cell); j <= (long) Math.floor(maxZ / cell); j++) {
-                long hash = Hash.of(settlement.id() ^ 0xE57A7EL, i, j);
-                if (Hash.unit(hash) >= config.estateChance) {
+                long hash = Hash.of(settlement.id() ^ salt, i, j);
+                if (Hash.unit(hash) >= chance) {
                     continue;
                 }
-                double x = (i + Hash.unit(Hash.mix(hash))) * cell;
-                double z = (j + Hash.unit(Hash.mix(hash + 1))) * cell;
                 // Mostly small, now and then large (a temple precinct, a college): a long tail, as real towns' blocks
                 double u = Hash.unit(Hash.mix(hash + 2));
-                double radius = config.estateRadius * (1.0 + 2.0 * u * u * u);
-                District district = districts.at(x, z);
-                if (!window.built(x, z) || window.inCapital(x, z) || window.inGrounds(x, z)
-                        || district != District.RESIDENTIAL && district != District.OLD_TOWN && district != District.CENTRAL) {
-                    continue;
-                }
-                // Whole on built land, clear of the streets laid so far and of other estates
-                boolean clear = !laid.near(x, z, radius + 6.0, Double.NaN, Double.NaN);
-                for (int k = 0; k < 8 && clear; k++) {
-                    double a = Math.PI * k / 4;
-                    clear = window.built(x + Math.cos(a) * radius, z + Math.sin(a) * radius);
-                }
-                for (double[] e : window.estates) {
-                    clear &= Math.hypot(x - e[0], z - e[1]) > radius + e[2] + 60.0;
-                }
-                if (clear) {
-                    window.estates.add(new double[]{x, z, radius});
+                double radius = least + (most - least) * u * u * u;
+                // The grand grounds try a few places in their cell, smaller each time, as a great precinct takes the
+                // land there is between the arterials
+                int tries = grand ? 8 : 1;
+                for (int t = 0; t < tries; t++) {
+                    long at = t == 0 ? hash : Hash.of(hash, t);
+                    double x = (i + Hash.unit(Hash.mix(at))) * cell;
+                    double z = (j + Hash.unit(Hash.mix(at + 1))) * cell;
+                    double r = Math.max(least, radius * (1.0 - 0.08 * t));
+                    District district = districts.at(x, z);
+                    if (!window.built(x, z) || window.inCapital(x, z) || window.inGrounds(x, z)
+                            || district != District.RESIDENTIAL && district != District.OLD_TOWN && district != District.CENTRAL) {
+                        continue;
+                    }
+                    // Whole on built land, clear of the streets laid so far and of other estates
+                    boolean clear = !laid.near(x, z, r + 6.0, Double.NaN, Double.NaN);
+                    for (int k = 0; k < 8 && clear; k++) {
+                        double a = Math.PI * k / 4;
+                        clear = window.built(x + Math.cos(a) * r, z + Math.sin(a) * r);
+                    }
+                    for (double[] e : window.estates) {
+                        clear &= Math.hypot(x - e[0], z - e[1]) > r + e[2] + 60.0;
+                    }
+                    if (clear) {
+                        window.estates.add(new double[]{x, z, r, grand ? 1 : 0});
+                        break;
+                    }
                 }
             }
         }
@@ -5248,7 +5266,7 @@ public final class StreetLayer {
         final float[] edge;
         /** A capital's planned city, {min x, min z, max x, max z}, or null. */
         double[] capital;
-        /** Large estates no street or lane enters (temples, schools, mansions), each {x, z, radius}. */
+        /** Large estates no street or lane enters (temples, schools, mansions), each {x, z, radius, 1 if grand}. */
         final List<double[]> estates = new ArrayList<>();
 
         boolean estate(double x, double z) {

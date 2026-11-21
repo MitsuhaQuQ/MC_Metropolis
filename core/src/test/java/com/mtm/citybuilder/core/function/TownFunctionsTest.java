@@ -78,6 +78,16 @@ class TownFunctionsTest {
                 }
             }
         }
+        // The large parks, greens, head temples and great shrines take whole estates, the grand grounds all
+        int grand = 0;
+        for (Facility f : functions.facilities()) {
+            if (f.kind() == Facility.Kind.LARGE_PARK || f.kind() == Facility.Kind.GREEN
+                    || f.kind() == Facility.Kind.GRAND_TEMPLE || f.kind() == Facility.Kind.GRAND_SHRINE) {
+                grand++;
+                assertTrue(plan.estates().stream().anyMatch(e -> e[0] == f.x() && e[1] == f.z() && e[2] == f.radius()), f.toString());
+            }
+        }
+        assertTrue(grand > 0, "no large park, green or grand temple or shrine");
         // A lot facility stands on a lot of a street it suits
         for (Facility f : functions.facilities()) {
             if (f.onLot()) {
