@@ -78,6 +78,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/canal", this::canal);
             route(http, "/airport", this::airport);
             route(http, "/road", this::road);
+            route(http, "/roads-near", this::roadsNear);
             route(http, "/station", this::station);
             route(http, "/stop-line", this::stopLine);
             route(http, "/stop", this::stop);
@@ -242,6 +243,8 @@ public final class TestKit implements DedicatedServerModInitializer {
             Map<String, Integer> top = new TreeMap<>();
             Map<Integer, Integer> paved = new TreeMap<>();
             int covered = 0;
+            Map<String, Integer> coveredBy = new HashMap<>();
+            List<int[]> coveredAt = new ArrayList<>();
             int unloaded = 0;
             Map<String, Integer> thin = new TreeMap<>();
             java.util.List<int[]> lava = new java.util.ArrayList<>();
@@ -307,8 +310,13 @@ public final class TestKit implements DedicatedServerModInitializer {
                         if (ours(chunk.getBlockState(pos.set(x, py, z)).getBlock())) {
                             paved.merge(py, 1, Integer::sum);
                             for (int up = 1; up <= 4; up++) {
-                                if (!chunk.getBlockState(pos.set(x, py + up, z)).isAir()) {
+                                BlockState over = chunk.getBlockState(pos.set(x, py + up, z));
+                                if (!over.isAir()) {
                                     covered++;
+                                    coveredBy.merge(BuiltInRegistries.BLOCK.getKey(over.getBlock()).toString(), 1, Integer::sum);
+                                    if (coveredAt.size() < 10) {
+                                        coveredAt.add(new int[]{x, py + up, z});
+                                    }
                                     break;
                                 }
                             }
@@ -321,6 +329,8 @@ public final class TestKit implements DedicatedServerModInitializer {
             result.put("top", top);
             result.put("pavedHeights", paved);
             result.put("pavedCovered", covered);
+            result.put("coveredBy", coveredBy);
+            result.put("coveredAt", coveredAt);
             result.put("unloaded", unloaded);
             result.put("thinWalls", thin);
             result.put("lavaAt", lava);
@@ -342,7 +352,9 @@ public final class TestKit implements DedicatedServerModInitializer {
     private static boolean ours(Block block) {
         return block == CityBlocks.ASPHALT.get() || block == CityBlocks.ASPHALT_LINE_WHITE.get()
                 || block == CityBlocks.ASPHALT_LINE_YELLOW.get() || block == CityBlocks.SIDEWALK.get()
-                || block == CityBlocks.ASPHALT_WHITE.get() || block == CityBlocks.CURB_EDGE.get();
+                || block == CityBlocks.ASPHALT_WHITE.get() || block == CityBlocks.CURB_EDGE.get()
+                || block == CityBlocks.MANHOLE.get() || block == CityBlocks.DRAIN_GRATE.get()
+                || BuiltInRegistries.BLOCK.getKey(block).getPath().startsWith("side_ditch");
     }
 
     /** The slowest of the last hundred ticks, in milliseconds. */
@@ -408,6 +420,8 @@ public final class TestKit implements DedicatedServerModInitializer {
         found.put("z", mz);
         found.put("heading", Math.toDegrees(Math.atan2(best.z2() - best.z1(), best.x2() - best.x1())));
         found.put("width", best.width());
+        found.put("structure", best.structure().name());
+        found.put("ends", new double[]{best.x1(), best.z1(), best.x2(), best.z2()});
         // The ground there (the top of the surface, plants aside), once its chunk is loaded
         int bx = (int) Math.floor(mx);
         int bz = (int) Math.floor(mz);
@@ -498,6 +512,42 @@ public final class TestKit implements DedicatedServerModInitializer {
      * of a stretch of one kind ({@code kind}: SURFACE, SWITCHBACK, BRIDGE or TUNNEL, any if left out), as this world
      * routed it: {found, x, z, road (its height), ground, kind, heading in degrees, width, road key}.
      */
+    /** Every intercity road passing within r of a point: its key, the nearest sample's distance, height and kind. */
+    private Object roadsNear(Map<String, String> query, String body) {
+        double x = Double.parseDouble(query.get("x"));
+        double z = Double.parseDouble(query.get("z"));
+        double r = Double.parseDouble(query.getOrDefault("r", "40"));
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        List<Object> found = new ArrayList<>();
+        if (logic == null) {
+            return found;
+        }
+        for (com.mtm.citybuilder.core.road.RoadEdge edge : logic.roads(x - r, z - r, x + r, z + r)) {
+            com.mtm.citybuilder.core.road.RoadRoute route = logic.route(edge);
+            int best = -1;
+            double nearest = r;
+            for (int i = 0; i < route.samples(); i++) {
+                double d = Math.hypot(route.x(i) - x, route.z(i) - z);
+                if (d < nearest) {
+                    nearest = d;
+                    best = i;
+                }
+            }
+            if (best >= 0) {
+                Map<String, Object> one = new java.util.LinkedHashMap<>();
+                one.put("key", edge.key());
+                one.put("distance", nearest);
+                one.put("x", route.x(best));
+                one.put("z", route.z(best));
+                one.put("road", route.road(best));
+                one.put("kind", route.kind(best).name());
+                one.put("width", route.width());
+                found.add(one);
+            }
+        }
+        return found;
+    }
+
     private Object road(Map<String, String> query, String body) {
         double x = Double.parseDouble(query.get("x"));
         double z = Double.parseDouble(query.get("z"));
@@ -527,6 +577,10 @@ public final class TestKit implements DedicatedServerModInitializer {
                 }
                 com.mtm.citybuilder.core.extent.UrbanSample sample = logic.urban(route.x(i), route.z(i));
                 if (!run || sample.owner() != null && sample.intensity() > built) {
+                    continue;
+                }
+                // Not on a stretch a town lays as its old road
+                if (logic.chunks().oldRoad(route.x(i), route.z(i))) {
                     continue;
                 }
                 best = route;

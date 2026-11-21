@@ -6364,6 +6364,39 @@ public final class StreetLayer {
         return new Anchor(kind, bestX, bestZ);
     }
 
+    /**
+     * Which of a road's samples lie between the town's built land: built land within
+     * {@link com.mtm.citybuilder.core.chunk.RoadChunks#ENCLOSED} along the road both ways (or on it).
+     */
+    private static boolean[] enclosed(RoadRoute route, Window window) {
+        int n = route.samples();
+        double[] along = new double[n];
+        boolean[] built = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            along[i] = i == 0 ? 0.0 : along[i - 1] + Math.hypot(route.x(i) - route.x(i - 1), route.z(i) - route.z(i - 1));
+            built[i] = window.built(route.x(i), route.z(i));
+        }
+        double reach = com.mtm.citybuilder.core.chunk.RoadChunks.ENCLOSED;
+        // The distance back to the last built sample, and on to the next
+        double[] back = new double[n];
+        double last = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < n; i++) {
+            if (built[i]) {
+                last = along[i];
+            }
+            back[i] = along[i] - last;
+        }
+        boolean[] enclosed = new boolean[n];
+        double next = Double.POSITIVE_INFINITY;
+        for (int i = n - 1; i >= 0; i--) {
+            if (built[i]) {
+                next = along[i];
+            }
+            enclosed[i] = built[i] || back[i] <= reach && next - along[i] <= reach;
+        }
+        return enclosed;
+    }
+
     /** The intercity roads where they cross built land, as old-road segments; returns their points with directions. */
     private List<double[]> oldRoads(Settlement settlement, Window window, List<StreetSegment> segments) {
         List<double[]> points = new ArrayList<>();
@@ -6373,6 +6406,7 @@ public final class StreetLayer {
         double maxZ = (double) (window.originZ + window.size) * grid;
         for (RoadEdge edge : logic.roads(minX, minZ, maxX, maxZ)) {
             RoadRoute route = logic.route(edge);
+            boolean[] enclosed = enclosed(route, window);
             for (int i = 1; i < route.samples(); i++) {
                 double ax = route.x(i - 1);
                 double az = route.z(i - 1);
@@ -6381,8 +6415,15 @@ public final class StreetLayer {
                 // On built land, or over water inside the town: an old road's bridge stays a bridge
                 boolean bridge = route.kind(i) == com.mtm.citybuilder.core.road.RoadKind.BRIDGE
                         || window.water(ax, az) || window.water(bx, bz);
-                boolean onLand = window.built(ax, az) && window.built(bx, bz);
-                boolean overWater = bridge && window.inside(ax, az) && window.inside(bx, bz)
+                // On built land, or on open land between built land (a river's banks, a park): the intercity
+                // layer leaves those stretches to the town (RoadChunks#ENCLOSED)
+                boolean onLand = window.built(ax, az) && window.built(bx, bz)
+                        || enclosed[i - 1] && enclosed[i] && window.inside(ax, az) && window.inside(bx, bz)
+                        && !window.inGrounds(ax, az) && !window.inGrounds(bx, bz)
+                        && window.intensity(0.5 * (ax + bx), 0.5 * (az + bz)) > 0.0;
+                // Over water only between built land too: a bridge at the town's edge is the intercity layer's,
+                // else both lay it, at their own heights
+                boolean overWater = bridge && enclosed[i - 1] && enclosed[i] && window.inside(ax, az) && window.inside(bx, bz)
                         && !window.inGrounds(ax, az) && !window.inGrounds(bx, bz)
                         && window.intensity(0.5 * (ax + bx), 0.5 * (az + bz)) > 0.0;
                 if (!onLand && !overWater) {

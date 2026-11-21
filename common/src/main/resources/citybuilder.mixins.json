@@ -6,7 +6,10 @@
   "mixins": [
     "ChunkGeneratorMixin",
     "ConfiguredFeatureMixin",
-    "MinecraftServerMixin"
+    "InitialSpawnMixin",
+    "MinecraftServerMixin",
+    "StructureManagerAccessor",
+    "StructureStartsMixin"
   ],
   "client": [],
   "injectors": {

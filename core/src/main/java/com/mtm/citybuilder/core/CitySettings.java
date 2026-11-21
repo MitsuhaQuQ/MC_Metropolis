@@ -196,6 +196,12 @@ public final class CitySettings {
         public int regionSize = 4096;
         /** Edge of a cell of the coarse grid in blocks, which the region-scale layers sample terrain on. */
         public int gridSize = 64;
+        /**
+         * Whether a new world's players start in a city: the spawn set at the heart of the nearest city or
+         * metropolis to where the game would have put it, looked for out to {@code spawnSearch}.
+         */
+        public boolean spawnInCity = true;
+        public double spawnSearch = 32000.0;
     }
 
     /** L1: how well suited a place is for a city, from 0 to 1. */
@@ -1108,6 +1114,12 @@ public final class CitySettings {
          * built.
          */
         public double backOpenScale = 0.4;
+        /**
+         * In a city or a metropolis the open share is times this, and a built back lot with neither a lane nor room for
+         * a pole is still built, reached by a footway between the lots in front (a roji), not left a garden: a large
+         * block's inside there was a field among the houses (the user, 2026-11-22).
+         */
+        public double backOpenCity = 0.5;
         public double backParking = 0.4;
         public double backFieldReach = 2000.0;
         public double backFlats = 0.18;

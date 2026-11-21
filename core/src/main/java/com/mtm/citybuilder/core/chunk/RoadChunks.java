@@ -51,7 +51,26 @@ public final class RoadChunks {
 
     /** A road's segments by the chunks they (with their slopes) reach, and the distance along it to each sample. */
     private record Index(RoadRoute route, Map<Long, int[]> byChunk, double[] along) {
+        /** The position on the road at a distance along it. */
+        double[] at(double distance) {
+            int i = java.util.Arrays.binarySearch(along, distance);
+            if (i >= 0) {
+                return new double[]{route.x(i), route.z(i)};
+            }
+            int hi = Math.max(1, Math.min(along.length - 1, -i - 1));
+            double span = Math.max(1e-9, along[hi] - along[hi - 1]);
+            double t = Math.max(0.0, Math.min(1.0, (distance - along[hi - 1]) / span));
+            return new double[]{route.x(hi - 1) + (route.x(hi) - route.x(hi - 1)) * t,
+                    route.z(hi - 1) + (route.z(hi) - route.z(hi - 1)) * t};
+        }
     }
+
+    /**
+     * How far along a road a town's built land is looked for either side of a point: a river, its banks or a park the
+     * road crosses with the town's built land on both sides is the town's to lay as its old road (the street layer),
+     * not this layer's, which leaves every stretch the town lays (the user, 2026-11-22: two roads crossed on a river).
+     */
+    public static final double ENCLOSED = 500.0;
 
     private static final int REGION = 1024;
 
@@ -76,7 +95,8 @@ public final class RoadChunks {
      * The road columns of a chunk, x-major as {@link ChunkLayer#columns}, null for a column no road reaches, where a
      * town's street already lies ({@code streets}), or in a town's built land; null for the whole array where none is.
      */
-    public Cell[] cells(int chunkX, int chunkZ, ChunkLayer.Column[] streets) {
+    public Cell[] cells(int chunkX, int chunkZ, ChunkLayer.Column[] streets,
+                        java.util.function.BiPredicate<Double, Double> townRoad) {
         double minX = chunkX * 16.0;
         double minZ = chunkZ * 16.0;
         long chunk = key(chunkX, chunkZ);
@@ -101,12 +121,18 @@ public final class RoadChunks {
                 }
                 double cx = minX + x + 0.5;
                 double cz = minZ + z + 0.5;
-                Cell cell = cell(near, chunk, cx, cz);
+                Object[] where = new Object[2];
+                Cell cell = cell(near, chunk, cx, cz, where);
                 if (cell == null) {
                     continue;
                 }
                 UrbanSample sample = logic.urban(cx, cz);
                 if (sample.owner() != null && sample.intensity() > built) {
+                    continue;
+                }
+                // Where a town lays the road as its old road (between its built land, over its water), the town's
+                double[] centre = ((Index) where[0]).at((Double) where[1]);
+                if (townRoad.test(centre[0], centre[1])) {
                     continue;
                 }
                 cells[c] = cell;
@@ -144,8 +170,11 @@ public final class RoadChunks {
         return routed;
     }
 
-    /** The cell of the road nearest a position, measured from its edge, or null beyond every road's slopes. */
-    private static Cell cell(List<Index> near, long chunk, double cx, double cz) {
+    /**
+     * The cell of the road nearest a position, measured from its edge, or null beyond every road's slopes;
+     * {@code where} gets that road's index and the distance along it.
+     */
+    private static Cell cell(List<Index> near, long chunk, double cx, double cz, Object[] where) {
         Index best = null;
         int bestSegment = -1;
         double bestScore = SLOPES;
@@ -183,6 +212,8 @@ public final class RoadChunks {
         }
         RoadRoute route = best.route;
         int i = bestSegment;
+        where[0] = best;
+        where[1] = best.along[i - 1] + bestT * (best.along[i] - best.along[i - 1]);
         RoadKind kind = route.kind(bestT < 0.5 ? i - 1 : i);
         double height = route.road(i - 1) + (route.road(i) - route.road(i - 1)) * bestT;
         int level = (int) Math.floor(height);

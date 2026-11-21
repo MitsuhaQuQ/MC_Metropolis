@@ -2629,11 +2629,6 @@
   ],
   "sign": [
    "minecraft:white_concrete",
-   "minecraft:yellow_concrete",
-   "minecraft:red_concrete",
-   "minecraft:light_blue_concrete",
-   "minecraft:orange_concrete",
-   "minecraft:lime_concrete",
    "minecraft:sea_lantern"
   ],
   "vending": [
@@ -3119,29 +3114,11 @@
   ],
   "tenantSign": [
    "minecraft:white_concrete",
-   "minecraft:yellow_concrete",
-   "minecraft:red_concrete",
-   "minecraft:light_blue_concrete",
-   "minecraft:orange_concrete",
-   "minecraft:lime_concrete",
-   "minecraft:magenta_concrete",
-   "minecraft:sea_lantern",
-   "minecraft:pink_concrete",
-   "minecraft:black_concrete",
-   "minecraft:ochre_froglight",
-   "minecraft:blue_concrete"
+   "minecraft:sea_lantern"
   ],
   "ad": [
-   "minecraft:red_concrete",
-   "minecraft:yellow_concrete",
-   "minecraft:blue_concrete",
    "minecraft:white_concrete",
-   "minecraft:magenta_concrete",
-   "minecraft:lime_concrete",
-   "minecraft:orange_concrete",
-   "minecraft:light_blue_concrete",
-   "minecraft:pink_concrete",
-   "minecraft:black_concrete"
+   "minecraft:sea_lantern"
   ]
  },
  "weathering": {

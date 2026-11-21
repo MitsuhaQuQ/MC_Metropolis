@@ -126,6 +126,21 @@ public final class CityChunks {
                 .setValue(PavingBlock.LOW, mark.low());
     }
 
+    /** The block under a paving block: asphalt under the carriageway's, slabs under a pavement's, else none. */
+    private static BlockState base(BlockState paving) {
+        Block block = paving.getBlock();
+        if (block == CityBlocks.SIDEWALK.get() || block == CityBlocks.CURB_EDGE.get()) {
+            return CityBlocks.SIDEWALK.get().defaultBlockState();
+        }
+        if (block == CityBlocks.ASPHALT.get() || block == CityBlocks.ASPHALT_LINE_WHITE.get()
+                || block == CityBlocks.ASPHALT_LINE_YELLOW.get() || block == CityBlocks.ASPHALT_WHITE.get()
+                || block == CityBlocks.MANHOLE.get() || block == CityBlocks.DRAIN_GRATE.get()
+                || block == ours("side_ditch") || block == ours("side_ditch_grate")) {
+            return CityBlocks.ASPHALT.get().defaultBlockState();
+        }
+        return null;
+    }
+
     private static boolean paving(BlockState state) {
         Block block = state.getBlock();
         return block == CityBlocks.ASPHALT.get() || block == CityBlocks.ASPHALT_LINE_WHITE.get()
@@ -259,6 +274,30 @@ public final class CityChunks {
         }
     }
 
+    /**
+     * Whether a chunk lies in a town's land (any intensity) or on an airport: no structure of the game (a village, an
+     * igloo, a ruin) starts there.
+     */
+    public static boolean structureBarred(net.minecraft.server.level.ServerLevel level, int chunkX, int chunkZ) {
+        if (failed) {
+            return false;
+        }
+        try {
+            CityLogic logic = CityWorlds.of(level);
+            if (logic == null) {
+                return false;
+            }
+            double x = chunkX * 16 + 8.0;
+            double z = chunkZ * 16 + 8.0;
+            com.mtm.citybuilder.core.extent.UrbanSample sample = logic.urban(x, z);
+            return sample.owner() != null && sample.intensity() > 0 || logic.chunks().airportAt((int) x, (int) z);
+        } catch (RuntimeException e) {
+            failed = true;
+            CityBuilder.LOGGER.error("City logic failed at chunk {} {}; no more cities are built this session", chunkX, chunkZ, e);
+            return false;
+        }
+    }
+
     /** Whether the biome may grow a tree at a position: not in a town's built land (see {@link ChunkLayer#treeAllowed}). */
     public static boolean treeAllowed(WorldGenLevel level, BlockPos origin) {
         if (failed) {
@@ -356,6 +395,16 @@ public final class CityChunks {
                     }
                 }
                 chunk.setBlockState(pos.set(baseX + x, y, baseZ + z), block, false);
+                if (!column.bridge() && column.canal() == 0) {
+                    // Under the paving its own kind of block, full height: where the next column lies a block or two
+                    // lower the step's face is road, not the ground's stone or earth
+                    BlockState base = base(block);
+                    if (base != null) {
+                        for (int k = 1; k <= 2 && y - k > chunk.getMinBuildHeight(); k++) {
+                            chunk.setBlockState(pos.set(baseX + x, y - k, baseZ + z), base, false);
+                        }
+                    }
+                }
                 if (column.pathUnder()) {
                     // A riverside promenade under the deck: on the ground beneath, the space up to the deck cleared
                     int ground = y - 1;
@@ -375,6 +424,11 @@ public final class CityChunks {
                 }
                 if (ChunkLayer.parapet(column)) {
                     chunk.setBlockState(pos.set(baseX + x, y + 1, baseZ + z), Blocks.STONE_BRICK_WALL.defaultBlockState(), false);
+                } else if (ChunkLayer.railing(column)) {
+                    // A street bridge's parapet along its edge, its face outward (the street's left is its normal)
+                    double outward = column.heading() + (column.across() >= 0 ? 0.5 * Math.PI : -0.5 * Math.PI);
+                    chunk.setBlockState(pos.set(baseX + x, y + 1, baseZ + z), CityBlocks.CONCRETE_PARAPET.get().defaultBlockState()
+                            .setValue(EdgeBlock.FACING, direction(outward)), false);
                 }
                 fixture(chunk, ChunkLayer.furniture(column), baseX + x, y, baseZ + z, pos, top);
             }
@@ -700,7 +754,7 @@ public final class CityChunks {
                     continue;
                 }
                 // A bridge's parapet stands on the paving: kept
-                for (int y = paved + (ChunkLayer.parapet(column) ? 2 : 1); y <= high; y++) {
+                for (int y = paved + (ChunkLayer.parapet(column) || ChunkLayer.railing(column) ? 2 : 1); y <= high; y++) {
                     BlockState state = chunk.getBlockState(pos.set(baseX + x, y, baseZ + z));
                     if (!state.isAir() && state.getFluidState().isEmpty() && !furniture(state)) {
                         chunk.setBlockState(pos, Blocks.AIR.defaultBlockState(), false);

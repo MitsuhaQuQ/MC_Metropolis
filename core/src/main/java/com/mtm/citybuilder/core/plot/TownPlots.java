@@ -623,7 +623,9 @@ public final class TownPlots {
         int band = fromStreet <= 25 ? 0 : fromStreet <= 40 ? 1 : fromStreet <= 60 ? 2 : 3;
         boolean dense = front.district() == District.OLD_TOWN || front.district() == District.CENTRAL
                 || front.district() == District.STATION_FRONT;
-        double open = config.backOpen[band] * (dense ? config.backOpenDense : 1.0) * config.backOpenScale;
+        boolean big = plan.settlement().tier().lowlandOnly();
+        double open = config.backOpen[band] * (dense ? config.backOpenDense : 1.0) * config.backOpenScale
+                * (big ? config.backOpenCity : 1.0);
         Plot.Use use;
         if (Hash.unit(id) < open) {
             double[] p = pointAt(template.chain(), middle);
@@ -634,7 +636,7 @@ public final class TownPlots {
             use = Hash.unit(Hash.mix(id + 1)) < config.backFlats ? Plot.Use.FLATS : Plot.Use.HOUSE;
         }
         // A built lot or a car park needs a way in: a lane near, or a pole from the lot in front of its first edge
-        if ((use.built() || use == Plot.Use.PARKING) && !laneAccess(template, row, index) && !poleRoom(template, row, index)) {
+        if ((use == Plot.Use.PARKING || use.built() && !big) && !laneAccess(template, row, index) && !poleRoom(template, row, index)) {
             use = Plot.Use.GARDEN;
         }
         return use;

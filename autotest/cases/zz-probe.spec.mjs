@@ -15,4 +15,10 @@ test('what lies round a place', async () => {
   const top = Object.entries(blocks.top).sort((a, b) => b[1] - a[1]);
   console.log('top', JSON.stringify(top));
   console.log('lava', JSON.stringify(blocks.lavaAt));
+  for (const c of ['BOULEVARD', 'ARTERIAL', 'OLD_ROAD', 'STREET', 'LANE']) {
+    const g = await server.street(x, z, c);
+    console.log('street', c, JSON.stringify(g));
+  }
+  console.log('roads', JSON.stringify(await server.roadsNear(x, z, r)));
+  console.log('paved', JSON.stringify(blocks.pavedHeights), 'covered', blocks.pavedCovered, JSON.stringify(blocks.coveredBy), JSON.stringify(blocks.coveredAt));
 });

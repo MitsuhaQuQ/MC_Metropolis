@@ -64,6 +64,16 @@ public final class ChunkLayer {
                 && Math.abs(column.across) > 0.5 * column.width - 1.0;
     }
 
+    /**
+     * Whether a street bridge's parapet stands on a column: the outermost block of its deck, not where streets meet
+     * on it nor on a footbridge's path.
+     */
+    public static boolean railing(Column column) {
+        return column.bridge && column.surface != Surface.NONE && column.surface != Surface.PATH
+                && column.surface != Surface.PLAZA && column.plaza == null && !column.junction && column.width >= 4.0
+                && Math.abs(column.across) > 0.5 * column.width - 1.0;
+    }
+
     /** Whether a surface is marked with lines: arterials, collectors and boulevards. */
     public static boolean marked(Surface surface) {
         return surface == Surface.ARTERIAL || surface == Surface.BOULEVARD;
@@ -592,7 +602,7 @@ public final class ChunkLayer {
      * {@link #columns} for it (see {@link RoadChunks}); null where none is.
      */
     public RoadChunks.Cell[] roads(int chunkX, int chunkZ, Column[] streets) {
-        return roads.cells(chunkX, chunkZ, streets);
+        return roads.cells(chunkX, chunkZ, streets, this::oldRoad);
     }
 
     /** Routes the intercity roads that may reach a rectangle ahead of its chunks (see {@link RoadChunks#prepare}). */
@@ -625,7 +635,19 @@ public final class ChunkLayer {
      */
     private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links,
                          Map<Long, List<double[]>> canals, Map<Long, List<StationPlaza>> plazas,
-                         Map<Long, List<Stop>> stops, Map<Long, Double> heights) {
+                         Map<Long, List<Stop>> stops, Map<Long, Double> heights, boolean[][] round) {
+        /**
+         * Whether a column lies on a piece's paving: within half its width of its line and, past an end, only where
+         * that end is round (a bend's outside); a square end stops at the end's line.
+         */
+        boolean covers(int p, double x, double z) {
+            StreetSegment g = segments.get(p);
+            double dx = g.x2() - g.x1();
+            double dz = g.z2() - g.z1();
+            double t = ((x - g.x1()) * dx + (z - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz);
+            return t >= 0 && t <= 1 || t < 0 && round[p][0] || t > 1 && round[p][1];
+        }
+
         /** Whether two pieces are of one street: the same, continuing each other, or with one piece between. */
         boolean sameStreet(int p, int q) {
             if (p == q) {
@@ -680,6 +702,9 @@ public final class ChunkLayer {
         Index[][] firstAnyIndex = new Index[2][256];
         boolean[][] meet = new boolean[2][256];
         boolean[] footpath = new boolean[256];
+        // Whether a street without pavements (all asphalt) covers it: a pavement of another street it runs into
+        // gives way to its asphalt
+        boolean[][] asphalt = new boolean[2][256];
         double minX = chunkX * 16.0;
         double minZ = chunkZ * 16.0;
         List<double[]> canals = new ArrayList<>();
@@ -706,7 +731,7 @@ public final class ChunkLayer {
                         double cx = minX + x + 0.5;
                         double cz = minZ + z + 0.5;
                         double d = distance(g, cx, cz);
-                        if (d > half) {
+                        if (d > half || !index.covers(p, cx, cz)) {
                             continue;
                         }
                         int c = x * 16 + z;
@@ -719,6 +744,9 @@ public final class ChunkLayer {
                             firstAnyIndex[level][c] = index;
                         } else if (firstAnyIndex[level][c] != index || !index.sameStreet(firstAny[level][c], p)) {
                             meet[level][c] = true;
+                        }
+                        if (surface == Surface.STREET || surface == Surface.OLD_ROAD) {
+                            asphalt[level][c] = true;
                         }
                         if (marked(surface)) {
                             if (first[level][c] < 0) {
@@ -762,6 +790,20 @@ public final class ChunkLayer {
                 // Unmarked streets meeting: nothing to break off, but no parapet in a junction
                 columns[c] = new Column(column.surface, column.bridge, column.deck, column.across, column.heading,
                         column.along, column.width, true, false);
+            }
+        }
+        // No pavement or median between two carriageways: where another street's carriageway runs into a marked
+        // street's pavement, its asphalt goes on through to the kerb line (laid low, as the carriageway)
+        for (int c = 0; c < 256; c++) {
+            Column column = columns[c];
+            int level = column.bridge ? 1 : 0;
+            if (!marked(column.surface) || column.junction || column.plaza != null
+                    || !(carriage[level][c] || asphalt[level][c])) {
+                continue;
+            }
+            Paving paving = mark(column).paving();
+            if (paving == Paving.SIDEWALK || paving == Paving.CURB || paving == Paving.MEDIAN) {
+                columns[c] = column.withStop(new Mark(Paving.ASPHALT, 0, 0, true));
             }
         }
         // Stop lines before the junctions, over the approaching streets' own paving
@@ -1047,6 +1089,10 @@ public final class ChunkLayer {
         double[] verge = new double[256];
         double[] outside = new double[256];
         double[] nearest = new double[256];
+        // Each street's level weighted by how near its centre line runs: where pieces meet (a bend, a junction) the
+        // level passes from one to the next without a step, instead of jumping where the nearest changes
+        double[] weight = new double[256];
+        double[] weighted = new double[256];
         java.util.Arrays.fill(level, Double.NaN);
         java.util.Arrays.fill(verge, Double.NaN);
         java.util.Arrays.fill(outside, Double.POSITIVE_INFINITY);
@@ -1078,12 +1124,13 @@ public final class ChunkLayer {
                         double d = Math.hypot(g.x1() + dx * t - cx, g.z1() + dz * t - cz);
                         int c = x * 16 + z;
                         double at = h1 + (h2 - h1) * t;
-                        if (d <= half) {
-                            if (d < nearest[c]) {
-                                nearest[c] = d;
-                                level[c] = at;
-                            }
-                        } else if (d <= half + VERGE && d - half < outside[c]) {
+                        boolean covered = index.covers(p, cx, cz);
+                        if (d <= half && covered) {
+                            double w = 1.0 / ((d + 0.5) * (d + 0.5));
+                            weight[c] += w;
+                            weighted[c] += w * at;
+                            nearest[c] = Math.min(nearest[c], d);
+                        } else if (d <= half + VERGE && covered && d - half < outside[c]) {
                             outside[c] = d - half;
                             verge[c] = at;
                         }
@@ -1092,7 +1139,8 @@ public final class ChunkLayer {
             }
         }
         for (int c = 0; c < 256; c++) {
-            if (!Double.isNaN(level[c])) {
+            if (weight[c] > 0) {
+                level[c] = weighted[c] / weight[c];
                 verge[c] = Double.NaN;
             }
             if (Double.isNaN(verge[c])) {
@@ -1123,6 +1171,29 @@ public final class ChunkLayer {
      * no town's built land, the owners of the banks round it, out to {@link #WATER_REACH}, so a bridge is laid all the
      * way across a river or a lake, not only over its edges.
      */
+    /**
+     * Whether a town lays an old road over a position on an intercity road's centre line: the intercity layer leaves
+     * that stretch, its whole width and slopes, to the town.
+     */
+    public boolean oldRoad(double x, double z) {
+        int chunkX = Math.floorDiv((int) Math.floor(x), 16);
+        int chunkZ = Math.floorDiv((int) Math.floor(z), 16);
+        for (Settlement town : towns(chunkX * 16.0, chunkZ * 16.0)) {
+            Index index = index(town);
+            List<Integer> pieces = index.byChunk.get(key(chunkX, chunkZ));
+            if (pieces == null) {
+                continue;
+            }
+            for (int p : pieces) {
+                StreetSegment g = index.segments.get(p);
+                if (g.streetClass() == StreetClass.OLD_ROAD && distance(g, x, z) <= 1.5) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private Set<Settlement> towns(double minX, double minZ) {
         Set<Settlement> towns = new LinkedHashSet<>();
         for (double[] p : new double[][]{{minX + 8, minZ + 8}, {minX, minZ}, {minX + 16, minZ}, {minX, minZ + 16},
@@ -1290,7 +1361,45 @@ public final class ChunkLayer {
                 }
             }
         }
-        return new Index(byChunk, segments, deck, links, canals, plazas, stops, new java.util.concurrent.ConcurrentHashMap<>());
+        return new Index(byChunk, segments, deck, links, canals, plazas, stops, new java.util.concurrent.ConcurrentHashMap<>(),
+                round(segments));
+    }
+
+    /**
+     * Which ends of each piece are round: where two or more pieces end at a point and, going round it, the angle
+     * between two neighbouring pieces' lines is over 180 degrees, those two (a bend's outside, which square ends would
+     * leave notched). A dead end, an end on another street's side (a T), a straight run on and a junction whose
+     * pieces leave no such gap stay square, the other pieces' paving filling the junction: no half circle sticks out.
+     */
+    static boolean[][] round(List<StreetSegment> segments) {
+        // Each end: {piece, which end, angle of the piece's line leaving the point}
+        Map<Long, List<double[]>> ends = new HashMap<>();
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            double out = Math.atan2(g.z2() - g.z1(), g.x2() - g.x1());
+            ends.computeIfAbsent(point(g.x1(), g.z1()), k -> new ArrayList<>()).add(new double[]{p, 0, out});
+            ends.computeIfAbsent(point(g.x2(), g.z2()), k -> new ArrayList<>()).add(new double[]{p, 1, out + Math.PI});
+        }
+        boolean[][] round = new boolean[segments.size()][2];
+        for (List<double[]> at : ends.values()) {
+            if (at.size() < 2) {
+                continue;
+            }
+            for (double[] e : at) {
+                e[2] = Math.floorMod((long) Math.round(Math.toDegrees(e[2]) * 1000), 360_000L) / 1000.0;
+            }
+            at.sort(java.util.Comparator.comparingDouble(e -> e[2]));
+            for (int k = 0; k < at.size(); k++) {
+                double[] e = at.get(k);
+                double[] next = at.get((k + 1) % at.size());
+                double gap = Math.floorMod((long) Math.round((next[2] - e[2]) * 1000), 360_000L) / 1000.0;
+                if (gap > 181.0) {
+                    round[(int) e[0]][(int) e[1]] = true;
+                    round[(int) next[0]][(int) next[1]] = true;
+                }
+            }
+        }
+        return round;
     }
 
     /** Pieces continuing each other: of one class, an end shared, lines within 30 degrees. */

@@ -29,6 +29,8 @@ export const server = {
   /** The nearest piece of a class of street (BOULEVARD, ARTERIAL, ...) in this world's plan: {found, x, z, heading, width}. */
   /** The nearest stop line before a junction of marked streets: {found, x, z, heading of travel, ground}. */
   stopLine: (x, z) => call('/stop-line', { x, z }),
+  /** Every intercity road within r of a point. */
+  roadsNear: (x, z, r = 40) => call('/roads-near', { x, z, r }),
   street: (x, z, streetClass, end = false) => call('/street', { x, z, class: streetClass, end: end ? 1 : 0 }),
   /** The nearest point of a canal (its middle third) in this world's plan: {found, x, z, heading, ground once loaded}. */
   canal: (x, z) => call('/canal', { x, z }),
