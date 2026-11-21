@@ -1,0 +1,20 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "citybuilder:block/flight_board",
+      "y": 0
+    },
+    "facing=east": {
+      "model": "citybuilder:block/flight_board",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "citybuilder:block/flight_board",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "citybuilder:block/flight_board",
+      "y": 270
+    }
+  }
+}

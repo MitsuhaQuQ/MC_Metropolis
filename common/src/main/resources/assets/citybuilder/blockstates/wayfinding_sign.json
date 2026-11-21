@@ -1,0 +1,260 @@
+{
+  "variants": {
+    "facing=north,icon=0": {
+      "model": "citybuilder:block/sign/departures",
+      "y": 0
+    },
+    "facing=east,icon=0": {
+      "model": "citybuilder:block/sign/departures",
+      "y": 90
+    },
+    "facing=south,icon=0": {
+      "model": "citybuilder:block/sign/departures",
+      "y": 180
+    },
+    "facing=west,icon=0": {
+      "model": "citybuilder:block/sign/departures",
+      "y": 270
+    },
+    "facing=north,icon=1": {
+      "model": "citybuilder:block/sign/arrivals",
+      "y": 0
+    },
+    "facing=east,icon=1": {
+      "model": "citybuilder:block/sign/arrivals",
+      "y": 90
+    },
+    "facing=south,icon=1": {
+      "model": "citybuilder:block/sign/arrivals",
+      "y": 180
+    },
+    "facing=west,icon=1": {
+      "model": "citybuilder:block/sign/arrivals",
+      "y": 270
+    },
+    "facing=north,icon=2": {
+      "model": "citybuilder:block/sign/baggage",
+      "y": 0
+    },
+    "facing=east,icon=2": {
+      "model": "citybuilder:block/sign/baggage",
+      "y": 90
+    },
+    "facing=south,icon=2": {
+      "model": "citybuilder:block/sign/baggage",
+      "y": 180
+    },
+    "facing=west,icon=2": {
+      "model": "citybuilder:block/sign/baggage",
+      "y": 270
+    },
+    "facing=north,icon=3": {
+      "model": "citybuilder:block/sign/toilets",
+      "y": 0
+    },
+    "facing=east,icon=3": {
+      "model": "citybuilder:block/sign/toilets",
+      "y": 90
+    },
+    "facing=south,icon=3": {
+      "model": "citybuilder:block/sign/toilets",
+      "y": 180
+    },
+    "facing=west,icon=3": {
+      "model": "citybuilder:block/sign/toilets",
+      "y": 270
+    },
+    "facing=north,icon=4": {
+      "model": "citybuilder:block/sign/left",
+      "y": 0
+    },
+    "facing=east,icon=4": {
+      "model": "citybuilder:block/sign/left",
+      "y": 90
+    },
+    "facing=south,icon=4": {
+      "model": "citybuilder:block/sign/left",
+      "y": 180
+    },
+    "facing=west,icon=4": {
+      "model": "citybuilder:block/sign/left",
+      "y": 270
+    },
+    "facing=north,icon=5": {
+      "model": "citybuilder:block/sign/right",
+      "y": 0
+    },
+    "facing=east,icon=5": {
+      "model": "citybuilder:block/sign/right",
+      "y": 90
+    },
+    "facing=south,icon=5": {
+      "model": "citybuilder:block/sign/right",
+      "y": 180
+    },
+    "facing=west,icon=5": {
+      "model": "citybuilder:block/sign/right",
+      "y": 270
+    },
+    "facing=north,icon=6": {
+      "model": "citybuilder:block/sign/up",
+      "y": 0
+    },
+    "facing=east,icon=6": {
+      "model": "citybuilder:block/sign/up",
+      "y": 90
+    },
+    "facing=south,icon=6": {
+      "model": "citybuilder:block/sign/up",
+      "y": 180
+    },
+    "facing=west,icon=6": {
+      "model": "citybuilder:block/sign/up",
+      "y": 270
+    },
+    "facing=north,icon=7": {
+      "model": "citybuilder:block/sign/info",
+      "y": 0
+    },
+    "facing=east,icon=7": {
+      "model": "citybuilder:block/sign/info",
+      "y": 90
+    },
+    "facing=south,icon=7": {
+      "model": "citybuilder:block/sign/info",
+      "y": 180
+    },
+    "facing=west,icon=7": {
+      "model": "citybuilder:block/sign/info",
+      "y": 270
+    },
+    "facing=north,icon=8": {
+      "model": "citybuilder:block/sign/restaurant",
+      "y": 0
+    },
+    "facing=east,icon=8": {
+      "model": "citybuilder:block/sign/restaurant",
+      "y": 90
+    },
+    "facing=south,icon=8": {
+      "model": "citybuilder:block/sign/restaurant",
+      "y": 180
+    },
+    "facing=west,icon=8": {
+      "model": "citybuilder:block/sign/restaurant",
+      "y": 270
+    },
+    "facing=north,icon=9": {
+      "model": "citybuilder:block/sign/shopping",
+      "y": 0
+    },
+    "facing=east,icon=9": {
+      "model": "citybuilder:block/sign/shopping",
+      "y": 90
+    },
+    "facing=south,icon=9": {
+      "model": "citybuilder:block/sign/shopping",
+      "y": 180
+    },
+    "facing=west,icon=9": {
+      "model": "citybuilder:block/sign/shopping",
+      "y": 270
+    },
+    "facing=north,icon=10": {
+      "model": "citybuilder:block/sign/elevator",
+      "y": 0
+    },
+    "facing=east,icon=10": {
+      "model": "citybuilder:block/sign/elevator",
+      "y": 90
+    },
+    "facing=south,icon=10": {
+      "model": "citybuilder:block/sign/elevator",
+      "y": 180
+    },
+    "facing=west,icon=10": {
+      "model": "citybuilder:block/sign/elevator",
+      "y": 270
+    },
+    "facing=north,icon=11": {
+      "model": "citybuilder:block/sign/escalator",
+      "y": 0
+    },
+    "facing=east,icon=11": {
+      "model": "citybuilder:block/sign/escalator",
+      "y": 90
+    },
+    "facing=south,icon=11": {
+      "model": "citybuilder:block/sign/escalator",
+      "y": 180
+    },
+    "facing=west,icon=11": {
+      "model": "citybuilder:block/sign/escalator",
+      "y": 270
+    },
+    "facing=north,icon=12": {
+      "model": "citybuilder:block/sign/gates",
+      "y": 0
+    },
+    "facing=east,icon=12": {
+      "model": "citybuilder:block/sign/gates",
+      "y": 90
+    },
+    "facing=south,icon=12": {
+      "model": "citybuilder:block/sign/gates",
+      "y": 180
+    },
+    "facing=west,icon=12": {
+      "model": "citybuilder:block/sign/gates",
+      "y": 270
+    },
+    "facing=north,icon=13": {
+      "model": "citybuilder:block/sign/bus",
+      "y": 0
+    },
+    "facing=east,icon=13": {
+      "model": "citybuilder:block/sign/bus",
+      "y": 90
+    },
+    "facing=south,icon=13": {
+      "model": "citybuilder:block/sign/bus",
+      "y": 180
+    },
+    "facing=west,icon=13": {
+      "model": "citybuilder:block/sign/bus",
+      "y": 270
+    },
+    "facing=north,icon=14": {
+      "model": "citybuilder:block/sign/train",
+      "y": 0
+    },
+    "facing=east,icon=14": {
+      "model": "citybuilder:block/sign/train",
+      "y": 90
+    },
+    "facing=south,icon=14": {
+      "model": "citybuilder:block/sign/train",
+      "y": 180
+    },
+    "facing=west,icon=14": {
+      "model": "citybuilder:block/sign/train",
+      "y": 270
+    },
+    "facing=north,icon=15": {
+      "model": "citybuilder:block/sign/parking",
+      "y": 0
+    },
+    "facing=east,icon=15": {
+      "model": "citybuilder:block/sign/parking",
+      "y": 90
+    },
+    "facing=south,icon=15": {
+      "model": "citybuilder:block/sign/parking",
+      "y": 180
+    },
+    "facing=west,icon=15": {
+      "model": "citybuilder:block/sign/parking",
+      "y": 270
+    }
+  }
+}

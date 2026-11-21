@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/slab",
+  "textures": {
+    "top": "citybuilder:block/metal_roof_white",
+    "bottom": "citybuilder:block/metal_roof_white",
+    "side": "citybuilder:block/metal_roof_white_end"
+  }
+}

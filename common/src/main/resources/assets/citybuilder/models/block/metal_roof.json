@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "citybuilder:block/metal_roof_end",
+    "side": "citybuilder:block/metal_roof"
+  }
+}

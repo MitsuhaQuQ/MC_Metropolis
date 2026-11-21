@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "axis=x,type=bottom": {
+      "model": "citybuilder:block/baggage_belt",
+      "y": 90
+    },
+    "axis=x,type=top": {
+      "model": "citybuilder:block/baggage_belt_top",
+      "y": 90
+    },
+    "axis=x,type=double": {
+      "model": "citybuilder:block/baggage_belt_double",
+      "y": 90
+    },
+    "axis=z,type=bottom": {
+      "model": "citybuilder:block/baggage_belt",
+      "y": 0
+    },
+    "axis=z,type=top": {
+      "model": "citybuilder:block/baggage_belt_top",
+      "y": 0
+    },
+    "axis=z,type=double": {
+      "model": "citybuilder:block/baggage_belt_double",
+      "y": 0
+    }
+  }
+}
