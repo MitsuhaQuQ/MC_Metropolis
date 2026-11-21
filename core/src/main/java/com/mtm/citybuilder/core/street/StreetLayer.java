@@ -763,8 +763,18 @@ public final class StreetLayer {
                 double nx = -uz * side;
                 double nz = ux * side;
                 double edge = 0.5 * g.width();
-                double[] hit = all.sound(px + nx * edge, pz + nz * edge, nx, nz, 200.0, px, pz);
+                double[] hit = all.sound(px + nx * edge, pz + nz * edge, nx, nz, config.interiorReach, px, pz);
                 if (hit == null) {
+                    // No street across within reach: a dead end in, as far as the built land and the lanes allow
+                    District district = districts.at(px + nx * (edge + 30.0), pz + nz * (edge + 30.0));
+                    if (district == District.OLD_TOWN || district == District.RESIDENTIAL || district == District.CENTRAL
+                            || district == District.STATION_FRONT) {
+                        List<StreetSegment> lane = layLane(window, all, px, pz, nx, nz, edge, edge + config.interiorMax, null,
+                                Hash.mix(place ^ (side * 0x51L)));
+                        if (lane != null) {
+                            lanes.addAll(lane);
+                        }
+                    }
                     continue;
                 }
                 StreetSegment other = all.piece((int) hit[1]);

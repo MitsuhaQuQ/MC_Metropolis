@@ -106,6 +106,7 @@ class BridgeEndsTest {
         System.out.println("bridge pieces " + pieces + ", unpaved " + unpaved);
         assertTrue(unpaved.isEmpty(), () -> "bridge pieces left unpaved of " + bridgePieces + ": " + unpaved);
         noStreetStopsShortOfAnother(segments);
+        builtLandIsReachedByStreets(logic, town, segments);
         streetsAreLaidSmoothlyNearTheGround(logic, terrain);
     }
 
@@ -145,6 +146,47 @@ class BridgeEndsTest {
         assertTrue(streets > 1000, () -> "streets " + s);
         assertTrue(s <= 1.0, () -> "a street steps " + s + " between neighbouring blocks");
         assertTrue(f < 8.0, () -> "a street laid " + f + " from the ground");
+    }
+
+    /**
+     * The town's built land lies near its streets and lanes: no more than a sliver further than the lots reach back
+     * from a street (90), which would be left open land in the middle of a large block.
+     */
+    private static void builtLandIsReachedByStreets(CityLogic logic, Settlement town, List<StreetSegment> segments) {
+        Map<Long, List<StreetSegment>> cells = new HashMap<>();
+        for (StreetSegment g : segments) {
+            if (g.streetClass() == StreetClass.PATH) {
+                continue;
+            }
+            for (long cx = (long) Math.floor((Math.min(g.x1(), g.x2()) - 100) / 64); cx <= (long) Math.floor((Math.max(g.x1(), g.x2()) + 100) / 64); cx++) {
+                for (long cz = (long) Math.floor((Math.min(g.z1(), g.z2()) - 100) / 64); cz <= (long) Math.floor((Math.max(g.z1(), g.z2()) + 100) / 64); cz++) {
+                    cells.computeIfAbsent((cx << 32) ^ (cz & 0xFFFFFFFFL), k -> new ArrayList<>()).add(g);
+                }
+            }
+        }
+        double built = logic.settings().streets.builtIntensity;
+        com.mtm.citybuilder.core.extent.CityExtent extent = logic.extent(town);
+        int land = 0;
+        int far = 0;
+        for (double x = extent.coreX() - 2000; x < extent.coreX() + 2000; x += 8) {
+            for (double z = extent.coreZ() - 2000; z < extent.coreZ() + 2000; z += 8) {
+                com.mtm.citybuilder.core.extent.UrbanSample u = logic.urban(x, z);
+                if (u.owner() == null || u.owner().id() != town.id() || u.intensity() <= 0.3) {
+                    continue;
+                }
+                land++;
+                double nearest = Double.POSITIVE_INFINITY;
+                for (StreetSegment g : cells.getOrDefault(((long) Math.floor(x / 64) << 32) ^ ((long) Math.floor(z / 64) & 0xFFFFFFFFL), List.of())) {
+                    nearest = Math.min(nearest, distance(g, x, z) - 0.5 * g.width());
+                }
+                if (nearest > 90) {
+                    far++;
+                }
+            }
+        }
+        double share = (double) far / Math.max(1, land);
+        System.out.println("built land " + land + " samples, further than 90 from a street " + String.format("%.4f", share));
+        assertTrue(share < 0.02, () -> "built land far from any street: " + share);
     }
 
     private static void noStreetStopsShortOfAnother(List<StreetSegment> segments) {

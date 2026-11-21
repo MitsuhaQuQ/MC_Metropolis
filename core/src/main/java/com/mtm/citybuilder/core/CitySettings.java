@@ -893,6 +893,12 @@ public final class CitySettings {
         public double interiorClear = 8.0;
         public double interiorMinLane = 25.0;
         /**
+         * How far across a block the next street is looked for: a large block's (a superblock between the main roads,
+         * hundreds across) is cut through by lanes too; where none is found so far, as where a block runs out to the
+         * town's edge, a dead-end lane goes in {@code interiorMax}.
+         */
+        public double interiorReach = 600.0;
+        /**
          * The lanes knit into a net: branches about every {@code branchSpacing} along a lane, to one side, where the
          * land runs deeper than {@code branchMin} to the next street or lane; a dead end with a street or lane within
          * {@code joinReach} ahead carried on to it.
