@@ -359,9 +359,12 @@ public final class BuildingLayer {
         }
     }
 
+    /** The least side of a building: walls of a block either side and three blocks of room between them. */
+    private static final double MIN_SIDE = 5.0;
+
     /** The least depth a building of so many storeys stands with. */
     private static double minDepth(int storeys) {
-        return storeys >= 6 ? 9.0 : storeys >= 3 ? 7.0 : storeys == 2 ? 5.0 : 4.0;
+        return storeys >= 6 ? 9.0 : storeys >= 3 ? 7.0 : storeys == 2 ? 6.0 : MIN_SIDE;
     }
 
     /** The building on a lot, null where none stands (a street, a block's interior, a remnant, a vacant lot). */
@@ -693,12 +696,16 @@ public final class BuildingLayer {
             width = Math.floor(plot.frontage() - 2.0 * sideGap);
         }
         depth = Math.floor(Math.min(depth, plot.maxDepth() - front - backGap));
-        if (width < 4.0 || depth < 4.0) {
+        // Room inside its walls: at least three blocks clear between them either way
+        if (width < MIN_SIDE || depth < MIN_SIDE) {
             return null;
         }
+
         if (type == Building.Type.APARTMENT && composition.is(Slot.ACCESS, "corridor")) {
-            // The outside stair stands beside the right-hand wall: the block moves over to make room for it
-            if (width - STAIR_SIDE >= 7.0) {
+            // The outside stair stands beside the right-hand wall: the block moves over to make room for it. Only on a
+            // block square to the world's: turned, its stair's steps fall corner to corner and cannot be climbed
+            double turn = Math.abs(Math.IEEEremainder(plot.heading(), 0.5 * Math.PI));
+            if (width - STAIR_SIDE >= 7.0 && turn < 0.02) {
                 width -= STAIR_SIDE;
                 shift -= 0.5 * STAIR_SIDE;
             } else {
@@ -799,11 +806,11 @@ public final class BuildingLayer {
         if (type == Building.Type.WORKS) {
             storeys = Math.min(storeys, 2);
         }
-        // Deep and broad enough to stand: a room and its stair or corridor behind the front (5 deep for two storeys, 7
-        // for three, 9 for six and more), and walls no higher than four times the narrower side, so a block does not
-        // come out a sheet; storeys taken off where the lot is too small for them
+        // Deep and broad enough to stand: a room and its stair or corridor behind the front (6 either way for two
+        // storeys, 7 deep for three, 9 for six and more), and walls no higher than four times the narrower side, so a
+        // block does not come out a sheet; storeys taken off where the lot is too small for them
         double narrow = Math.min(width, depth);
-        while (storeys > 1 && (depth < minDepth(storeys) || ground + (storeys - 1) * upper > 4.0 * narrow)) {
+        while (storeys > 1 && (depth < minDepth(storeys) || narrow < 6.0 || ground + (storeys - 1) * upper > 4.0 * narrow)) {
             storeys--;
         }
         step = Math.min(step, storeys);
@@ -908,6 +915,10 @@ public final class BuildingLayer {
         long variant = Hash.of(h, 9);
 
         boolean carport = layout != 0 && composition.is(Slot.CARPORT, "carport");
+        if (Math.min(width, depth) < 8.0 && composition.is(Slot.RECESS, "recessed")) {
+            // Windows set back a block take a block inside each wall: only where that leaves room
+            composition = composition.with(Slot.RECESS, "flush");
+        }
         Building made = new Building(plot.id(), type, storeys, ground, upper, roof, ridgeAlong, slope, from, to, front, back,
                 step, stepBack, upFrom, upTo, upBack, wingFrom, wingTo, wingBack, chamferLeft, chamferRight, layout, plot.start() - from,
                 plot.end() - from, plot.maxDepth(), parkFrom, parkTo, parkBack, carport, base, ox, oz, p[2], p[3], nx, nz,

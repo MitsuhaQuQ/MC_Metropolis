@@ -73,7 +73,8 @@ class PlotLayerTest {
                 samples.merge(plot.id(), 1, Integer::sum);
                 // Along its street within the lot's frontage; a strip joined from across, measured from the lot's
                 // street, may reach a little past it
-                assertTrue(plot.along() >= plot.start() - 30 && plot.along() <= plot.end() + 30, () -> "along " + plot);
+                // (frontages carry the walls' allowance, so a joined strip may reach some way past a wide parcel's ends)
+                assertTrue(plot.along() >= plot.start() - 40 && plot.along() <= plot.end() + 40, () -> "along " + plot);
                 assertTrue(plot.depth() >= 0 && plot.depth() <= plot.maxDepth(), () -> "depth " + plot);
                 Plot before = seen.putIfAbsent(plot.id(), plot);
                 if (before != null) {

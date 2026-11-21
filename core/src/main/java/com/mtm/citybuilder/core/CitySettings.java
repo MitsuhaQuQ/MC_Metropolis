@@ -1026,6 +1026,13 @@ public final class CitySettings {
         public double[] port = {40, 55, 75, 100, 150, 50, 90};
         public double[] lane = {3.5, 4.3, 5.8, 9.2, 13.8, 8, 12};
         /**
+         * Added to every frontage drawn, and the least frontage: a wall here is a block thick, where a real one is a
+         * fraction of that, so a lot of a real width is drawn wider by the difference (two walls of 1 for two of about
+         * 0.15) to leave rooms of a real width inside; and none narrower than a house with a room in it.
+         */
+        public double wallAllowance = 1.7;
+        public double minFrontage = 6.0;
+        /**
          * Land goes to the street whose edge is nearest, a wider street's edge counting this much nearer: its lots
          * run deeper, the front street (omotedori) taking the corners from the back streets.
          */

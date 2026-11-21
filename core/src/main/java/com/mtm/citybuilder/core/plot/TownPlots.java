@@ -315,7 +315,7 @@ public final class TownPlots {
                     }
                     double[] range = range(district, first.streetClass());
                     long hash = Hash.of(seed, c, side, index);
-                    double frontage = frontage(range, Hash.unit(hash));
+                    double frontage = Math.max(config.minFrontage, frontage(range, Hash.unit(hash)) + config.wallAllowance);
                     double lotDepth = range[5] + (range[6] - range[5]) * Hash.unit(Hash.mix(hash));
                     // The last lot takes what is left, if that is short
                     if (length - (position + frontage) < 0.5 * range[0]) {
@@ -674,7 +674,8 @@ public final class TownPlots {
             double position = 0.0;
             int index = 0;
             while (position < length - 1e-6) {
-                double width = frontage(config.backFrontage, Hash.unit(Hash.of(seed ^ 0xBAC7L, chain, side * 64L + row, index)));
+                double width = Math.max(config.minFrontage, frontage(config.backFrontage,
+                        Hash.unit(Hash.of(seed ^ 0xBAC7L, chain, side * 64L + row, index))) + config.wallAllowance);
                 if (length - (position + width) < 0.5 * config.backFrontage[0]) {
                     width = length - position;
                 }
@@ -735,12 +736,7 @@ public final class TownPlots {
         Plot lot = nominal(position, target);
         // The street as it runs past the middle of the lot's frontage: the same wherever on the lot it is asked, as a
         // lot has one building facing one way
-        double mid = 0.5 * (start + end);
-        Object[] facing = lotStreets.computeIfAbsent(Hash.of(0x5713EL, position.chain(), position.side(), target), k -> {
-            StreetSegment street = streetAt(position.chain(), mid);
-            return street == null ? new Object[0]
-                    : new Object[]{street.streetClass(), street.width(), headingOf(position.chain(), street)};
-        });
+        Object[] facing = facing(position.chain(), position.side(), target);
         com.mtm.citybuilder.core.street.StreetClass streetClass = facing.length == 0 ? position.street()
                 : (com.mtm.citybuilder.core.street.StreetClass) facing[0];
         double streetWidth = facing.length == 0 ? position.streetWidth() : (Double) facing[1];
@@ -748,6 +744,18 @@ public final class TownPlots {
         return new Plot(lot.id(), position.chain(), position.side(), target, start, end, position.along(),
                 position.depth(), lot.maxDepth(), lot.district(), streetClass, streetWidth, heading,
                 position.depth() > lot.maxDepth(), false);
+    }
+
+    /**
+     * The street a lot faces, as it runs past the middle of the lot's frontage as cut: {class, width, heading}, or empty
+     * where the chain has none; the same however the lot is reached.
+     */
+    private Object[] facing(int chain, int side, int index) {
+        return lotStreets.computeIfAbsent(Hash.of(0x5713EL, chain, side, index), k -> {
+            double[] starts = cuts.get(chain)[side > 0 ? 0 : 1];
+            StreetSegment street = streetAt(chain, 0.5 * (starts[index] + starts[index + 1]));
+            return street == null ? new Object[0] : new Object[]{street.streetClass(), street.width(), headingOf(chain, street)};
+        });
     }
 
     /** The piece of a chain at a distance along it (the nearest end's piece past its ends), or null. */
@@ -843,9 +851,14 @@ public final class TownPlots {
     private Plot nominal(Plot plot, int index) {
         int s = plot.side() > 0 ? 0 : 1;
         double[] starts = cuts.get(plot.chain())[s];
+        // Its own street, not the asking position's: what is measured of it (its area) is kept by its id
+        Object[] facing = facing(plot.chain(), plot.side(), index);
+        StreetClass street = facing.length == 0 ? plot.street() : (StreetClass) facing[0];
+        double width = facing.length == 0 ? plot.streetWidth() : (Double) facing[1];
+        double heading = facing.length == 0 ? plot.heading() : (Double) facing[2];
         return new Plot(Hash.of(seed ^ 0x9107L, plot.chain(), plot.side(), index), plot.chain(), plot.side(), index,
                 starts[index], starts[index + 1], plot.along(), plot.depth(), depths.get(plot.chain())[s][index],
-                districts.get(plot.chain())[s][index], plot.street(), plot.streetWidth(), plot.heading(), false, false);
+                districts.get(plot.chain())[s][index], street, width, heading, false, false);
     }
 
     /**

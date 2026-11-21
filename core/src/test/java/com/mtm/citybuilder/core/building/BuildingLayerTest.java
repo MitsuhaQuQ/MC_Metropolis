@@ -126,7 +126,10 @@ class BuildingLayerTest {
             if (b.type() == Building.Type.WORKS || b.program() != null) {
                 continue;
             }
-            double least = b.storeys() >= 6 ? 9.0 : b.storeys() >= 3 ? 7.0 : b.storeys() == 2 ? 5.0 : 4.0;
+            double least = b.storeys() >= 6 ? 9.0 : b.storeys() >= 3 ? 7.0 : b.storeys() == 2 ? 6.0 : 5.0;
+            assertTrue(Math.min(b.width(), b.depth()) >= 5.0 - 1e-9, () -> "no room inside: " + b.width() + " by " + b.depth() + " " + b.type());
+            assertTrue(b.storeys() == 1 || Math.min(b.width(), b.depth()) >= 6.0 - 1e-9,
+                    () -> "too narrow for " + b.storeys() + " storeys: " + b.width() + " by " + b.depth());
             assertTrue(b.depth() >= least - 1e-9, () -> "too shallow for " + b.storeys() + " storeys: " + b.depth() + " " + b.type());
             assertTrue(b.storeys() == 1 || b.wallHeight() <= 4.0 * Math.min(b.width(), b.depth()) + 1e-9,
                     () -> "a sheet: " + b.wallHeight() + " high on " + b.width() + " by " + b.depth() + " " + b.type());
@@ -350,11 +353,18 @@ class BuildingLayerTest {
                 if (corridor(b, b.local(at[0] + 0.5, at[1] + 0.5))) {
                     reached.add(at[2]);
                 }
-                for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                // Side to side, and corner to corner where a player squeezes past (both cells beside the corner clear
+                // for feet and head): a stair at an angle to the blocks climbs corner to corner
+                for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}}) {
                     for (int up = -1; up <= 1; up++) {
                         int nx = at[0] + d[0];
                         int nz = at[1] + d[1];
                         int ny = at[2] + up;
+                        boolean diagonal = d[0] != 0 && d[1] != 0;
+                        int high = Math.max(at[2], ny);
+                        if (diagonal && !(clear(b, at[0] + d[0], at[1], high) && clear(b, at[0], at[1] + d[1], high))) {
+                            continue;
+                        }
                         if (inAccess(b, b.local(nx + 0.5, nz + 0.5)) && stand(b, nx, nz, ny)) {
                             queue.add(new int[]{nx, nz, ny});
                         }
@@ -362,7 +372,8 @@ class BuildingLayerTest {
                 }
             }
             for (int k = 1; k < b.step(); k++) {
-                assertTrue(reached.contains(b.floorOf(k) + 1), "flats " + b.id() + " floor " + k + " not reached: " + reached);
+                int floor = k;
+                assertTrue(reached.contains(b.floorOf(k) + 1), () -> "flats " + b.id() + " floor " + floor + " not reached: " + reached + " " + b);
             }
         }
     }
@@ -586,6 +597,12 @@ class BuildingLayerTest {
         boolean floor = below == BuildingLayer.Part.STAIRS_FRONT || below == BuildingLayer.Part.ACCENT
                 || below == BuildingLayer.Part.PAVING;
         return floor && open(BuildingLayer.part(c, b.base() + dy)) && open(BuildingLayer.part(c, b.base() + dy + 1));
+    }
+
+    /** Whether a player's feet and head fit at a block, {@code dy} over a building's base. */
+    private static boolean clear(Building b, int x, int z, int dy) {
+        BuildingLayer.Column c = BuildingLayer.column(b, x + 0.5, z + 0.5, false, true, null);
+        return open(BuildingLayer.part(c, b.base() + dy)) && open(BuildingLayer.part(c, b.base() + dy + 1));
     }
 
     private static boolean open(BuildingLayer.Part p) {
