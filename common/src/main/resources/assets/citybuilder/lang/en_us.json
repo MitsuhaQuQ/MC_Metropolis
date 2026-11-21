@@ -13,5 +13,21 @@
   "block.citybuilder.sidewalk_granite": "Granite Paving",
   "block.citybuilder.sidewalk_interlocking": "Interlocking Pavers",
   "block.citybuilder.tactile_dot": "Tactile Paving (Warning)",
-  "block.citybuilder.tactile_line": "Tactile Paving (Guide)"
+  "block.citybuilder.tactile_line": "Tactile Paving (Guide)",
+  "block.citybuilder.track": "All-Weather Track",
+  "block.citybuilder.track_line_white": "Track with White Line",
+  "block.citybuilder.turf": "Pitch Turf",
+  "block.citybuilder.turf_dark": "Pitch Turf (Dark Stripe)",
+  "block.citybuilder.turf_line_white": "Pitch Turf with White Line",
+  "block.citybuilder.turf_dark_line_white": "Pitch Turf (Dark Stripe) with White Line",
+  "block.citybuilder.soil": "Infield Soil",
+  "block.citybuilder.soil_line_white": "Infield Soil with White Line",
+  "block.citybuilder.fresnel_lens": "Fresnel Lens",
+  "block.citybuilder.led_panel": "LED Scoreboard Panel",
+  "block.citybuilder.seat_blue": "Blue Stadium Seat",
+  "block.citybuilder.seat_light_blue": "Light Blue Stadium Seat",
+  "block.citybuilder.seat_red": "Red Stadium Seat",
+  "block.citybuilder.seat_green": "Green Stadium Seat",
+  "block.citybuilder.seat_orange": "Orange Stadium Seat",
+  "block.citybuilder.seat_white": "White Stadium Seat"
 }

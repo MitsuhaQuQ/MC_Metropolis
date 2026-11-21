@@ -1,0 +1,7 @@
+{
+  "parent": "citybuilder:block/seat",
+  "textures": {
+    "seat": "citybuilder:block/seat_orange",
+    "metal": "minecraft:block/light_gray_concrete"
+  }
+}

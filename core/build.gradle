@@ -95,3 +95,17 @@ tasks.register("osmStats", JavaExec) {
         args([file(input.get()).absolutePath] + (box.isPresent() ? box.get().tokenize(" ") : []))
     }
 }
+
+// gradlew :core:templeModels -Pin=<specs.json> -Pout=<dir>: temple halls and pagodas built from specs, as JSON for
+// tools/assets/plateau_voxel.py (structure templates and previews)
+tasks.register("templeModels", JavaExec) {
+    group = "citybuilder"
+    description = "Builds temple models (halls, pagodas) from a list of specs"
+    classpath = sourceSets.tools.runtimeClasspath
+    mainClass = "com.mtm.citybuilder.tools.TempleModels"
+    def input = providers.gradleProperty("in")
+    def output = providers.gradleProperty("out")
+    if (input.isPresent() && output.isPresent()) {
+        args([file(input.get()).absolutePath, file(output.get()).absolutePath])
+    }
+}

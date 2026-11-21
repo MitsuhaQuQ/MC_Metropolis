@@ -1,0 +1,772 @@
+{
+  "variants": {
+    "angle=0,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_0_0"
+    },
+    "angle=0,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_0_0"
+    },
+    "angle=0,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_0_1"
+    },
+    "angle=0,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_0_1"
+    },
+    "angle=0,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_0_2"
+    },
+    "angle=0,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_0_2"
+    },
+    "angle=0,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_0_3"
+    },
+    "angle=0,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_0_3"
+    },
+    "angle=0,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_0_4"
+    },
+    "angle=0,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_0_4"
+    },
+    "angle=0,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_0_5"
+    },
+    "angle=0,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_0_5"
+    },
+    "angle=0,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_0_6"
+    },
+    "angle=0,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_0_6"
+    },
+    "angle=0,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_0_7"
+    },
+    "angle=0,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_0_7"
+    },
+    "angle=1,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_1_0"
+    },
+    "angle=1,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_1_0"
+    },
+    "angle=1,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_1_1"
+    },
+    "angle=1,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_1_1"
+    },
+    "angle=1,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_1_2"
+    },
+    "angle=1,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_1_2"
+    },
+    "angle=1,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_1_3"
+    },
+    "angle=1,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_1_3"
+    },
+    "angle=1,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_1_4"
+    },
+    "angle=1,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_1_4"
+    },
+    "angle=1,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_1_5"
+    },
+    "angle=1,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_1_5"
+    },
+    "angle=1,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_1_6"
+    },
+    "angle=1,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_1_6"
+    },
+    "angle=1,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_1_7"
+    },
+    "angle=1,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_1_7"
+    },
+    "angle=2,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_2_0"
+    },
+    "angle=2,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_2_0"
+    },
+    "angle=2,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_2_1"
+    },
+    "angle=2,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_2_1"
+    },
+    "angle=2,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_2_2"
+    },
+    "angle=2,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_2_2"
+    },
+    "angle=2,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_2_3"
+    },
+    "angle=2,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_2_3"
+    },
+    "angle=2,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_2_4"
+    },
+    "angle=2,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_2_4"
+    },
+    "angle=2,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_2_5"
+    },
+    "angle=2,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_2_5"
+    },
+    "angle=2,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_2_6"
+    },
+    "angle=2,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_2_6"
+    },
+    "angle=2,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_2_7"
+    },
+    "angle=2,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_2_7"
+    },
+    "angle=3,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_3_0"
+    },
+    "angle=3,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_3_0"
+    },
+    "angle=3,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_3_1"
+    },
+    "angle=3,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_3_1"
+    },
+    "angle=3,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_3_2"
+    },
+    "angle=3,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_3_2"
+    },
+    "angle=3,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_3_3"
+    },
+    "angle=3,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_3_3"
+    },
+    "angle=3,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_3_4"
+    },
+    "angle=3,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_3_4"
+    },
+    "angle=3,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_3_5"
+    },
+    "angle=3,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_3_5"
+    },
+    "angle=3,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_3_6"
+    },
+    "angle=3,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_3_6"
+    },
+    "angle=3,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_3_7"
+    },
+    "angle=3,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_3_7"
+    },
+    "angle=4,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_4_0"
+    },
+    "angle=4,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_4_0"
+    },
+    "angle=4,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_4_1"
+    },
+    "angle=4,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_4_1"
+    },
+    "angle=4,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_4_2"
+    },
+    "angle=4,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_4_2"
+    },
+    "angle=4,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_4_3"
+    },
+    "angle=4,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_4_3"
+    },
+    "angle=4,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_4_4"
+    },
+    "angle=4,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_4_4"
+    },
+    "angle=4,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_4_5"
+    },
+    "angle=4,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_4_5"
+    },
+    "angle=4,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_4_6"
+    },
+    "angle=4,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_4_6"
+    },
+    "angle=4,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_4_7"
+    },
+    "angle=4,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_4_7"
+    },
+    "angle=5,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_5_0"
+    },
+    "angle=5,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_5_0"
+    },
+    "angle=5,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_5_1"
+    },
+    "angle=5,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_5_1"
+    },
+    "angle=5,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_5_2"
+    },
+    "angle=5,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_5_2"
+    },
+    "angle=5,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_5_3"
+    },
+    "angle=5,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_5_3"
+    },
+    "angle=5,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_5_4"
+    },
+    "angle=5,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_5_4"
+    },
+    "angle=5,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_5_5"
+    },
+    "angle=5,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_5_5"
+    },
+    "angle=5,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_5_6"
+    },
+    "angle=5,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_5_6"
+    },
+    "angle=5,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_5_7"
+    },
+    "angle=5,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_5_7"
+    },
+    "angle=6,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_6_0"
+    },
+    "angle=6,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_6_0"
+    },
+    "angle=6,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_6_1"
+    },
+    "angle=6,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_6_1"
+    },
+    "angle=6,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_6_2"
+    },
+    "angle=6,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_6_2"
+    },
+    "angle=6,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_6_3"
+    },
+    "angle=6,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_6_3"
+    },
+    "angle=6,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_6_4"
+    },
+    "angle=6,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_6_4"
+    },
+    "angle=6,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_6_5"
+    },
+    "angle=6,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_6_5"
+    },
+    "angle=6,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_6_6"
+    },
+    "angle=6,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_6_6"
+    },
+    "angle=6,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_6_7"
+    },
+    "angle=6,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_6_7"
+    },
+    "angle=7,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_7_0"
+    },
+    "angle=7,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_7_0"
+    },
+    "angle=7,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_7_1"
+    },
+    "angle=7,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_7_1"
+    },
+    "angle=7,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_7_2"
+    },
+    "angle=7,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_7_2"
+    },
+    "angle=7,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_7_3"
+    },
+    "angle=7,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_7_3"
+    },
+    "angle=7,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_7_4"
+    },
+    "angle=7,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_7_4"
+    },
+    "angle=7,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_7_5"
+    },
+    "angle=7,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_7_5"
+    },
+    "angle=7,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_7_6"
+    },
+    "angle=7,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_7_6"
+    },
+    "angle=7,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_7_7"
+    },
+    "angle=7,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_7_7"
+    },
+    "angle=8,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_8_0"
+    },
+    "angle=8,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_8_0"
+    },
+    "angle=8,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_8_1"
+    },
+    "angle=8,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_8_1"
+    },
+    "angle=8,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_8_2"
+    },
+    "angle=8,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_8_2"
+    },
+    "angle=8,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_8_3"
+    },
+    "angle=8,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_8_3"
+    },
+    "angle=8,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_8_4"
+    },
+    "angle=8,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_8_4"
+    },
+    "angle=8,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_8_5"
+    },
+    "angle=8,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_8_5"
+    },
+    "angle=8,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_8_6"
+    },
+    "angle=8,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_8_6"
+    },
+    "angle=8,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_8_7"
+    },
+    "angle=8,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_8_7"
+    },
+    "angle=9,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_9_0"
+    },
+    "angle=9,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_9_0"
+    },
+    "angle=9,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_9_1"
+    },
+    "angle=9,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_9_1"
+    },
+    "angle=9,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_9_2"
+    },
+    "angle=9,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_9_2"
+    },
+    "angle=9,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_9_3"
+    },
+    "angle=9,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_9_3"
+    },
+    "angle=9,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_9_4"
+    },
+    "angle=9,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_9_4"
+    },
+    "angle=9,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_9_5"
+    },
+    "angle=9,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_9_5"
+    },
+    "angle=9,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_9_6"
+    },
+    "angle=9,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_9_6"
+    },
+    "angle=9,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_9_7"
+    },
+    "angle=9,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_9_7"
+    },
+    "angle=10,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_10_0"
+    },
+    "angle=10,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_10_0"
+    },
+    "angle=10,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_10_1"
+    },
+    "angle=10,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_10_1"
+    },
+    "angle=10,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_10_2"
+    },
+    "angle=10,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_10_2"
+    },
+    "angle=10,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_10_3"
+    },
+    "angle=10,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_10_3"
+    },
+    "angle=10,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_10_4"
+    },
+    "angle=10,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_10_4"
+    },
+    "angle=10,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_10_5"
+    },
+    "angle=10,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_10_5"
+    },
+    "angle=10,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_10_6"
+    },
+    "angle=10,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_10_6"
+    },
+    "angle=10,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_10_7"
+    },
+    "angle=10,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_10_7"
+    },
+    "angle=11,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_11_0"
+    },
+    "angle=11,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_11_0"
+    },
+    "angle=11,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_11_1"
+    },
+    "angle=11,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_11_1"
+    },
+    "angle=11,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_11_2"
+    },
+    "angle=11,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_11_2"
+    },
+    "angle=11,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_11_3"
+    },
+    "angle=11,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_11_3"
+    },
+    "angle=11,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_11_4"
+    },
+    "angle=11,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_11_4"
+    },
+    "angle=11,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_11_5"
+    },
+    "angle=11,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_11_5"
+    },
+    "angle=11,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_11_6"
+    },
+    "angle=11,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_11_6"
+    },
+    "angle=11,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_11_7"
+    },
+    "angle=11,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_11_7"
+    },
+    "angle=12,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_12_0"
+    },
+    "angle=12,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_12_0"
+    },
+    "angle=12,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_12_1"
+    },
+    "angle=12,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_12_1"
+    },
+    "angle=12,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_12_2"
+    },
+    "angle=12,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_12_2"
+    },
+    "angle=12,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_12_3"
+    },
+    "angle=12,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_12_3"
+    },
+    "angle=12,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_12_4"
+    },
+    "angle=12,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_12_4"
+    },
+    "angle=12,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_12_5"
+    },
+    "angle=12,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_12_5"
+    },
+    "angle=12,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_12_6"
+    },
+    "angle=12,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_12_6"
+    },
+    "angle=12,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_12_7"
+    },
+    "angle=12,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_12_7"
+    },
+    "angle=13,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_13_0"
+    },
+    "angle=13,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_13_0"
+    },
+    "angle=13,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_13_1"
+    },
+    "angle=13,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_13_1"
+    },
+    "angle=13,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_13_2"
+    },
+    "angle=13,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_13_2"
+    },
+    "angle=13,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_13_3"
+    },
+    "angle=13,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_13_3"
+    },
+    "angle=13,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_13_4"
+    },
+    "angle=13,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_13_4"
+    },
+    "angle=13,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_13_5"
+    },
+    "angle=13,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_13_5"
+    },
+    "angle=13,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_13_6"
+    },
+    "angle=13,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_13_6"
+    },
+    "angle=13,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_13_7"
+    },
+    "angle=13,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_13_7"
+    },
+    "angle=14,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_14_0"
+    },
+    "angle=14,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_14_0"
+    },
+    "angle=14,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_14_1"
+    },
+    "angle=14,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_14_1"
+    },
+    "angle=14,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_14_2"
+    },
+    "angle=14,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_14_2"
+    },
+    "angle=14,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_14_3"
+    },
+    "angle=14,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_14_3"
+    },
+    "angle=14,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_14_4"
+    },
+    "angle=14,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_14_4"
+    },
+    "angle=14,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_14_5"
+    },
+    "angle=14,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_14_5"
+    },
+    "angle=14,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_14_6"
+    },
+    "angle=14,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_14_6"
+    },
+    "angle=14,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_14_7"
+    },
+    "angle=14,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_14_7"
+    },
+    "angle=15,low=false,offset=0": {
+      "model": "citybuilder:block/line/soil_white_15_0"
+    },
+    "angle=15,low=true,offset=0": {
+      "model": "citybuilder:block/line/soil_white_15_0"
+    },
+    "angle=15,low=false,offset=1": {
+      "model": "citybuilder:block/line/soil_white_15_1"
+    },
+    "angle=15,low=true,offset=1": {
+      "model": "citybuilder:block/line/soil_white_15_1"
+    },
+    "angle=15,low=false,offset=2": {
+      "model": "citybuilder:block/line/soil_white_15_2"
+    },
+    "angle=15,low=true,offset=2": {
+      "model": "citybuilder:block/line/soil_white_15_2"
+    },
+    "angle=15,low=false,offset=3": {
+      "model": "citybuilder:block/line/soil_white_15_3"
+    },
+    "angle=15,low=true,offset=3": {
+      "model": "citybuilder:block/line/soil_white_15_3"
+    },
+    "angle=15,low=false,offset=4": {
+      "model": "citybuilder:block/line/soil_white_15_4"
+    },
+    "angle=15,low=true,offset=4": {
+      "model": "citybuilder:block/line/soil_white_15_4"
+    },
+    "angle=15,low=false,offset=5": {
+      "model": "citybuilder:block/line/soil_white_15_5"
+    },
+    "angle=15,low=true,offset=5": {
+      "model": "citybuilder:block/line/soil_white_15_5"
+    },
+    "angle=15,low=false,offset=6": {
+      "model": "citybuilder:block/line/soil_white_15_6"
+    },
+    "angle=15,low=true,offset=6": {
+      "model": "citybuilder:block/line/soil_white_15_6"
+    },
+    "angle=15,low=false,offset=7": {
+      "model": "citybuilder:block/line/soil_white_15_7"
+    },
+    "angle=15,low=true,offset=7": {
+      "model": "citybuilder:block/line/soil_white_15_7"
+    }
+  }
+}

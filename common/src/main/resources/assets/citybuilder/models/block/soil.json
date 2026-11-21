@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "citybuilder:block/soil",
+    "side": "citybuilder:block/soil",
+    "bottom": "citybuilder:block/soil"
+  }
+}

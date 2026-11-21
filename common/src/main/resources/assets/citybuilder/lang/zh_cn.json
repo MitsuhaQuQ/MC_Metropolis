@@ -13,5 +13,21 @@
   "block.citybuilder.sidewalk_granite": "\u82b1\u5c97\u5ca9\u94fa\u88c5",
   "block.citybuilder.sidewalk_interlocking": "\u8fde\u9501\u7816",
   "block.citybuilder.tactile_dot": "\u76f2\u9053\u7816\uff08\u70b9\u72b6\uff09",
-  "block.citybuilder.tactile_line": "\u76f2\u9053\u7816\uff08\u6761\u72b6\uff09"
+  "block.citybuilder.tactile_line": "\u76f2\u9053\u7816\uff08\u6761\u72b6\uff09",
+  "block.citybuilder.track": "全天候跑道",
+  "block.citybuilder.track_line_white": "跑道（白线）",
+  "block.citybuilder.turf": "球场草皮",
+  "block.citybuilder.turf_dark": "球场草皮（深色条纹）",
+  "block.citybuilder.turf_line_white": "球场草皮（白线）",
+  "block.citybuilder.turf_dark_line_white": "球场草皮（深色条纹、白线）",
+  "block.citybuilder.soil": "内野土",
+  "block.citybuilder.soil_line_white": "内野土（白线）",
+  "block.citybuilder.fresnel_lens": "菲涅耳透镜",
+  "block.citybuilder.led_panel": "记分牌 LED 面板",
+  "block.citybuilder.seat_blue": "蓝色看台座椅",
+  "block.citybuilder.seat_light_blue": "浅蓝色看台座椅",
+  "block.citybuilder.seat_red": "红色看台座椅",
+  "block.citybuilder.seat_green": "绿色看台座椅",
+  "block.citybuilder.seat_orange": "橙色看台座椅",
+  "block.citybuilder.seat_white": "白色看台座椅"
 }
