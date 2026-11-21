@@ -126,6 +126,44 @@ class TempleTest {
     }
 
     @Test
+    void mountainShrineOnTheRealTerrain() {
+        // On MTM_worldgen's terrain (seed 12345, round the castle town): the mountainside site the demos use, a shrine
+        // built on it, walked from the street up the stairway to its first hall.
+        var terrain = new com.mtm.citybuilder.core.terrain.WorldgenTerrainView(com.mtm.worldgen.logic.TerrainLogic
+                .forWorld(12345L, com.mtm.worldgen.logic.WorldgenSettings.DEFAULT));
+        long t0 = System.nanoTime();
+        TerrainGround.Site site = TerrainGround.find(terrain, -10232, -10272, 3000, 41, 121, 30, 60);
+        long found = System.nanoTime();
+        assertTrue(site != null, "a site");
+        Ground g = TerrainGround.at(terrain, site, 41, 121);
+        List<Precinct.Placed> placed = new ArrayList<>();
+        Model m = new Precinct(Precinct.Kind.SHRINE, null, 41, 121, 12, TemplePalette.VERMILION, g, false).plan(placed);
+        System.out.printf("site %s found in %d ms, built in %d ms%n", site, (found - t0) / 1_000_000,
+                (System.nanoTime() - found) / 1_000_000);
+        int cx = 20, stop = hallFront(placed, cx), prev = Integer.MIN_VALUE;
+        assertTrue(stop > 0, "a hall on the axis");
+        for (int z = 120; z >= stop; z--) {
+            int top = Integer.MIN_VALUE, cap = prev == Integer.MIN_VALUE ? 200 : prev + 2;
+            for (int y = cap; y >= -200; y--) {
+                if (solid(m, cx, y, z)) {
+                    top = y;
+                    break;
+                }
+            }
+            if (top == Integer.MIN_VALUE) {
+                top = g.surface(cx, z);
+            }
+            if (prev != Integer.MIN_VALUE) {
+                assertTrue(Math.abs(top - prev) <= 1, "a step of " + (top - prev) + " at z " + z);
+            }
+            for (int y = top + 1; y <= top + 3; y++) {
+                assertTrue(!solid(m, cx, y, z), "blocked at " + y + "," + z + ": " + m.get(cx, y, z));
+            }
+            prev = top;
+        }
+    }
+
+    @Test
     void gardens() {
         Model m = new Model();
         List<int[]> rocks = Garden.karesansui(m, new Rect(0, 0, 21, 13), 1, 3);

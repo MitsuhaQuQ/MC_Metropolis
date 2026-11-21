@@ -181,28 +181,29 @@ TEMPLES = {
     # Precincts planned on a plot (rank, scale, seeded choices, terraces on the slope, forest); showGround puts the
     # natural ground in for the preview only.
     "demo_precinct_shrine_small_hill": dict(kind="precinct", role="KEIDAI", precinct="SHRINE", width=33, depth=45,
-                                            seed=3, ground="hillside", foot=40, grade=0.3, steepen=0.006,
+                                            seed=3, ground="worldgen", worldSeed=12345, x=-10232, z=-10272, radius=3000, minRise=6, maxRise=16,
                                             showGround=True, palette="VERMILION"),
     "demo_precinct_shrine_medium_hill": dict(kind="precinct", role="KEIDAI", precinct="SHRINE", width=51, depth=75,
-                                             seed=5, ground="hillside", foot=60, grade=0.25, steepen=0.005,
+                                             seed=5, ground="worldgen", worldSeed=12345, x=-10232, z=-10272, radius=3000, minRise=10, maxRise=25,
                                              showGround=True, palette="HIWADA"),
     "demo_precinct_shrine_large": dict(kind="precinct", role="KEIDAI", precinct="SHRINE", width=75, depth=105, seed=9,
                                        ground="slope", perX=0.03, perZ=-0.06, showGround=True, palette="INARI"),
     "demo_precinct_temple_medium_hill": dict(kind="precinct", role="GARAN", precinct="TEMPLE", width=55, depth=81,
-                                             seed=4, ground="hillside", foot=60, grade=0.22, steepen=0.004,
+                                             seed=4, ground="worldgen", worldSeed=12345, x=-10232, z=-10272, radius=3000, minRise=10, maxRise=25,
                                              showGround=True, palette="NATURAL"),
     "demo_precinct_temple_large": dict(kind="precinct", role="GARAN", precinct="TEMPLE", width=89, depth=121, seed=8,
                                        ground="slope", perX=0, perZ=-0.05, showGround=True, palette="NATURAL"),
     "demo_hall_copper": dict(kind="hall", role="HAIDEN", width=29, depth=21, eave=8.0, ridge=17.0, roof="IRIMOYA", gableInset=4,
                              overhang=4, platform=2, bay=4.0, palette="COPPER"),
-    # A shrine high on a mountainside: the approach climbs ~40 m from the street, gentle at the foot, steeper and
-    # steeper up the hill, so its stairway's treads shorten and landings with torii break the steep flights.
+    # The hillside demos stand on MTM_worldgen's real terrain (seed 12345, round the castle town): each finds the
+    # mountainside site nearest the town whose ground climbs as much as asked from the street to the back.
+    # A shrine high on a mountainside: the approach climbs 30-60 m from the street.
     "demo_precinct_shrine_mountain": dict(kind="precinct", role="KEIDAI", precinct="SHRINE", width=41, depth=121,
-                                          seed=12, ground="hillside", foot=112, grade=0.25, steepen=0.006,
+                                          seed=12, ground="worldgen", worldSeed=12345, x=-10232, z=-10272, radius=3000, minRise=30, maxRise=60,
                                           showGround=True, palette="VERMILION"),
-    # The torii tunnel up a mountain path (Inariyama): gentle at the foot, steeper higher up, landings on the steep part.
+    # The torii tunnel up a mountain path (Inariyama), climbing 18-40 m.
     "demo_senbon_torii_mountain": dict(kind="torii_tunnel", role="TORII", length=60, span=3, height=7, spacing=2,
-                                       ground="hillside", foot=58, grade=0.2, steepen=0.008, showGround=True,
+                                       ground="worldgen", worldSeed=12345, x=-10232, z=-10272, radius=3000, minRise=18, maxRise=40, showGround=True,
                                        palette="INARI"),
     "demo_karesansui": dict(kind="garden", role="TEIEN", style="karesansui", width=25, depth=15, seed=7),
     "demo_moss_garden": dict(kind="garden", role="TEIEN", style="moss", width=15, depth=17, seed=7),

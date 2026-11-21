@@ -9,6 +9,10 @@ import com.mtm.citybuilder.core.building.temple.Belfry;
 import com.mtm.citybuilder.core.building.temple.Corridor;
 import com.mtm.citybuilder.core.building.temple.Furnishing;
 import com.mtm.citybuilder.core.building.temple.Garden;
+import com.mtm.citybuilder.core.building.temple.TerrainGround;
+import com.mtm.citybuilder.core.terrain.WorldgenTerrainView;
+import com.mtm.worldgen.logic.TerrainLogic;
+import com.mtm.worldgen.logic.WorldgenSettings;
 import com.mtm.citybuilder.core.building.temple.Gate;
 import com.mtm.citybuilder.core.building.temple.Ground;
 import com.mtm.citybuilder.core.building.temple.GateStyle;
@@ -88,6 +92,8 @@ public final class TempleModels {
         return m;
     }
 
+    private static final java.util.Map<Long, WorldgenTerrainView> TERRAINS = new java.util.HashMap<>();
+
     static Model build(JsonObject o) {
         TemplePalette palette = TemplePalette.named(str(o, "palette", "NATURAL"));
         return switch (o.get("kind").getAsString()) {
@@ -138,9 +144,28 @@ public final class TempleModels {
 
     /**
      * The ground under a precinct: {@code "ground": "flat"}, {@code "slope"} (with {@code perX}, {@code perZ}) or
-     * {@code "hillside"} (with {@code foot}, {@code grade}, {@code steepen}).
+     * {@code "hillside"} (with {@code foot}, {@code grade}, {@code steepen}), or {@code "worldgen"}: MTM_worldgen's
+     * terrain for {@code seed}, at the mountainside site nearest ({@code x}, {@code z}) within {@code radius} whose
+     * ground climbs between {@code minRise} and {@code maxRise} from the street to the back (see
+     * {@link TerrainGround#find}).
      */
     private static Ground ground(JsonObject o) {
+        if (str(o, "ground", "flat").equals("worldgen")) {
+            long seed = o.get("worldSeed").getAsLong();
+            WorldgenTerrainView t = TERRAINS.computeIfAbsent(seed,
+                    s -> new WorldgenTerrainView(TerrainLogic.forWorld(s, WorldgenSettings.DEFAULT)));
+            int w = o.has("width") ? i(o, "width") : i(o, "span") + 8;
+            int dp = o.has("depth") ? i(o, "depth") : i(o, "length");
+            TerrainGround.Site site = TerrainGround.find(t, i(o, "x", 0), i(o, "z", 0), i(o, "radius", 2000), w, dp,
+                    d(o, "minRise", 20), d(o, "maxRise", 50));
+            if (site == null) {
+                throw new IllegalStateException("no mountainside site near " + i(o, "x", 0) + " " + i(o, "z", 0));
+            }
+            System.out.printf("  %s: site at %d %d facing %s, rise %.1f, tilt %.1f%n", o.get("slug").getAsString(),
+                    site.originX(), site.originZ(), new String[]{"south", "west", "north", "east"}[site.turns()],
+                    site.rise(), site.tilt());
+            return TerrainGround.at(t, site, w, dp);
+        }
         return switch (str(o, "ground", "flat")) {
             case "slope" -> Ground.slope(d(o, "perX", 0), d(o, "perZ", -0.2));
             case "hillside" -> Ground.hillside(i(o, "foot", 0), d(o, "grade", 0.25), d(o, "steepen", 0.004));
