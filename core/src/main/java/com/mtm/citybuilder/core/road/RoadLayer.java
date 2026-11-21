@@ -161,6 +161,10 @@ public final class RoadLayer {
         final byte[] kind;
         final float[] suit;
         final float[] ground;
+        /** How far each node lies from the nearest river's water, in the corridor; infinite elsewhere. */
+        final float[] riverEdge;
+        /** How many of three points along each node's step each way lie in a river: -1 not yet looked. */
+        final byte[] wet;
 
         Window(RoadEdge edge) {
             double margin = margin(edge.length());
@@ -171,6 +175,10 @@ public final class RoadLayer {
             kind = new byte[width * height];
             suit = new float[width * height];
             ground = new float[width * height];
+            riverEdge = new float[width * height];
+            java.util.Arrays.fill(riverEdge, Float.POSITIVE_INFINITY);
+            wet = new byte[width * height * STEPS.length];
+            java.util.Arrays.fill(wet, (byte) -1);
             // Columns read the terrain independently: in parallel
             java.util.stream.IntStream.range(0, width).parallel().forEach(i -> {
                 for (int j = 0; j < height; j++) {
@@ -189,6 +197,43 @@ public final class RoadLayer {
 
         boolean inside(int i, int j) {
             return i >= 0 && j >= 0 && i < width && j < height;
+        }
+
+        /**
+         * The share of a step (from node k by STEPS[d] to node m) that runs in a river, from three points along it:
+         * none where no river comes near either end.
+         */
+        double wetShare(int k, int d, int m) {
+            if (riverEdge[k] > 1.5 * grid && riverEdge[m] > 1.5 * grid) {
+                return 0.0;
+            }
+            int at = k * STEPS.length + d;
+            byte known = wet[at];
+            if (known < 0) {
+                double ax = (double) (originX + k / height) * grid;
+                double az = (double) (originZ + k % height) * grid;
+                byte count = 0;
+                for (int q = 1; q <= 3; q++) {
+                    double t = q / 4.0;
+                    RiverSample river = terrain.nearestRiver(ax + STEPS[d][0] * grid * t, az + STEPS[d][1] * grid * t);
+                    count += river != null && river.inWater() ? 1 : 0;
+                }
+                wet[at] = count;
+                known = count;
+            }
+            return known / 3.0;
+        }
+
+        /** Whether any of the nodes in a stretch of a path lies near a river. */
+        boolean nearRiver(double[][] nodes, int from, int to) {
+            for (int k = from; k <= to; k++) {
+                int i = (int) Math.round(nodes[k][0] / grid) - originX;
+                int j = (int) Math.round(nodes[k][1] / grid) - originZ;
+                if (inside(i, j) && riverEdge[index(i, j)] <= 1.5 * grid) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /** The kind of the node nearest to a position; blocked outside the window. */
@@ -260,6 +305,11 @@ public final class RoadLayer {
                         if (Double.isNaN(below.suitabilityNode(originX + i, originZ + j))) {
                             kind[k] = WATER;
                         }
+                        // Rivers narrower than the grid run between its nodes: how far off this one's is
+                        RiverSample river = terrain.nearestRiver((double) (originX + i) * grid, (double) (originZ + j) * grid);
+                        if (river != null) {
+                            riverEdge[k] = (float) river.bankDistance();
+                        }
                     }
                 }
             }
@@ -315,7 +365,8 @@ public final class RoadLayer {
             int i = k / w.height;
             int j = k % w.height;
             boolean steepAhead = false;
-            for (int[] step : STEPS) {
+            for (int d = 0; d < STEPS.length; d++) {
+                int[] step = STEPS[d];
                 int ni = i + step[0];
                 int nj = j + step[1];
                 if (!w.inside(ni, nj)) {
@@ -333,11 +384,13 @@ public final class RoadLayer {
                     next = length * (1.0 + (w.kind[m] == WATER ? config.bridgeCost : 0.0));
                 } else {
                     double poor = 1.0 + config.unsuitCost * (1.0 - w.suit[m]);
+                    // A river narrower than the grid between the nodes: what of the step runs over it is bridge
+                    double bridged = length * w.wetShare(k, d, m) * config.bridgeCost;
                     if (rise <= config.maxGrade * length) {
-                        next = length * poor + config.climbCost * rise;
+                        next = length * poor + config.climbCost * rise + bridged;
                     } else {
                         steepAhead |= w.ground[m] > w.ground[k];
-                        next = rise / config.maxGrade * config.switchbackCost * poor + config.climbCost * rise;
+                        next = rise / config.maxGrade * config.switchbackCost * poor + config.climbCost * rise + bridged;
                         kind = CLIMB;
                     }
                 }
@@ -738,7 +791,31 @@ public final class RoadLayer {
                 return false;
             }
         }
-        return water <= 2 * routeWater;
+        if (water > 2 * routeWater) {
+            return false;
+        }
+        // Rivers narrower than the grid: no wetter than the route it replaces
+        if (w.nearRiver(nodes, i, j)) {
+            int routeWet = 0;
+            for (int k = i; k < j; k++) {
+                routeWet += wetCount(nodes[k], nodes[k + 1]);
+            }
+            return wetCount(nodes[i], nodes[j]) <= routeWet + 1;
+        }
+        return true;
+    }
+
+    /** How many points 8 apart along a straight lie in a river. */
+    private int wetCount(double[] a, double[] b) {
+        double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        int steps = Math.max(1, (int) Math.ceil(length / 8.0));
+        int count = 0;
+        for (int q = 1; q < steps; q++) {
+            double t = (double) q / steps;
+            RiverSample river = terrain.nearestRiver(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t);
+            count += river != null && river.inWater() ? 1 : 0;
+        }
+        return count;
     }
 
     /** Drops kept vertices whose curve cannot reach the least radius, where the straight past them is allowed. */
