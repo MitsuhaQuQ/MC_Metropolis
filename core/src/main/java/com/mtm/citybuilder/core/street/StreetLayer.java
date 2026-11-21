@@ -1134,6 +1134,88 @@ public final class StreetLayer {
     }
 
     /**
+     * A street that stops at the edge of another (traced up to a line laid before it) carried on to that street's
+     * middle: its end, met by no other piece, moved onto the nearest centre line ahead of it within that street's half
+     * width and {@link #SNAP_REACH}, so the two meet in a junction instead of the first ending in a round cap of
+     * pavement beside the other's kerb. Bridges and footpaths keep their ends.
+     */
+    static void snapEnds(List<StreetSegment> segments) {
+        Map<Long, Integer> ends = new HashMap<>();
+        Map<Long, List<Integer>> cells = new HashMap<>();
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            // A footpath ending where a street does is no way on for the street's traffic
+            if (g.streetClass() == StreetClass.PATH) {
+                continue;
+            }
+            ends.merge(bridgeEnd(g.x1(), g.z1()), 1, Integer::sum);
+            ends.merge(bridgeEnd(g.x2(), g.z2()), 1, Integer::sum);
+            double reach = 0.5 * g.width() + SNAP_REACH;
+            for (long cx = (long) Math.floor((Math.min(g.x1(), g.x2()) - reach) / 32); cx <= (long) Math.floor((Math.max(g.x1(), g.x2()) + reach) / 32); cx++) {
+                for (long cz = (long) Math.floor((Math.min(g.z1(), g.z2()) - reach) / 32); cz <= (long) Math.floor((Math.max(g.z1(), g.z2()) + reach) / 32); cz++) {
+                    cells.computeIfAbsent((cx << 32) ^ (cz & 0xFFFFFFFFL), k -> new ArrayList<>()).add(p);
+                }
+            }
+        }
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            if (g.streetClass() == StreetClass.PATH || g.structure() == StreetStructure.BRIDGE) {
+                continue;
+            }
+            for (int end = 0; end < 2; end++) {
+                double ex = end == 0 ? g.x1() : g.x2();
+                double ez = end == 0 ? g.z1() : g.z2();
+                if (ends.getOrDefault(bridgeEnd(ex, ez), 0) != 1) {
+                    continue;
+                }
+                double ox = end == 0 ? g.x2() : g.x1();
+                double oz = end == 0 ? g.z2() : g.z1();
+                double length = Math.hypot(ex - ox, ez - oz);
+                if (length < 1e-6) {
+                    continue;
+                }
+                double dx = (ex - ox) / length;
+                double dz = (ez - oz) / length;
+                double[] best = null;
+                double bestDistance = Double.POSITIVE_INFINITY;
+                long key = ((long) Math.floor(ex / 32) << 32) ^ ((long) Math.floor(ez / 32) & 0xFFFFFFFFL);
+                for (int q : cells.getOrDefault(key, List.of())) {
+                    if (q == p) {
+                        continue;
+                    }
+                    StreetSegment o = segments.get(q);
+                    // Not the street it runs on from, nor one its other end already meets
+                    if (bridgeEnd(o.x1(), o.z1()) == bridgeEnd(ox, oz) || bridgeEnd(o.x2(), o.z2()) == bridgeEnd(ox, oz)) {
+                        continue;
+                    }
+                    double qx = o.x2() - o.x1();
+                    double qz = o.z2() - o.z1();
+                    double t = Math.max(0, Math.min(1, ((ex - o.x1()) * qx + (ez - o.z1()) * qz) / Math.max(1e-9, qx * qx + qz * qz)));
+                    double px = o.x1() + qx * t;
+                    double pz = o.z1() + qz * t;
+                    double d = Math.hypot(px - ex, pz - ez);
+                    // Within the other street or just short of its edge, and ahead of the end, not behind it
+                    if (d > 1e-3 && d <= 0.5 * o.width() + SNAP_REACH && (px - ex) * dx + (pz - ez) * dz > -0.5
+                            && d < bestDistance) {
+                        bestDistance = d;
+                        best = new double[]{px, pz};
+                    }
+                }
+                if (best != null) {
+                    StreetSegment moved = end == 0
+                            ? new StreetSegment(best[0], best[1], g.x2(), g.z2(), g.streetClass(), g.era(), g.width(), g.structure())
+                            : new StreetSegment(g.x1(), g.z1(), best[0], best[1], g.streetClass(), g.era(), g.width(), g.structure());
+                    segments.set(p, moved);
+                    g = moved;
+                }
+            }
+        }
+    }
+
+    /** How far short of another street's edge a dead end may stop and still be carried on to meet it. */
+    private static final double SNAP_REACH = 2.5;
+
+    /**
      * Bridges left reaching no street: a run of bridge pieces (joined end to end) one of whose banks no street on the
      * land meets, at its end or across its middle, goes, and again until none is left; a bridge over to nothing is
      * worse than none. Its street was cut back after it was laid (a piece too steep dropped, an estate cleared, an old
@@ -1472,6 +1554,7 @@ public final class StreetLayer {
             }
         }
         clearEstates(window, segments);
+        snapEnds(segments);
         dropLooseBridges(segments);
         List<Promenade> promenades = formation == Formation.VILLAGE ? List.of()
                 : promenades(settlement, window, canals, segments);
@@ -4271,6 +4354,29 @@ public final class StreetLayer {
             }
             segments.set(k, new StreetSegment(g.x1(), g.z1(), g.x2(), g.z2(), StreetClass.COLLECTOR, g.era(),
                     Math.min(g.width(), config.collectorWidth), g.structure()));
+        }
+        // The busiest arterials widened: in a metropolis the most used to four lanes each way, then in a city or
+        // metropolis the next to three (the station avenue as it is)
+        boolean metropolis = settlement.tier() == com.mtm.citybuilder.core.settlement.SettlementTier.METROPOLIS;
+        boolean city = metropolis || settlement.tier() == com.mtm.citybuilder.core.settlement.SettlementTier.CITY;
+        if (city) {
+            double grand = metropolis ? config.grandAvenueShare * arterialLength : 0.0;
+            double avenue = grand + config.avenueShare * arterialLength;
+            double widened = 0.0;
+            for (int e : arterials) {
+                int k = edgePiece.get(e);
+                StreetSegment g = segments.get(k);
+                if (g.streetClass() != StreetClass.ARTERIAL || g.width() > config.arterialWidth) {
+                    continue;
+                }
+                if (widened >= avenue) {
+                    break;
+                }
+                double width = widened < grand ? config.grandAvenueWidth : config.avenueWidth;
+                widened += g.length();
+                segments.set(k, new StreetSegment(g.x1(), g.z1(), g.x2(), g.z2(), g.streetClass(), g.era(), width,
+                        g.structure()));
+            }
         }
         return used;
     }

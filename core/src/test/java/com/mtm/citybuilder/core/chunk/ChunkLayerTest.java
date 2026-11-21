@@ -193,6 +193,23 @@ class ChunkLayerTest {
     }
 
     @Test
+    void avenuesHaveThreeOrFourLanesEachWay() {
+        // Six lanes, 26 wide: pavements of 4, a carriageway of 9 each way in three lanes, lines at 3 and 6
+        assertEquals(ChunkLayer.Paving.YELLOW_LINE, paving(ChunkLayer.Surface.ARTERIAL, 0.0, 2.0, 26.0));
+        assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.ARTERIAL, 3.0, 2.0, 26.0));
+        assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.ARTERIAL, -6.0, 2.0, 26.0));
+        assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.ARTERIAL, 4.5, 2.0, 26.0));
+        assertEquals(ChunkLayer.Paving.SIDEWALK, paving(ChunkLayer.Surface.ARTERIAL, 10.5, 2.0, 26.0));
+        // Eight lanes, 36 wide: a raised divider of 2, four lanes of 3.25 each way, lines along the divider
+        assertEquals(ChunkLayer.Paving.SIDEWALK, paving(ChunkLayer.Surface.ARTERIAL, 0.5, 2.0, 36.0));
+        assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.ARTERIAL, 1.5, 2.0, 36.0));
+        assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.ARTERIAL, -(1.0 + 13.0 / 4), 2.0, 36.0));
+        assertEquals(ChunkLayer.Paving.SIDEWALK, paving(ChunkLayer.Surface.ARTERIAL, 15.5, 2.0, 36.0));
+        // An ordinary arterial, 16 wide, keeps its two lanes each way
+        assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.ARTERIAL, 2.5, 2.0, 16.0));
+    }
+
+    @Test
     void streetsHaveLightsDrainsAndDitches() {
         // An arterial 16 wide heading +x: pavements of 3, carriageway 5 either side of the centre line
         ChunkLayer.Column left = new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false, Double.NaN, 5.5, 0.0, 0.5, 16.0);

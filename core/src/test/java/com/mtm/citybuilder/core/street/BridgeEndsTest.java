@@ -16,7 +16,11 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Bridges in a real town (seed 12345's castle town): each one's banks reached by a street on the ground. */
+/**
+ * Seed 12345's castle town on real terrain, one plan for all the checks (a real town's plan and terrain are large: one
+ * at a time): each bridge's banks reached by a street on the ground and every piece paved; no street stopping short of
+ * another; the streets laid smoothly near the ground.
+ */
 class BridgeEndsTest {
     private static final long SEED = 12345L;
 
@@ -101,12 +105,11 @@ class BridgeEndsTest {
         int bridgePieces = pieces;
         System.out.println("bridge pieces " + pieces + ", unpaved " + unpaved);
         assertTrue(unpaved.isEmpty(), () -> "bridge pieces left unpaved of " + bridgePieces + ": " + unpaved);
+        noStreetStopsShortOfAnother(segments);
+        streetsAreLaidSmoothlyNearTheGround(logic, terrain);
     }
 
-    @Test
-    void streetsAreLaidSmoothlyNearTheGround() {
-        WorldgenTerrainView terrain = new WorldgenTerrainView(TerrainLogic.forWorld(SEED, WorldgenSettings.DEFAULT));
-        CityLogic logic = new CityLogic(SEED, CitySettings.DEFAULT, terrain);
+    private static void streetsAreLaidSmoothlyNearTheGround(CityLogic logic, WorldgenTerrainView terrain) {
         com.mtm.citybuilder.core.chunk.ChunkLayer chunks = logic.chunks();
         int cx = Math.floorDiv(-10232, 16);
         int cz = Math.floorDiv(-10272, 16);
@@ -142,6 +145,63 @@ class BridgeEndsTest {
         assertTrue(streets > 1000, () -> "streets " + s);
         assertTrue(s <= 1.0, () -> "a street steps " + s + " between neighbouring blocks");
         assertTrue(f < 8.0, () -> "a street laid " + f + " from the ground");
+    }
+
+    private static void noStreetStopsShortOfAnother(List<StreetSegment> segments) {
+        Map<Long, Integer> count = new HashMap<>();
+        for (StreetSegment g : segments) {
+            if (g.streetClass() != StreetClass.PATH) {
+                count.merge(key(g.x1(), g.z1()), 1, Integer::sum);
+                count.merge(key(g.x2(), g.z2()), 1, Integer::sum);
+            }
+        }
+        int deadEnds = 0;
+        List<String> short_ = new ArrayList<>();
+        for (StreetSegment g : segments) {
+            if (g.streetClass() == StreetClass.PATH || g.structure() == StreetStructure.BRIDGE) {
+                continue;
+            }
+            for (double[] e : new double[][]{{g.x1(), g.z1(), g.x2(), g.z2()}, {g.x2(), g.z2(), g.x1(), g.z1()}}) {
+                if (count.get(key(e[0], e[1])) != 1) {
+                    continue;
+                }
+                deadEnds++;
+                // Already on another street (met at its middle): joined
+                boolean on = false;
+                for (StreetSegment o : segments) {
+                    if (o != g && o.streetClass() != StreetClass.PATH && distance(o, e[0], e[1]) <= 0.5 * o.width()) {
+                        on = true;
+                        break;
+                    }
+                }
+                if (on) {
+                    continue;
+                }
+                double length = Math.hypot(e[0] - e[2], e[1] - e[3]);
+                double dx = (e[0] - e[2]) / length;
+                double dz = (e[1] - e[3]) / length;
+                for (StreetSegment o : segments) {
+                    if (o == g || o.streetClass() == StreetClass.PATH
+                            || key(o.x1(), o.z1()) == key(e[2], e[3]) || key(o.x2(), o.z2()) == key(e[2], e[3])) {
+                        continue;
+                    }
+                    double qx = o.x2() - o.x1();
+                    double qz = o.z2() - o.z1();
+                    double t = Math.max(0, Math.min(1, ((e[0] - o.x1()) * qx + (e[1] - o.z1()) * qz) / Math.max(1e-9, qx * qx + qz * qz)));
+                    double px = o.x1() + qx * t - e[0];
+                    double pz = o.z1() + qz * t - e[1];
+                    double d = Math.hypot(px, pz);
+                    // Short of the other's centre, ahead of the end, near its edge: it stopped at the kerb
+                    if (d > 0.01 && d <= 0.5 * o.width() + 2.5 && px * dx + pz * dz > 0.5 && short_.size() < 10) {
+                        short_.add(g.streetClass() + " at " + Math.round(e[0]) + " " + Math.round(e[1]) + " short of " + o.streetClass()
+                                + " by " + String.format("%.1f", d));
+                    }
+                }
+            }
+        }
+        int ends = deadEnds;
+        System.out.println("dead ends " + ends + ", stopping short " + short_);
+        assertTrue(short_.isEmpty(), () -> "streets stopping short of another: " + short_);
     }
 
     private static long key(double x, double z) {

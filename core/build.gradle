@@ -40,7 +40,7 @@ test {
     // Two test JVMs, each running its tests concurrently (src/test/resources/junit-platform.properties), with room
     // for every test's towns in memory at once; -PtestForks=<n> to change, -PtestHeap=<size> for each one's heap
     maxParallelForks = providers.gradleProperty("testForks").map { it as int }.getOrElse(2)
-    maxHeapSize = providers.gradleProperty("testHeap").getOrElse("16g")
+    maxHeapSize = providers.gradleProperty("testHeap").getOrElse("32g")
     jvmArgs "-XX:+UseParallelGC"
     testLogging {
         events "failed"

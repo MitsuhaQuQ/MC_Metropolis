@@ -74,7 +74,9 @@ class PlotLayerTest {
                 // Along its street within the lot's frontage; a strip joined from across, measured from the lot's
                 // street, may reach a little past it
                 // (frontages carry the walls' allowance, so a joined strip may reach some way past a wide parcel's ends)
-                assertTrue(plot.along() >= plot.start() - 40 && plot.along() <= plot.end() + 40, () -> "along " + plot);
+                // (and the lots are cut wider for the game: frontageScale)
+                double past = 40 * CitySettings.DEFAULT.plots.frontageScale;
+                assertTrue(plot.along() >= plot.start() - past && plot.along() <= plot.end() + past, () -> "along " + plot);
                 assertTrue(plot.depth() >= 0 && plot.depth() <= plot.maxDepth(), () -> "depth " + plot);
                 Plot before = seen.putIfAbsent(plot.id(), plot);
                 if (before != null) {

@@ -263,10 +263,12 @@ public final class ChunkLayer {
             return new Mark(Paving.SIDEWALK, 0, 0);
         }
         List<Line> lines = new ArrayList<>();
-        if (column.surface == Surface.BOULEVARD) {
-            double median = 0.5 * MEDIAN;
+        double divider = median(column.surface, width);
+        if (divider > 0) {
+            // A boulevard's planted median, or the raised divider of a road four lanes each way
+            double median = 0.5 * divider;
             if (Math.abs(column.across) < median) {
-                return new Mark(column.bridge ? Paving.SIDEWALK : Paving.MEDIAN, 0, 0);
+                return new Mark(column.bridge || column.surface != Surface.BOULEVARD ? Paving.SIDEWALK : Paving.MEDIAN, 0, 0);
             }
             double side = carriage - median;
             int lanes = Math.max(1, (int) Math.floor(side / 3.0));
@@ -282,13 +284,17 @@ public final class ChunkLayer {
         } else if (walk > 0) {
             lines.add(new Line(0.0, Paving.WHITE_LINE, false));
         }
-        if (walk > 0 && column.surface != Surface.BOULEVARD) {
+        if (walk > 0 && divider == 0) {
             lines.add(new Line(carriage - 0.5, Paving.WHITE_LINE, false));
             lines.add(new Line(-(carriage - 0.5), Paving.WHITE_LINE, false));
         }
-        if (carriage >= 5.0 && column.surface != Surface.BOULEVARD) {
-            lines.add(new Line(0.5 * carriage, Paving.WHITE_LINE, true));
-            lines.add(new Line(-0.5 * carriage, Paving.WHITE_LINE, true));
+        if (carriage >= 5.0 && divider == 0) {
+            // Lanes about 3.25 wide each way, dashed lines between them: two on an arterial, three on an avenue
+            int lanes = Math.max(1, (int) Math.round(carriage / 3.25));
+            for (int k = 1; k < lanes; k++) {
+                lines.add(new Line(carriage * k / lanes, Paving.WHITE_LINE, true));
+                lines.add(new Line(-carriage * k / lanes, Paving.WHITE_LINE, true));
+            }
         }
         // A carriageway with pavements beside it is laid low
         Mark drawn = draw(lines, column.across, column.heading, column.along, walk > 0);
@@ -357,7 +363,7 @@ public final class ChunkLayer {
         if (marked(column.surface)) {
             double walk = walk(column.width);
             double carriage = 0.5 * column.width - walk;
-            if (column.surface == Surface.BOULEVARD && Math.abs(column.across) < 0.5 && Math.floorMod(along, 30) == 0) {
+            if (median(column.surface, column.width) > 0 && Math.abs(column.across) < 0.5 && Math.floorMod(along, 30) == 0) {
                 return new Furniture(Fixture.LIGHT_DOUBLE, column.heading + 0.5 * Math.PI);
             }
             if (walk > 0 && Math.abs(column.across) >= carriage + 0.5 && Math.abs(column.across) < carriage + 1.5
@@ -598,6 +604,14 @@ public final class ChunkLayer {
     public static int angle(double heading) {
         double steps = heading / Math.PI * ANGLES;
         return Math.floorMod(Math.round(steps), ANGLES);
+    }
+
+    /**
+     * The width of a street's median: a boulevard's planted one ({@link #MEDIAN}), a raised divider of 2 down a main
+     * road four lanes each way (30 wide and more), none on the rest.
+     */
+    static double median(Surface surface, double width) {
+        return surface == Surface.BOULEVARD ? MEDIAN : surface == Surface.ARTERIAL && width >= 30.0 ? 2.0 : 0.0;
     }
 
     /** The pavement either side of a marked street: 3 from 14 wide, 4 from 20, none narrower. */
@@ -1347,7 +1361,7 @@ public final class ChunkLayer {
                 continue;
             }
             double half = 0.5 * g.width();
-            double from = marked ? (surface == Surface.BOULEVARD ? 0.5 * MEDIAN : 0.0) : -half;
+            double from = marked ? 0.5 * median(surface, g.width()) : -half;
             double to = marked ? half - walk(g.width()) - 0.5 : half;
             double reach = Math.max(Math.abs(from), Math.abs(to));
             for (int end = 0; end < 2; end++) {

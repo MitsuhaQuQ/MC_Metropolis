@@ -50,7 +50,11 @@ public final class TownPlots {
     private final List<double[][]> depths = new ArrayList<>();
     /** Per chain and side: each lot's district, the one behind its start, as it was cut by. */
     private final List<District[][]> districts = new ArrayList<>();
-    private final Map<Long, List<Integer>> cells = new HashMap<>();
+    /**
+     * The pieces near each cell of {@link #CELL}, as plain arrays of their indices: every piece is listed in every cell
+     * within its reach, millions of entries in a city, boxed numbers in lists would take gigabytes.
+     */
+    private final Map<Long, int[]> cells = new HashMap<>();
     /** The canals' pieces by cell: {x1, z1, x2, z2, half width with the walls}. */
     private final Map<Long, List<double[]>> canalCells = new HashMap<>();
     private final double reach;
@@ -130,15 +134,26 @@ public final class TownPlots {
                 }
             }
         }
+        Map<Long, int[]> growing = new HashMap<>();
         for (int p = 0; p < pieces.size(); p++) {
             StreetSegment g = pieces.get(p);
             // A works' or quay's street reaches further back: their blocks are large
             double reach = works(g) ? this.reach - config.backReach + config.industrialReach : this.reach;
             for (long cx = (long) Math.floor((Math.min(g.x1(), g.x2()) - reach) / CELL); cx <= (long) Math.floor((Math.max(g.x1(), g.x2()) + reach) / CELL); cx++) {
                 for (long cz = (long) Math.floor((Math.min(g.z1(), g.z2()) - reach) / CELL); cz <= (long) Math.floor((Math.max(g.z1(), g.z2()) + reach) / CELL); cz++) {
-                    cells.computeIfAbsent((cx << 32) ^ (cz & 0xFFFFFFFFL), k -> new ArrayList<>()).add(p);
+                    // The cell's indices after a count in the first slot, grown as needed
+                    int[] list = growing.computeIfAbsent((cx << 32) ^ (cz & 0xFFFFFFFFL), k -> new int[5]);
+                    if (list[0] + 1 == list.length) {
+                        list = java.util.Arrays.copyOf(list, list.length * 2);
+                        growing.put((cx << 32) ^ (cz & 0xFFFFFFFFL), list);
+                    }
+                    list[++list[0]] = p;
                 }
             }
+        }
+        for (Map.Entry<Long, int[]> e : growing.entrySet()) {
+            int[] list = e.getValue();
+            cells.put(e.getKey(), java.util.Arrays.copyOfRange(list, 1, list[0] + 1));
         }
     }
 
@@ -608,7 +623,7 @@ public final class TownPlots {
         int band = fromStreet <= 25 ? 0 : fromStreet <= 40 ? 1 : fromStreet <= 60 ? 2 : 3;
         boolean dense = front.district() == District.OLD_TOWN || front.district() == District.CENTRAL
                 || front.district() == District.STATION_FRONT;
-        double open = config.backOpen[band] * (dense ? config.backOpenDense : 1.0);
+        double open = config.backOpen[band] * (dense ? config.backOpenDense : 1.0) * config.backOpenScale;
         Plot.Use use;
         if (Hash.unit(id) < open) {
             double[] p = pointAt(template.chain(), middle);
@@ -642,7 +657,7 @@ public final class TownPlots {
         double back = 0.5 * template.streetWidth() + depth;
         double x = p[0] - p[3] * template.side() * back;
         double z = p[1] + p[2] * template.side() * back;
-        for (int q : cells.getOrDefault(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL), List.of())) {
+        for (int q : cells.getOrDefault(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL), new int[0])) {
             StreetSegment g = pieces.get(q);
             if (g.streetClass() != StreetClass.LANE) {
                 continue;
@@ -1020,7 +1035,7 @@ public final class TownPlots {
         if (inCanal(x, z) || plan.plazaAt(x, z) != null) {
             return null;
         }
-        List<Integer> near = cells.get(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL));
+        int[] near = cells.get(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL));
         if (near == null) {
             return null;
         }
@@ -1105,7 +1120,7 @@ public final class TownPlots {
                 return true;
             }
         }
-        List<Integer> near = cells.get(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL));
+        int[] near = cells.get(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL));
         if (near == null) {
             return false;
         }

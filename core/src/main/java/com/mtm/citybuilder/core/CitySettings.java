@@ -108,7 +108,7 @@ public final class CitySettings {
     }
 
     /**
-     * What a town's streets and facilities are for (see core.function and the design document, "城市细部功能"),
+     * What a town's streets and facilities are for (see core.function and the design document, "åŸŽå¸‚ç»†éƒ¨åŠŸèƒ½"),
      * calibrated on PLATEAU's buildings along OpenStreetMap's streets (tools/assets/plateau_uses.py).
      * <p>
      * Shopping streets by distance from the town's middle {0-0.5, 0.5-1, 1-2, over 2 km}, the chance a street, a lane
@@ -427,7 +427,7 @@ public final class CitySettings {
         public double tunnelDepth = 15.0;
         public double bridgeHeight = 8.0;
         /**
-         * Geometry by Japan's road structure ordinance (道路構造令), trunk roads as class 3 type 1 at 60 km/h, local
+         * Geometry by Japan's road structure ordinance (é“è·¯æ§‹é€ ä»¤), trunk roads as class 3 type 1 at 60 km/h, local
          * roads as class 3 type 3 at 40 km/h: least curve radius, the radius curves get where there is room, grade, the
          * grade allowed in hills and mountains (the ordinance's exception for hard terrain), and width curb to curb;
          * trunk roads between two metropolises have four lanes.
@@ -443,7 +443,7 @@ public final class CitySettings {
         public double localGrade = 0.07;
         public double localMountainGrade = 0.09;
         public double localWidth = 8.0;
-        /** Each transition curve's length (the ordinance's least 緩和区間 at the design speed), trunk and local. */
+        /** Each transition curve's length (the ordinance's least ç·©å’ŒåŒºé–“ at the design speed), trunk and local. */
         public double trunkTransition = 50.0;
         public double localTransition = 35.0;
         /** Straightening the routed line may move it at most this far from the route, nor onto ground this much higher or lower. */
@@ -788,6 +788,16 @@ public final class CitySettings {
         public double collectorWidth = 11.0;
         public double mainShare = 0.6;
         /**
+         * The busiest of the main roads widened, as the national roads through Japanese cities are: in a city or
+         * metropolis the share {@code avenueShare} of the arterials' length most used carries three lanes each way
+         * ({@code avenueWidth}: pavements of 4, a yellow centre line), and in a metropolis the most used share
+         * {@code grandAvenueShare} four lanes each way ({@code grandAvenueWidth}, a raised divider down the middle).
+         */
+        public double avenueWidth = 26.0;
+        public double avenueShare = 0.2;
+        public double grandAvenueWidth = 36.0;
+        public double grandAvenueShare = 0.08;
+        /**
          * A street meeting another at a sharper angle than this, leaving a wedge of a block too thin to build on, is
          * bent to meet it squarely (OpenStreetMap: under 1% of junction corners sharper than 30 degrees).
          */
@@ -953,7 +963,7 @@ public final class CitySettings {
         public double hillMin = 120.0;
         public double bankJoin = 120.0;
         /**
-         * Irrigation canals (yōsui) in a castle, temple or port town with at least {@code canalMinOld} square blocks of
+         * Irrigation canals (yÅsui) in a castle, temple or port town with at least {@code canalMinOld} square blocks of
          * old town and a bank road within {@code canalReach} of it: {@code canalWidth} wide, from an intake upstream
          * to an outfall at least {@code canalMinRun} downstream; a metropolis's second {@code canalApart} to one side
          * of the first. The street along a canal keeps {@code canalBankClear} from its ends, where the bank road is.
@@ -1086,6 +1096,12 @@ public final class CitySettings {
         public double poleWidth = 2.5;
         public double[] backOpen = {0.25, 0.35, 0.45, 0.6};
         public double backOpenDense = 0.7;
+        /**
+         * The measured shares of open back land times this in the game: a large block's inside left as its real share
+         * of yards and fields reads as an empty field among the houses (the user, 2026-11-22), so most back lots are
+         * built.
+         */
+        public double backOpenScale = 0.4;
         public double backParking = 0.4;
         public double backFieldReach = 2000.0;
         public double backFlats = 0.18;
@@ -1137,7 +1153,7 @@ public final class CitySettings {
 
     /**
      * The squares in front of the main stations (L5, ekimae), after Toyama's south square: a template by the town's
-     * tier, laid on the station's front toward its avenue (design document L5, "站前广场"). Every template has the
+     * tier, laid on the station's front toward its avenue (design document L5, "ç«™å‰å¹¿åœº"). Every template has the
      * station building's land against the platforms, a pedestrian forecourt in front of it, and a nearly round one-way
      * loop ({@code lane} wide: a lane to stop in and one to drive on) round an island, ringed by a pavement
      * {@code walk} wide, its throat on the avenue split by a planted {@code median}. Per template {building width,
