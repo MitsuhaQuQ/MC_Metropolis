@@ -1,5 +1,6 @@
 package com.mtm.citybuilder.core.building.rail;
 
+import com.mtm.citybuilder.core.building.rail.mtr.VerticalProfile;
 import com.mtm.citybuilder.core.building.temple.Model;
 
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ public final class Viaduct {
     private final int width;
     private final int level;
     private final int levelEnd;
+    private final VerticalProfile profile;
     private final Spans.Limits limits;
     private final int columns;
     private final int[] trackZ;
@@ -62,6 +64,16 @@ public final class Viaduct {
             this.deck = deck;
             this.length = length;
             this.level = level;
+        }
+
+        private double gradeStart;
+        private double gradeEnd;
+
+        /** The grades set on the nodes at the two ends (rise over length along x; 0, level, by default). */
+        public Builder grades(double start, double end) {
+            this.gradeStart = start;
+            this.gradeEnd = end;
+            return this;
         }
 
         /** The deck's level at x = length (the default: level all along). */
@@ -150,6 +162,9 @@ public final class Viaduct {
         this.width = Math.max(3, w | 1);
         this.level = b.level;
         this.levelEnd = b.levelEnd != null ? b.levelEnd : b.level;
+        this.profile = levelEnd == level && b.gradeStart == 0 && b.gradeEnd == 0 ? null
+                : VerticalProfile.of(b.length, level, levelEnd, b.gradeStart, b.gradeEnd, VerticalProfile.DEFAULT_RADIUS,
+                VerticalProfile.DEFAULT_RADIUS);
         this.limits = b.limits != null ? b.limits
                 : b.deck == Deck.ROAD ? Spans.Limits.ROAD : b.deck == Deck.FOOT ? Spans.Limits.FOOT : Spans.Limits.RAIL;
         this.columns = b.columns > 0 ? b.columns
@@ -189,13 +204,25 @@ public final class Viaduct {
         return length;
     }
 
-    /** The walking level at x (the deck's top block one below), straight from {@code level} to {@code levelEnd}. */
+    /**
+     * The rail's height at x as MTR lays it between nodes at {@code level} and {@code levelEnd} with the end grades
+     * given ({@link VerticalProfile}: vertical curves of radius 500 into and out of a constant grade).
+     */
+    public double railY(int x) {
+        return profile == null ? level : profile.getY(Math.max(0, Math.min(length, x + 0.5)));
+    }
+
+    /**
+     * The walking level at x: the deck's top block one below, at the rail's height or under it (taken down to the
+     * block); {@link #halfStep} where the rail is half a block or more above it.
+     */
     public int levelAt(int x) {
-        if (level == levelEnd) {
-            return level;
-        }
-        double f = Math.max(0, Math.min(1, x / (double) length));
-        return (int) Math.round(level + f * (levelEnd - level));
+        return (int) Math.floor(railY(x) + 1e-6);
+    }
+
+    /** Whether the deck at x carries a bottom slab at {@link #levelAt}, the rail being in the upper half there. */
+    public boolean halfStep(int x) {
+        return profile != null && railY(x) - levelAt(x) >= 0.5 - 1e-6;
     }
 
     public int level() {
@@ -526,6 +553,17 @@ public final class Viaduct {
                     }
                     m.set(x, lv, -h, RailPalette.edgeZ(p.railing(), true));
                     m.set(x, lv, h, RailPalette.edgeZ(p.railing(), false));
+                }
+            }
+        }
+        // Where the rail is in the upper half of a block, a bottom slab over the deck so it does not float
+        if (profile != null) {
+            for (int x = 1; x < length; x++) {
+                if (halfStep(x)) {
+                    int lv = levelAt(x);
+                    for (int z = -h + 1; z <= h - 1; z++) {
+                        m.set(x, lv, z, RailPalette.slab(p.concreteSlab(), false));
+                    }
                 }
             }
         }

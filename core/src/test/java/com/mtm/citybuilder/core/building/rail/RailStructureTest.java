@@ -89,7 +89,10 @@ class RailStructureTest {
                     for (int tc : v.trackCentres()) {
                         for (int x = 1; x < 160; x++) {
                             assertEquals(P.ballast(), m.get(x, v.levelAt(x) - 1, tc), "bed at " + x);
-                            for (int y = v.levelAt(x); y <= v.levelAt(x) + 4; y++) {
+                            if (v.halfStep(x)) {  // the rail in the upper half of a block: a slab under it
+                                assertTrue(base(m.get(x, v.levelAt(x), tc)).endsWith("_slab"), "half step at " + x);
+                            }
+                            for (int y = v.levelAt(x) + (v.halfStep(x) ? 1 : 0); y <= v.levelAt(x) + 4; y++) {
                                 for (int z = tc - 1; z <= tc + 1; z++) {
                                     assertFalse(m.has(x, y, z), "train at " + x + "," + y + "," + z);
                                 }
@@ -310,8 +313,7 @@ class RailStructureTest {
                     List.of(), 0, 0, P, Ground.FLAT);
             double start = Math.abs(radius) >= CurvedStation.BUILDING_MIN_RADIUS ? 20 : st.concourseX()[1] + 2;
             Curve c = new Curve(start, radius, 206 - start);
-            Model m = CurvedStation.elevated(st, c, 20, CurvedStation.BUILDING_MIN_RADIUS, P);
-            double gap = CurvedStation.edgeGap(radius, 20);
+            Model m = CurvedStation.elevated(st, c, 25, CurvedStation.BUILDING_MIN_RADIUS, P);
             int[] tracks = st.trackCentres();
             int[] near = {0};
             m.forEach((x, y, z, s) -> {
@@ -319,11 +321,18 @@ class RailStructureTest {
                     return;
                 }
                 double[] sd = c.project(x + 0.5, z + 0.5);
-                if (sd[0] < start + 10 || sd[0] > c.start() + c.length() - 10) {
+                if (sd[0] < start + 15 || sd[0] > c.start() + c.length() - 15) {
                     return;
                 }
+                double h = c.at(sd[0])[2];
                 for (int t : tracks) {
-                    if (Math.abs(sd[1] - (t + 0.5)) - 0.5 < gap - 1e-9) {
+                    double off = sd[1] - (t + 0.5);
+                    // MTR's edge: half the car, the half-block gap, and on the inside its middle's sagitta
+                    boolean inside = Math.signum(radius) * off > 0;
+                    double trackRadius = Math.abs(radius) - Math.signum(radius) * (t + 0.5);
+                    double edge = 1.5 + (inside ? 25.0 * 25 / (8 * trackRadius) : 0);
+                    double face = Math.abs(off) - 0.5 * (Math.abs(Math.sin(h)) + Math.abs(Math.cos(h)));
+                    if (face < edge + 1 - 0.05) {
                         near[0]++;
                     }
                 }
@@ -349,6 +358,52 @@ class RailStructureTest {
                     }
                 }
             }
+        }
+    }
+
+    @Test
+    void structuresFollowTheRailsMtrLays() {
+        for (double[] k : new double[][] {{160, 40, 0}, {160, -35, 30}, {400, 25, 40}, {1000, -12, 60}}) {
+            MtrAlignment.Node[] n = MtrAlignment.design(0, 20, k[0], k[1], k[2], 30, 9);
+            var reference = MtrAlignment.rail(n[0], n[1]);
+            assertTrue(reference.valid());
+            assertEquals(k[2] > 0, reference.hasTransitions(), "transitions as asked");
+            Curve c = MtrAlignment.curve(reference);
+            Viaduct v = Viaduct.builder(Viaduct.Deck.RAIL, (int) reference.length(), 9).tracks(2).catenary(false).build();
+            Model m = c.apply(v.build());
+            for (MtrAlignment.Track t : MtrAlignment.tracks(reference, v.trackCentres(), n[0], n[1], 9)) {
+                assertTrue(MtrAlignment.stray(c, t) < 0.75, k[0] + ": track " + t.z() + " strays "
+                        + MtrAlignment.stray(c, t));
+                // Under every point of the track's own MTR rail, its bed; over it, room for the train
+                for (double s = 2; s < t.rail().length() - 2; s += 0.5) {  // not the abutments
+                    double[] p = t.rail().point(s);
+                    int x = (int) Math.floor(p[0]), z = (int) Math.floor(p[1]);
+                    assertEquals(P.ballast(), m.get(x, 8, z), k[0] + ": bed under the rail at " + s);
+                    for (int y = 9; y <= 13; y++) {
+                        assertFalse(m.has(x, y, z), k[0] + ": train at " + s);
+                    }
+                }
+            }
+            // Node angles are MTR's: tenths of a degree
+            assertEquals(Math.round(n[1].angle() * 10) / 10.0, n[1].angle(), 1e-9);
+        }
+    }
+
+    @Test
+    void decksFollowMtrsVerticalCurves() {
+        for (int[] lv : new int[][] {{4, 11}, {12, 6}, {9, 10}}) {
+            Viaduct v = Viaduct.builder(Viaduct.Deck.RAIL, 140, lv[0]).levelEnd(lv[1]).tracks(1).catenary(false).build();
+            Model m = v.build();
+            for (int x = 1; x < 140; x++) {
+                double rail = v.railY(x);
+                double top = v.levelAt(x) + (v.halfStep(x) ? 0.5 : 0);
+                assertTrue(top <= rail + 1e-6 && top > rail - 0.5 - 1e-6, "deck at " + top + " under a rail at " + rail);
+                String surface = m.get(x, v.halfStep(x) ? v.levelAt(x) : v.levelAt(x) - 1, 0);
+                assertTrue(surface != null, "deck under the rail at " + x);
+            }
+            // Level at both ends (the nodes' grades 0), as MTR's vertical curves leave them
+            assertEquals(lv[0], v.railY(0), 0.05);
+            assertEquals(lv[1], v.railY(139), 0.05);
         }
     }
 

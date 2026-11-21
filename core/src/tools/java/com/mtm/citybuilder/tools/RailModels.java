@@ -14,6 +14,8 @@ import com.mtm.citybuilder.core.building.rail.Footbridge;
 import com.mtm.citybuilder.core.building.rail.FrameViaduct;
 import com.mtm.citybuilder.core.building.rail.Ground;
 import com.mtm.citybuilder.core.building.rail.GroundStation;
+import com.mtm.citybuilder.core.building.rail.MtrAlignment;
+import com.mtm.citybuilder.core.building.rail.mtr.MtrRail;
 import com.mtm.citybuilder.core.building.rail.RailPalette;
 import com.mtm.citybuilder.core.building.rail.Spans;
 import com.mtm.citybuilder.core.building.rail.Viaduct;
@@ -65,7 +67,7 @@ public final class RailModels {
                 meta.add("curve", c);
             }
             Model m = build(o, meta, curve);
-            if (curve != null && !meta.has("curvedStation")) {
+            if (curve != null && !meta.has("curved")) {
                 m = curve.apply(m);
             }
             write(m, meta, out.resolve(slug + ".json"));
@@ -92,9 +94,14 @@ public final class RailModels {
                 if (o.has("spans")) {
                     b.spans(limits(o, null));
                 }
+                if (o.has("grades")) {
+                    JsonArray g = o.getAsJsonArray("grades");
+                    b.grades(g.get(0).getAsDouble(), g.get(1).getAsDouble());
+                }
                 Viaduct v = b.build();
                 describe(meta, v.spans(), v.trackCentres(), v.level());
-                return v.build();
+                Plan pl = plan(o, v.length(), v.trackCentres(), v.level(), i(o, "levelEnd", v.level()), meta);
+                return pl == null ? v.build() : pl.curve().apply(v.build());
             }
             case "footbridge" -> {
                 Footbridge f = new Footbridge(i(o, "clearSpan"), i(o, "clearance", 5), i(o, "width", 3), p, ground);
@@ -110,9 +117,14 @@ public final class RailModels {
                 describe(meta, s.viaduct().spans(), s.trackCentres(), s.viaduct().level());
                 meta.addProperty("platformStart", s.platformStart());
                 meta.addProperty("platformEnd", s.platformEnd());
+                Plan pl = plan(o, s.viaduct().length(), s.trackCentres(), s.viaduct().level(), s.viaduct().level(), meta);
+                if (pl != null) {
+                    return CurvedStation.elevated(s, pl.curve(), pl.rails(), i(o, "carSpacing", CurvedStation.CAR_SPACING),
+                            CurvedStation.CAR_WIDTH, i(o, "buildingMinRadius", CurvedStation.BUILDING_MIN_RADIUS), p);
+                }
                 if (curve != null) {
-                    meta.addProperty("curvedStation", true);
-                    return CurvedStation.elevated(s, curve, i(o, "carLength", CurvedStation.CAR_LENGTH),
+                    meta.addProperty("curved", true);
+                    return CurvedStation.elevated(s, curve, i(o, "carSpacing", CurvedStation.CAR_SPACING),
                             i(o, "buildingMinRadius", CurvedStation.BUILDING_MIN_RADIUS), p);
                 }
                 return s.build();
@@ -126,9 +138,14 @@ public final class RailModels {
                 describe(meta, List.of(), s.trackCentres(), 1);
                 meta.addProperty("platformStart", s.platformStart());
                 meta.addProperty("platformEnd", s.platformEnd());
+                Plan pl = plan(o, s.length(), s.trackCentres(), 1, 1, meta);
+                if (pl != null) {
+                    return CurvedStation.ground(s, pl.curve(), pl.rails(), i(o, "carSpacing", CurvedStation.CAR_SPACING),
+                            CurvedStation.CAR_WIDTH, i(o, "buildingMinRadius", CurvedStation.BUILDING_MIN_RADIUS), p);
+                }
                 if (curve != null) {
-                    meta.addProperty("curvedStation", true);
-                    return CurvedStation.ground(s, curve, i(o, "carLength", CurvedStation.CAR_LENGTH),
+                    meta.addProperty("curved", true);
+                    return CurvedStation.ground(s, curve, i(o, "carSpacing", CurvedStation.CAR_SPACING),
                             i(o, "buildingMinRadius", CurvedStation.BUILDING_MIN_RADIUS), p);
                 }
                 return s.build();
@@ -138,17 +155,79 @@ public final class RailModels {
                         i(o, "tracks", 2), !o.has("catenary") || bool(o, "catenary"), o.has("seed")
                         ? o.get("seed").getAsLong() : 1L, p, ground);
                 describe(meta, v.spans(), v.trackCentres(), v.level());
-                return v.build();
+                Plan pl = plan(o, i(o, "length"), v.trackCentres(), v.level(), v.level(), meta);
+                return pl == null ? v.build() : pl.curve().apply(v.build());
             }
             case "frame_viaduct" -> {
                 FrameViaduct v = new FrameViaduct(i(o, "length"), i(o, "level", 10), i(o, "bay", 8),
                         i(o, "unitBays", 3), i(o, "tracks", 2), i(o, "trackSpacing", 4), i(o, "wallHeight", 2),
                         clear(o), p, ground);
                 describe(meta, v.spans(), v.trackCentres(), v.level());
-                return v.build();
+                Plan pl = plan(o, i(o, "length"), v.trackCentres(), v.level(), v.level(), meta);
+                return pl == null ? v.build() : pl.curve().apply(v.build());
             }
             default -> throw new IllegalArgumentException("kind " + kind);
         }
+    }
+
+    /** A structure laid along the rails MTR will lay, and each track's own rail. */
+    record Plan(Curve curve, List<MtrAlignment.Track> tracks) {
+        List<com.mtm.citybuilder.core.building.rail.Path> rails() {
+            List<com.mtm.citybuilder.core.building.rail.Path> out = new ArrayList<>();
+            for (MtrAlignment.Track t : tracks) {
+                out.add(t.rail());
+            }
+            return out;
+        }
+    }
+
+    /**
+     * {@code mtr}: {heading, before, radius, turn, transition}: the nodes for a line straight for {@code before}, then a
+     * turn of {@code turn} degrees at {@code radius} with transition curves, then straight to the structure's end;
+     * the structure laid along the rail MTR makes of them, and each track's nodes written out ({@code mtrNodes}: track
+     * z, start node, end node as [x, y, z, angle, transition, grade], and how far its own rail strays from the
+     * structure's line), for the curve markers.
+     */
+    static Plan plan(JsonObject o, int length, int[] tracks, int y, int yEnd, JsonObject meta) {
+        if (!o.has("mtr")) {
+            return null;
+        }
+        JsonObject m = o.getAsJsonObject("mtr");
+        double radius = m.get("radius").getAsDouble(), turn = m.get("turn").getAsDouble();
+        double before = m.has("before") ? m.get("before").getAsDouble() : 0;
+        double t = m.has("transition") ? m.get("transition").getAsDouble() : 0;
+        double after = Math.max(0, length - before - radius * Math.toRadians(Math.abs(turn)) - t);
+        MtrAlignment.Node[] n = MtrAlignment.design(m.has("heading") ? m.get("heading").getAsDouble() : 0, before, radius,
+                turn, t, after, y);
+        MtrAlignment.Node end = new MtrAlignment.Node(n[1].x(), yEnd, n[1].z(), n[1].angle(), n[1].transition(),
+                n[1].grade());
+        MtrRail reference = MtrAlignment.rail(n[0], end);
+        Curve curve = MtrAlignment.curve(reference);
+        List<MtrAlignment.Track> ts = MtrAlignment.tracks(reference, tracks, n[0], end, yEnd);
+        JsonArray nodes = new JsonArray();
+        for (MtrAlignment.Track tr : ts) {
+            JsonArray e = new JsonArray();
+            e.add(tr.z());
+            e.add(node(tr.start()));
+            e.add(node(tr.end()));
+            e.add(Math.round(MtrAlignment.stray(curve, tr) * 100) / 100.0);
+            nodes.add(e);
+        }
+        meta.add("mtrNodes", nodes);
+        meta.addProperty("mtrLength", Math.round(reference.length() * 10) / 10.0);
+        meta.addProperty("curved", true);
+        return new Plan(curve, ts);
+    }
+
+    private static JsonArray node(MtrAlignment.Node n) {
+        JsonArray a = new JsonArray();
+        a.add(n.x());
+        a.add(n.y());
+        a.add(n.z());
+        a.add(n.angle());
+        a.add(n.transition());
+        a.add(n.grade());
+        return a;
     }
 
     /** {@code ground}: [[x, y], ...] along x, straight between; flat without it. */
