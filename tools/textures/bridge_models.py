@@ -33,6 +33,13 @@ NAMES = {
     'catenary_beam': ('Catenary Portal Beam', '接触网门架横梁'),
     'catenary_arm': ('Catenary Cantilever Arm', '接触网腕臂'),
     'catenary_hanger': ('Catenary Drop Hanger', '接触网吊柱'),
+    'curve_marker': ('Curve Marker', '曲线标'),
+}
+# Further names of the mod (not blocks): (English, Chinese)
+EXTRA = {
+    'block.citybuilder.curve_marker.describe': (
+        'Curve marker, track %s: MTR node at %s %s %s, angle %s°, transition %s, grade %s‰, radius %s',
+        '曲线标（股道 %s）：MTR 节点在 %s %s %s，角度 %s°，缓和曲线 %s 格，坡度 %s‰，半径 %s'),
 }
 FACING_Y = {'north': 0, 'east': 90, 'south': 180, 'west': 270}
 
@@ -123,6 +130,23 @@ def catenary():
            'catenary_hanger', 'catenary_hanger', 'cutout')
 
 
+def marker():
+    post = box((7, 0, 7), (9, 8, 9), 'curve_marker_post', 'curve_marker_post')
+    board = box((1, 8, 7), (15, 16, 9), 'curve_marker_post', 'curve_marker_post')
+    for face in ('north', 'south'):  # the board's two faces, whole
+        board['faces'][face]['texture'] = '#board'
+        board['faces'][face]['uv'] = [0, 0, 16, 16]
+    write(os.path.join(MODELS, 'curve_marker.json'), {
+        'parent': 'minecraft:block/block',
+        'textures': {'particle': tex('curve_marker_board'), 'board': tex('curve_marker_board'),
+                     'side': tex('curve_marker_post'), 'top': tex('curve_marker_post'),
+                     'bottom': tex('curve_marker_post')},
+        'elements': [post, board]})
+    write(os.path.join(BLOCKSTATES, 'curve_marker.json'), {'variants': {
+        'facing=%s' % f: dict({'model': 'citybuilder:block/curve_marker'}, **({'y': 90} if f in ('east', 'west') else {}))
+        for f in ('north', 'east', 'south', 'west')}})
+
+
 def main():
     edge('concrete_parapet', 'concrete_parapet', 'concrete_parapet_top', 0, 16, 5)
     edge('bridge_railing', 'bridge_railing', 'bridge_railing_top', 0, 16, 2, 'cutout')
@@ -149,6 +173,7 @@ def main():
         'top': tex('deck_drain'), 'bottom': tex('deck_side'), 'side': tex('deck_side')}})
     write(os.path.join(BLOCKSTATES, 'deck_drain.json'), {'variants': {'': {'model': 'citybuilder:block/deck_drain'}}})
     catenary()
+    marker()
     for name in NAMES:
         write(os.path.join(ITEMS, name + '.json'), {'parent': 'citybuilder:block/' + name})
         write(os.path.join(LOOT, name + '.json'), {'type': 'minecraft:block', 'pools': [{
@@ -160,6 +185,8 @@ def main():
             names = json.load(f)
         for name, both in NAMES.items():
             names['block.citybuilder.' + name] = both[i]
+        for key, both in EXTRA.items():
+            names[key] = both[i]
         write(path, names)
 
 

@@ -551,8 +551,10 @@ def colours(names, cache):
         with zipfile.ZipFile(pv.MC_JAR) as z:
             for n in missing:
                 if n.startswith('citybuilder:'):
-                    path = os.path.join(MOD_TEXTURES, n.split(':', 1)[1] + '.png')
-                    if not os.path.exists(path):
+                    base = os.path.join(MOD_TEXTURES, n.split(':', 1)[1])
+                    path = next((base + suffix + '.png' for suffix in ('', '_board', '_side')
+                                 if os.path.exists(base + suffix + '.png')), None)
+                    if path is None:
                         continue
                     with open(path, 'rb') as fh:
                         data = fh.read()
@@ -598,11 +600,35 @@ MOD_TEXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.
 
 
 def state(s):
-    """'ns:x[a=b]' -> ('x' for vanilla, 'citybuilder:x' for this mod's, {'a': 'b'} or None)."""
+    """'ns:x[a=b]{K:v}' -> ('x' for vanilla, 'citybuilder:x' for this mod's, {'a': 'b'} or None); the block
+    entity's data ({K:v}) is kept apart in NBT_OF."""
+    nbt = None
+    if s.endswith('}') and '{' in s:
+        s, _, nbt = s.partition('{')
+        nbt = '{' + nbt
     name, _, props = s.partition('[')
     if name.startswith('minecraft:'):
         name = name[len('minecraft:'):]
-    return name, (dict(kv.split('=', 1) for kv in props.rstrip(']').split(',')) if props else None)
+    props = dict(kv.split('=', 1) for kv in props.rstrip(']').split(',')) if props else None
+    if nbt:
+        props = dict(props or {})
+        props['__nbt__'] = nbt
+    return name, props
+
+
+def snbt(text):
+    """The flat SNBT of a marker's data ({K:1,K:2.5f,K:"s"}) as NBT payload items (name, type, bytes)."""
+    import re
+    import plateau_voxel as pv
+    items = []
+    for key, value in re.findall(r'(\w+):("[^"]*"|-?[0-9.]+f?)', text):
+        if value.startswith('"'):
+            items.append((key, 8, pv.nbt_string(value[1:-1])))
+        elif value.endswith('f'):
+            items.append((key, 5, struct.pack('>f', float(value[:-1]))))
+        else:
+            items.append((key, 3, struct.pack('>i', int(value))))
+    return items
 
 
 def write_nbt(path, blocks, size):
@@ -611,6 +637,11 @@ def write_nbt(path, blocks, size):
     import plateau_voxel as pv
     states, index, entries = [], {}, []
     for (x, y, z), (name, props) in sorted(blocks.items(), key=lambda kv: (kv[0][1], kv[0][2], kv[0][0])):
+        nbt = None
+        if props and '__nbt__' in props:
+            props = dict(props)
+            nbt = props.pop('__nbt__')
+            props = props or None
         key = (name, tuple(sorted(props.items())) if props else ())
         if key not in index:
             index[key] = len(states)
@@ -619,8 +650,10 @@ def write_nbt(path, blocks, size):
                 items.append(('Properties', 10, pv.nbt_compound([(k, 8, pv.nbt_string(v))
                                                                  for k, v in sorted(props.items())])))
             states.append(pv.nbt_compound(items))
-        entries.append(pv.nbt_compound([('pos', 9, pv.nbt_int_list([x, y, z])),
-                                        ('state', 3, struct.pack('>i', index[key]))]))
+        entry = [('pos', 9, pv.nbt_int_list([x, y, z])), ('state', 3, struct.pack('>i', index[key]))]
+        if nbt:  # the block entity's data, with its id
+            entry.append(('nbt', 10, pv.nbt_compound(snbt(nbt) + [('id', 8, pv.nbt_string(name))])))
+        entries.append(pv.nbt_compound(entry))
     root = pv.nbt_compound([
         ('DataVersion', 3, struct.pack('>i', 3465)),  # 1.20.1
         ('size', 9, pv.nbt_int_list(list(size))),
@@ -654,9 +687,11 @@ def build(out):
         # The catenary's thin steel drawn as posts (the renderer takes names ending in _fence for those)
         thin = {}
         for k, (name, props) in blocks.items():
+            if props and '__nbt__' in props:
+                props = {p: v for p, v in props.items() if p != '__nbt__'} or None
             if name in ('citybuilder:catenary_beam', 'citybuilder:catenary_arm'):  # a bar across: drawn as a top slab
                 props = {'type': 'top'}
-            elif name.startswith('citybuilder:catenary_'):
+            elif name.startswith(('citybuilder:catenary_', 'citybuilder:curve_marker')):
                 bc[name + '_fence'] = bc.get(name, (168, 172, 174))
                 name = name + '_fence'
             thin[k] = (name, props)

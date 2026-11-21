@@ -3,6 +3,7 @@ package com.mtm.citybuilder.block;
 import com.mtm.citybuilder.platform.Platform;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 
 import java.util.function.Supplier;
@@ -53,6 +54,10 @@ public final class CityBlocks {
     /** A drop hanger with its string of insulators, holding the wires over a track. */
     public static Supplier<Block> CATENARY_HANGER;
 
+    /** A curve marker (曲線標) beside a track, telling where an MTR node goes and how it is set. */
+    public static Supplier<Block> CURVE_MARKER;
+    public static Supplier<BlockEntityType<CurveMarkerBlockEntity>> CURVE_MARKER_ENTITY;
+
     private CityBlocks() {
     }
 
@@ -87,6 +92,8 @@ public final class CityBlocks {
                 () -> new AxisShapedBlock(thin(Blocks.IRON_BARS), 4, 12, 4, 12));
         CATENARY_ARM = platform.registerBlock("catenary_arm",
                 () -> new AxisShapedBlock(thin(Blocks.IRON_BARS), 7, 9, 7, 9));
+        CURVE_MARKER = platform.registerBlock("curve_marker", () -> new CurveMarkerBlock(thin(Blocks.IRON_BARS)));
+        CURVE_MARKER_ENTITY = platform.registerBlockEntity("curve_marker", CurveMarkerBlockEntity::new, CURVE_MARKER);
         CATENARY_HANGER = platform.registerBlock("catenary_hanger",
                 () -> new ShapedBlock(thin(Blocks.IRON_BARS), Block.box(5, 0, 5, 11, 16, 11)));
     }

@@ -386,6 +386,34 @@ class RailStructureTest {
             }
             // Node angles are MTR's: tenths of a degree
             assertEquals(Math.round(n[1].angle() * 10) / 10.0, n[1].angle(), 1e-9);
+            // A curve marker beside both ends of every track, pointing at its node, clear of the trains
+            List<MtrAlignment.Track> tracks = MtrAlignment.tracks(reference, v.trackCentres(), n[0], n[1], 9);
+            CurveMarker.place(m, tracks);
+            List<int[]> markers = new ArrayList<>();
+            List<String> states = new ArrayList<>();
+            m.forEach((x, y, z, s) -> {
+                if (s.startsWith(CurveMarker.BLOCK)) {
+                    markers.add(new int[] {x, y, z});
+                    states.add(s);
+                }
+            });
+            assertEquals(2 * tracks.size(), markers.size(), k[0] + ": markers");
+            for (int i = 0; i < markers.size(); i++) {
+                int[] at = markers.get(i);
+                String s = states.get(i);
+                int nx = at[0] + Integer.parseInt(s.replaceAll(".*NodeX:(-?\\d+).*", "$1"));
+                int nz = at[2] + Integer.parseInt(s.replaceAll(".*NodeZ:(-?\\d+).*", "$1"));
+                boolean isNode = false;
+                for (MtrAlignment.Track t : tracks) {
+                    isNode |= nx == t.start().x() && nz == t.start().z() || nx == t.end().x() && nz == t.end().z();
+                }
+                assertTrue(isNode, k[0] + ": marker " + s + " points at a node");
+                assertTrue(s.contains("Transition:" + String.format(java.util.Locale.ROOT, "%.1f", k[2]) + "f"), s);
+                for (MtrAlignment.Track t : tracks) {
+                    double[] sd = Curve.along(t.rail(), 0, 0).project(at[0] + 0.5, at[2] + 0.5);
+                    assertTrue(Math.abs(sd[1]) >= 1.5, k[0] + ": marker clear of track " + t.z() + " " + sd[1]);
+                }
+            }
         }
     }
 

@@ -17,5 +17,7 @@
   "block.citybuilder.catenary_pole": "接触网支柱",
   "block.citybuilder.catenary_beam": "接触网门架横梁",
   "block.citybuilder.catenary_arm": "接触网腕臂",
-  "block.citybuilder.catenary_hanger": "接触网吊柱"
+  "block.citybuilder.catenary_hanger": "接触网吊柱",
+  "block.citybuilder.curve_marker": "曲线标",
+  "block.citybuilder.curve_marker.describe": "曲线标（股道 %s）：MTR 节点在 %s %s %s，角度 %s°，缓和曲线 %s 格，坡度 %s‰，半径 %s"
 }

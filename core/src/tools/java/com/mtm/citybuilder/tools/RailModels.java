@@ -8,6 +8,7 @@ import com.google.gson.JsonParser;
 import com.mtm.citybuilder.core.building.rail.BrickViaduct;
 import com.mtm.citybuilder.core.building.rail.CrossSection;
 import com.mtm.citybuilder.core.building.rail.Curve;
+import com.mtm.citybuilder.core.building.rail.CurveMarker;
 import com.mtm.citybuilder.core.building.rail.CurvedStation;
 import com.mtm.citybuilder.core.building.rail.ElevatedStation;
 import com.mtm.citybuilder.core.building.rail.Footbridge;
@@ -101,7 +102,7 @@ public final class RailModels {
                 Viaduct v = b.build();
                 describe(meta, v.spans(), v.trackCentres(), v.level());
                 Plan pl = plan(o, v.length(), v.trackCentres(), v.level(), i(o, "levelEnd", v.level()), meta);
-                return pl == null ? v.build() : pl.curve().apply(v.build());
+                return pl == null ? v.build() : pl.mark(pl.curve().apply(v.build()));
             }
             case "footbridge" -> {
                 Footbridge f = new Footbridge(i(o, "clearSpan"), i(o, "clearance", 5), i(o, "width", 3), p, ground);
@@ -119,8 +120,9 @@ public final class RailModels {
                 meta.addProperty("platformEnd", s.platformEnd());
                 Plan pl = plan(o, s.viaduct().length(), s.trackCentres(), s.viaduct().level(), s.viaduct().level(), meta);
                 if (pl != null) {
-                    return CurvedStation.elevated(s, pl.curve(), pl.rails(), i(o, "carSpacing", CurvedStation.CAR_SPACING),
-                            CurvedStation.CAR_WIDTH, i(o, "buildingMinRadius", CurvedStation.BUILDING_MIN_RADIUS), p);
+                    return pl.mark(CurvedStation.elevated(s, pl.curve(), pl.rails(),
+                            i(o, "carSpacing", CurvedStation.CAR_SPACING), CurvedStation.CAR_WIDTH,
+                            i(o, "buildingMinRadius", CurvedStation.BUILDING_MIN_RADIUS), p));
                 }
                 if (curve != null) {
                     meta.addProperty("curved", true);
@@ -140,8 +142,9 @@ public final class RailModels {
                 meta.addProperty("platformEnd", s.platformEnd());
                 Plan pl = plan(o, s.length(), s.trackCentres(), 1, 1, meta);
                 if (pl != null) {
-                    return CurvedStation.ground(s, pl.curve(), pl.rails(), i(o, "carSpacing", CurvedStation.CAR_SPACING),
-                            CurvedStation.CAR_WIDTH, i(o, "buildingMinRadius", CurvedStation.BUILDING_MIN_RADIUS), p);
+                    return pl.mark(CurvedStation.ground(s, pl.curve(), pl.rails(),
+                            i(o, "carSpacing", CurvedStation.CAR_SPACING), CurvedStation.CAR_WIDTH,
+                            i(o, "buildingMinRadius", CurvedStation.BUILDING_MIN_RADIUS), p));
                 }
                 if (curve != null) {
                     meta.addProperty("curved", true);
@@ -156,7 +159,7 @@ public final class RailModels {
                         ? o.get("seed").getAsLong() : 1L, p, ground);
                 describe(meta, v.spans(), v.trackCentres(), v.level());
                 Plan pl = plan(o, i(o, "length"), v.trackCentres(), v.level(), v.level(), meta);
-                return pl == null ? v.build() : pl.curve().apply(v.build());
+                return pl == null ? v.build() : pl.mark(pl.curve().apply(v.build()));
             }
             case "frame_viaduct" -> {
                 FrameViaduct v = new FrameViaduct(i(o, "length"), i(o, "level", 10), i(o, "bay", 8),
@@ -164,7 +167,7 @@ public final class RailModels {
                         clear(o), p, ground);
                 describe(meta, v.spans(), v.trackCentres(), v.level());
                 Plan pl = plan(o, i(o, "length"), v.trackCentres(), v.level(), v.level(), meta);
-                return pl == null ? v.build() : pl.curve().apply(v.build());
+                return pl == null ? v.build() : pl.mark(pl.curve().apply(v.build()));
             }
             default -> throw new IllegalArgumentException("kind " + kind);
         }
@@ -172,6 +175,12 @@ public final class RailModels {
 
     /** A structure laid along the rails MTR will lay, and each track's own rail. */
     record Plan(Curve curve, List<MtrAlignment.Track> tracks) {
+        /** The curve markers beside every track's nodes. */
+        Model mark(Model m) {
+            CurveMarker.place(m, tracks);
+            return m;
+        }
+
         List<com.mtm.citybuilder.core.building.rail.Path> rails() {
             List<com.mtm.citybuilder.core.building.rail.Path> out = new ArrayList<>();
             for (MtrAlignment.Track t : tracks) {

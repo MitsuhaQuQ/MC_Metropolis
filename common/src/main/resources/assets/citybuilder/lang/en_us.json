@@ -17,5 +17,7 @@
   "block.citybuilder.catenary_pole": "Catenary Pole",
   "block.citybuilder.catenary_beam": "Catenary Portal Beam",
   "block.citybuilder.catenary_arm": "Catenary Cantilever Arm",
-  "block.citybuilder.catenary_hanger": "Catenary Drop Hanger"
+  "block.citybuilder.catenary_hanger": "Catenary Drop Hanger",
+  "block.citybuilder.curve_marker": "Curve Marker",
+  "block.citybuilder.curve_marker.describe": "Curve marker, track %s: MTR node at %s %s %s, angle %s°, transition %s, grade %s‰, radius %s"
 }

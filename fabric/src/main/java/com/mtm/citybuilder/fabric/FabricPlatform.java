@@ -9,8 +9,15 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+
+import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.nio.file.Path;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 public final class FabricPlatform implements Platform {
@@ -40,5 +47,15 @@ public final class FabricPlatform implements Platform {
         Block block = Registry.register(BuiltInRegistries.BLOCK, id, factory.get());
         Registry.register(BuiltInRegistries.ITEM, id, new BlockItem(block, new Item.Properties()));
         return () -> block;
+    }
+
+    @Override
+    public <T extends BlockEntity> Supplier<BlockEntityType<T>> registerBlockEntity(String name,
+                                                                                    BiFunction<BlockPos, BlockState, T> factory,
+                                                                                    Supplier<Block> block) {
+        BlockEntityType<T> type = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE,
+                new ResourceLocation(CityBuilder.MOD_ID, name),
+                FabricBlockEntityTypeBuilder.create(factory::apply, block.get()).build());
+        return () -> type;
     }
 }

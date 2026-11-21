@@ -90,6 +90,17 @@ def hanger(x, y):
     return shade(DARK, 1.0) if 5 <= x <= 10 else CLEAR
 
 
+def marker_board(x, y):
+    # A curve marker's board: white, a black rim (the text is drawn by the game)
+    if x in (0, 15) or y in (0, 15):
+        return (24, 24, 24)
+    return shade((238, 238, 232), 1.0, noise(x, y, 9) * 2)
+
+
+def marker_post(x, y):
+    return shade((150, 152, 154), 0.9 if x % 4 == 0 else 1.0, noise(x, y, 11) * 2)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     png('catenary_pole', grid(pole))
@@ -98,6 +109,8 @@ def main():
     png('catenary_beam_end', grid(beam_end))
     png('catenary_arm', grid(arm))
     png('catenary_hanger', grid(hanger))
+    png('curve_marker_board', grid(marker_board))
+    png('curve_marker_post', grid(marker_post))
 
 
 if __name__ == '__main__':

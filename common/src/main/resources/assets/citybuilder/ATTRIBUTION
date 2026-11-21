@@ -7,5 +7,5 @@ textures/block/concrete_parapet*.png, bridge_railing*.png, sound_barrier*.png, s
 expansion_joint.png, deck_side.png, deck_drain.png, drain_pipe.png
   Drawn for this mod by tools/textures/bridge_textures.py (no outside sources); the mod's own licence.
 
-textures/block/catenary_*.png
+textures/block/catenary_*.png, curve_marker_*.png
   Drawn for this mod by tools/textures/catenary_textures.py (no outside sources); the mod's own licence.
