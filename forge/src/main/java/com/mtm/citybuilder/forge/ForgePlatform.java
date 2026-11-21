@@ -24,6 +24,8 @@ import java.util.function.Supplier;
 public final class ForgePlatform implements Platform {
     static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, CityBuilder.MOD_ID);
     static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, CityBuilder.MOD_ID);
+    static final DeferredRegister<net.minecraft.world.item.CreativeModeTab> TABS =
+            DeferredRegister.create(net.minecraft.core.registries.Registries.CREATIVE_MODE_TAB, CityBuilder.MOD_ID);
     static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
             DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, CityBuilder.MOD_ID);
 
@@ -52,6 +54,14 @@ public final class ForgePlatform implements Platform {
         RegistryObject<Block> block = BLOCKS.register(name, factory);
         ITEMS.register(name, () -> new BlockItem(block.get(), new Item.Properties()));
         return block;
+    }
+
+    @Override
+    public void registerTab(String name, net.minecraft.network.chat.Component title,
+                            Supplier<net.minecraft.world.item.ItemStack> icon, java.util.function.Predicate<String> items) {
+        TABS.register(name, () -> net.minecraft.world.item.CreativeModeTab.builder().title(title).icon(icon)
+                .displayItems((parameters, output) -> output.acceptAll(com.mtm.citybuilder.item.CityTabs.items(items)))
+                .build());
     }
 
     @Override

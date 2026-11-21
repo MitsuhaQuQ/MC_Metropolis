@@ -50,6 +50,15 @@ public final class FabricPlatform implements Platform {
     }
 
     @Override
+    public void registerTab(String name, net.minecraft.network.chat.Component title,
+                            Supplier<net.minecraft.world.item.ItemStack> icon, java.util.function.Predicate<String> items) {
+        Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, new ResourceLocation(CityBuilder.MOD_ID, name),
+                net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup.builder().title(title).icon(icon)
+                        .displayItems((parameters, output) -> output.acceptAll(com.mtm.citybuilder.item.CityTabs.items(items)))
+                        .build());
+    }
+
+    @Override
     public Supplier<Item> registerItem(String name, Supplier<Item> factory) {
         Item item = Registry.register(BuiltInRegistries.ITEM, new ResourceLocation(CityBuilder.MOD_ID, name), factory.get());
         return () -> item;

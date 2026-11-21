@@ -31,6 +31,13 @@ public interface Platform {
      */
     Supplier<Block> registerBlock(String name, Supplier<Block> factory);
 
+    /**
+     * Registers a page of this mod in the creative inventory, {@code citybuilder:<name>}: its title, its icon, and which
+     * of this mod's items (by name) it shows (see {@code item.CityTabs}).
+     */
+    void registerTab(String name, net.minecraft.network.chat.Component title,
+                     Supplier<net.minecraft.world.item.ItemStack> icon, java.util.function.Predicate<String> items);
+
     /** Registers an item of this mod under {@code citybuilder:<name>}; the item once it is registered. */
     Supplier<net.minecraft.world.item.Item> registerItem(String name, Supplier<net.minecraft.world.item.Item> factory);
 

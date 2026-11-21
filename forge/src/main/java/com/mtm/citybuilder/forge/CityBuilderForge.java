@@ -14,6 +14,7 @@ public final class CityBuilderForge {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
         ForgePlatform.BLOCKS.register(bus);
         ForgePlatform.ITEMS.register(bus);
+        ForgePlatform.TABS.register(bus);
         ForgePlatform.BLOCK_ENTITIES.register(bus);
         if (FMLEnvironment.dist == Dist.CLIENT) {
             ForgeClient.init(bus);
