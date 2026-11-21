@@ -51,8 +51,74 @@ public final class CityChunks {
             case SHELTER -> Blocks.SMOOTH_STONE.defaultBlockState();
             case CURB -> CityBlocks.CURB_EDGE.get().defaultBlockState().setValue(KerbEdgeBlock.ANGLE, mark.angle())
                     .setValue(KerbEdgeBlock.OFFSET, mark.offset());
+            case MANHOLE -> CityBlocks.MANHOLE.get().defaultBlockState().setValue(PavingBlock.LOW, mark.low());
+            case DRAIN -> directed(CityBlocks.DRAIN_GRATE.get(), mark);
+            case DITCH -> directed(ours("side_ditch"), mark);
+            case DITCH_GRATE -> directed(ours("side_ditch_grate"), mark);
             case NONE -> null;
         };
+    }
+
+    /** This mod's block by name (those registered by the building blocks, without fields of their own here). */
+    private static Block ours(String name) {
+        return net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                new net.minecraft.resources.ResourceLocation(CityBuilder.MOD_ID, name));
+    }
+
+    /** A block running along a street (a drain, a ditch): facing along its run, from the mark's angle; low as marked. */
+    private static BlockState directed(Block block, ChunkLayer.Mark mark) {
+        double heading = Math.PI * mark.angle() / ChunkLayer.ANGLES;
+        BlockState state = block.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING,
+                        Direction.getNearest(Math.cos(heading), 0, Math.sin(heading)));
+        return state.hasProperty(PavingBlock.LOW) ? state.setValue(PavingBlock.LOW, mark.low()) : state;
+    }
+
+    /** The street lights and lamps, kept when what grew over a street is cleared. */
+    private static boolean furniture(BlockState state) {
+        net.minecraft.resources.ResourceLocation id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        return id.getNamespace().equals(CityBuilder.MOD_ID) && id.getPath().startsWith("street_light");
+    }
+
+    /**
+     * A street's fixture stood on its paving at {@code y}: a road light's pole 7 high and its head, a lamp's post 2
+     * and its lamp, the head facing as the city logic says.
+     */
+    private static void fixture(ChunkAccess chunk, ChunkLayer.Furniture furniture, int wx, int y, int wz,
+                                BlockPos.MutableBlockPos pos, int top) {
+        String head;
+        int pole;
+        switch (furniture.fixture()) {
+            case LIGHT -> {
+                head = "street_light_head";
+                pole = 7;
+            }
+            case LIGHT_DOUBLE -> {
+                head = "street_light_head_double";
+                pole = 7;
+            }
+            case LAMP -> {
+                head = "street_light_lamp";
+                pole = 2;
+            }
+            default -> {
+                return;
+            }
+        }
+        if (y + pole + 1 > top) {
+            return;
+        }
+        BlockState post = ours("street_light_pole").defaultBlockState();
+        for (int k = 1; k <= pole; k++) {
+            chunk.setBlockState(pos.set(wx, y + k, wz), post, false);
+        }
+        BlockState lamp = ours(head).defaultBlockState();
+        net.minecraft.world.level.block.state.properties.DirectionProperty facing =
+                net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
+        if (lamp.hasProperty(facing)) {
+            lamp = lamp.setValue(facing, Direction.getNearest(Math.cos(furniture.facing()), 0, Math.sin(furniture.facing())));
+        }
+        chunk.setBlockState(pos.set(wx, y + pole + 1, wz), lamp, false);
     }
 
     private static BlockState line(Block block, ChunkLayer.Mark mark) {
@@ -65,7 +131,9 @@ public final class CityChunks {
         return block == CityBlocks.ASPHALT.get() || block == CityBlocks.ASPHALT_LINE_WHITE.get()
                 || block == CityBlocks.ASPHALT_LINE_YELLOW.get() || block == CityBlocks.SIDEWALK.get()
                 || block == Blocks.DIRT_PATH
-                || block == CityBlocks.ASPHALT_WHITE.get() || block == Blocks.SMOOTH_STONE || block == CityBlocks.CURB_EDGE.get();
+                || block == CityBlocks.ASPHALT_WHITE.get() || block == Blocks.SMOOTH_STONE || block == CityBlocks.CURB_EDGE.get()
+                || block == CityBlocks.MANHOLE.get() || block == CityBlocks.DRAIN_GRATE.get() || block == ours("side_ditch")
+                || block == ours("side_ditch_grate");
     }
 
     /**
@@ -308,6 +376,7 @@ public final class CityChunks {
                 if (ChunkLayer.parapet(column)) {
                     chunk.setBlockState(pos.set(baseX + x, y + 1, baseZ + z), Blocks.STONE_BRICK_WALL.defaultBlockState(), false);
                 }
+                fixture(chunk, ChunkLayer.furniture(column), baseX + x, y, baseZ + z, pos, top);
             }
         }
     }
@@ -633,7 +702,7 @@ public final class CityChunks {
                 // A bridge's parapet stands on the paving: kept
                 for (int y = paved + (ChunkLayer.parapet(column) ? 2 : 1); y <= high; y++) {
                     BlockState state = chunk.getBlockState(pos.set(baseX + x, y, baseZ + z));
-                    if (!state.isAir() && state.getFluidState().isEmpty()) {
+                    if (!state.isAir() && state.getFluidState().isEmpty() && !furniture(state)) {
                         chunk.setBlockState(pos, Blocks.AIR.defaultBlockState(), false);
                     }
                 }

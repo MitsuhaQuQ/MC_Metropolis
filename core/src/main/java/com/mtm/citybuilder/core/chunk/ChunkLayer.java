@@ -165,7 +165,15 @@ public final class ChunkLayer {
          * the mark's angle (of {@link #KERB_ANGLES}) is the direction of the pavement's side, its offset where the line
          * crosses.
          */
-        CURB
+        CURB,
+        /** A manhole cover in a lane of the carriageway. */
+        MANHOLE,
+        /** A drain grating in the gutter by the kerb; the mark's angle is the street's run. */
+        DRAIN,
+        /** A side ditch's concrete lid (側溝), along the edge of a street without pavements; angle its run. */
+        DITCH,
+        /** A side ditch's steel grating, every so often along it and at junctions. */
+        DITCH_GRATE
     }
 
     /** Directions a kerb crossing a block may face: every 360 / KERB_ANGLES degrees. */
@@ -232,7 +240,7 @@ public final class ChunkLayer {
                 return new Mark(Paving.PATH, 0, 0);
             case STREET:
             case OLD_ROAD:
-                return new Mark(Paving.ASPHALT, 0, 0);
+                return narrow(column);
             default:
                 break;
         }
@@ -283,7 +291,87 @@ public final class ChunkLayer {
             lines.add(new Line(-0.5 * carriage, Paving.WHITE_LINE, true));
         }
         // A carriageway with pavements beside it is laid low
-        return draw(lines, column.across, column.heading, column.along, walk > 0);
+        Mark drawn = draw(lines, column.across, column.heading, column.along, walk > 0);
+        if (walk > 0 && !column.bridge && (drawn.paving() == Paving.ASPHALT || drawn.paving() == Paving.WHITE_LINE)) {
+            double inLane = Math.abs(column.across);
+            long along = (long) Math.floor(column.along);
+            // A drain grating in the gutter by the kerb (over the edge line, which runs just inside it), every 15; a
+            // manhole in the near lane, every 35
+            if (inLane > carriage - 1.0 && Math.floorMod(along, 15) == 7) {
+                return new Mark(Paving.DRAIN, angle(column.heading), 0, true);
+            }
+            if (drawn.paving() == Paving.ASPHALT && Math.abs(inLane - 0.5 * carriage) < 0.5 && Math.floorMod(along, 35) == 17) {
+                return new Mark(Paving.MANHOLE, 0, 0, true);
+            }
+        }
+        return drawn;
+    }
+
+    /**
+     * A street or old road without pavements: asphalt, and along its edges a side ditch with concrete lids (側溝),
+     * a steel grating every 8 and wherever streets meet; a lane of paving slabs only, and none on a bridge.
+     */
+    private static Mark narrow(Column column) {
+        double half = 0.5 * column.width;
+        if (!column.bridge && column.width >= 5.0 && Math.abs(column.across) > half - 1.0) {
+            boolean grate = column.junction || Math.floorMod((long) Math.floor(column.along), 8) == 0;
+            return new Mark(grate ? Paving.DITCH_GRATE : Paving.DITCH, angle(column.heading), 0);
+        }
+        return new Mark(Paving.ASPHALT, 0, 0);
+    }
+
+    /** What stands on a column of a street. */
+    public enum Fixture {
+        NONE,
+        /** A road light: a tall pole, its arm out over the carriageway. */
+        LIGHT,
+        /** A road light on a median, an arm each way. */
+        LIGHT_DOUBLE,
+        /** A small lamp on a post, by a narrow street. */
+        LAMP
+    }
+
+    /**
+     * A fixture on a street's column and the heading it faces (radians, from +x towards +z): the way its arm reaches
+     * (over the carriageway, from the pavement's kerb side); a median's double arm along the street's normal.
+     */
+    public record Furniture(Fixture fixture, double facing) {
+        public static final Furniture NONE = new Furniture(Fixture.NONE, 0.0);
+    }
+
+    /**
+     * The street's furniture on a column, as Japanese streets have it: on a street with pavements a road light on the
+     * pavement by the kerb every 30, the two sides staggered, its arm out over the carriageway; on a boulevard's
+     * median one every 30 with an arm each way; by a street without pavements a small lamp on the edge every 20,
+     * the sides alternating. Not on a bridge, at a junction or in a station's square.
+     */
+    public static Furniture furniture(Column column) {
+        if (column.plaza != null || column.bridge || column.junction || column.surface == Surface.NONE
+                || column.surface == Surface.PATH || column.stop != null) {
+            return Furniture.NONE;
+        }
+        long along = (long) Math.floor(column.along);
+        double sign = column.across >= 0 ? 1.0 : -1.0;
+        // The street's left (positive across) is its normal (-sin, cos); towards the middle is against the column's side
+        double inward = Math.atan2(-Math.cos(column.heading) * sign, Math.sin(column.heading) * sign);
+        if (marked(column.surface)) {
+            double walk = walk(column.width);
+            double carriage = 0.5 * column.width - walk;
+            if (column.surface == Surface.BOULEVARD && Math.abs(column.across) < 0.5 && Math.floorMod(along, 30) == 0) {
+                return new Furniture(Fixture.LIGHT_DOUBLE, column.heading + 0.5 * Math.PI);
+            }
+            if (walk > 0 && Math.abs(column.across) >= carriage + 0.5 && Math.abs(column.across) < carriage + 1.5
+                    && Math.floorMod(along, 30) == (sign > 0 ? 0 : 15)) {
+                return new Furniture(Fixture.LIGHT, inward);
+            }
+            return Furniture.NONE;
+        }
+        if ((column.surface == Surface.STREET || column.surface == Surface.OLD_ROAD) && column.width >= 5.0
+                && Math.abs(column.across) > 0.5 * column.width - 1.0
+                && Math.floorMod(along, 20) == (sign > 0 ? 0 : 10)) {
+            return new Furniture(Fixture.LAMP, inward);
+        }
+        return Furniture.NONE;
     }
 
     /**

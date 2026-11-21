@@ -193,6 +193,38 @@ class ChunkLayerTest {
     }
 
     @Test
+    void streetsHaveLightsDrainsAndDitches() {
+        // An arterial 16 wide heading +x: pavements of 3, carriageway 5 either side of the centre line
+        ChunkLayer.Column left = new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false, Double.NaN, 5.5, 0.0, 0.5, 16.0);
+        ChunkLayer.Furniture light = ChunkLayer.furniture(left);
+        assertEquals(ChunkLayer.Fixture.LIGHT, light.fixture());
+        // Its arm out over the carriageway: from the left (+z) side towards -z
+        assertEquals(-1.0, Math.sin(light.facing()), 1e-9);
+        // The other side's lights stand halfway between
+        assertEquals(ChunkLayer.Fixture.NONE, ChunkLayer.furniture(
+                new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false, Double.NaN, -5.5, 0.0, 0.5, 16.0)).fixture());
+        assertEquals(ChunkLayer.Fixture.LIGHT, ChunkLayer.furniture(
+                new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false, Double.NaN, -5.5, 0.0, 15.5, 16.0)).fixture());
+        // A manhole in the near lane, a drain by the kerb
+        assertEquals(ChunkLayer.Paving.MANHOLE, ChunkLayer.paving(
+                new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false, Double.NaN, 2.5, 0.0, 17.5, 16.0)));
+        assertEquals(ChunkLayer.Paving.DRAIN, ChunkLayer.paving(
+                new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false, Double.NaN, 4.5, 0.0, 7.5, 16.0)));
+        // A street 6 wide: side ditches along both edges, a grating every 8, asphalt between; a lamp now and then
+        assertEquals(ChunkLayer.Paving.DITCH, ChunkLayer.paving(
+                new ChunkLayer.Column(ChunkLayer.Surface.STREET, false, Double.NaN, 2.5, 0.0, 3.5, 6.0)));
+        assertEquals(ChunkLayer.Paving.DITCH_GRATE, ChunkLayer.paving(
+                new ChunkLayer.Column(ChunkLayer.Surface.STREET, false, Double.NaN, -2.5, 0.0, 8.5, 6.0)));
+        assertEquals(ChunkLayer.Paving.ASPHALT, ChunkLayer.paving(
+                new ChunkLayer.Column(ChunkLayer.Surface.STREET, false, Double.NaN, 0.5, 0.0, 3.5, 6.0)));
+        assertEquals(ChunkLayer.Fixture.LAMP, ChunkLayer.furniture(
+                new ChunkLayer.Column(ChunkLayer.Surface.STREET, false, Double.NaN, 2.5, 0.0, 0.5, 6.0)).fixture());
+        // None on a bridge
+        assertEquals(ChunkLayer.Fixture.NONE, ChunkLayer.furniture(
+                new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, true, 70.0, 5.5, 0.0, 0.5, 16.0)).fixture());
+    }
+
+    @Test
     void stopLinesStandOnTheIncomingDriversLeft() {
         // Two arterials 16 wide crossing at the origin, and a narrow street coming out onto the east-west one from
         // the north at x = 60
@@ -257,7 +289,7 @@ class ChunkLayerTest {
         assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.BOULEVARD, 3.5, 2.0, 30.0));
         assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.BOULEVARD, 5.0, 2.0, 30.0));
         assertEquals(ChunkLayer.Paving.ASPHALT, paving(ChunkLayer.Surface.BOULEVARD, 5.0, 7.0, 30.0));
-        assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.BOULEVARD, -10.5, 7.0, 30.0));
+        assertEquals(ChunkLayer.Paving.WHITE_LINE, paving(ChunkLayer.Surface.BOULEVARD, -10.5, 8.0, 30.0));
         assertEquals(ChunkLayer.Paving.SIDEWALK, paving(ChunkLayer.Surface.BOULEVARD, 12.0, 7.0, 30.0));
         // On a bridge the median is paved; at a junction it is broken off
         assertEquals(ChunkLayer.Paving.SIDEWALK, ChunkLayer.paving(new ChunkLayer.Column(ChunkLayer.Surface.BOULEVARD, true,
