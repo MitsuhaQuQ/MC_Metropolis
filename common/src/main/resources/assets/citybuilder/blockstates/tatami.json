@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "citybuilder:block/tatami"
+    },
+    "facing=east": {
+      "model": "citybuilder:block/tatami",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "citybuilder:block/tatami",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "citybuilder:block/tatami",
+      "y": 270
+    }
+  }
+}

@@ -24,11 +24,12 @@ import com.mtm.citybuilder.core.building.temple.Parts.Rect;
  * @param platform        height of the stone platform
  * @param bay             distance between columns
  * @param veranda         a wooden veranda (縁) with a railing (高欄) round the outer walls, as on shrine halls
+ * @param interior        what is inside (see {@link HallInterior}); the front wall's middle bay is open into it
  * @param palette         materials
  */
 public record Hall(int width, int depth, double eave, double ridge, RoofType roof, double gableInset, int overhang,
                    int mokoshiWidth, int mokoshiDepth, double mokoshiEave, int mokoshiOverhang, int platform,
-                   double bay, boolean veranda, TemplePalette palette) {
+                   double bay, boolean veranda, HallInterior interior, TemplePalette palette) {
 
     /** The highest wall row under a roof: just below the roof's lowest piece over the wall line. */
     static int wallTop(Roof roof, Rect walls) {
@@ -68,13 +69,14 @@ public record Hall(int width, int depth, double eave, double ridge, RoofType roo
                 Math.min(2.0, 0.8 + width / 30.0), gableInset).walls(body.x0(), body.z0(), body.x1(), body.z1());
         // The walls reach the roof's underside where it passes over them, less the brackets.
         int top = Math.max(platform + 3, wallTop(mainRoof, body) - steps);
+        int mTop = top;
         if (hasMokoshi()) {
             int mSteps = 1;
             double mRidge = mokoshiEave + 0.55 * Math.min(mokoshiWidth, mokoshiDepth) / 2.0;
             Roof mRoof = new Roof(p, mok.x0(), mok.z0(), mok.width(), mok.depth(), mokoshiEave, mRidge, RoofType.HIP,
                     0.25, Math.min(1.0, mokoshiWidth / 40.0), 0)
                     .mask(body::contains).walls(ring.x0(), ring.z0(), ring.x1(), ring.z1()).noRidges();
-            int mTop = Math.max(platform + 3, wallTop(mRoof, ring) - mSteps);
+            mTop = Math.max(platform + 3, wallTop(mRoof, ring) - mSteps);
             Parts.walls(m, p, ring, platform, mTop, bay);
             Parts.brackets(m, p, ring, mTop, mSteps, mRoof);
             Parts.walls(m, p, body, platform, top, bay);
@@ -85,6 +87,23 @@ public record Hall(int width, int depth, double eave, double ridge, RoofType roo
         Parts.brackets(m, p, body, top, steps, mainRoof);
         mainRoof.build(m);
         Parts.closeToRoof(m, p, body, top + 1, (int) Math.ceil(ridge) + 2);
+        if (interior != HallInterior.NONE) {
+            if (hasMokoshi()) {
+                // Under the pent roof is inside too (an aisle, 裳階): the inner walls below its ceiling are columns only.
+                for (int x = body.x0(); x < body.x1(); x++) {
+                    for (int z = body.z0(); z < body.z1(); z++) {
+                        boolean edge = x == body.x0() || x == body.x1() - 1 || z == body.z0() || z == body.z1() - 1;
+                        for (int y = platform; edge && y < mTop; y++) {
+                            if (!Parts.upright(p.column()).equals(m.get(x, y, z))) {
+                                m.set(x, y, z, Interior.AIR);
+                            }
+                        }
+                    }
+                }
+            }
+            Interior.hall(m, p, outerWalls, platform, mTop, interior);
+            Interior.entrance(m, outerWalls, platform, Math.min(3, mTop - platform), interior == HallInterior.BUTSUDO);
+        }
         return m;
     }
 }

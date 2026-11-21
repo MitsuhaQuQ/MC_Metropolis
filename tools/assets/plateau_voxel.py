@@ -240,8 +240,21 @@ TEMPLES = {
     "demo_kitsune": dict(kind="guardians", role="KOMAINU", spacing=6, fox=True, palette="INARI"),
     "demo_temizuya": dict(kind="temizuya", role="TEMIZUYA", width=9, depth=7, eave=6.0, ridge=9.0, roof="IRIMOYA",
                           palette="COPPER"),
-    "demo_precinct_shrine": dict(kind="precinct", role="KEIDAI", precinct="SHRINE", approach=40, palette="INARI"),
-    "demo_precinct_temple": dict(kind="precinct", role="GARAN", precinct="TEMPLE", approach=30, palette="NATURAL"),
+    # Precincts planned on a plot (rank, scale, seeded choices, terraces on the slope, forest); showGround puts the
+    # natural ground in for the preview only.
+    "demo_precinct_shrine_small_hill": dict(kind="precinct", role="KEIDAI", precinct="SHRINE", width=33, depth=45,
+                                            seed=3, ground="worldgen", worldSeed=12345, x=-10232, z=-10272, radius=3000, minRise=6, maxRise=16,
+                                            showGround=True, palette="VERMILION"),
+    "demo_precinct_shrine_medium_hill": dict(kind="precinct", role="KEIDAI", precinct="SHRINE", width=51, depth=75,
+                                             seed=5, ground="worldgen", worldSeed=12345, x=-10232, z=-10272, radius=3000, minRise=10, maxRise=25,
+                                             showGround=True, palette="HIWADA"),
+    "demo_precinct_shrine_large": dict(kind="precinct", role="KEIDAI", precinct="SHRINE", width=75, depth=105, seed=9,
+                                       ground="slope", perX=0.03, perZ=-0.06, showGround=True, palette="INARI"),
+    "demo_precinct_temple_medium_hill": dict(kind="precinct", role="GARAN", precinct="TEMPLE", width=55, depth=81,
+                                             seed=4, ground="worldgen", worldSeed=12345, x=-10232, z=-10272, radius=3000, minRise=10, maxRise=25,
+                                             showGround=True, palette="NATURAL"),
+    "demo_precinct_temple_large": dict(kind="precinct", role="GARAN", precinct="TEMPLE", width=89, depth=121, seed=8,
+                                       ground="slope", perX=0, perZ=-0.05, showGround=True, palette="NATURAL"),
     "demo_hall_copper": dict(kind="hall", role="HAIDEN", width=29, depth=21, eave=8.0, ridge=17.0, roof="IRIMOYA", gableInset=4,
                              overhang=4, platform=2, bay=4.0, palette="COPPER"),
     # Landmarks PLATEAU does not cover (core.building.landmark), self-made at real Japanese sizes. Lighthouses: a
@@ -262,6 +275,20 @@ TEMPLES = {
     "stadium_baseball": dict(kind="ballpark", role="BALLPARK", lines=98, centre=122, foul=16, standDepth=26,
                              floodlights=36),
     "athletics_ground": dict(kind="athletics", role="ATHLETICS_GROUND", standDepth=20, roofLength=60),
+    # The hillside demos stand on MTM_worldgen's real terrain (seed 12345, round the castle town): each finds the
+    # mountainside site nearest the town whose ground climbs as much as asked from the street to the back.
+    # A shrine high on a mountainside: the approach climbs 30-60 m from the street.
+    "demo_precinct_shrine_mountain": dict(kind="precinct", role="KEIDAI", precinct="SHRINE", width=41, depth=121,
+                                          seed=12, ground="worldgen", worldSeed=12345, x=-10232, z=-10272, radius=3000, minRise=30, maxRise=60,
+                                          showGround=True, palette="VERMILION"),
+    # The torii tunnel up a mountain path (Inariyama), climbing 18-40 m.
+    "demo_senbon_torii_mountain": dict(kind="torii_tunnel", role="TORII", length=60, span=3, height=7, spacing=2,
+                                       ground="worldgen", worldSeed=12345, x=-10232, z=-10272, radius=3000, minRise=18, maxRise=40, showGround=True,
+                                       palette="INARI"),
+    "demo_karesansui": dict(kind="garden", role="TEIEN", style="karesansui", width=25, depth=15, seed=7),
+    "demo_moss_garden": dict(kind="garden", role="TEIEN", style="moss", width=15, depth=17, seed=7),
+    "demo_shoin": dict(kind="hall", role="QUARTERS", width=27, depth=21, eave=5.5, ridge=11.0, roof="IRIMOYA",
+                       gableInset=3, overhang=3, platform=1, bay=3.0, veranda=True),
 }
 
 # What each library entry is, for reuse: a category for every building; for sacred buildings also temple (寺院) or
@@ -322,15 +349,31 @@ LABELS = {
     "harbour_light_white": ("lighthouse", None, "HARBOUR_LIGHT"),
     "stadium_football": ("sports", None, "STADIUM"), "stadium_baseball": ("sports", None, "BALLPARK"),
     "athletics_ground": ("sports", None, "ATHLETICS_GROUND"),
+    "demo_precinct_shrine_small_hill": ("sacred", SHRINE, "KEIDAI"),
+    "demo_precinct_shrine_medium_hill": ("sacred", SHRINE, "KEIDAI"),
+    "demo_precinct_shrine_large": ("sacred", SHRINE, "KEIDAI"),
+    "demo_precinct_temple_medium_hill": ("sacred", TEMPLE, "GARAN"),
+    "demo_precinct_temple_large": ("sacred", TEMPLE, "GARAN"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
+    "demo_shoin": ("sacred", TEMPLE, "QUARTERS"),
+    "demo_precinct_shrine_mountain": ("sacred", SHRINE, "KEIDAI"),
+    "demo_senbon_torii_mountain": ("sacred", SHRINE, "TORII"),
+    "demo_karesansui": ("sacred", TEMPLE, "TEIEN"), "demo_moss_garden": ("sacred", BOTH, "TEIEN"),
 }
 DEMO_NAMES = {"lighthouse_cape": "灯台（岬、犬吠埼風、退息所付き）", "lighthouse_cape_small": "灯台（岬、潮岬風）",
               "harbour_light_red": "防波堤灯台（赤）", "harbour_light_white": "防波堤灯台（白）",
               "stadium_football": "球技場（サッカー）", "stadium_baseball": "野球場", "athletics_ground": "陸上競技場",
               "demo_precinct_shrine": "神社の境内（稲荷風）", "demo_precinct_temple": "寺院の伽藍", "demo_kasuga": "本殿（春日造）", "demo_hachiman": "本殿（八幡造）", "demo_shinmei": "本殿（神明造）",
+              "demo_precinct_shrine_small_hill": "小さな神社（山の斜面）", "demo_precinct_shrine_medium_hill": "中規模の神社（山麓）",
+              "demo_precinct_shrine_large": "大きな神社（稲荷風、緩い斜面）", "demo_precinct_temple_medium_hill": "中規模の寺院（山麓）",
+              "demo_precinct_temple_large": "大きな寺院の伽藍（緩い斜面）", "demo_kasuga": "本殿（春日造）", "demo_hachiman": "本殿（八幡造）", "demo_shinmei": "本殿（神明造）",
               "demo_kairo": "回廊（L 字、角）", "demo_toro_kasuga": "石灯籠（春日灯籠）", "demo_toro_small": "石灯籠（小）",
               "demo_komainu": "狛犬", "demo_kitsune": "狐（稲荷）", "demo_temizuya": "手水舎", "inari_otorii": "伏見稲荷大社 大鳥居", "inari_senbon_torii": "伏見稲荷大社 千本鳥居", "demo_honden_nagare": "本殿（流造、檜皮葺）", "demo_honden_chigi": "本殿（千木・鰹木）",
               "demo_torii": "鳥居（明神鳥居）", "demo_otorii": "大鳥居", "demo_gate_vermilion": "二重門（朱塗り、宝蔵門風）", "demo_belfry_open": "鐘楼（吹放し）",
-              "demo_belfry_hakamagoshi": "鐘楼（袴腰）","demo_pagoda_vermilion": "五重塔（朱塗り、浅草寺風）", "demo_hall_copper": "拝殿（銅板葺、神社）"}
+              "demo_belfry_hakamagoshi": "鐘楼（袴腰）","demo_pagoda_vermilion": "五重塔（朱塗り、浅草寺風）", "demo_hall_copper": "拝殿（銅板葺、神社）",
+              "demo_shoin": "書院・庫裏（和室）", "demo_karesansui": "枯山水（砂紋、石組）",
+              "demo_precinct_shrine_mountain": "山上の神社（石段の参道、踊り場に鳥居）",
+              "demo_senbon_torii_mountain": "千本鳥居（山道、石段）",
+              "demo_moss_garden": "苔庭（飛石、灯籠、紅葉、建仁寺垣）"}
 
 
 def label(slug):
@@ -648,6 +691,7 @@ def voxelize(rings, tex=None, texdir=None):
     surf = {}  # voxel -> class
     height = {}  # column -> highest roof point
     colours = {}  # (voxel, class) -> [rgb]
+    owners = {}  # wall voxel -> {polygon id: samples}
     columns = set()
     prio = {"ground": 0, "wall": 1, "roof": 2}
     for cls, ring, holes, pid in rings:
@@ -673,6 +717,9 @@ def voxelize(rings, tex=None, texdir=None):
                     lst = colours.setdefault((v, cls), [])
                     if len(lst) < 32:
                         lst.append(pix[px, py])
+                    if cls == "wall":
+                        o = owners.setdefault(v, {})
+                        o[pid] = o.get(pid, 0) + 1
             if cls == "roof":
                 col = (v[0], v[2])
                 if y > height.get(col, -1e9):
@@ -708,7 +755,7 @@ def voxelize(rings, tex=None, texdir=None):
                 solid.add((col[0], y, col[1]))
     if odd:
         print(f"  {odd} of {len(hits)} columns cross the surface an odd number of times", flush=True)
-    return solid, surf, height, colours
+    return solid, surf, height, colours, owners
 
 
 # ---------------------------------------------------------------- palettes
@@ -1086,6 +1133,399 @@ def recolour(blocks, solid, colours, pal, bc):
     return len(final)
 
 
+# ---------------------------------------------------------------- windows from the textures
+
+def _glass_for(rgb):
+    """The stained glass whose tint a window's colour suggests: blue, teal, grey or dark."""
+    r, g, b = rgb
+    if b > r + 18 and b >= g - 5:
+        return "light_blue" if b > 120 else "blue"
+    if g > r + 12 and b > r + 8:
+        return "cyan"
+    return "gray" if luminance(rgb) < 85 else "light_gray"
+
+
+def _smooth(vals, w):
+    """Moving average over a window of 2w+1, ignoring None."""
+    out = []
+    for i in range(len(vals)):
+        seg = [v for v in vals[max(0, i - w):i + w + 1] if v is not None]
+        out.append(sum(seg) / len(seg) if seg else None)
+    return out
+
+
+def _period(profile, lo, hi):
+    """The lag in [lo, hi] at which a profile (None for no data) best matches itself, and that correlation."""
+    xs = [v for v in profile if v is not None]
+    if len(xs) < 2 * hi:
+        return None, 0.0
+    mu = sum(xs) / len(xs)
+    var = sum((v - mu) ** 2 for v in xs) / len(xs)
+    if var < 1e-6:
+        return None, 0.0
+    best = (None, 0.0)
+    for lag in range(lo, hi + 1):
+        pairs = [(profile[i] - mu, profile[i + lag] - mu) for i in range(len(profile) - lag)
+                 if profile[i] is not None and profile[i + lag] is not None]
+        if len(pairs) < lag:
+            continue
+        c = sum(x * y for x, y in pairs) / len(pairs) / var
+        if c > best[1]:
+            best = (lag, c)
+    return best
+
+
+def _fold(profile, period):
+    bins = [[] for _ in range(period)]
+    for i, v in enumerate(profile):
+        if v is not None:
+            bins[i % period].append(v)
+    return [sum(b) / len(b) if b else None for b in bins]
+
+
+STEP_F = 0.25  # metres between samples on a facade
+
+
+def facade_patterns(rings, tex, texdir):
+    """For each textured wall polygon tall enough to hold storeys, its window pattern read off the photograph.
+
+    The polygon is sampled every 25 cm in its own frame (along the wall, up); each sample's brightness is divided by
+    the mean of its 6 m neighbourhood, which takes out shade and the sun's gradient. The vertical profile's period
+    (2.8 to 5 m, by autocorrelation) is the storey; folded by it, the darker part is the window band. Within that
+    band the horizontal profile's period (1.25 to 8 m) and its brighter part are the piers, if it has one clearly.
+    Returns {polygon id: dict(origin, u, base, storey, band, pier, piers, glass, wall rgb)}."""
+    out = {}
+    for cls, ring, holes, pid in rings:
+        if cls != "wall" or not tex or pid not in tex:
+            continue
+        pts = open_ring(ring)
+        if len(pts) < 3:
+            continue
+        n = newell(pts)
+        nh = math.hypot(n[0], n[2])
+        if nh < 1e-6 or abs(n[1]) > 0.2 * nh:
+            continue  # not a vertical wall
+        ux, uz = -n[2] / nh, n[0] / nh
+        ox, oz = pts[0][0], pts[0][2]
+        A = [(p[0] - ox) * ux + (p[2] - oz) * uz for p in pts]
+        H = [p[1] for p in pts]
+        a0, a1, h0, h1 = min(A), max(A), min(H), max(H)
+        if h1 - h0 < 8 or a1 - a0 < 4:
+            continue
+        tm = texture_map(ring, tex[pid])
+        if not tm:
+            continue
+        pix, W, Hh = atlas(os.path.join(texdir, tm[0]))
+        _, ta, tb, cu, cv = tm
+        poly2 = list(zip(A, H))
+        na, nhh = int((a1 - a0) / STEP_F), int((h1 - h0) / STEP_F)
+        grid = [[None] * na for _ in range(nhh)]
+        rgbs = [[None] * na for _ in range(nhh)]
+        for j in range(nhh):
+            h = h0 + (j + 0.5) * STEP_F
+            for i in range(na):
+                a = a0 + (i + 0.5) * STEP_F
+                if not inside(a, h, poly2):
+                    continue
+                p3 = (ox + a * ux, h, oz + a * uz)
+                u = cu[0] + cu[1] * p3[ta] + cu[2] * p3[tb]
+                w = cv[0] + cv[1] * p3[ta] + cv[2] * p3[tb]
+                px, py = int(u * W), int((1 - w) * Hh)
+                if 0 <= px < W and 0 <= py < Hh:
+                    c = pix[px, py]
+                    grid[j][i] = luminance(c)
+                    rgbs[j][i] = c
+        # Take out the shading: divide by the 6 m neighbourhood (rows, then columns, of the moving average).
+        k = int(3 / STEP_F)
+        rows_sm = [_smooth(r, k) for r in grid]
+        cols_sm = [[None] * na for _ in range(nhh)]
+        for i in range(na):
+            col = _smooth([rows_sm[j][i] for j in range(nhh)], k)
+            for j in range(nhh):
+                cols_sm[j][i] = col[j]
+        ratio = [[grid[j][i] / cols_sm[j][i] if grid[j][i] is not None and cols_sm[j][i] else None
+                  for i in range(na)] for j in range(nhh)]
+        vert = []
+        for j in range(nhh):
+            r = [v for v in ratio[j] if v is not None]
+            vert.append(sum(r) / len(r) if len(r) > na * 0.3 else None)
+        storey, corr = _period(vert, int(2.8 / STEP_F), int(5.0 / STEP_F))
+        if not storey or corr < 0.3:
+            continue
+        folded = _fold(vert, storey)
+        if any(v is None for v in folded) or max(folded) - min(folded) < 0.08:
+            continue
+        mid = (max(folded) + min(folded)) / 2
+        band = [v < mid for v in folded]
+        if all(band) or not any(band):
+            continue
+        horiz = []
+        for i in range(na):
+            r = [ratio[j][i] for j in range(nhh) if band[j % storey] and ratio[j][i] is not None]
+            horiz.append(sum(r) / len(r) if len(r) > 2 else None)
+        pier, pc = _period(horiz, int(1.25 / STEP_F), int(8 / STEP_F))
+        piers = None
+        if pier and pc > 0.35:
+            fh = _fold(horiz, pier)
+            if all(v is not None for v in fh) and max(fh) - min(fh) > 0.08:
+                hmid = (max(fh) + min(fh)) / 2
+                piers = [v >= hmid for v in fh]
+                if all(piers) or not any(piers):
+                    piers = None
+        win, wall = [], []
+        for j in range(nhh):
+            for i in range(na):
+                c = rgbs[j][i]
+                if c is None:
+                    continue
+                is_win = band[j % storey] and not (piers and piers[i % pier])
+                (win if is_win else wall).append(c)
+        if not win or not wall:
+            continue
+        med = lambda cs: tuple(sorted(c[t] for c in cs)[len(cs) // 2] for t in range(3))
+        out[pid] = dict(origin=(ox, oz), u=(ux, uz), a0=a0, h0=h0, storey=storey, band=band, pier=pier,
+                        piers=piers, glass=_glass_for(med(win)), wall=med(wall))
+    return out
+
+
+def windows(blocks, solid, owners, patterns, bc):
+    """Puts the windows read off the photographs into the walls: each outer wall block takes the pattern of the
+    polygon that gave it most of its samples, and is a window if most of its metre lies in the window band and off
+    the piers. Windows become stained glass panes (set back in the wall), the rest of that polygon's wall one block,
+    the commonest the colours gave it, or the nearest to its wall colour."""
+    by_pid = {}
+    for v, (name, props) in blocks.items():
+        x, y, z = v
+        if props is not None or (x, y + 1, z) not in solid or v not in owners:
+            continue
+        sides = [d for d in ((1, 0), (-1, 0), (0, 1), (0, -1)) if (x + d[0], y, z + d[1]) not in solid]
+        if len(sides) != 1:
+            continue
+        pid = max(owners[v], key=owners[v].get)
+        if pid in patterns:
+            by_pid.setdefault(pid, []).append((v, sides[0]))
+    walls = Matcher(bc, [b for b in WALL_BLOCKS])
+    changed = 0
+    for pid, cells in by_pid.items():
+        pt = patterns[pid]
+        ox, oz = pt["origin"]
+        ux, uz = pt["u"]
+        st, band, pier, piers = pt["storey"], pt["band"], pt["pier"], pt["piers"]
+
+        def window_at(x, y, z):
+            hits = 0
+            for dy in (0.125, 0.375, 0.625, 0.875):
+                for da in (-0.375, -0.125, 0.125, 0.375):
+                    a = (x + 0.5 - ox) * ux + (z + 0.5 - oz) * uz + da
+                    jj = int((y + dy - pt["h0"]) / STEP_F)
+                    ii = int((a - pt["a0"]) / STEP_F)
+                    if jj < 0 or ii < 0:
+                        continue
+                    if band[jj % st] and not (piers and piers[ii % pier]):
+                        hits += 1
+            return hits >= 8
+        count = {}
+        flags = []
+        for v, d in cells:
+            w = window_at(*v)
+            flags.append((v, d, w))
+            n = blocks[v][0]
+            if not w and "glass" not in n:
+                count[n] = count.get(n, 0) + 1
+        wall = max(count, key=count.get) if count else walls(pt["wall"])
+        pane = pt["glass"] + "_stained_glass_pane"
+        for v, d, w in flags:
+            if w:
+                blocks[v] = (pane, {"east": "true", "west": "true"} if d[0] == 0 else {"north": "true", "south": "true"})
+            else:
+                blocks[v] = (wall, None)
+            changed += 1
+    return changed
+
+
+# ---------------------------------------------------------------- shaded lower floors
+
+def _block_lum(name, bc):
+    n = name[:-5] if name.endswith("_pane") else name
+    c = bc.get(FULL_OF.get(n, PREVIEW_ALIAS.get(n, n)))
+    return luminance(c) if c else None
+
+
+def lift_shaded_floors(blocks, solid, bc, storey):
+    """The aerial photographs see a facade's lower floors in the street's shadow, or hidden by the buildings across
+    it, so they come out dark. Facade by facade (outer wall blocks facing one way in one plane), the rows from the
+    ground up that are much darker than the lit upper half are given the upper floors' materials, column by column
+    (each column keeps the block it has most often above, so piers and window bands carry down); the ground floor,
+    where it was dark, becomes a shopfront: glass panes between piers of the facade's wall. Facades whose windows
+    were read already, or without lit floors above, are left alone."""
+    facades = {}
+    for v, (name, props) in blocks.items():
+        x, y, z = v
+        if (x, y + 1, z) not in solid or (props is not None and not name.endswith("_pane")):
+            continue
+        sides = [d for d in ((1, 0), (-1, 0), (0, 1), (0, -1)) if (x + d[0], y, z + d[1]) not in solid]
+        if len(sides) != 1:
+            continue
+        d = sides[0]
+        facades.setdefault((d, x if d[0] else z), {})[(z if d[0] else x, y)] = v
+    changed = 0
+    # The building's lit facades set how bright its walls really are: the upper quartile of facade medians.
+    fac_med = {}
+    for key, cells in facades.items():
+        ls = sorted(l for l in (_block_lum(blocks[v][0], bc) for v in cells.values()) if l is not None)
+        if len(ls) >= 20:
+            fac_med[key] = ls[len(ls) // 2]
+    meds = sorted(fac_med.values())
+    lit = meds[len(meds) * 3 // 4] if meds else None
+    # The lit facades' commonest wall block: what the building's walls are made of where the photograph saw them.
+    lit_count = {}
+    for key, cells in facades.items():
+        if lit and fac_med.get(key, 0) >= 0.85 * lit:
+            for v in cells.values():
+                n = blocks[v]
+                if n[1] is None and "glass" not in n[0]:
+                    lit_count[n] = lit_count.get(n, 0) + 1
+    lit_wall = max(lit_count, key=lit_count.get) if lit_count else None
+    for key, cells in list(facades.items()):
+        d = key[0]
+        props = {"east": "true", "west": "true"} if d[0] == 0 else {"north": "true", "south": "true"}
+        has_panes = any(blocks[v][0].endswith("_pane") for v in cells.values())
+        if lit_wall and key in fac_med and fac_med[key] < 0.6 * lit:
+            # In shade from top to foot: the lit facades' wall; where it was much darker than the rest of the
+            # facade, a window (unless the windows were read already).
+            for v in cells.values():
+                n, pr = blocks[v]
+                if pr is not None:
+                    continue
+                l = _block_lum(n, bc)
+                if not has_panes and l is not None and l < 0.6 * fac_med[key]:
+                    blocks[v] = ("gray_stained_glass_pane", dict(props))
+                else:
+                    blocks[v] = lit_wall
+                changed += 1
+            continue
+        if has_panes:
+            continue  # its windows were read: already in order
+        ys = sorted({y for _, y in cells})
+        y0, y1 = ys[0], ys[-1]
+        if y1 - y0 < 8 or len(cells) < 40:
+            continue
+        rows = {}
+        for (a, y), v in cells.items():
+            l = _block_lum(blocks[v][0], bc)
+            if l is not None:
+                rows.setdefault(y, []).append(l)
+        med = {y: sorted(ls)[len(ls) // 2] for y, ls in rows.items() if len(ls) >= 4}
+        upper = [med[y] for y in med if y >= y0 + (y1 - y0) // 2]
+        if not upper:
+            continue
+        ref = sorted(upper)[len(upper) // 2]
+        # The dark rows, contiguous from the ground up.
+        top_dark = None
+        for y in range(y0, y1 + 1):
+            if y in med and med[y] < 0.7 * ref:
+                top_dark = y
+            elif y in med:
+                break
+        if top_dark is None or top_dark >= y0 + (y1 - y0) * 2 // 3:
+            continue  # nothing dark at the foot, or the whole facade is dark: no lit floors to borrow from
+        # Each column's commonest block above the dark rows, and the facade's.
+        col_mode, all_count = {}, {}
+        for (a, y), v in cells.items():
+            if y > top_dark:
+                n = blocks[v]
+                col_mode.setdefault(a, {})
+                col_mode[a][n] = col_mode[a].get(n, 0) + 1
+                all_count[n] = all_count.get(n, 0) + 1
+        if not all_count:
+            continue
+        facade_mode = max(all_count, key=all_count.get)
+        wall = max((n for n in all_count if "glass" not in n[0]), key=all_count.get, default=facade_mode)
+        props = {"east": "true", "west": "true"} if d[0] == 0 else {"north": "true", "south": "true"}
+        for (a, y), v in cells.items():
+            if y > top_dark:
+                continue
+            if y <= y0 + min(3, storey):  # the ground floor: a shopfront
+                blocks[v] = wall if (a % 4 == 0 or y == y0) else ("light_gray_stained_glass_pane", dict(props))
+            else:
+                m = col_mode.get(a)
+                blocks[v] = max(m, key=m.get) if m else facade_mode
+            changed += 1
+    return changed
+
+
+# ---------------------------------------------------------------- rooftops
+
+def tidy_roofs(blocks, solid, parapets=True):
+    """Flat roofs as the photographs show them are speckled with what stands on them (air conditioners, tanks,
+    skylights, their shadows), one block each. Each flat roof plane (full blocks open to the sky, connected at one
+    height) gets one material: its commonest block, keeping only patches of another block large enough to be a
+    real surface (a roof garden, a rooflight; at least 5% of the plane and 25 blocks). Where a plane ends at a drop,
+    a parapet one block high goes round it, of the wall below it. Pitched roofs (stairs, slabs) are left alone."""
+    top = {v for v, (n, pr) in blocks.items() if pr is None and (v[0], v[1] + 1, v[2]) not in blocks
+           and "glass" not in n}
+    seen, planes = set(), []
+    for v in top:
+        if v in seen:
+            continue
+        plane, stack = [], [v]
+        seen.add(v)
+        while stack:
+            c = stack.pop()
+            plane.append(c)
+            for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = (c[0] + dx, c[1], c[2] + dz)
+                if n in top and n not in seen:
+                    seen.add(n)
+                    stack.append(n)
+        if len(plane) >= 20:
+            planes.append(plane)
+    changed = 0
+    for plane in planes:
+        cells = set(plane)
+        # Patches of one block, connected.
+        patch_of, patches = {}, []
+        for v in plane:
+            if v in patch_of:
+                continue
+            name = blocks[v][0]
+            comp, stack = [], [v]
+            patch_of[v] = len(patches)
+            while stack:
+                c = stack.pop()
+                comp.append(c)
+                for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    n = (c[0] + dx, c[1], c[2] + dz)
+                    if n in cells and n not in patch_of and blocks[n][0] == name:
+                        patch_of[n] = len(patches)
+                        stack.append(n)
+            patches.append((name, comp))
+        big = max(25, len(plane) // 20)
+        count = {}
+        for name, comp in patches:
+            count[name] = count.get(name, 0) + len(comp)
+        main = max(count, key=count.get)
+        for name, comp in patches:
+            if name != main and len(comp) < big:
+                for c in comp:
+                    blocks[c] = (main, None)
+                    changed += 1
+        if not parapets or len(plane) < 30:
+            continue
+        for v in plane:
+            x, y, z = v
+            for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = (x + dx, y, z + dz)
+                if n not in solid and (x + dx, y - 1, z + dz) not in solid:
+                    below = blocks.get((x, y - 1, z))
+                    wall = below if below and below[1] is None and "glass" not in below[0] else (main, None)
+                    if (x, y + 1, z) not in blocks:
+                        blocks[(x, y + 1, z)] = wall
+                        changed += 1
+                    break
+    return changed
+
+
 # ---------------------------------------------------------------- NBT
 
 def nbt_string(s):
@@ -1133,6 +1573,7 @@ def write_nbt(path, blocks, size):
 # ---------------------------------------------------------------- preview
 
 COLOURS = {
+    "candle": 0xE6DEC8,
     "deepslate_tiles": 0x3A3A3E, "deepslate_tile_stairs": 0x3A3A3E, "deepslate_tile_slab": 0x3A3A3E,
     "calcite": 0xDFE0DC, "dark_oak_planks": 0x4A3220, "dark_oak_log": 0x3C2E1A, "spruce_planks": 0x725431,
     "bricks": 0x976253, "stone_bricks": 0x7A7A7A, "smooth_stone": 0x9E9E9E, "gray_stained_glass": 0x4C5258,
@@ -1150,7 +1591,11 @@ COLOURS = {
 }
 
 
-PREVIEW_ALIAS = {"white_concrete_powder": "white_concrete", "andesite_wall": "andesite", "andesite_stairs": "andesite", "andesite_slab": "andesite",
+PREVIEW_ALIAS = {"cyan_stained_glass": "cyan_stained_glass", "end_rod": "white_concrete", "brown_stained_glass": "brown_stained_glass", "grass_block": "lime_terracotta", "dirt": "brown_terracotta", "cobblestone": "andesite",
+                 "mossy_cobblestone": "mossy_stone_bricks", "spruce_log": "spruce_planks", "dark_oak_log": "dark_oak_planks",
+                 "oak_log": "oak_planks", "spruce_leaves": "green_terracotta", "jungle_leaves": "green_concrete",
+                 "dark_oak_leaves": "green_terracotta", "oak_leaves": "lime_terracotta", "acacia_leaves": "orange_terracotta",
+                 "stone_brick_stairs": "stone_bricks", "white_concrete_powder": "white_concrete", "andesite_wall": "andesite", "andesite_stairs": "andesite", "andesite_slab": "andesite",
                  "water_cauldron": "light_blue_concrete", "mud_brick_stairs": "mud_bricks", "mud_brick_slab": "mud_bricks",
                  "oak_fence": "oak_planks", "oak_stairs": "oak_planks", "spruce_stairs": "spruce_planks",
                  "chiseled_stone_bricks": "stone_bricks", "acacia_stairs": "acacia_planks", "green_terracotta": "green_terracotta", "lantern": "gold_block", "spruce_slab": "spruce_planks", "dark_oak_slab": "dark_oak_planks",
@@ -1172,6 +1617,8 @@ _mod_colours = {}
 def colour_of(name, bc):
     """A block's preview colour: vanilla from the client jar's textures (or COLOURS), this mod's own blocks from their
     textures in the repository, painted lines lighter than their surface."""
+    if name in bc:
+        return bc[name]
     if name.startswith("citybuilder:"):
         if name not in _mod_colours:
             short = name.split(":", 1)[1]
@@ -1188,6 +1635,7 @@ def colour_of(name, bc):
 
 
 def render(blocks, size, path, bc, max_px=1800):
+    blocks = {v: b for v, b in blocks.items() if b[0] != "air"}  # cuts in the hillside: nothing to draw
     sx, sy, sz = size
     s = 2
     while s < 8 and (sx + sz) * (s + 2) <= max_px and ((sx + sz) * (s + 2)) // 2 + sy * (s + 2) <= max_px:
@@ -1228,6 +1676,8 @@ def render(blocks, size, path, bc, max_px=1800):
             continue
         if name == "spruce_planks" and props is None and name not in bc:
             pass
+        if name.endswith("_pane"):
+            name = name[:-5]
         r, g, b = colour_of(name, bc)
         bx, by = proj(x, y, z)
         bx, by = int(bx) + ox, int(by) + oy
@@ -1235,8 +1685,12 @@ def render(blocks, size, path, bc, max_px=1800):
             spr = shapes["plate_top" if props and props.get("half") == "top" else "plate_bottom"]
         elif name.endswith(("_fence", "_wall", "iron_bars", "lightning_rod", "chain")):
             spr = shapes["post"]
-        elif name == "bell":
+        elif name in ("bell", "citybuilder:koro", "citybuilder:chochin"):
             spr = shapes["bell"]
+        elif name == "citybuilder:zabuton":
+            spr = shapes["plate_bottom"]
+        elif name == "citybuilder:shimenawa":
+            spr = shapes["plate_top"]
         elif props and props.get("type") == "top":
             spr = shapes["slab_top"]
         else:
@@ -1261,6 +1715,8 @@ def render(blocks, size, path, bc, max_px=1800):
         out[row * W * 3:(row * W + w) * 3] = img[row * w * 3:(row + 1) * w * 3]
     for (x, y), z in front.items():
         name, props = blocks[(x, y, z)]
+        if name.endswith("_pane"):
+            name = name[:-5]
         r, g, b = colour_of(name, bc)
         k = 0.95 - 0.45 * (sz - 1 - z) / max(1, sz - 1)
         col = bytes((int(r * k), int(g * k), int(b * k)))
@@ -1281,7 +1737,8 @@ def render(blocks, size, path, bc, max_px=1800):
 
 def thin(name):
     return name.endswith(("trapdoor", "_fence", "_wall", "iron_bars", "lightning_rod", "chain", "_slab", "_stairs")) \
-        or name == "bell" or name.startswith("citybuilder:seat_")
+        or name in ("bell", "citybuilder:koro", "citybuilder:chochin", "citybuilder:zabuton", "citybuilder:shimenawa",
+                    "citybuilder:saisen_bako") or name.startswith("citybuilder:seat_")
 
 
 def inside(x, y, poly):
@@ -1308,10 +1765,72 @@ def parse_state(state):
     """'minecraft:x[a=b,c=d]' -> ('x', {'a': 'b', 'c': 'd'} or None)."""
     name, _, props = state.partition("[")
     if name.startswith("minecraft:"):
-        name = name.split(":", 1)[1]  # vanilla names stay bare; the mod's own keep their namespace
+        name = name[len("minecraft:"):]  # vanilla blocks by their bare names; this mod's keep their namespace
     if not props:
         return name, None
     return name, dict(kv.split("=", 1) for kv in props.rstrip("]").split(","))
+
+
+def own_top_texture(name, props):
+    """The texture file of this mod's block's top face, and the quarter turns it is drawn with; None if not ours."""
+    if not name.startswith("citybuilder:"):
+        return None
+    n = name.split(":", 1)[1]
+    props = props or {}
+    if n == "raked_gravel_ring":
+        return f"raked_gravel_ring_{props['facing']}_{props['part']}", 0
+    if n == "raked_gravel":
+        return "raked_gravel", 1 if props.get("axis") == "z" else 0
+    if n == "tatami":
+        return "tatami", {"north": 0, "east": 1, "south": 2, "west": 3}[props.get("facing", "north")]
+    return {"tobiishi": "tobiishi_stone", "fusuma": "fusuma_upper", "fusuma_gold": "fusuma_gold_upper",
+            "saisen_bako": "saisen_bako_top", "koro": "koro_top", "chochin": "chochin_cap",
+            "coffered_ceiling": "coffered_ceiling_side"}.get(n, n), 0
+
+
+def render_plan(blocks, size, path, bc, px=8):
+    """Seen from straight above, every column's top block drawn with its own texture where it is one of this mod's
+    (scaled to px per block), else its average colour; higher blocks a little lighter. Shows raking, tatami and
+    paving, which the averaged isometric view cannot."""
+    sx, _, sz = size
+    top = {}
+    for (x, y, z), b in blocks.items():
+        if b[0] != "air" and y > top.get((x, z), (-1, None))[0]:
+            top[(x, z)] = (y, b)
+    ymin = min(t[0] for t in top.values())
+    img = Image.new("RGB", (sx * px, sz * px), (244, 241, 234))
+    cache = {}
+    for (x, z), (y, (name, props)) in top.items():
+        tex = own_top_texture(name, props)
+        k = 1 + 0.03 * (y - ymin)
+        if tex:
+            key = tex
+            if key not in cache:
+                t = Image.open(os.path.join(OWN_TEXTURES, tex[0] + ".png")).convert("RGB")
+                for _ in range(tex[1]):
+                    t = t.transpose(Image.Transpose.ROTATE_270)  # a quarter turn clockwise
+                cache[key] = t.resize((px, px), Image.Resampling.BOX)
+            tile = cache[key].point(lambda v: min(255, int(v * k)))
+        else:
+            n = name[:-5] if name.endswith("_pane") else name
+            c = bc.get(FULL_OF.get(n, PREVIEW_ALIAS.get(n, n))) or ((COLOURS[n] >> 16, (COLOURS[n] >> 8) & 255,
+                                                                      COLOURS[n] & 255) if n in COLOURS else (255, 0, 255))
+            tile = Image.new("RGB", (px, px), tuple(min(255, int(v * k)) for v in c))
+        img.paste(tile, (x * px, z * px))
+    img.save(path)
+
+
+def interior_cut(blocks, kind):
+    """The height to cut a building at to show its interior: three above its lowest tatami (the fusuma and the beam
+    over them, below the rooms' ceilings), or above a pagoda's ground floor; None without an interior. The images
+    (gold) are kept whole above the cut."""
+    if kind not in ("hall", "pagoda"):
+        return None  # a precinct's hillside would be cut through too
+    tatami = [y for (x, y, z), (n, _) in blocks.items() if n == "citybuilder:tatami"]
+    if tatami:
+        return min(tatami) + 3
+    gold = [y for (x, y, z), (n, _) in blocks.items() if n == "gold_block"]
+    return min(gold) + 2 if gold and kind == "pagoda" else None
 
 
 def build_temple(out, gid, slug, name, row, bc):
@@ -1321,6 +1840,18 @@ def build_temple(out, gid, slug, name, row, bc):
     size = tuple(model["size"])
     write_nbt(os.path.join(out, slug + ".nbt"), blocks, size)
     render(blocks, size, os.path.join(out, slug + ".png"), bc)
+    if TEMPLES[slug]["kind"] == "garden":
+        render_plan(blocks, size, os.path.join(out, slug + "_plan.png"), bc, px=16)
+    cut = interior_cut(blocks, TEMPLES[slug]["kind"])
+    if cut is not None:  # a cutaway: everything above the rooms' fusuma taken off, the rooms seen from above
+        floor = [v for v, b in blocks.items() if b[0] in ("citybuilder:tatami", "gold_block") and v[1] <= cut]
+        x0, x1 = min(v[0] for v in floor), max(v[0] for v in floor)
+        z0, z1 = min(v[2] for v in floor), max(v[2] for v in floor)
+        kept = {v: b for v, b in blocks.items() if v[1] <= cut or b[0] in ("gold_block", "gilded_blackstone")
+                and v[1] <= cut + 6 and x0 <= v[0] <= x1 and z0 <= v[2] <= z1}
+        render(kept, (size[0], max(v[1] for v in kept) + 1, size[2]), os.path.join(out, slug + "_interior.png"), bc)
+    elif os.path.exists(os.path.join(out, slug + "_interior.png")):
+        os.remove(os.path.join(out, slug + "_interior.png"))
     counts = {}
     for n, _ in blocks.values():
         counts[n] = counts.get(n, 0) + 1
@@ -1330,6 +1861,160 @@ def build_temple(out, gid, slug, name, row, bc):
             **label(slug), "palette": "generated", "spec": TEMPLES[slug], "size": list(size), "blocks": len(blocks),
             "surfaces": 0, "textured_polygons": 0, "recoloured_blocks": 0, "rotation_deg": 0.0,
             "block_counts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
+
+
+# ---------------------------------------------------------------- landmark fixes
+#
+# Where LOD2 and its photographs fall short of a landmark everyone knows, its upper parts are rebuilt by hand after
+# photographs, keeping LOD2's heights and axis; the rest stays as voxelized and coloured from the textures.
+
+def _ring(blocks, cx, cz, y, r_out, r_in, state, keep=None):
+    """A ring (or a disc with r_in < 0) of `state` at height y round the axis (cx, cz), voxel centres."""
+    R = int(r_out) + 1
+    for x in range(int(cx) - R - 1, int(cx) + R + 2):
+        for z in range(int(cz) - R - 1, int(cz) + R + 2):
+            d = ((x + 0.5 - cx) ** 2 + (z + 0.5 - cz) ** 2) ** 0.5
+            if r_in < d <= r_out and (keep is None or keep(x, z, d)):
+                blocks[(x, y, z)] = state
+
+
+def kyoto_tower(blocks):
+    """Kyoto Tower above its building's roof, after a photograph: a golden glass bowl on the roof with light mullions,
+    the white shaft narrowing upwards from a flared foot, the observation deck (an orange-red cone under it, a band of
+    windows between white rims) inside a cage of red ribs bulging outwards, a white drum, the orange-and-white
+    antenna and a red-and-white mast. Heights and axis from LOD2 (shaft 48-98, deck 99-104, drum 105-110, antenna
+    111-122, mast to 130)."""
+    shaft = [(x, z) for (x, y, z) in blocks if 60 <= y <= 90]
+    cx = sum(x for x, _ in shaft) / len(shaft) + 0.5
+    cz = sum(z for _, z in shaft) / len(shaft) + 0.5
+    for v in [v for v in blocks if v[1] >= 36 and ((v[0] + 0.5 - cx) ** 2 + (v[2] + 0.5 - cz) ** 2) ** 0.5 <= 13.5]:
+        del blocks[v]
+    white, orange, glass = ("white_concrete", None), ("orange_concrete", None), ("brown_stained_glass", None)
+    mullion, deckglass = ("smooth_sandstone", None), ("gray_stained_glass", None)
+    # The bowl: narrow at the roof, opening upwards, glass with a light mullion every few degrees, a white lip and top.
+    import math
+    for y in range(36, 47):
+        t = (y - 36) / 10
+        r = 5.5 + 6.5 * t ** 0.8
+
+        def stripe(x, z, d):
+            return int(round(math.degrees(math.atan2(z + 0.5 - cz, x + 0.5 - cx)) / 15)) % 2 == 0
+        _ring(blocks, cx, cz, y, r, r - 1.2, glass if y < 46 else white)
+        if y < 46:
+            _ring(blocks, cx, cz, y, r, r - 1.2, mullion, keep=lambda x, z, d: abs(math.degrees(math.atan2(z + 0.5 - cz, x + 0.5 - cx))) % 20 < 3)
+    _ring(blocks, cx, cz, 46, 12.0, -1, white)
+    _ring(blocks, cx, cz, 35, 5.5, -1, white)
+    # The shaft, white, from a flared foot to 6.6 m under the deck.
+    for y in range(47, 99):
+        r = 3.3 + 1.2 * max(0.0, (75 - y) / 28) ** 1.5 + (1.2 if y < 49 else 0.5 if y < 51 else 0)
+        _ring(blocks, cx, cz, y, r, r - 1.1, white)
+    # The deck: the orange-red cone under it, white rims, a band of windows, the floor and roof.
+    for y, r in ((95, 4.2), (96, 5.2), (97, 6.3), (98, 7.4), (99, 8.5)):
+        _ring(blocks, cx, cz, y, r, -1, orange)
+    _ring(blocks, cx, cz, 100, 9.3, -1, white)
+    for y in (101, 102):
+        _ring(blocks, cx, cz, y, 9.3, 8.2, deckglass)
+    _ring(blocks, cx, cz, 103, 9.0, -1, white)
+    _ring(blocks, cx, cz, 104, 6.0, -1, white)
+    # The cage of red ribs round the deck, bulging out at its middle, every 30 degrees.
+    for k in range(12):
+        a = math.radians(k * 30 + 15)
+        for y, r in ((99, 9.6), (100, 10.4), (101, 10.8), (102, 10.8), (103, 10.4), (104, 9.6), (105, 8.2)):
+            x, z = int(math.floor(cx + r * math.cos(a))), int(math.floor(cz + r * math.sin(a)))
+            blocks[(x, y, z)] = ("mangrove_fence", None)
+    _ring(blocks, cx, cz, 105, 8.6, 7.6, ("mangrove_fence", None))
+    # The drum, the antenna (orange, then white), the mast (red and white).
+    for y in range(105, 111):
+        _ring(blocks, cx, cz, y, 3.4, -1, white)
+    for y in range(111, 123):
+        _ring(blocks, cx, cz, y, 1.6, -1, orange if y < 115 else white)
+    for y in range(123, 131):
+        blocks[(int(cx), y, int(cz))] = ("lightning_rod", {"facing": "up"}) if y % 3 == 0 else ("end_rod", {"facing": "up"})
+    # The Kyoto Tower Building under it, as in the photographs: continuous ribbon windows of teal glass floor by floor,
+    # thin dark spandrel bands between, shopfronts at the street and a light parapet on top; in place of the shaded,
+    # speckled colours from the aerial textures.
+    for (x, y, z), b in list(blocks.items()):
+        if y > 31 or b[1] is not None:
+            continue
+        sides = [d for d in ((1, 0), (-1, 0), (0, 1), (0, -1)) if (x + d[0], y, z + d[1]) not in blocks]
+        if not sides or (x, y + 1, z) not in blocks:
+            continue  # inside, or a roof
+        along = z if sides[0][0] else x
+        top = (x, y + 1, z) in blocks and (x, y + 2, z) not in blocks
+        if y < 4:
+            blocks[(x, y, z)] = ("glass", None) if 0 < y < 3 and along % 5 else ("gray_terracotta", None)
+        elif top:
+            blocks[(x, y, z)] = white  # the parapet
+        elif y % 3 == 1:
+            blocks[(x, y, z)] = ("gray_terracotta", None)  # spandrel
+        else:
+            blocks[(x, y, z)] = ("cyan_stained_glass", None)
+
+
+def kyoto_station(blocks):
+    """Kyoto Station's front, the north side facing the city, after photographs of its main entrance.
+
+    Above 12 m every north wall is a curtain wall of blue reflecting glass on a grid of fine light grey mullions
+    (every 3 blocks both ways), a grey band every 12. In the middle stretch of the tall front (the central concourse,
+    x 240-335 in the model) the bottom 24 m is the great gate: grey tiled stone piers at its ends; between them a
+    white steel truss whose top chord runs straight at 23 m and whose bottom chord rises in two arches from the
+    piers and from an X-braced white post in the middle; the truss's web crossing diagonals in a row of X; under the
+    arches the atrium, open and dark; glass doors at the street. Elsewhere below 12 m the colours stay as read off
+    the photographs."""
+    import math
+    gx0, gx1, top = 240, 336, 23
+    ix0, ix1 = gx0 + 8, gx1 - 8  # inside the piers
+    xc = (ix0 + ix1) // 2  # the middle post: xc - 2 .. xc + 1
+    foot, crown = 13, 19  # the arches' bottom chord: at the supports, at mid-span
+    frame, band = ("light_gray_concrete", None), ("gray_concrete", None)
+    stone, joint, white = ("polished_andesite", None), ("andesite", None), ("white_concrete", None)
+    ew = {"east": "true", "west": "true"}
+    dark = ("black_stained_glass_pane", dict(ew))
+
+    def arch(x):
+        """The bottom chord's height over x, in the half-span it is in."""
+        a0, a1 = (ix0, xc - 2) if x < xc else (xc + 2, ix1)
+        t = (x - a0 + 0.5) / max(1, a1 - a0)
+        return foot + (crown - foot) * math.sin(math.pi * max(0.0, min(1.0, t)))
+
+    def diagonal(x, y, period=6):
+        k, j = (x - ix0) % period, (y - foot) % period
+        return k == j or k == (period - j) % period
+
+    for (x, y, z), b in list(blocks.items()):
+        if y < 1 or (x, y, z - 1) in blocks:
+            continue  # not facing north
+        if (b[1] is not None and not b[0].endswith("_pane")) or (x, y + 1, z) not in blocks:
+            continue  # stairs, slabs, roofs
+        if gx0 <= x < gx1 and y <= top:
+            if x < ix0 or x >= ix1:  # the piers, tiled
+                blocks[(x, y, z)] = joint if y % 3 == 0 or (x - gx0) % 4 == 0 else stone
+            elif xc - 2 <= x < xc + 2 and y < arch(xc - 3):  # the middle post, X-braced
+                edge = x in (xc - 2, xc + 1)
+                blocks[(x, y, z)] = white if edge or diagonal(x, y, 4) else dark
+            elif y == top:
+                blocks[(x, y, z)] = white  # the top chord
+            elif y >= round(arch(x)):
+                if y == round(arch(x)) or y == round(arch(x)) + 1:
+                    blocks[(x, y, z)] = white  # the bottom chord, arched
+                else:
+                    blocks[(x, y, z)] = white if diagonal(x, y) else dark  # the web
+            elif y < 4:
+                blocks[(x, y, z)] = frame if x % 4 == 0 else ("light_gray_stained_glass_pane", dict(ew))
+            else:
+                blocks[(x, y, z)] = dark  # the atrium under the arches
+        elif y >= 12:
+            if y % 12 == 0:
+                blocks[(x, y, z)] = band
+            elif x % 3 == 0 or y % 3 == 0:
+                blocks[(x, y, z)] = frame
+            else:
+                blocks[(x, y, z)] = ("light_blue_stained_glass_pane", dict(ew))
+
+
+LANDMARK_FIXES = {"kyoto_tower": kyoto_tower, "kyoto_station": kyoto_station}
+# Previews seen from another side: quarter turns of the model before drawing (the station's front faces north).
+PREVIEW_TURN = {"kyoto_station": 2}
 
 
 def build_one(args):
@@ -1349,14 +2034,24 @@ def _build_one(out, gid, slug, name, pal, row, bc, textured):
     if not surf:
         return None
     rings, angle, (lat, lon) = to_local(surf)
-    solid, cls, height, colours = voxelize(rings, geom.get("tex") if textured else None, os.path.join(out, "tex"))
+    tex = geom.get("tex") if textured else None
+    solid, cls, height, colours, owners = voxelize(rings, tex, os.path.join(out, "tex"))
     pal = pal or choose_palette(row)
     sh = storey_height(row)
     blocks = assign_blocks(solid, cls, height, pal, sh)
     recoloured = recolour(blocks, solid, colours, pal, bc)
+    glazed = windows(blocks, solid, owners, facade_patterns(rings, tex, os.path.join(out, "tex")), bc) if tex else 0
+    lifted = lift_shaded_floors(blocks, solid, bc, sh) if tex else 0
+    roofs = tidy_roofs(blocks, solid, parapets=pal in ("modern", "glass", "white", "brick")) if tex else 0
+    if slug in LANDMARK_FIXES:
+        LANDMARK_FIXES[slug](blocks)
     size = tuple(max(v[i] for v in blocks) + 1 for i in range(3))
     write_nbt(os.path.join(out, slug + ".nbt"), blocks, size)
-    render(blocks, size, os.path.join(out, slug + ".png"), bc)
+    view = blocks
+    for _ in range(PREVIEW_TURN.get(slug, 0)):  # quarter turns, clockwise seen from above, for the preview only
+        sz_ = max(v[2] for v in view) + 1
+        view = {(sz_ - 1 - z, y, x): b for (x, y, z), b in view.items()}
+    render(view, tuple(max(v[i] for v in view) + 1 for i in range(3)), os.path.join(out, slug + ".png"), bc)
     counts = {}
     for n, _ in blocks.values():
         counts[n] = counts.get(n, 0) + 1
@@ -1366,12 +2061,37 @@ def _build_one(out, gid, slug, name, pal, row, bc, textured):
             "roof_shape": row.get("roof_shape"), "roof_pitch": row.get("roof_pitch"),
             "palette": pal, "storey_height": sh, "rotation_deg": round(angle, 1),
             "size": list(size), "blocks": len(blocks), "surfaces": len(surf),
-            "textured_polygons": len(geom.get("tex", {})), "recoloured_blocks": recoloured,
+            "textured_polygons": len(geom.get("tex", {})), "recoloured_blocks": recoloured, "window_blocks": glazed, "lifted_blocks": lifted, "roof_blocks": roofs,
             "block_counts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
+
+
+# This mod's blocks: the texture whose colour stands for each in previews (the rest by their own names).
+OWN_TEXTURE = {"fusuma": "fusuma_lower", "fusuma_gold": "fusuma_gold_lower", "raked_gravel_ring": "raked_gravel",
+               "tobiishi": "tobiishi_stone", "saisen_bako": "saisen_bako_top"}
+OWN_TEXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "common", "src", "main",
+                            "resources", "assets", "citybuilder", "textures", "block")
+
+
+def own_colours():
+    """Average colours of this mod's own block textures (drawn by tools/textures), keyed 'citybuilder:<id>'."""
+    out = {}
+    for f in os.listdir(OWN_TEXTURES):
+        if not f.endswith(".png"):
+            continue
+        img = Image.open(os.path.join(OWN_TEXTURES, f)).convert("RGB")
+        px = list(img.getdata())
+        out[f[:-4]] = tuple(round(sum(c[i] for c in px) / len(px)) for i in range(3))
+    named = {}
+    for tex in out:
+        named["citybuilder:" + tex] = out[tex]
+    for block, tex in OWN_TEXTURE.items():
+        named["citybuilder:" + block] = out[tex]
+    return named
 
 
 def build(rows, out, chosen, jar=MC_JAR, textured=True):
     bc = block_colours(jar, os.path.join(out, "block_colours.json"))
+    bc.update(own_colours())
     jobs = [(out, gid, slug, name, pal, rows.get(gid, {}), bc, textured, city) for gid, slug, name, pal, city in chosen
             if os.path.exists(os.path.join(out, "geom", gid + ".json"))
             or slug in TEMPLES and os.path.exists(os.path.join(out, "models", slug + ".json"))]  # LOD1-only ones too
@@ -1385,7 +2105,7 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
                 entries.append(e)
                 print(f"{e['slug']:24s} {e['name']:16s} {e['size'][0]:4d}x{e['size'][1]:3d}x{e['size'][2]:4d} "
                       f"{e['blocks']:7d} blocks  {e['palette']:6s} turned {e['rotation_deg']:+.1f}  "
-                      f"{e['recoloured_blocks']} from textures", flush=True)
+                      f"{e['recoloured_blocks']} from textures, {e.get('window_blocks', 0)} facade blocks redone, {e.get('lifted_blocks', 0)} shaded lifted, {e.get('roof_blocks', 0)} roof tidied", flush=True)
     cities = {e["city"] for e in entries if e.get("city")}
     credit = attribution(cities)
     with open(os.path.join(out, "library.json"), "w", encoding="utf-8") as fh:
@@ -1402,6 +2122,16 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
     for e in entries:
         with open(os.path.join(out, e["slug"] + ".png"), "rb") as fh:
             data = base64.b64encode(fh.read()).decode()
+        plan = os.path.join(out, e["slug"] + "_plan.png")
+        if os.path.exists(plan):
+            with open(plan, "rb") as fh:
+                html.append(f"<figure><img src='data:image/png;base64,{base64.b64encode(fh.read()).decode()}'>"
+                            f"<figcaption><b>{e['name']}</b> — 俯瞰（实际纹理）</figcaption></figure>")
+        cutaway = os.path.join(out, e["slug"] + "_interior.png")
+        if os.path.exists(cutaway):
+            with open(cutaway, "rb") as fh:
+                html.append(f"<figure><img src='data:image/png;base64,{base64.b64encode(fh.read()).decode()}'>"
+                            f"<figcaption><b>{e['name']}</b> — 内部（切断）</figcaption></figure>")
         kind = e["category"] + (f" / {e['religion']}" if e.get("religion") else "") + (f" {e['role']}" if e.get("role") else "")
         html.append(f"<figure><img src='data:image/png;base64,{data}'><figcaption><b>{e['name']}</b> [{kind}] "
                     f"{e['slug']} — {e['size'][0]}×{e['size'][1]}×{e['size'][2]}, {e['blocks']} blocks, "

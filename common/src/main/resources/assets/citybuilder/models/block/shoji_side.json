@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/template_glass_pane_side",
+  "textures": {
+    "pane": "citybuilder:block/shoji",
+    "edge": "citybuilder:block/shoji_edge"
+  }
+}

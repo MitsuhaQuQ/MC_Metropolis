@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "citybuilder:block/tatami",
+    "side": "citybuilder:block/tatami_side",
+    "bottom": "citybuilder:block/tatami_side"
+  }
+}

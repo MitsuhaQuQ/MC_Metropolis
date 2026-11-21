@@ -1,0 +1,172 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_lower_post"
+      },
+      "when": {
+        "half": "lower"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_lower_side"
+      },
+      "when": {
+        "half": "lower",
+        "north": "true"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_lower_side",
+        "y": 90
+      },
+      "when": {
+        "half": "lower",
+        "east": "true"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_lower_side_alt"
+      },
+      "when": {
+        "half": "lower",
+        "south": "true"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_lower_side_alt",
+        "y": 90
+      },
+      "when": {
+        "half": "lower",
+        "west": "true"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_lower_noside"
+      },
+      "when": {
+        "half": "lower",
+        "north": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_lower_noside_alt"
+      },
+      "when": {
+        "half": "lower",
+        "east": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_lower_noside_alt",
+        "y": 90
+      },
+      "when": {
+        "half": "lower",
+        "south": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_lower_noside",
+        "y": 270
+      },
+      "when": {
+        "half": "lower",
+        "west": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_upper_post"
+      },
+      "when": {
+        "half": "upper"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_upper_side"
+      },
+      "when": {
+        "half": "upper",
+        "north": "true"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_upper_side",
+        "y": 90
+      },
+      "when": {
+        "half": "upper",
+        "east": "true"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_upper_side_alt"
+      },
+      "when": {
+        "half": "upper",
+        "south": "true"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_upper_side_alt",
+        "y": 90
+      },
+      "when": {
+        "half": "upper",
+        "west": "true"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_upper_noside"
+      },
+      "when": {
+        "half": "upper",
+        "north": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_upper_noside_alt"
+      },
+      "when": {
+        "half": "upper",
+        "east": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_upper_noside_alt",
+        "y": 90
+      },
+      "when": {
+        "half": "upper",
+        "south": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "citybuilder:block/fusuma_gold_upper_noside",
+        "y": 270
+      },
+      "when": {
+        "half": "upper",
+        "west": "false"
+      }
+    }
+  ]
+}

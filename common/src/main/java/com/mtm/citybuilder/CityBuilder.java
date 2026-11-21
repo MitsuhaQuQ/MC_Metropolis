@@ -23,6 +23,7 @@ public final class CityBuilder {
     public static void init() {
         Platform platform = Platform.get();
         com.mtm.citybuilder.block.CityBlocks.register();
+        com.mtm.citybuilder.block.TempleBlocks.register();
         LOGGER.info("City Builder on {}: {} {}, {} {}", platform.loaderName(),
                 WORLDGEN_MOD_ID, platform.isModLoaded(WORLDGEN_MOD_ID) ? "found" : "absent",
                 MTR_MOD_ID, platform.isModLoaded(MTR_MOD_ID) ? "found" : "absent");

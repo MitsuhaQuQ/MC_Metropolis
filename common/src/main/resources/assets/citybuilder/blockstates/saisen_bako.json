@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "citybuilder:block/saisen_bako"
+    },
+    "facing=east": {
+      "model": "citybuilder:block/saisen_bako",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "citybuilder:block/saisen_bako",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "citybuilder:block/saisen_bako",
+      "y": 270
+    }
+  }
+}

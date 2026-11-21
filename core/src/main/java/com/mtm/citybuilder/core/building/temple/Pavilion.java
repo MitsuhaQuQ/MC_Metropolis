@@ -23,7 +23,7 @@ import com.mtm.citybuilder.core.building.temple.Parts.Rect;
 public record Pavilion(int width, int depth, double eave, double ridge, RoofType roof, double gableInset, int overhang,
                        int floor, boolean lanterns, boolean panels, boolean fence, TemplePalette palette) {
 
-    static final String LANTERN = "minecraft:lantern[hanging=true]";
+    static final String LANTERN = Decor.CHOCHIN;
 
     public Model build() {
         Model m = new Model();
@@ -79,12 +79,13 @@ public record Pavilion(int width, int depth, double eave, double ridge, RoofType
             }
             beam = top - 1 - rows;
         }
-        if (lanterns) { // hung under that beam between the columns
+        if (lanterns) { // paper lanterns hung under that beam between the columns, the sacred rope across the front
             for (int x = body.x0(); x < body.x1(); x++) {
                 for (int z = body.z0(); z < body.z1(); z++) {
                     boolean edge = x == body.x0() || x == body.x1() - 1 || z == body.z0() || z == body.z1() - 1;
+                    boolean front = z == body.z1() - 1 && x > body.x0() && x < body.x1() - 1;
                     if (edge && p.wood().equals(m.get(x, beam, z)) && !m.has(x, beam - 1, z) && beam - 1 >= floor + 1) {
-                        m.set(x, beam - 1, z, LANTERN);
+                        m.set(x, beam - 1, z, front ? Decor.shimenawa(true) : LANTERN);
                     }
                 }
             }

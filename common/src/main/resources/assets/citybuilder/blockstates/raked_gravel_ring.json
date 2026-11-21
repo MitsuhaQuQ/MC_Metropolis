@@ -1,0 +1,112 @@
+{
+  "variants": {
+    "facing=south,part=0": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_south_0"
+    },
+    "facing=south,part=1": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_south_1"
+    },
+    "facing=south,part=2": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_south_2"
+    },
+    "facing=south,part=3": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_south_3"
+    },
+    "facing=south,part=4": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_south_4"
+    },
+    "facing=south,part=5": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_south_5"
+    },
+    "facing=south,part=6": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_south_6"
+    },
+    "facing=south,part=7": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_south_7"
+    },
+    "facing=south,part=8": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_south_8"
+    },
+    "facing=west,part=0": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_west_0"
+    },
+    "facing=west,part=1": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_west_1"
+    },
+    "facing=west,part=2": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_west_2"
+    },
+    "facing=west,part=3": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_west_3"
+    },
+    "facing=west,part=4": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_west_4"
+    },
+    "facing=west,part=5": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_west_5"
+    },
+    "facing=west,part=6": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_west_6"
+    },
+    "facing=west,part=7": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_west_7"
+    },
+    "facing=west,part=8": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_west_8"
+    },
+    "facing=north,part=0": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_north_0"
+    },
+    "facing=north,part=1": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_north_1"
+    },
+    "facing=north,part=2": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_north_2"
+    },
+    "facing=north,part=3": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_north_3"
+    },
+    "facing=north,part=4": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_north_4"
+    },
+    "facing=north,part=5": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_north_5"
+    },
+    "facing=north,part=6": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_north_6"
+    },
+    "facing=north,part=7": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_north_7"
+    },
+    "facing=north,part=8": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_north_8"
+    },
+    "facing=east,part=0": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_east_0"
+    },
+    "facing=east,part=1": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_east_1"
+    },
+    "facing=east,part=2": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_east_2"
+    },
+    "facing=east,part=3": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_east_3"
+    },
+    "facing=east,part=4": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_east_4"
+    },
+    "facing=east,part=5": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_east_5"
+    },
+    "facing=east,part=6": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_east_6"
+    },
+    "facing=east,part=7": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_east_7"
+    },
+    "facing=east,part=8": {
+      "model": "citybuilder:block/ring/raked_gravel_ring_east_8"
+    }
+  }
+}

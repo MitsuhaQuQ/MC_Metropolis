@@ -218,6 +218,12 @@ public record Gate(int width, int depth, double eave, double ridge, RoofType roo
      */
     private void lowerStorey(Model m, TemplePalette p, Rect r, int top) {
         int w = r.width();
+        // As many bays as asked, but each at least 4 apart so a way through is 3 wide: a narrow gate has fewer.
+        int bays = this.bays;
+        while (bays > 1 && (w - 1) / bays < 4) {
+            bays -= 2;
+        }
+        int passages = Math.min(this.passages, bays);
         int[] cols = new int[bays + 1];
         for (int i = 0; i <= bays; i++) {
             int a = (int) Math.round(i * (w - 1) / (double) bays);
