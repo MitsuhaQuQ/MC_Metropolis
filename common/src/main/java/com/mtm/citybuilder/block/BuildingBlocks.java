@@ -22,7 +22,10 @@ import java.util.function.Supplier;
  * any of this mod's shaped blocks by hand; their models, states and the rest are written by
  * {@code tools/textures/thin_walls.py}. Lamps ({@link LampBlock}: paper lanterns, andon, porch, gate post and stone
  * lantern lights) and doors (a wooden lattice door, aluminium entrance doors, a shop's glass door), drawn and modelled
- * by {@code tools/textures/lantern_door_textures.py}.
+ * by {@code tools/textures/lantern_door_textures.py}. Fixtures: air conditioners' outdoor units ({@link AcUnitBlock}),
+ * vending machines and water heaters ({@link TallFixtureBlock}), post boxes, downpipes, solar panels, television
+ * aerials and a covered street's louvres ({@link LouvreBlock}), drawn and modelled by
+ * {@code tools/textures/fixture_textures.py}.
  */
 public final class BuildingBlocks {
     /** The frames and the glass the windows come in. */
@@ -115,6 +118,41 @@ public final class BuildingBlocks {
             TRANSLUCENT.add(p.registerBlock(name, () -> new CityDoorBlock(BlockBehaviour.Properties.copy(Blocks.IRON_DOOR)
                     .strength(3.0f), ALUMINIUM)));
         }
+        // Fixtures (models and boxes drawn by tools/textures/fixture_textures.py, facing north, the wall to the south)
+        for (String colour : new String[]{"white", "beige"}) {
+            p.registerBlock("ac_unit_" + colour, () -> new AcUnitBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+                    .strength(1.5f).noOcclusion()));
+        }
+        for (String colour : new String[]{"red", "blue", "white"}) {
+            p.registerBlock("vending_" + colour, () -> new TallFixtureBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+                    .strength(2.0f).lightLevel(s -> 9).noOcclusion(), new double[][]{{1, 0, 4, 15, 16, 16}},
+                    new double[][]{{1, 0, 4, 15, 13, 16}, {0.5, 13, 3.5, 15.5, 14, 16}}));
+        }
+        p.registerBlock("water_heater", () -> new TallFixtureBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+                .strength(1.5f).noOcclusion(), new double[][]{{5, 0, 13, 11, 16, 16}},
+                new double[][]{{5, 0, 13, 11, 3, 16}, {4, 3, 12, 12, 13, 16}}));
+        p.registerBlock("postbox", () -> new LampBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(2.0f)
+                .noOcclusion(), new double[]{3.5, 0, 3.5, 12.5, 16, 12.5}));
+        for (String colour : new String[]{"gray", "beige", "brown", "black"}) {
+            p.registerBlock("downpipe_" + colour, () -> new LampBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BARS)
+                    .strength(1.0f).noOcclusion(), new double[]{6, 0, 11.5, 10, 16, 16}));
+        }
+        p.registerBlock("solar_panel", () -> new LampBlock(BlockBehaviour.Properties.copy(Blocks.DAYLIGHT_DETECTOR)
+                .strength(1.0f).noOcclusion(), new double[]{0, 0, 0, 16, 8, 16}));
+        p.registerBlock("tv_antenna", () -> new LampBlock(BlockBehaviour.Properties.copy(Blocks.LIGHTNING_ROD)
+                .noOcclusion(), new double[]{7, 0, 7, 9, 16, 9}, new double[]{1.5, 10, 1, 14.5, 15, 15}));
+        p.registerBlock("arcade_louvre", () -> new LouvreBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BARS)
+                .strength(1.0f).noOcclusion()));
+        // Street lights: a pole of stacked segments, a head on its top whose arm reaches towards its facing (and a
+        // median's two-armed head), a lane's small lantern on a post top
+        p.registerBlock("street_light_pole", () -> new ShapedBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BARS)
+                .strength(2.0f).noOcclusion(), new double[]{6, 0, 6, 10, 16, 10}));
+        for (String name : new String[]{"street_light_head", "street_light_head_double"}) {
+            p.registerBlock(name, () -> new LampBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).strength(2.0f)
+                    .lightLevel(s -> 15).noOcclusion(), new double[]{6, 0, 6, 10, 10, 10}));
+        }
+        p.registerBlock("street_light_lamp", () -> new LampBlock(BlockBehaviour.Properties.copy(Blocks.LANTERN)
+                .lightLevel(s -> 14).noOcclusion(), new double[]{4, 0, 4, 12, 16, 12}));
         ADJUSTER = p.registerItem("adjuster",
                 () -> new com.mtm.citybuilder.item.AdjusterItem(new net.minecraft.world.item.Item.Properties().stacksTo(1)));
     }

@@ -1,0 +1,206 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "citybuilder:block/fixture/pipe_beige",
+    "pipe": "citybuilder:block/fixture/pipe_beige",
+    "steel": "citybuilder:block/fixture/steel"
+  },
+  "elements": [
+    {
+      "from": [
+        6.5,
+        0,
+        12
+      ],
+      "to": [
+        9.5,
+        16,
+        15
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            6.5,
+            0,
+            9.5,
+            16
+          ],
+          "texture": "#pipe"
+        },
+        "south": {
+          "uv": [
+            6.5,
+            0,
+            9.5,
+            16
+          ],
+          "texture": "#pipe"
+        },
+        "west": {
+          "uv": [
+            6.5,
+            0,
+            9.5,
+            16
+          ],
+          "texture": "#pipe"
+        },
+        "east": {
+          "uv": [
+            6.5,
+            0,
+            9.5,
+            16
+          ],
+          "texture": "#pipe"
+        },
+        "up": {
+          "uv": [
+            6.5,
+            12,
+            9.5,
+            15
+          ],
+          "texture": "#pipe"
+        },
+        "down": {
+          "uv": [
+            6.5,
+            1,
+            9.5,
+            4
+          ],
+          "texture": "#pipe"
+        }
+      }
+    },
+    {
+      "from": [
+        6,
+        10,
+        11.5
+      ],
+      "to": [
+        10,
+        11,
+        15.5
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            6,
+            0.5,
+            10,
+            4.5
+          ],
+          "texture": "#steel"
+        },
+        "up": {
+          "uv": [
+            6,
+            11.5,
+            10,
+            15.5
+          ],
+          "texture": "#steel"
+        },
+        "north": {
+          "uv": [
+            6,
+            5,
+            10,
+            6
+          ],
+          "texture": "#steel"
+        },
+        "south": {
+          "uv": [
+            6,
+            5,
+            10,
+            6
+          ],
+          "texture": "#steel"
+        },
+        "west": {
+          "uv": [
+            11.5,
+            5,
+            15.5,
+            6
+          ],
+          "texture": "#steel"
+        },
+        "east": {
+          "uv": [
+            0.5,
+            5,
+            4.5,
+            6
+          ],
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "from": [
+        7.5,
+        10,
+        15.5
+      ],
+      "to": [
+        8.5,
+        11,
+        16
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            7.5,
+            0,
+            8.5,
+            0.5
+          ],
+          "texture": "#steel"
+        },
+        "up": {
+          "uv": [
+            7.5,
+            15.5,
+            8.5,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "north": {
+          "uv": [
+            7.5,
+            5,
+            8.5,
+            6
+          ],
+          "texture": "#steel"
+        },
+        "west": {
+          "uv": [
+            15.5,
+            5,
+            16,
+            6
+          ],
+          "texture": "#steel"
+        },
+        "east": {
+          "uv": [
+            0,
+            5,
+            0.5,
+            6
+          ],
+          "texture": "#steel"
+        }
+      }
+    }
+  ]
+}

@@ -63,6 +63,24 @@
     "citybuilder:toro_light",
     "citybuilder:entrance_door_silver",
     "citybuilder:entrance_door_bronze",
-    "citybuilder:shop_door"
+    "citybuilder:shop_door",
+    "citybuilder:ac_unit_white",
+    "citybuilder:ac_unit_beige",
+    "citybuilder:vending_red",
+    "citybuilder:vending_blue",
+    "citybuilder:vending_white",
+    "citybuilder:water_heater",
+    "citybuilder:postbox",
+    "citybuilder:downpipe_gray",
+    "citybuilder:downpipe_beige",
+    "citybuilder:downpipe_brown",
+    "citybuilder:downpipe_black",
+    "citybuilder:solar_panel",
+    "citybuilder:tv_antenna",
+    "citybuilder:arcade_louvre",
+    "citybuilder:street_light_pole",
+    "citybuilder:street_light_head",
+    "citybuilder:street_light_head_double",
+    "citybuilder:street_light_lamp"
   ]
 }

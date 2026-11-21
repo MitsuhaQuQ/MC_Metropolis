@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "citybuilder:block/fixture/street_light_pole"
+    }
+  }
+}

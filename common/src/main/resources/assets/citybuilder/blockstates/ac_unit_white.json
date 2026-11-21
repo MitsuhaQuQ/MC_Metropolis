@@ -1,0 +1,49 @@
+{
+  "variants": {
+    "facing=north,mount=floor": {
+      "model": "citybuilder:block/fixture/ac_unit_white_floor"
+    },
+    "facing=east,mount=floor": {
+      "model": "citybuilder:block/fixture/ac_unit_white_floor",
+      "y": 90
+    },
+    "facing=south,mount=floor": {
+      "model": "citybuilder:block/fixture/ac_unit_white_floor",
+      "y": 180
+    },
+    "facing=west,mount=floor": {
+      "model": "citybuilder:block/fixture/ac_unit_white_floor",
+      "y": 270
+    },
+    "facing=north,mount=wall": {
+      "model": "citybuilder:block/fixture/ac_unit_white_wall"
+    },
+    "facing=east,mount=wall": {
+      "model": "citybuilder:block/fixture/ac_unit_white_wall",
+      "y": 90
+    },
+    "facing=south,mount=wall": {
+      "model": "citybuilder:block/fixture/ac_unit_white_wall",
+      "y": 180
+    },
+    "facing=west,mount=wall": {
+      "model": "citybuilder:block/fixture/ac_unit_white_wall",
+      "y": 270
+    },
+    "facing=north,mount=roof": {
+      "model": "citybuilder:block/fixture/ac_unit_white_roof"
+    },
+    "facing=east,mount=roof": {
+      "model": "citybuilder:block/fixture/ac_unit_white_roof",
+      "y": 90
+    },
+    "facing=south,mount=roof": {
+      "model": "citybuilder:block/fixture/ac_unit_white_roof",
+      "y": 180
+    },
+    "facing=west,mount=roof": {
+      "model": "citybuilder:block/fixture/ac_unit_white_roof",
+      "y": 270
+    }
+  }
+}

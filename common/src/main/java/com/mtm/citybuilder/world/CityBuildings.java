@@ -118,6 +118,7 @@ public final class CityBuildings {
                             placed = placed.setValue(com.mtm.citybuilder.block.RoofBlock.AXIS,
                                     alongX ? Direction.Axis.X : Direction.Axis.Z);
                         }
+                        placed = fixture(chunk, pos.set(baseX + x, y, baseZ + z), placed, column, y, part);
                         if (thin != null && THIN_PARTS.contains(part) && thinOf(id) instanceof ThinWallBlock wall
                                 && closed(columns, column, x, z, y)) {
                             placed = wall.state(thin);
@@ -141,6 +142,35 @@ public final class CityBuildings {
         bridge(chunk, columns, panes);
         join(level, panes);
         tidy(level, chunk, columns);
+    }
+
+    /**
+     * A fixture's state from what is under it: a two-block fixture's upper half over its lower (the same part under
+     * it); an outdoor unit hung on its brackets over nothing (under a window), on its stand in a building's own
+     * footprint over anything but a balcony's floor (a roof), on its feet otherwise (the ground, a balcony). What is
+     * under it is laid already: the columns are laid upwards.
+     */
+    private static BlockState fixture(ChunkAccess chunk, BlockPos at, BlockState placed, BuildingLayer.Column column,
+                                      int y, BuildingLayer.Part part) {
+        Block block = placed.getBlock();
+        if (block instanceof com.mtm.citybuilder.block.TallFixtureBlock) {
+            boolean upper = y - 1 >= BuildingLayer.bottom(column) && BuildingLayer.part(column, y - 1) == part;
+            return placed.setValue(com.mtm.citybuilder.block.TallFixtureBlock.HALF,
+                    upper ? DoubleBlockHalf.UPPER : DoubleBlockHalf.LOWER);
+        }
+        if (block instanceof com.mtm.citybuilder.block.AcUnitBlock) {
+            com.mtm.citybuilder.block.AcUnitBlock.Mount mount;
+            if (!chunk.getBlockState(at.below()).blocksMotion()) {
+                mount = com.mtm.citybuilder.block.AcUnitBlock.Mount.WALL;
+            } else if (!column.ring() && (y - 1 < BuildingLayer.bottom(column)
+                    || BuildingLayer.part(column, y - 1) != BuildingLayer.Part.ACCENT)) {
+                mount = com.mtm.citybuilder.block.AcUnitBlock.Mount.ROOF;
+            } else {
+                mount = com.mtm.citybuilder.block.AcUnitBlock.Mount.FLOOR;
+            }
+            return placed.setValue(com.mtm.citybuilder.block.AcUnitBlock.MOUNT, mount);
+        }
+        return placed;
     }
 
     /** The parts laid as thin walls where their material comes as one: the walls' faces, not trim or parapets. */

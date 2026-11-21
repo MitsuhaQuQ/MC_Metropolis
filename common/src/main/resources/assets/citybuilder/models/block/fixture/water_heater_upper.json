@@ -1,0 +1,121 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "citybuilder:block/fixture/casing_white",
+    "front": "citybuilder:block/fixture/heater_front",
+    "casing": "citybuilder:block/fixture/casing_white",
+    "cover": "citybuilder:block/fixture/pipe_cover"
+  },
+  "elements": [
+    {
+      "from": [
+        5,
+        0,
+        13
+      ],
+      "to": [
+        11,
+        3,
+        16
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            5,
+            0,
+            11,
+            3
+          ],
+          "texture": "#cover"
+        },
+        "north": {
+          "uv": [
+            5,
+            13,
+            11,
+            16
+          ],
+          "texture": "#cover"
+        },
+        "west": {
+          "uv": [
+            13,
+            13,
+            16,
+            16
+          ],
+          "texture": "#cover"
+        },
+        "east": {
+          "uv": [
+            0,
+            13,
+            3,
+            16
+          ],
+          "texture": "#cover"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        3,
+        12
+      ],
+      "to": [
+        12,
+        13,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            4,
+            3,
+            12,
+            13
+          ],
+          "texture": "#front"
+        },
+        "west": {
+          "uv": [
+            12,
+            3,
+            16,
+            13
+          ],
+          "texture": "#casing"
+        },
+        "east": {
+          "uv": [
+            0,
+            3,
+            4,
+            13
+          ],
+          "texture": "#casing"
+        },
+        "up": {
+          "uv": [
+            4,
+            12,
+            12,
+            16
+          ],
+          "texture": "#casing"
+        },
+        "down": {
+          "uv": [
+            4,
+            0,
+            12,
+            4
+          ],
+          "texture": "#casing"
+        }
+      }
+    }
+  ]
+}

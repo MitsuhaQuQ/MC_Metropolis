@@ -1,0 +1,11 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "citybuilder:block/fixture/arcade_louvre"
+    },
+    "axis=z": {
+      "model": "citybuilder:block/fixture/arcade_louvre",
+      "y": 90
+    }
+  }
+}

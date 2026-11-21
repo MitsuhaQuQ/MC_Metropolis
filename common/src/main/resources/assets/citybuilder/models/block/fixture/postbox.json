@@ -1,0 +1,189 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "citybuilder:block/fixture/postbox_red",
+    "front": "citybuilder:block/fixture/postbox_front",
+    "red": "citybuilder:block/fixture/postbox_red",
+    "cap": "citybuilder:block/fixture/postbox_cap"
+  },
+  "elements": [
+    {
+      "from": [
+        5,
+        0,
+        5
+      ],
+      "to": [
+        11,
+        2,
+        11
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ],
+          "texture": "#cap"
+        },
+        "north": {
+          "uv": [
+            5,
+            14,
+            11,
+            16
+          ],
+          "texture": "#cap"
+        },
+        "south": {
+          "uv": [
+            5,
+            14,
+            11,
+            16
+          ],
+          "texture": "#cap"
+        },
+        "west": {
+          "uv": [
+            5,
+            14,
+            11,
+            16
+          ],
+          "texture": "#cap"
+        },
+        "east": {
+          "uv": [
+            5,
+            14,
+            11,
+            16
+          ],
+          "texture": "#cap"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        2,
+        4
+      ],
+      "to": [
+        12,
+        15,
+        12
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            4,
+            1,
+            12,
+            14
+          ],
+          "texture": "#front"
+        },
+        "south": {
+          "uv": [
+            4,
+            1,
+            12,
+            14
+          ],
+          "texture": "#red"
+        },
+        "west": {
+          "uv": [
+            4,
+            1,
+            12,
+            14
+          ],
+          "texture": "#red"
+        },
+        "east": {
+          "uv": [
+            4,
+            1,
+            12,
+            14
+          ],
+          "texture": "#red"
+        }
+      }
+    },
+    {
+      "from": [
+        3.5,
+        15,
+        3.5
+      ],
+      "to": [
+        12.5,
+        16,
+        12.5
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            3.5,
+            3.5,
+            12.5,
+            12.5
+          ],
+          "texture": "#cap"
+        },
+        "up": {
+          "uv": [
+            3.5,
+            3.5,
+            12.5,
+            12.5
+          ],
+          "texture": "#cap"
+        },
+        "north": {
+          "uv": [
+            3.5,
+            0,
+            12.5,
+            1
+          ],
+          "texture": "#cap"
+        },
+        "south": {
+          "uv": [
+            3.5,
+            0,
+            12.5,
+            1
+          ],
+          "texture": "#cap"
+        },
+        "west": {
+          "uv": [
+            3.5,
+            0,
+            12.5,
+            1
+          ],
+          "texture": "#cap"
+        },
+        "east": {
+          "uv": [
+            3.5,
+            0,
+            12.5,
+            1
+          ],
+          "texture": "#cap"
+        }
+      }
+    }
+  ]
+}

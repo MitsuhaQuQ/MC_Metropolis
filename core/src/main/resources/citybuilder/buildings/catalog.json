@@ -2637,10 +2637,10 @@
    "minecraft:sea_lantern"
   ],
   "vending": [
-   "minecraft:red_concrete",
-   "minecraft:blue_concrete",
-   "minecraft:white_concrete",
-   "minecraft:light_blue_concrete"
+   "citybuilder:vending_red",
+   "citybuilder:vending_blue",
+   "citybuilder:vending_white",
+   "citybuilder:vending_red"
   ],
   "fence": [
    "minecraft:stone_bricks",
@@ -2709,7 +2709,9 @@
    "minecraft:mangrove_fence"
   ],
   "equipment": [
-   "minecraft:smooth_quartz"
+   "citybuilder:ac_unit_white",
+   "citybuilder:ac_unit_white",
+   "citybuilder:ac_unit_beige"
   ],
   "shutter": [
    "minecraft:smooth_stone"
@@ -2730,7 +2732,11 @@
    "minecraft:iron_trapdoor"
   ],
   "downpipe": [
-   "minecraft:andesite_wall"
+   "citybuilder:downpipe_gray",
+   "citybuilder:downpipe_beige",
+   "citybuilder:downpipe_brown",
+   "citybuilder:downpipe_black",
+   "citybuilder:downpipe_gray"
   ],
   "lantern": [
    "citybuilder:chochin_red",
@@ -2802,7 +2808,7 @@
    "minecraft:red_concrete"
   ],
   "postbox": [
-   "minecraft:red_concrete"
+   "citybuilder:postbox"
   ],
   "line": [
    "minecraft:white_concrete"
@@ -3001,14 +3007,13 @@
    "minecraft:white_carpet"
   ],
   "solar": [
-   "minecraft:daylight_detector"
+   "citybuilder:solar_panel"
   ],
   "antenna": [
-   "minecraft:lightning_rod"
+   "citybuilder:tv_antenna"
   ],
   "heater": [
-   "minecraft:white_concrete",
-   "minecraft:smooth_quartz"
+   "citybuilder:water_heater"
   ],
   "oni": [
    "minecraft:polished_blackstone_brick_wall",
@@ -3086,7 +3091,7 @@
    "minecraft:glass"
   ],
   "louvre": [
-   "minecraft:iron_bars"
+   "citybuilder:arcade_louvre"
   ],
   "rust": [
    "minecraft:orange_terracotta",

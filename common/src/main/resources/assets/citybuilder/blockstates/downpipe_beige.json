@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "citybuilder:block/fixture/downpipe_beige"
+    },
+    "facing=east": {
+      "model": "citybuilder:block/fixture/downpipe_beige",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "citybuilder:block/fixture/downpipe_beige",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "citybuilder:block/fixture/downpipe_beige",
+      "y": 270
+    }
+  }
+}
