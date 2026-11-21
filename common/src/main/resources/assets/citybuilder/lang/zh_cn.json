@@ -200,5 +200,8 @@
   "block.citybuilder.street_light_pole": "路灯杆",
   "block.citybuilder.street_light_head": "路灯灯头",
   "block.citybuilder.street_light_head_double": "路灯灯头（双臂）",
-  "block.citybuilder.street_light_lamp": "小路灯"
+  "block.citybuilder.street_light_lamp": "小路灯",
+  "key.citybuilder.map": "城市地图",
+  "key.categories.citybuilder": "City Builder",
+  "screen.citybuilder.map": "城市地图"
 }

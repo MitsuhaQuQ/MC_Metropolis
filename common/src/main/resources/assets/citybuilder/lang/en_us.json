@@ -200,5 +200,8 @@
   "block.citybuilder.street_light_pole": "Street Light Pole",
   "block.citybuilder.street_light_head": "Street Light Head",
   "block.citybuilder.street_light_head_double": "Street Light Head (Two Arms)",
-  "block.citybuilder.street_light_lamp": "Lane Light"
+  "block.citybuilder.street_light_lamp": "Lane Light",
+  "key.citybuilder.map": "City map",
+  "key.categories.citybuilder": "City Builder",
+  "screen.citybuilder.map": "City map"
 }

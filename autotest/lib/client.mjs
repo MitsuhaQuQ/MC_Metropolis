@@ -25,6 +25,7 @@ export const client = {
   join: (address = '127.0.0.1:25566') => call('/join', { address }),
   look: (yaw, pitch) => call('/look', { yaw, pitch }),
   screenshot: (file) => call('/screenshot', { file }),
+  map: (query = {}) => call('/map', query),
   quit: () => call('/quit'),
 };
 

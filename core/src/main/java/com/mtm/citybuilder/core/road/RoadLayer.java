@@ -152,6 +152,13 @@ public final class RoadLayer {
         return route;
     }
 
+    /** The route of a road if it has been computed and is still kept, else null; never routes it. */
+    public RoadRoute cached(RoadEdge edge) {
+        synchronized (routes) {
+            return routes.get(edge.key());
+        }
+    }
+
     /** The coarse grid of a routing window. */
     private final class Window {
         final int originX;

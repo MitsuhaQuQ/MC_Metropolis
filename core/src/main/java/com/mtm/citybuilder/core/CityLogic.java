@@ -394,6 +394,11 @@ public final class CityLogic {
         return roads.route(edge);
     }
 
+    /** L4: the route of a road if it has been routed already (and is still kept), else null; never routes it. */
+    public RoadRoute cachedRoute(RoadEdge edge) {
+        return roads.cached(edge);
+    }
+
     /** L4b: the rail corridors whose routing window touches a rectangle. */
     public List<RailEdge> railLines(double minX, double minZ, double maxX, double maxZ) {
         return rail.edges(minX, minZ, maxX, maxZ);

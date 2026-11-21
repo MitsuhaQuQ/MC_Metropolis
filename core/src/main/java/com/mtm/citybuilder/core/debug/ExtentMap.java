@@ -87,7 +87,7 @@ public final class ExtentMap {
     }
 
     /** The colour of the water at a pixel, or -1 where it is dry; rivers at least two pixels wide. */
-    private static int water(TerrainView terrain, double x, double z, int scale, double height) {
+    static int water(TerrainView terrain, double x, double z, int scale, double height) {
         if (terrain.landform(x, z) == Landform.OCEAN) {
             return SEA;
         }
@@ -99,7 +99,7 @@ public final class ExtentMap {
         return river != null && river.distance() < Math.max(river.width(), 2.0 * scale) * 0.5 ? RIVER : -1;
     }
 
-    private static double shade(double[] heights, int size, int px, int py, int scale) {
+    static double shade(double[] heights, int size, int px, int py, int scale) {
         double here = heights[py * (size + 1) + px];
         double dx = heights[py * (size + 1) + px + 1] - here;
         double dz = heights[(py + 1) * (size + 1) + px] - here;
@@ -107,14 +107,14 @@ public final class ExtentMap {
         return Math.max(0.6, Math.min(1.2, 1.0 + slope * 0.8));
     }
 
-    private static int mix(int a, int b, double t) {
+    static int mix(int a, int b, double t) {
         int r = (int) Math.round(((a >> 16) & 255) * (1 - t) + ((b >> 16) & 255) * t);
         int g = (int) Math.round(((a >> 8) & 255) * (1 - t) + ((b >> 8) & 255) * t);
         int bl = (int) Math.round((a & 255) * (1 - t) + (b & 255) * t);
         return (r << 16) | (g << 8) | bl;
     }
 
-    private static int scaled(int color, double factor) {
+    static int scaled(int color, double factor) {
         int r = Math.min(255, (int) Math.round(((color >> 16) & 255) * factor));
         int g = Math.min(255, (int) Math.round(((color >> 8) & 255) * factor));
         int b = Math.min(255, (int) Math.round((color & 255) * factor));

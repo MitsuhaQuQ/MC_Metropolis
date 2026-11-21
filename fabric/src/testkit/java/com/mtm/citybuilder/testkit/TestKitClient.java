@@ -93,6 +93,38 @@ public final class TestKitClient implements ClientModInitializer {
                     }
                 });
             });
+            // The city map: open=1 opens it, x/z/zoom aim it, px/pz probe a spot, close=1 closes it; returns its tiles'
+            // counts and the last probe's answer
+            route(http, "/map", q -> onThread(() -> {
+                com.mtm.citybuilder.client.map.CityMapScreen screen =
+                        minecraft.screen instanceof com.mtm.citybuilder.client.map.CityMapScreen s ? s : null;
+                if ("1".equals(q.get("close"))) {
+                    if (screen != null) {
+                        minecraft.setScreen(null);
+                    }
+                    screen = null;
+                } else if (screen == null && "1".equals(q.get("open"))) {
+                    screen = new com.mtm.citybuilder.client.map.CityMapScreen();
+                    minecraft.setScreen(screen);
+                }
+                if (screen != null && q.containsKey("x")) {
+                    screen.view(Double.parseDouble(q.get("x")), Double.parseDouble(q.get("z")),
+                            Integer.parseInt(q.getOrDefault("zoom", "1")));
+                }
+                if (q.containsKey("px")) {
+                    com.mtm.citybuilder.client.map.CityMapClient.askProbe(Double.parseDouble(q.get("px")),
+                            Double.parseDouble(q.get("pz")));
+                }
+                int[] counts = com.mtm.citybuilder.client.map.CityMapClient.counts();
+                Map<String, Object> state = new HashMap<>();
+                state.put("open", screen != null);
+                state.put("tiles", counts[0]);
+                state.put("received", counts[1]);
+                state.put("inFlight", counts[2]);
+                state.put("partial", counts[3]);
+                state.put("probe", com.mtm.citybuilder.client.map.CityMapClient.probeLines());
+                return state;
+            }));
             route(http, "/quit", q -> {
                 minecraft.execute(minecraft::stop);
                 return Map.of("quitting", true);
