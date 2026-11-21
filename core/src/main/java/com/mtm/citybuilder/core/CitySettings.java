@@ -820,6 +820,22 @@ public final class CitySettings {
          */
         public double bankMinWidth = 40.0;
         public double riversideArterial = 600.0;
+        /**
+         * Footpaths along the water: a riverside promenade {@code promenadeWidth} wide on the line
+         * {@code promenadeOffset} from wide water (between it and the bank road), its open land reaching to the water
+         * and {@code promenadeVerge} past its far edge; a canal path {@code canalPathWidth} wide on the side of a canal
+         * without a street, a verge of {@code canalPathVerge}. Pieces on another street are left out; a run shorter
+         * than {@code promenadeMin} is dropped; every {@code promenadeAccess} along it a path leads to the nearest
+         * street within {@code promenadeReach}.
+         */
+        public double promenadeOffset = 8.0;
+        public double promenadeWidth = 4.0;
+        public double promenadeVerge = 4.0;
+        public double canalPathWidth = 2.0;
+        public double canalPathVerge = 1.0;
+        public double promenadeMin = 60.0;
+        public double promenadeAccess = 160.0;
+        public double promenadeReach = 30.0;
         public double bankJoin = 120.0;
         /**
          * Irrigation canals (yōsui) in a castle, temple or port town with at least {@code canalMinOld} square blocks of

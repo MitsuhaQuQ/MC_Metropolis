@@ -49,7 +49,7 @@ public final class TownFunctions {
         this.centreZ = centreZ;
         this.builtKm2 = builtKm2;
         for (StreetSegment g : plan.segments()) {
-            if (g.streetClass() == StreetClass.LANE) {
+            if (g.streetClass() == StreetClass.LANE || g.streetClass() == StreetClass.PATH) {
                 continue;
             }
             for (long cx = (long) Math.floor(Math.min(g.x1(), g.x2()) / CELL); cx <= (long) Math.floor(Math.max(g.x1(), g.x2()) / CELL); cx++) {

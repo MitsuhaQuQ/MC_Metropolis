@@ -62,11 +62,18 @@ public final class TownPlots {
      */
     private final Map<Long, int[]> behind = new java.util.concurrent.ConcurrentHashMap<>();
 
+    /** The footpaths' pieces, which front no lots. */
+    private final List<StreetSegment> paths = new ArrayList<>();
+
     public TownPlots(CitySettings.Plots config, StreetPlan plan, long seed) {
         this.config = config;
         this.plan = plan;
         this.seed = seed;
         for (StreetSegment g : plan.segments()) {
+            if (g.streetClass() == com.mtm.citybuilder.core.street.StreetClass.PATH) {
+                paths.add(g);
+                continue;
+            }
             if (g.structure() != StreetStructure.BRIDGE && g.structure() != StreetStructure.LEVEL_CROSSING && g.length() > 1e-6) {
                 pieces.add(g);
             }
@@ -319,7 +326,7 @@ public final class TownPlots {
             case COLLECTOR -> config.priorityCollector;
             case OLD_ROAD -> config.priorityOldRoad;
             case STREET -> config.priorityStreet;
-            case LANE -> config.priorityLane;
+            case LANE, PATH -> config.priorityLane;
         };
     }
 
@@ -328,6 +335,12 @@ public final class TownPlots {
      * in grounds and corridors kept clear). A lot too small to build on is joined to its neighbour, or is a remnant.
      */
     public Plot at(double x, double z) {
+        // The footpaths and the open land along them, to the water
+        for (com.mtm.citybuilder.core.street.Promenade promenade : plan.promenades()) {
+            if (promenade.open(x, z)) {
+                return null;
+            }
+        }
         Plot plot = raw(x, z);
         if (plot == null || plot.interior()) {
             return plot;
@@ -629,6 +642,14 @@ public final class TownPlots {
 
     /** Whether a position lies on one of the town's streets (lots front), between its edges. */
     public boolean onStreet(double x, double z) {
+        for (StreetSegment g : paths) {
+            double dx = g.x2() - g.x1();
+            double dz = g.z2() - g.z1();
+            double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+            if (Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z) < 0.5 * g.width()) {
+                return true;
+            }
+        }
         List<Integer> near = cells.get(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL));
         if (near == null) {
             return false;

@@ -16,5 +16,10 @@ public enum StreetClass {
     /** A street, laying out blocks. */
     STREET,
     /** A lane inside a block, as Kyoto's roji and zushi. */
-    LANE
+    LANE,
+    /**
+     * A footpath: a promenade along a river or a canal, no lots along it (see {@link Promenade}); the finest of the
+     * town's ways, for walking only.
+     */
+    PATH
 }

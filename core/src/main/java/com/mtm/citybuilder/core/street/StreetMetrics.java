@@ -20,7 +20,7 @@ public final class StreetMetrics {
             double dx = segment.x2() - segment.x1();
             double dz = segment.z2() - segment.z1();
             double length = Math.hypot(dx, dz);
-            if (length < 1e-6) {
+            if (length < 1e-6 || segment.streetClass() == StreetClass.PATH) {
                 continue;
             }
             double bearing = Math.toDegrees(Math.atan2(dx, -dz));
@@ -63,6 +63,9 @@ public final class StreetMetrics {
         double length = 0.0;
         double lanes = 0.0;
         for (StreetSegment segment : segments) {
+            if (segment.streetClass() == StreetClass.PATH) {
+                continue;
+            }
             if (segment.streetClass() == StreetClass.LANE) {
                 lanes += segment.length();
                 continue;
@@ -201,7 +204,7 @@ public final class StreetMetrics {
 
     private static double beside(List<StreetSegment> segments, java.util.function.Predicate<StreetSegment> of, double distance,
                                  java.util.function.BiFunction<StreetSegment, StreetSegment, Double> within) {
-        List<StreetSegment> streets = segments.stream().filter(s -> s.streetClass() != StreetClass.LANE && s.length() > 1e-6).toList();
+        List<StreetSegment> streets = segments.stream().filter(s -> s.streetClass() != StreetClass.LANE && s.streetClass() != StreetClass.PATH && s.length() > 1e-6).toList();
         double cell = Math.max(distance, 32.0);
         java.util.Map<Long, List<StreetSegment>> cells = new java.util.HashMap<>();
         for (StreetSegment s : streets) {
@@ -259,7 +262,7 @@ public final class StreetMetrics {
         java.util.Map<Long, List<Double>> headings = new java.util.HashMap<>();
         List<StreetSegment> streets = new java.util.ArrayList<>();
         for (StreetSegment s : segments) {
-            if (s.streetClass() == StreetClass.LANE || s.length() < 1e-6) {
+            if (s.streetClass() == StreetClass.LANE || s.streetClass() == StreetClass.PATH || s.length() < 1e-6) {
                 continue;
             }
             streets.add(s);
@@ -381,7 +384,7 @@ public final class StreetMetrics {
         int nz = (int) Math.ceil((maxZ - minZ) / cell);
         boolean[] road = new boolean[nx * nz];
         for (StreetSegment s : segments) {
-            if (s.streetClass() == StreetClass.LANE) {
+            if (s.streetClass() == StreetClass.LANE || s.streetClass() == StreetClass.PATH) {
                 continue;
             }
             double half = 0.5 * s.width() + 0.5 * cell;

@@ -32,7 +32,9 @@ public final class ChunkLayer {
         OLD_ROAD,
         ARTERIAL,
         /** A boulevard, divided by a planted median. */
-        BOULEVARD
+        BOULEVARD,
+        /** A footpath along water: packed earth. */
+        PATH
     }
 
     /** A canal's water: the column is dug out, the water a block below the ground and two deep, on stone. */
@@ -112,7 +114,9 @@ public final class ChunkLayer {
         /** Paving slabs: a pavement beside a wide street, or a lane. */
         SIDEWALK,
         /** The planted median of a boulevard: grass. */
-        MEDIAN
+        MEDIAN,
+        /** A footpath: packed earth. */
+        PATH
     }
 
     /** Directions a line may cross its block at: every 180 / ANGLES degrees, from along +x towards +z. */
@@ -166,6 +170,8 @@ public final class ChunkLayer {
                 return new Mark(Paving.NONE, 0, 0);
             case LANE:
                 return new Mark(Paving.SIDEWALK, 0, 0);
+            case PATH:
+                return new Mark(Paving.PATH, 0, 0);
             case STREET:
             case OLD_ROAD:
                 return new Mark(Paving.ASPHALT, 0, 0);
@@ -724,6 +730,7 @@ public final class ChunkLayer {
             case OLD_ROAD -> Surface.OLD_ROAD;
             case STREET -> Surface.STREET;
             case LANE -> Surface.LANE;
+            case PATH -> Surface.PATH;
         };
     }
 

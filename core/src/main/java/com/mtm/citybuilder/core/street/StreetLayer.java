@@ -1368,11 +1368,153 @@ public final class StreetLayer {
                 }
             }
         }
+        List<Promenade> promenades = formation == Formation.VILLAGE ? List.of()
+                : promenades(settlement, window, canals, segments);
         List<StationSite> sites = formation == Formation.VILLAGE ? List.of()
                 : sites(settlement, window, anchors, railways, urban, segments);
         List<List<double[]>> highSpeed = highSpeedCorridor(settlement, window, districts, anchors);
         return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments, urban,
-                window.capital == null ? null : window.capital.clone(), sites, highSpeed, canals, window.estates);
+                window.capital == null ? null : window.capital.clone(), sites, highSpeed, canals, window.estates,
+                promenades);
+    }
+
+    /**
+     * The footpaths along the water, laid last so no street ends on one: a promenade on the bank of every river, lake
+     * and sea front through built land, on the line {@code promenadeOffset} from the wide water (between it and the
+     * bank road, as the paths along the Kamo), and a path along each canal on the side its street is not (as the
+     * Philosopher's Path). Cut where the land is not built, in grounds, over water or on another street; every
+     * {@code promenadeAccess} a short path leads to the nearest street. Their pieces join the segments as paths.
+     */
+    private List<Promenade> promenades(Settlement settlement, Window window, List<Canal> canals, List<StreetSegment> segments) {
+        List<StreetSegment> streets = new ArrayList<>(segments);
+        Sounding laid = new Sounding(streets);
+        List<Promenade> promenades = new ArrayList<>();
+        List<StreetSegment> paths = new ArrayList<>();
+        float[] d = wideWaterDistance(window);
+        int size = window.fineSize;
+        double baseX = (double) window.originX * grid;
+        double baseZ = (double) window.originZ * grid;
+        java.util.function.ToDoubleBiFunction<Double, Double> toWater = (x, z) -> {
+            int i = (int) Math.round((x - baseX) / FINE);
+            int j = (int) Math.round((z - baseZ) / FINE);
+            return i < 0 || j < 0 || i >= size || j >= size ? Double.MAX_VALUE : d[i * size + j];
+        };
+        for (List<double[]> line : contours(window, d, config.promenadeOffset)) {
+            List<double[]> points = resampleLine(line, config.step);
+            if (points.size() < 2) {
+                continue;
+            }
+            // The water to its left or right, by the field a little way to the left of its middle
+            double[] a = points.get(points.size() / 2 - (points.size() > 2 ? 1 : 0));
+            double[] b = points.get(points.size() / 2);
+            double len = Math.max(1e-9, Math.hypot(b[0] - a[0], b[1] - a[1]));
+            double lx = 0.5 * (a[0] + b[0]) - (b[1] - a[1]) / len * 4.0;
+            double lz = 0.5 * (a[1] + b[1]) + (b[0] - a[0]) / len * 4.0;
+            boolean waterLeft = toWater.applyAsDouble(lx, lz) < config.promenadeOffset;
+            double toEdge = config.promenadeOffset + 0.5 * config.bankMinWidth;
+            double land = 0.5 * config.promenadeWidth + config.promenadeVerge;
+            path(window, laid, points, config.promenadeWidth, waterLeft ? toEdge : land, waterLeft ? land : toEdge, true,
+                    promenades, paths);
+        }
+        for (int c = 0; c < canals.size(); c++) {
+            Canal canal = canals.get(c);
+            // The side canalStreets left free
+            double side = Hash.unit(Hash.of(settlement.id() ^ 0xCA75L, c)) < 0.5 ? 1 : -1;
+            double offset = 0.5 * canal.width() + 1.0 + 0.5 * config.canalPathWidth;
+            List<double[]> line = resampleLine(canal.points(), config.step);
+            List<double[]> points = new ArrayList<>();
+            for (int k = 0; k < line.size(); k++) {
+                double[] t = tangent(line, k);
+                points.add(new double[]{line.get(k)[0] - t[1] * side * offset, line.get(k)[1] + t[0] * side * offset});
+            }
+            // The path went to the left of travel (side 1) or the right; the canal lies the other way
+            boolean waterLeft = side < 0;
+            double land = 0.5 * config.canalPathWidth + config.canalPathVerge;
+            path(window, laid, points, config.canalPathWidth, waterLeft ? offset : land, waterLeft ? land : offset, false,
+                    promenades, paths);
+        }
+        // Ways in: every so far along each path, the shortest way to a street's edge
+        List<StreetSegment> access = new ArrayList<>();
+        for (Promenade p : promenades) {
+            double walked = 0.5 * config.promenadeAccess;
+            for (int k = 1; k < p.points().size(); k++) {
+                double[] a = p.points().get(k - 1);
+                double[] b = p.points().get(k);
+                walked += Math.hypot(b[0] - a[0], b[1] - a[1]);
+                if (walked < config.promenadeAccess) {
+                    continue;
+                }
+                double[] near = nearestStreet(streets, b[0], b[1], config.promenadeReach);
+                boolean crossesWater = near != null && window.water(0.5 * (near[0] + b[0]), 0.5 * (near[1] + b[1]));
+                for (Canal canal : canals) {
+                    crossesWater |= near != null && canal.crosses(b[0], b[1], near[0], near[1]);
+                }
+                if (near != null && !crossesWater && Math.hypot(near[0] - b[0], near[1] - b[1]) > 0.5 * p.width() + 1.0) {
+                    walked = 0;
+                    access.add(new StreetSegment(b[0], b[1], near[0], near[1], StreetClass.PATH,
+                            window.old(b[0], b[1]) ? Era.TOWN : Era.MODERN, p.width(), StreetStructure.GROUND));
+                }
+            }
+        }
+        segments.addAll(paths);
+        segments.addAll(access);
+        return promenades;
+    }
+
+    /**
+     * One path along a line of points: its runs over built land (out of grounds, off water and clear of the streets)
+     * of at least {@code promenadeMin}, each a promenade and its pieces.
+     */
+    private void path(Window window, Sounding laid, List<double[]> points, double width, double left, double right,
+                      boolean river, List<Promenade> promenades, List<StreetSegment> paths) {
+        List<double[]> run = new ArrayList<>();
+        for (int k = 0; k <= points.size(); k++) {
+            boolean ok = false;
+            if (k < points.size()) {
+                double[] p = points.get(k);
+                ok = window.inside(p[0], p[1]) && window.built(p[0], p[1]) && !window.inGrounds(p[0], p[1])
+                        && !window.water(p[0], p[1]) && !laid.near(p[0], p[1], 0.5 * width + 4.0, Double.NaN, Double.NaN);
+            }
+            if (ok) {
+                run.add(points.get(k));
+                continue;
+            }
+            if (run.size() >= 2 && (run.size() - 1) * config.step >= config.promenadeMin) {
+                promenades.add(new Promenade(run, width, left, right, river));
+                for (int q = 1; q < run.size(); q++) {
+                    double[] a = run.get(q - 1);
+                    double[] b = run.get(q);
+                    paths.add(new StreetSegment(a[0], a[1], b[0], b[1], StreetClass.PATH,
+                            window.old(a[0], a[1]) ? Era.TOWN : Era.MODERN, width, StreetStructure.GROUND));
+                }
+            }
+            run = new ArrayList<>();
+        }
+    }
+
+    /** The nearest point on the edge of a street (not a lane or path) within reach, or null. */
+    private static double[] nearestStreet(List<StreetSegment> streets, double x, double z, double reach) {
+        double[] best = null;
+        double bestDistance = reach;
+        for (StreetSegment g : streets) {
+            if (g.streetClass() == StreetClass.LANE || g.streetClass() == StreetClass.PATH
+                    || g.structure() == StreetStructure.BRIDGE) {
+                continue;
+            }
+            double dx = g.x2() - g.x1();
+            double dz = g.z2() - g.z1();
+            double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+            double px = g.x1() + dx * t;
+            double pz = g.z1() + dz * t;
+            double distance = Math.hypot(px - x, pz - z) - 0.5 * g.width();
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                double reachEdge = Math.max(0, Math.hypot(px - x, pz - z));
+                double f = reachEdge < 1e-9 ? 0 : (reachEdge - 0.5 * g.width()) / reachEdge;
+                best = new double[]{x + (px - x) * f, z + (pz - z) * f};
+            }
+        }
+        return best;
     }
 
     /** Points every {@code spacing} blocks along a line, its two ends included, as {x, z}. */
@@ -2378,9 +2520,19 @@ public final class StreetLayer {
      * Returns the pieces laid, which arterials ending at the water later join.
      */
     private List<StreetSegment> riverside(Window window, List<StreetSegment> segments, List<Embankment> embankments) {
+        List<StreetSegment> laid = new ArrayList<>();
+        for (List<double[]> line : contours(window, wideWaterDistance(window), config.bankOffset)) {
+            laid.addAll(riversideRuns(window, line, segments, embankments));
+        }
+        return laid;
+    }
+
+    /**
+     * The distance on the fine grid to water wide enough to follow: what a disc of half {@code bankMinWidth} fits in
+     * (a morphological opening), so narrow arms, inlets and creeks fall away; less that half width.
+     */
+    private float[] wideWaterDistance(Window window) {
         int size = window.fineSize;
-        // The water wide enough to follow: what a disc of half the least width fits in (a morphological opening), so
-        // narrow arms, inlets and creeks fall away; the distance to its edge
         int cells = size * size;
         boolean[] land = new boolean[cells];
         for (int k = 0; k < cells; k++) {
@@ -2397,7 +2549,13 @@ public final class StreetLayer {
         for (int k = 0; k < cells; k++) {
             d[k] = (float) (Math.min(toWide[k], 1e4) - radius);
         }
-        double level = config.bankOffset;
+        return d;
+    }
+
+    /** The lines where a field on the fine grid crosses a level, joined end to end and smoothed. */
+    private List<List<double[]>> contours(Window window, float[] d, double level) {
+        int size = window.fineSize;
+        List<List<double[]>> lines = new ArrayList<>();
         double baseX = (double) window.originX * grid;
         double baseZ = (double) window.originZ * grid;
         // Marching squares: pieces of the contour in each cell, joined end to end into lines
@@ -2449,7 +2607,6 @@ public final class StreetLayer {
         for (int p = 0; p < pieces.size(); p++) {
             index.put(pieces.get(p), p);
         }
-        List<StreetSegment> laid = new ArrayList<>();
         for (int p = 0; p < pieces.size(); p++) {
             if (used[p]) {
                 continue;
@@ -2487,9 +2644,9 @@ public final class StreetLayer {
             for (int round = 0; round < 2; round++) {
                 smooth = chaikin(smooth);
             }
-            laid.addAll(riversideRuns(window, smooth, segments, embankments));
+            lines.add(smooth);
         }
-        return laid;
+        return lines;
     }
 
     /**
@@ -3111,6 +3268,7 @@ public final class StreetLayer {
             case COLLECTOR -> 2;
             case STREET -> 1;
             case LANE -> 0;
+            case PATH -> -1;
         };
     }
 
