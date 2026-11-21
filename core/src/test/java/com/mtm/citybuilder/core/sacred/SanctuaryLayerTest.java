@@ -18,70 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The temples and shrines on the mountains round the towns. */
 class SanctuaryLayerTest {
-    /** Plains with round hills every 6 km, 300 high: every town has hills within reach. */
-    private static final class Hills implements TerrainView {
-        private final SyntheticTerrain plains = SyntheticTerrain.flatPlains();
-
-        private double bump(double x, double z) {
-            if (x < 0) {
-                return 0.0;
-            }
-            double cx = Math.floor(x / 6000.0) * 6000.0 + 3000.0;
-            double cz = Math.floor(z / 6000.0) * 6000.0 + 3000.0;
-            double d = Math.hypot(x - cx, z - cz);
-            return 300.0 * Math.exp(-d * d / (2 * 900.0 * 900.0));
-        }
-
-        @Override
-        public double surfaceHeight(int x, int z) {
-            return smoothHeight(x, z);
-        }
-
-        @Override
-        public double waterLevel(double x, double z) {
-            return Double.NaN;
-        }
-
-        @Override
-        public double grade(double x, double z) {
-            return 0.0;
-        }
-
-        @Override
-        public Landform landform(double x, double z) {
-            return x < 0 ? Landform.OCEAN : bump(x, z) > 40 ? Landform.HILLS : Landform.PLAINS;
-        }
-
-        @Override
-        public String biome(double x, double z) {
-            return plains.biome(x, z);
-        }
-
-        @Override
-        public double smoothHeight(double x, double z) {
-            return plains.smoothHeight(x, z) + bump(x, z);
-        }
-
-        @Override
-        public double seaLevel() {
-            return plains.seaLevel();
-        }
-
-        @Override
-        public RiverSample nearestRiver(double x, double z) {
-            return null;
-        }
-
-        @Override
-        public double lakeLevel(double x, double z) {
-            return Double.NaN;
-        }
-    }
-
     @Test
     void aCitysTemplesAndShrinesStandOnTheHillsAboveIt() {
         CitySettings settings = CitySettings.DEFAULT;
-        CityLogic logic = new CityLogic(5L, settings, new Hills());
+        CityLogic logic = new CityLogic(5L, settings, new com.mtm.citybuilder.core.terrain.HillyTerrain());
         List<Settlement> towns = logic.settlements(6000, -20000, 42000, 20000);
         Settlement city = towns.stream().filter(s -> s.tier() == SettlementTier.CITY || s.tier() == SettlementTier.METROPOLIS)
                 .findFirst().orElseThrow();

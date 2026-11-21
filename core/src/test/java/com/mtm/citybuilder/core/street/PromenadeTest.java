@@ -62,7 +62,7 @@ class PromenadeTest {
         assertTrue(paths > 0);
         for (StreetSegment g : plan.segments()) {
             if (g.streetClass() == StreetClass.PATH) {
-                assertEquals(StreetStructure.GROUND, g.structure());
+                assertTrue(g.structure() == StreetStructure.GROUND || g.structure() == StreetStructure.STAIRS);
             }
         }
         StreetMetrics.Network withPaths = StreetMetrics.network(plan.segments(), 10.0);
@@ -70,5 +70,111 @@ class PromenadeTest {
                 .filter(g -> g.streetClass() != StreetClass.PATH).toList(), 10.0);
         assertEquals(without.toString(), withPaths.toString());
         assertFalse(plan.promenades().isEmpty());
+        // Steps from the promenades down to the water's edge, square to the river
+        int steps = 0;
+        for (StreetSegment g : plan.segments()) {
+            if (g.streetClass() == StreetClass.PATH && g.structure() == StreetStructure.STAIRS
+                    && Math.abs(g.z1() - city.z()) < 3000) {
+                steps++;
+                double end = Math.min(Math.abs(g.x1() - RIVER_X), Math.abs(g.x2() - RIVER_X)) - 0.5 * RIVER_WIDTH;
+                assertTrue(end >= -1 && end < 3, "steps end at the water " + end);
+            }
+        }
+        assertTrue(steps > 0, "no steps down to the water");
+        // Where a promenade passes under a bridge, the bridge is over it
+        for (Promenade p : plan.promenades()) {
+            for (double[] u : p.under()) {
+                boolean bridged = plan.segments().stream().anyMatch(g -> g.structure() == StreetStructure.BRIDGE
+                        && Math.hypot(0.5 * (g.x1() + g.x2()) - u[0], 0.5 * (g.z1() + g.z2()) - u[1]) < g.length());
+                assertTrue(bridged, "under a bridge");
+            }
+        }
+    }
+
+    /** The walk along the foot of the hills: out of the built land, the hills rising behind it. */
+    @Test
+    void theHillsAtATownsEdgeHaveAWalkAlongTheirFoot() {
+        CitySettings settings = CitySettings.DEFAULT;
+        // A city on the plains; then the land rising steeply a little way north of it (the city nearest the foot)
+        CityLogic flat = new CityLogic(3L, settings, SyntheticTerrain.flatPlains());
+        Settlement first = flat.settlements(6000, -20000, 42000, 20000).stream()
+                .filter(t -> t.tier() == SettlementTier.METROPOLIS || t.tier() == SettlementTier.CITY).findFirst().orElseThrow();
+        double foot = first.z() - 0.8 * flat.targetRadius(first);
+        com.mtm.citybuilder.core.terrain.TerrainView plains = SyntheticTerrain.flatPlains();
+        com.mtm.citybuilder.core.terrain.TerrainView slope = new com.mtm.citybuilder.core.terrain.TerrainView() {
+            private double rise(double z) {
+                return z < foot ? Math.min(300.0, 0.3 * (foot - z)) : 0.0;
+            }
+
+            @Override
+            public double surfaceHeight(int x, int z) {
+                return smoothHeight(x, z);
+            }
+
+            @Override
+            public double waterLevel(double x, double z) {
+                return Double.NaN;
+            }
+
+            @Override
+            public double grade(double x, double z) {
+                return z < foot ? 0.3 : 0.0;
+            }
+
+            @Override
+            public Landform landform(double x, double z) {
+                return x < 0 ? Landform.OCEAN : rise(z) > 40 ? Landform.MOUNTAINS : rise(z) > 0 ? Landform.HILLS : Landform.PLAINS;
+            }
+
+            @Override
+            public String biome(double x, double z) {
+                return plains.biome(x, z);
+            }
+
+            @Override
+            public double smoothHeight(double x, double z) {
+                return plains.smoothHeight(x, z) + (x < 0 ? 0.0 : rise(z));
+            }
+
+            @Override
+            public double seaLevel() {
+                return plains.seaLevel();
+            }
+
+            @Override
+            public com.mtm.citybuilder.core.terrain.RiverSample nearestRiver(double x, double z) {
+                return null;
+            }
+
+            @Override
+            public double lakeLevel(double x, double z) {
+                return Double.NaN;
+            }
+        };
+        CityLogic logic = new CityLogic(3L, settings, slope);
+        Settlement city = null;
+        for (Settlement t : logic.settlements(6000, foot, 42000, 20000)) {
+            if ((t.tier() == SettlementTier.METROPOLIS || t.tier() == SettlementTier.CITY) && t.z() > foot
+                    && (city == null || t.z() - foot < city.z() - foot)) {
+                city = t;
+            }
+        }
+        assertNotNull(city);
+        StreetPlan plan = logic.streetPlan(city);
+        TownPlots plots = logic.plots().town(city);
+        int walks = 0;
+        for (Promenade p : plan.promenades()) {
+            if (p.kind() != Promenade.Kind.HILL) {
+                continue;
+            }
+            walks++;
+            assertTrue((p.points().size() - 1) * settings.streets.step >= settings.streets.hillMin - 1e-6);
+            for (double[] q : p.points()) {
+                // At the foot of the slope, out of the built land: no lots on it
+                assertTrue(Math.abs(q[1] - foot) < 300, "at the foot " + (q[1] - foot));
+                assertNull(plots.at(q[0], q[1]));
+            }
+        }
+        assertTrue(walks > 0, "no walk along the hills");
     }
 }

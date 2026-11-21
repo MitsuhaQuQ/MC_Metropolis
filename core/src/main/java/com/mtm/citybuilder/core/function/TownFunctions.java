@@ -36,6 +36,7 @@ public final class TownFunctions {
     private final StreetFunction[] functions;
     private final List<Facility> facilities = new ArrayList<>();
     private final List<Hanamachi> hanamachi = new ArrayList<>();
+    private final List<Walk> walks = new ArrayList<>();
     /** Street pieces (lanes aside) by cell, for how far a place lies from the streets. */
     private final Map<Long, List<StreetSegment>> streets = new HashMap<>();
 
@@ -64,6 +65,7 @@ public final class TownFunctions {
         placeHanamachi();
         lotFacilities();
         landmarks();
+        layWalks();
     }
 
     /** A street's function. */
@@ -74,6 +76,11 @@ public final class TownFunctions {
     /** The town's facilities and landmarks. */
     public List<Facility> facilities() {
         return facilities;
+    }
+
+    /** The paths inside the facilities' grounds: parks', greens', temples' and shrines'. */
+    public List<Walk> walks() {
+        return walks;
     }
 
     /** The town's historic pleasure quarters, each along its street. */
@@ -641,6 +648,140 @@ public final class TownFunctions {
             facilities.add(new Facility(kind, plots.lotId(bestLot[0], bestLot[1], bestLot[2]), best[0], best[1], 5,
                     bestLot[0], bestLot[1], bestLot[2], false));
         }
+    }
+
+    // ---- Paths in the grounds ------------------------------------------------------------------------------------
+
+    /**
+     * The paths inside the grounds: a park's loop and the ways in from the nearest streets (a large park's crossing
+     * through its middle too), a sports park's round its edge, a green tract's winding path across it, and a temple's
+     * or shrine's approach straight from the nearest street to its main hall in the middle (a great shrine's loop
+     * through its forest as well).
+     */
+    private void layWalks() {
+        for (Facility f : facilities) {
+            if (!f.kind().area() || f.landmark()) {
+                continue;
+            }
+            double r = f.radius();
+            double[] gate = nearestStreetPoint(f.x(), f.z(), r + 30.0);
+            switch (f.kind()) {
+                case PARK -> {
+                    if (r >= 25) {
+                        walks.add(new Walk(f.id(), f.kind(), loop(f.x(), f.z(), 0.6 * r), 2.0));
+                    }
+                    ways(f, gate, 0.6 * r, 2.0);
+                }
+                case LARGE_PARK, CENTRAL_PARK -> {
+                    walks.add(new Walk(f.id(), f.kind(), loop(f.x(), f.z(), 0.7 * r), 3.0));
+                    ways(f, gate, 0.7 * r, 3.0);
+                    if (gate != null) {
+                        // Across the middle from the way in, and in from the far side's street
+                        double ax = gate[0] - f.x();
+                        double az = gate[1] - f.z();
+                        double len = Math.max(1e-9, Math.hypot(ax, az));
+                        walks.add(new Walk(f.id(), f.kind(), List.of(new double[]{f.x() + ax / len * 0.7 * r, f.z() + az / len * 0.7 * r},
+                                new double[]{f.x() - ax / len * 0.7 * r, f.z() - az / len * 0.7 * r}), 3.0));
+                        double[] far = nearestStreetPoint(f.x() - ax / len * r, f.z() - az / len * r, 30.0);
+                        ways(f, far, 0.7 * r, 3.0);
+                    }
+                }
+                case SPORTS_PARK -> {
+                    walks.add(new Walk(f.id(), f.kind(), loop(f.x(), f.z(), 0.9 * r), 3.0));
+                    ways(f, gate, 0.9 * r, 3.0);
+                }
+                case GREEN -> {
+                    if (gate != null) {
+                        walks.add(new Walk(f.id(), f.kind(), winding(f, gate), 2.0));
+                    }
+                }
+                case TEMPLE, SHRINE, GRAND_TEMPLE, GRAND_SHRINE -> {
+                    boolean grand = f.kind() == Facility.Kind.GRAND_TEMPLE || f.kind() == Facility.Kind.GRAND_SHRINE;
+                    if (gate != null) {
+                        walks.add(new Walk(f.id(), f.kind(), List.of(gate, new double[]{f.x(), f.z()}), grand ? 6.0 : 3.0));
+                    }
+                    if (f.kind() == Facility.Kind.GRAND_SHRINE) {
+                        walks.add(new Walk(f.id(), f.kind(), loop(f.x(), f.z(), 0.75 * r), 2.0));
+                    }
+                }
+                default -> {
+                }
+            }
+        }
+    }
+
+    /** A closed loop of points round a middle. */
+    private static List<double[]> loop(double x, double z, double radius) {
+        int n = Math.max(12, (int) Math.ceil(2 * Math.PI * radius / 12.0));
+        List<double[]> points = new ArrayList<>();
+        for (int k = 0; k <= n; k++) {
+            double a = 2 * Math.PI * k / n;
+            points.add(new double[]{x + Math.cos(a) * radius, z + Math.sin(a) * radius});
+        }
+        return points;
+    }
+
+    /** A way in from a street's edge to a loop of radius {@code ring} round a facility's middle. */
+    private void ways(Facility f, double[] gate, double ring, double width) {
+        if (gate == null) {
+            return;
+        }
+        double ax = gate[0] - f.x();
+        double az = gate[1] - f.z();
+        double len = Math.hypot(ax, az);
+        if (len <= ring + 1.0) {
+            return;
+        }
+        walks.add(new Walk(f.id(), f.kind(), List.of(new double[]{f.x() + ax / len * ring, f.z() + az / len * ring}, gate), width));
+    }
+
+    /** A path winding across a green tract from the street at its gate to its far side. */
+    private List<double[]> winding(Facility f, double[] gate) {
+        double ax = f.x() - gate[0];
+        double az = f.z() - gate[1];
+        double len = Math.max(1e-9, Math.hypot(ax, az));
+        double ux = ax / len;
+        double uz = az / len;
+        double total = len + 0.9 * f.radius();
+        double phase = 2 * Math.PI * Hash.unit(Hash.of(seed ^ 0x6EE7L, f.id()));
+        List<double[]> points = new ArrayList<>();
+        for (double t = 0; t <= total; t += 8.0) {
+            // A slow swing to either side, none at the gate
+            double swing = 0.15 * f.radius() * Math.sin(phase + 2.5 * Math.PI * t / total) * Math.min(1.0, t / 20.0);
+            points.add(new double[]{gate[0] + ux * t - uz * swing, gate[1] + uz * t + ux * swing});
+        }
+        return points;
+    }
+
+    /** The nearest point on the edge of a street (lanes aside) within reach of a place, or null. */
+    private double[] nearestStreetPoint(double x, double z, double reach) {
+        double[] best = null;
+        double bestDistance = reach;
+        long cx = (long) Math.floor(x / CELL);
+        long cz = (long) Math.floor(z / CELL);
+        int cells = (int) Math.ceil(reach / CELL) + 1;
+        for (long ix = cx - cells; ix <= cx + cells; ix++) {
+            for (long iz = cz - cells; iz <= cz + cells; iz++) {
+                for (StreetSegment g : streets.getOrDefault((ix << 32) ^ (iz & 0xFFFFFFFFL), List.of())) {
+                    if (g.structure() == com.mtm.citybuilder.core.street.StreetStructure.BRIDGE) {
+                        continue;
+                    }
+                    double dx = g.x2() - g.x1();
+                    double dz = g.z2() - g.z1();
+                    double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+                    double px = g.x1() + dx * t;
+                    double pz = g.z1() + dz * t;
+                    double centre = Math.hypot(px - x, pz - z);
+                    double distance = centre - 0.5 * g.width();
+                    if (distance < bestDistance && centre > 1e-9) {
+                        bestDistance = distance;
+                        double f = (centre - 0.5 * g.width()) / centre;
+                        best = new double[]{x + (px - x) * f, z + (pz - z) * f};
+                    }
+                }
+            }
+        }
+        return best;
     }
 
     // ---- Landmarks ------------------------------------------------------------------------------------------------

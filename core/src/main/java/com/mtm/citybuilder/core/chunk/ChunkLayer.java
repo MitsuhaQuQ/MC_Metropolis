@@ -3,6 +3,7 @@ package com.mtm.citybuilder.core.chunk;
 import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.extent.UrbanSample;
 import com.mtm.citybuilder.core.settlement.Settlement;
+import com.mtm.citybuilder.core.street.StreetClass;
 import com.mtm.citybuilder.core.street.StreetPlan;
 import com.mtm.citybuilder.core.street.StreetSegment;
 import com.mtm.citybuilder.core.street.StreetStructure;
@@ -27,14 +28,14 @@ public final class ChunkLayer {
     /** What a column carries: the class of the street over it, the widest winning where streets meet. */
     public enum Surface {
         NONE,
+        /** A footpath: packed earth; any street over it wins. */
+        PATH,
         LANE,
         STREET,
         OLD_ROAD,
         ARTERIAL,
         /** A boulevard, divided by a planted median. */
-        BOULEVARD,
-        /** A footpath along water: packed earth. */
-        PATH
+        BOULEVARD
     }
 
     /** A canal's water: the column is dug out, the water a block below the ground and two deep, on stone. */
@@ -85,10 +86,18 @@ public final class ChunkLayer {
      * @param canal   a canal under the column: {@link #CANAL_WATER} its water, {@link #CANAL_WALL} its stone wall, 0
      *                none; under a street, a little bridge carries the street over it (see {@link #slabDeck},
      *                {@link #parapet})
+     * @param pathUnder whether a footpath runs on the ground under the column's bridge deck (a riverside promenade
+     *                  passing under a high bridge)
      */
     public record Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
-                         double width, boolean junction, boolean carriageway, int canal) {
+                         double width, boolean junction, boolean carriageway, int canal, boolean pathUnder) {
         public static final Column EMPTY = new Column(Surface.NONE, false, Double.NaN, 0.0, 0.0, 0.0, 0.0, false, false, 0);
+
+        /** A column with no footpath under a bridge's deck. */
+        public Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
+                      double width, boolean junction, boolean carriageway, int canal) {
+            this(surface, bridge, deck, across, heading, along, width, junction, carriageway, canal, false);
+        }
 
         /** A column of streets, without a canal. */
         public Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
@@ -444,6 +453,7 @@ public final class ChunkLayer {
         java.util.Arrays.fill(firstAny[1], -1);
         Index[][] firstAnyIndex = new Index[2][256];
         boolean[][] meet = new boolean[2][256];
+        boolean[] footpath = new boolean[256];
         double minX = chunkX * 16.0;
         double minZ = chunkZ * 16.0;
         List<double[]> canals = new ArrayList<>();
@@ -472,6 +482,9 @@ public final class ChunkLayer {
                             continue;
                         }
                         int c = x * 16 + z;
+                        if (surface == Surface.PATH && !bridge) {
+                            footpath[c] = true;
+                        }
                         int level = bridge ? 1 : 0;
                         if (firstAny[level][c] < 0) {
                             firstAny[level][c] = p;
@@ -521,6 +534,14 @@ public final class ChunkLayer {
                 // Unmarked streets meeting: nothing to break off, but no parapet in a junction
                 columns[c] = new Column(column.surface, column.bridge, column.deck, column.across, column.heading,
                         column.along, column.width, true, false);
+            }
+        }
+        // A footpath under a bridge's deck: laid on the ground beneath it
+        for (int c = 0; c < 256; c++) {
+            Column column = columns[c];
+            if (column.bridge && footpath[c]) {
+                columns[c] = new Column(column.surface, true, column.deck, column.across, column.heading, column.along,
+                        column.width, column.junction, column.carriageway, column.canal, true);
             }
         }
         // Canals: water within half its width of its middle line, a wall a block beyond; under a street too, which
@@ -613,7 +634,16 @@ public final class ChunkLayer {
     }
 
     private Index build(StreetPlan plan) {
-        List<StreetSegment> segments = plan.segments();
+        // The streets, and the paths inside the facilities' grounds as footpaths
+        List<StreetSegment> segments = new ArrayList<>(plan.segments());
+        for (com.mtm.citybuilder.core.function.Walk walk : logic.functions().town(plan.settlement()).walks()) {
+            for (int k = 1; k < walk.points().size(); k++) {
+                double[] a = walk.points().get(k - 1);
+                double[] b = walk.points().get(k);
+                segments.add(new StreetSegment(a[0], a[1], b[0], b[1], StreetClass.PATH,
+                        com.mtm.citybuilder.core.street.Era.MODERN, walk.width(), StreetStructure.GROUND));
+            }
+        }
         Map<Long, List<Integer>> byChunk = new HashMap<>();
         for (int p = 0; p < segments.size(); p++) {
             StreetSegment g = segments.get(p);

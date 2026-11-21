@@ -836,6 +836,25 @@ public final class CitySettings {
         public double promenadeMin = 60.0;
         public double promenadeAccess = 160.0;
         public double promenadeReach = 30.0;
+        /**
+         * Steps {@code waterStepsWidth} wide from a riverside promenade down to the water every {@code waterSteps}.
+         * A street onto a bridge crossing a riverside promenade carries the bridge on over the path where its deck
+         * would stand at least {@code underpassClear} above it (3 of headroom and the deck); lower, the path crosses
+         * the street at grade.
+         */
+        public double waterSteps = 120.0;
+        public double waterStepsWidth = 2.0;
+        public double underpassClear = 4.0;
+        /**
+         * The walk along the foot of the hills: {@code hillWidth} wide on the line {@code hillOffset} out from the
+         * built land, where the ground {@code hillReach} further out stands at least {@code hillRise} higher; runs
+         * shorter than {@code hillMin} dropped.
+         */
+        public double hillWidth = 2.0;
+        public double hillOffset = 12.0;
+        public double hillReach = 40.0;
+        public double hillRise = 6.0;
+        public double hillMin = 120.0;
         public double bankJoin = 120.0;
         /**
          * Irrigation canals (yōsui) in a castle, temple or port town with at least {@code canalMinOld} square blocks of

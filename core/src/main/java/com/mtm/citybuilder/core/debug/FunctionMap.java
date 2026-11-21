@@ -109,6 +109,16 @@ public final class FunctionMap {
                 g.drawString(label(f.kind()), cx - 6, cz + 4);
             }
         }
+        g.setStroke(new BasicStroke(1.5f));
+        g.setColor(new Color(40, 150, 60));
+        for (var walk : functions.walks()) {
+            for (int k = 1; k < walk.points().size(); k++) {
+                double[] a = walk.points().get(k - 1);
+                double[] b = walk.points().get(k);
+                g.drawLine((int) Math.round((a[0] - centerX) / scale + size / 2.0), (int) Math.round((a[1] - centerZ) / scale + size / 2.0),
+                        (int) Math.round((b[0] - centerX) / scale + size / 2.0), (int) Math.round((b[1] - centerZ) / scale + size / 2.0));
+            }
+        }
         for (var h : functions.hanamachi()) {
             int cx = (int) Math.round((h.x() - centerX) / scale + size / 2.0);
             int cz = (int) Math.round((h.z() - centerZ) / scale + size / 2.0);

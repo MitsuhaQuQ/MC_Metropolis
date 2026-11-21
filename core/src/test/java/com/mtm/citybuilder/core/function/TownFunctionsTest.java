@@ -17,6 +17,7 @@ import java.util.EnumMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -88,6 +89,24 @@ class TownFunctionsTest {
             }
         }
         assertTrue(grand > 0, "no large park, green or grand temple or shrine");
+        // Paths in the grounds: inside them or out to the street at their gate; a temple's or shrine's approach up to
+        // its middle
+        assertFalse(functions.walks().isEmpty());
+        java.util.Map<Long, Facility> byId = new java.util.HashMap<>();
+        for (Facility f : functions.facilities()) {
+            byId.put(f.id(), f);
+        }
+        for (Walk walk : functions.walks()) {
+            Facility f = byId.get(walk.facility());
+            assertNotNull(f);
+            for (double[] q : walk.points()) {
+                assertTrue(Math.hypot(q[0] - f.x(), q[1] - f.z()) <= f.radius() + 31.0, walk.kind() + " path off its grounds");
+            }
+            if (f.kind() == Facility.Kind.TEMPLE || f.kind() == Facility.Kind.GRAND_TEMPLE) {
+                double[] end = walk.points().get(walk.points().size() - 1);
+                assertEquals(0.0, Math.hypot(end[0] - f.x(), end[1] - f.z()), 1e-6, "the approach ends at the hall");
+            }
+        }
         // A lot facility stands on a lot of a street it suits
         for (Facility f : functions.facilities()) {
             if (f.onLot()) {

@@ -55,7 +55,8 @@ public final class CityChunks {
     private static boolean paving(BlockState state) {
         Block block = state.getBlock();
         return block == CityBlocks.ASPHALT.get() || block == CityBlocks.ASPHALT_LINE_WHITE.get()
-                || block == CityBlocks.ASPHALT_LINE_YELLOW.get() || block == CityBlocks.SIDEWALK.get();
+                || block == CityBlocks.ASPHALT_LINE_YELLOW.get() || block == CityBlocks.SIDEWALK.get()
+                || block == Blocks.DIRT_PATH;
     }
 
     private static ChunkLayer.Column[] columns(WorldGenLevel level, ChunkAccess chunk) {
@@ -153,6 +154,20 @@ public final class CityChunks {
                     }
                 }
                 chunk.setBlockState(pos.set(baseX + x, y, baseZ + z), block, false);
+                if (column.pathUnder()) {
+                    // A riverside promenade under the deck: on the ground beneath, the space up to the deck cleared
+                    int ground = y - 1;
+                    while (ground > chunk.getMinBuildHeight() && !chunk.getBlockState(pos.set(baseX + x, ground, baseZ + z)).blocksMotion()) {
+                        ground--;
+                    }
+                    // Only with headroom under the deck: a low bridge's path meets its street instead
+                    if (y - ground - 1 >= 3 && chunk.getBlockState(pos.set(baseX + x, ground + 1, baseZ + z)).getFluidState().isEmpty()) {
+                        chunk.setBlockState(pos.set(baseX + x, ground, baseZ + z), Blocks.DIRT_PATH.defaultBlockState(), false);
+                        for (int air = ground + 1; air < y; air++) {
+                            chunk.setBlockState(pos.set(baseX + x, air, baseZ + z), Blocks.AIR.defaultBlockState(), false);
+                        }
+                    }
+                }
                 for (int up = 1; up <= HEADROOM; up++) {
                     chunk.setBlockState(pos.set(baseX + x, y + up, baseZ + z), Blocks.AIR.defaultBlockState(), false);
                 }

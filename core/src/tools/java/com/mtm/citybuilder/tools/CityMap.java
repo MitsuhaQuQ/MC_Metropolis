@@ -601,6 +601,23 @@ public final class CityMap {
                 System.out.printf("  %-9s %6.1f km%n", streetClass, length / 1000);
             }
         }
+        for (com.mtm.citybuilder.core.street.Promenade.Kind kind : com.mtm.citybuilder.core.street.Promenade.Kind.values()) {
+            double length = 0;
+            int runs = 0;
+            int under = 0;
+            for (var p : plan.promenades()) {
+                if (p.kind() == kind) {
+                    runs++;
+                    under += p.under().size();
+                    for (int k = 1; k < p.points().size(); k++) {
+                        length += Math.hypot(p.points().get(k)[0] - p.points().get(k - 1)[0], p.points().get(k)[1] - p.points().get(k - 1)[1]);
+                    }
+                }
+            }
+            System.out.printf("  footpaths %-5s %5.1f km in %d runs, under %d bridges%n", kind, length / 1000, runs, under);
+        }
+        System.out.printf("  steps down to the water: %d%n", plan.segments().stream()
+                .filter(s -> s.streetClass() == StreetClass.PATH && s.structure() == StreetStructure.STAIRS).count());
         for (StreetStructure structure : StreetStructure.values()) {
             if (structure == StreetStructure.GROUND) {
                 continue;
