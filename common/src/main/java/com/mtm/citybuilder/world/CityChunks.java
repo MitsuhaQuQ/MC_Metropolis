@@ -8,6 +8,7 @@ import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.chunk.ChunkLayer;
 import com.mtm.citybuilder.core.chunk.RoadChunks;
 import com.mtm.citybuilder.block.EdgeBlock;
+import com.mtm.citybuilder.block.KerbEdgeBlock;
 import net.minecraft.core.Direction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.WorldGenLevel;
@@ -48,6 +49,8 @@ public final class CityChunks {
             case PATH -> net.minecraft.world.level.block.Blocks.DIRT_PATH.defaultBlockState();
             case PAINT -> CityBlocks.ASPHALT_WHITE.get().defaultBlockState().setValue(PavingBlock.LOW, mark.low());
             case SHELTER -> Blocks.SMOOTH_STONE.defaultBlockState();
+            case CURB -> CityBlocks.CURB_EDGE.get().defaultBlockState().setValue(KerbEdgeBlock.ANGLE, mark.angle())
+                    .setValue(KerbEdgeBlock.OFFSET, mark.offset());
             case NONE -> null;
         };
     }
@@ -62,7 +65,7 @@ public final class CityChunks {
         return block == CityBlocks.ASPHALT.get() || block == CityBlocks.ASPHALT_LINE_WHITE.get()
                 || block == CityBlocks.ASPHALT_LINE_YELLOW.get() || block == CityBlocks.SIDEWALK.get()
                 || block == Blocks.DIRT_PATH
-                || block == CityBlocks.ASPHALT_WHITE.get() || block == Blocks.SMOOTH_STONE;
+                || block == CityBlocks.ASPHALT_WHITE.get() || block == Blocks.SMOOTH_STONE || block == CityBlocks.CURB_EDGE.get();
     }
 
     private static ChunkLayer.Column[] columns(WorldGenLevel level, ChunkAccess chunk) {

@@ -61,6 +61,8 @@ public final class CityBlocks {
     public static Supplier<Block> SIDEWALK_GRANITE;
     /** A granite kerb stone, edging an island, a planter or a square. */
     public static Supplier<Block> CURB;
+    /** A kerb crossing its block at an angle (see {@link KerbEdgeBlock}). */
+    public static Supplier<Block> CURB_EDGE;
 
     /** A bridge's concrete wall parapet (壁高欄) along the deck's edge. */
     public static Supplier<Block> CONCRETE_PARAPET;
@@ -118,6 +120,7 @@ public final class CityBlocks {
         SIDEWALK_INTERLOCKING = platform.registerBlock("sidewalk_interlocking", () -> new Block(stone()));
         SIDEWALK_GRANITE = platform.registerBlock("sidewalk_granite", () -> new Block(stone()));
         CURB = platform.registerBlock("curb", () -> new Block(stone()));
+        CURB_EDGE = platform.registerBlock("curb_edge", () -> new KerbEdgeBlock(properties()));
         TRACK = platform.registerBlock("track", () -> new Block(copy(Blocks.RED_CONCRETE)));
         TRACK_LINE_WHITE = platform.registerBlock("track_line_white", () -> new MarkingBlock(copy(Blocks.RED_CONCRETE)));
         TURF = platform.registerBlock("turf", () -> new Block(copy(Blocks.MOSS_BLOCK)));

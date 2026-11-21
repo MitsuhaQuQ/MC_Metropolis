@@ -144,8 +144,17 @@ public final class ChunkLayer {
         /** Asphalt painted white all over: a zebra crossing's stripe. */
         PAINT,
         /** A shelter's place beside a berth in a station's square. */
-        SHELTER
+        SHELTER,
+        /**
+         * A kerb crossing the block at an angle: lowered carriageway one side of its line, raised pavement the other;
+         * the mark's angle (of {@link #KERB_ANGLES}) is the direction of the pavement's side, its offset where the line
+         * crosses.
+         */
+        CURB
     }
+
+    /** Directions a kerb crossing a block may face: every 360 / KERB_ANGLES degrees. */
+    public static final int KERB_ANGLES = 32;
 
     /** Directions a line may cross its block at: every 180 / ANGLES degrees, from along +x towards +z. */
     public static final int ANGLES = 16;
@@ -217,6 +226,13 @@ public final class ChunkLayer {
         double half = 0.5 * width;
         double walk = walk(width);
         double carriage = half - walk;
+        // Where the kerb crosses the block at an angle: cut along it, not stepped a block at a time
+        if (walk > 0 && column.plaza == null) {
+            Mark kerb = kerb(column.across, column.heading, carriage);
+            if (kerb != null) {
+                return kerb;
+            }
+        }
         if (Math.abs(column.across) > carriage) {
             return new Mark(Paving.SIDEWALK, 0, 0);
         }
@@ -279,6 +295,29 @@ public final class ChunkLayer {
             lines.add(new Line(-(half - 1.0), Paving.WHITE_LINE, false));
         }
         return draw(lines, across, heading, along, false);
+    }
+
+    /**
+     * The kerb of a carriageway {@code carriage} either side of its centre line where it crosses a block whose middle
+     * lies {@code across} from it: its pavement's side as one of {@link #KERB_ANGLES} directions, where the line crosses
+     * along that direction; null where it does not cross the block (or only along its very edge, as it does on a
+     * street square to the blocks, where the plain blocks either side already make the kerb).
+     */
+    static Mark kerb(double across, double heading, double carriage) {
+        double sign = across >= 0 ? 1.0 : -1.0;
+        // The pavement's side: the left of the heading for a positive offset, the right for a negative one
+        double side = heading + (sign > 0 ? 0.0 : Math.PI);
+        int angle = Math.floorMod(Math.round(side / (2.0 * Math.PI) * KERB_ANGLES), KERB_ANGLES);
+        double theta = 2.0 * Math.PI * angle / KERB_ANGLES;
+        double rate = Math.cos(theta - side);
+        double span = 0.5 * (Math.abs(Math.sin(theta)) + Math.abs(Math.cos(theta)));
+        // From the block's middle along the pavement's side to the kerb's line
+        double shift = (carriage - Math.abs(across)) / rate;
+        if (Math.abs(shift) >= span - 1.0 / 16.0) {
+            return null;
+        }
+        int offset = (int) Math.floor((shift + span) / (2.0 * span) * OFFSETS);
+        return new Mark(Paving.CURB, angle, Math.max(0, Math.min(OFFSETS - 1, offset)));
     }
 
     /**

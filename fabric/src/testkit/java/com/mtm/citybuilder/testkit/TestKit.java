@@ -286,7 +286,7 @@ public final class TestKit implements DedicatedServerModInitializer {
     private static boolean ours(Block block) {
         return block == CityBlocks.ASPHALT.get() || block == CityBlocks.ASPHALT_LINE_WHITE.get()
                 || block == CityBlocks.ASPHALT_LINE_YELLOW.get() || block == CityBlocks.SIDEWALK.get()
-                || block == CityBlocks.ASPHALT_WHITE.get();
+                || block == CityBlocks.ASPHALT_WHITE.get() || block == CityBlocks.CURB_EDGE.get();
     }
 
     /** The slowest of the last hundred ticks, in milliseconds. */

@@ -105,6 +105,35 @@ class BuildingLayerTest {
     }
 
     @Test
+    void buildingsAreDeepAndBroadEnoughForTheirHeight() {
+        CityLogic logic = logic();
+        Settlement city = city(logic);
+        CityExtent extent = logic.extent(city);
+        int cx = (int) Math.floor(extent.coreX() / 16);
+        int cz = (int) Math.floor(extent.coreZ() / 16);
+        java.util.Map<Long, Building> seen = new java.util.HashMap<>();
+        for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                for (BuildingLayer.Column column : logic.buildings().columns(cx + dx, cz + dz)) {
+                    if (column.building() != null) {
+                        seen.putIfAbsent(column.building().id(), column.building());
+                    }
+                }
+            }
+        }
+        assertTrue(seen.size() > 50, () -> "buildings " + seen.size());
+        for (Building b : seen.values()) {
+            if (b.type() == Building.Type.WORKS || b.program() != null) {
+                continue;
+            }
+            double least = b.storeys() >= 6 ? 9.0 : b.storeys() >= 3 ? 7.0 : b.storeys() == 2 ? 5.0 : 4.0;
+            assertTrue(b.depth() >= least - 1e-9, () -> "too shallow for " + b.storeys() + " storeys: " + b.depth() + " " + b.type());
+            assertTrue(b.storeys() == 1 || b.wallHeight() <= 4.0 * Math.min(b.width(), b.depth()) + 1e-9,
+                    () -> "a sheet: " + b.wallHeight() + " high on " + b.width() + " by " + b.depth() + " " + b.type());
+        }
+    }
+
+    @Test
     void chunksAgreeOnTheirSharedBuildings() {
         CityLogic logic = logic();
         Settlement city = city(logic);

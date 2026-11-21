@@ -20,4 +20,12 @@ test('the town centre is built up', async () => {
   // Most of a town centre's columns are roofs, walls and yards, not bare ground or street
   console.log('roofed share', (1 - onGround / total).toFixed(2));
   expect(1 - onGround / total).toBeGreaterThan(0.3);
+  // The yards kept: no forest floor or undergrowth between the buildings
+  const wild = ['minecraft:podzol', 'minecraft:coarse_dirt', 'minecraft:fern', 'minecraft:large_fern',
+    'minecraft:brown_mushroom', 'minecraft:red_mushroom'].reduce((a, k) => a + (blocks.top[k] ?? 0), 0);
+  console.log('wild', wild);
+  expect(wild).toBeLessThan(0.01 * total);
+  // Kerbs at an angle cut along their line
+  console.log('kerb edges', blocks.top['citybuilder:curb_edge'] ?? 0);
+  expect(blocks.top['citybuilder:curb_edge'] ?? 0).toBeGreaterThan(20);
 });

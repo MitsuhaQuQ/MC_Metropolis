@@ -276,4 +276,26 @@ class ChunkLayerTest {
         assertEquals(ChunkLayer.ANGLES / 4, ChunkLayer.angle(Math.PI / 4));
         assertEquals(ChunkLayer.ANGLES - 1, ChunkLayer.angle(-Math.PI / ChunkLayer.ANGLES));
     }
+
+    @Test
+    void kerbsAtAnAngleAreCutAlongTheirLine() {
+        // Square to the blocks, the kerb runs along the blocks' edges: plain blocks either side make it
+        for (double across = -8.5; across <= 8.5; across += 1.0) {
+            org.junit.jupiter.api.Assertions.assertNull(ChunkLayer.kerb(across, 0.0, 5.0), "square at " + across);
+        }
+        // At 30 degrees the kerb crosses blocks part way: a kerb block, its pavement towards the outside
+        double heading = Math.toRadians(30);
+        ChunkLayer.Mark left = ChunkLayer.kerb(5.1, heading, 5.0);
+        org.junit.jupiter.api.Assertions.assertNotNull(left);
+        org.junit.jupiter.api.Assertions.assertEquals(ChunkLayer.Paving.CURB, left.paving());
+        // The pavement's side, the heading's left: 30 degrees, nearest of 32 directions (11.25 degrees apart)
+        org.junit.jupiter.api.Assertions.assertEquals(3, left.angle());
+        ChunkLayer.Mark right = ChunkLayer.kerb(-5.1, heading, 5.0);
+        org.junit.jupiter.api.Assertions.assertEquals(3 + ChunkLayer.KERB_ANGLES / 2, right.angle());
+        // Crossing the middle: a middle offset
+        ChunkLayer.Mark middle = ChunkLayer.kerb(5.0, heading, 5.0);
+        org.junit.jupiter.api.Assertions.assertTrue(middle.offset() == 3 || middle.offset() == 4, () -> "offset " + middle.offset());
+        // Far from the kerb: none
+        org.junit.jupiter.api.Assertions.assertNull(ChunkLayer.kerb(3.0, heading, 5.0));
+    }
 }

@@ -359,6 +359,11 @@ public final class BuildingLayer {
         }
     }
 
+    /** The least depth a building of so many storeys stands with. */
+    private static double minDepth(int storeys) {
+        return storeys >= 6 ? 9.0 : storeys >= 3 ? 7.0 : storeys == 2 ? 5.0 : 4.0;
+    }
+
     /** The building on a lot, null where none stands (a street, a block's interior, a remnant, a vacant lot). */
     public Building building(TownPlots plots, Plot plot) {
         if (plot == null || plot.interior() || plot.remnant()) {
@@ -793,6 +798,13 @@ public final class BuildingLayer {
         }
         if (type == Building.Type.WORKS) {
             storeys = Math.min(storeys, 2);
+        }
+        // Deep and broad enough to stand: a room and its stair or corridor behind the front (5 deep for two storeys, 7
+        // for three, 9 for six and more), and walls no higher than four times the narrower side, so a block does not
+        // come out a sheet; storeys taken off where the lot is too small for them
+        double narrow = Math.min(width, depth);
+        while (storeys > 1 && (depth < minDepth(storeys) || ground + (storeys - 1) * upper > 4.0 * narrow)) {
+            storeys--;
         }
         step = Math.min(step, storeys);
         if (type == Building.Type.OFFICE && storeys < 4) {

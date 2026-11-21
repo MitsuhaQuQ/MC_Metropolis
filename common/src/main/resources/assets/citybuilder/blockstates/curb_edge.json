@@ -1,0 +1,772 @@
+{
+  "variants": {
+    "angle=0,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_0_0"
+    },
+    "angle=0,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_0_1"
+    },
+    "angle=0,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_0_2"
+    },
+    "angle=0,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_0_3"
+    },
+    "angle=0,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_0_4"
+    },
+    "angle=0,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_0_5"
+    },
+    "angle=0,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_0_6"
+    },
+    "angle=0,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_0_7"
+    },
+    "angle=1,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_1_0"
+    },
+    "angle=1,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_1_1"
+    },
+    "angle=1,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_1_2"
+    },
+    "angle=1,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_1_3"
+    },
+    "angle=1,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_1_4"
+    },
+    "angle=1,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_1_5"
+    },
+    "angle=1,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_1_6"
+    },
+    "angle=1,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_1_7"
+    },
+    "angle=2,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_2_0"
+    },
+    "angle=2,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_2_1"
+    },
+    "angle=2,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_2_2"
+    },
+    "angle=2,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_2_3"
+    },
+    "angle=2,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_2_4"
+    },
+    "angle=2,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_2_5"
+    },
+    "angle=2,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_2_6"
+    },
+    "angle=2,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_2_7"
+    },
+    "angle=3,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_3_0"
+    },
+    "angle=3,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_3_1"
+    },
+    "angle=3,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_3_2"
+    },
+    "angle=3,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_3_3"
+    },
+    "angle=3,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_3_4"
+    },
+    "angle=3,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_3_5"
+    },
+    "angle=3,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_3_6"
+    },
+    "angle=3,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_3_7"
+    },
+    "angle=4,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_4_0"
+    },
+    "angle=4,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_4_1"
+    },
+    "angle=4,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_4_2"
+    },
+    "angle=4,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_4_3"
+    },
+    "angle=4,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_4_4"
+    },
+    "angle=4,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_4_5"
+    },
+    "angle=4,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_4_6"
+    },
+    "angle=4,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_4_7"
+    },
+    "angle=5,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_5_0"
+    },
+    "angle=5,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_5_1"
+    },
+    "angle=5,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_5_2"
+    },
+    "angle=5,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_5_3"
+    },
+    "angle=5,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_5_4"
+    },
+    "angle=5,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_5_5"
+    },
+    "angle=5,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_5_6"
+    },
+    "angle=5,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_5_7"
+    },
+    "angle=6,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_6_0"
+    },
+    "angle=6,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_6_1"
+    },
+    "angle=6,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_6_2"
+    },
+    "angle=6,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_6_3"
+    },
+    "angle=6,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_6_4"
+    },
+    "angle=6,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_6_5"
+    },
+    "angle=6,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_6_6"
+    },
+    "angle=6,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_6_7"
+    },
+    "angle=7,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_7_0"
+    },
+    "angle=7,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_7_1"
+    },
+    "angle=7,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_7_2"
+    },
+    "angle=7,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_7_3"
+    },
+    "angle=7,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_7_4"
+    },
+    "angle=7,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_7_5"
+    },
+    "angle=7,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_7_6"
+    },
+    "angle=7,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_7_7"
+    },
+    "angle=8,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_8_0"
+    },
+    "angle=8,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_8_1"
+    },
+    "angle=8,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_8_2"
+    },
+    "angle=8,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_8_3"
+    },
+    "angle=8,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_8_4"
+    },
+    "angle=8,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_8_5"
+    },
+    "angle=8,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_8_6"
+    },
+    "angle=8,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_8_7"
+    },
+    "angle=9,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_9_0"
+    },
+    "angle=9,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_9_1"
+    },
+    "angle=9,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_9_2"
+    },
+    "angle=9,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_9_3"
+    },
+    "angle=9,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_9_4"
+    },
+    "angle=9,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_9_5"
+    },
+    "angle=9,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_9_6"
+    },
+    "angle=9,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_9_7"
+    },
+    "angle=10,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_10_0"
+    },
+    "angle=10,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_10_1"
+    },
+    "angle=10,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_10_2"
+    },
+    "angle=10,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_10_3"
+    },
+    "angle=10,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_10_4"
+    },
+    "angle=10,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_10_5"
+    },
+    "angle=10,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_10_6"
+    },
+    "angle=10,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_10_7"
+    },
+    "angle=11,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_11_0"
+    },
+    "angle=11,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_11_1"
+    },
+    "angle=11,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_11_2"
+    },
+    "angle=11,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_11_3"
+    },
+    "angle=11,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_11_4"
+    },
+    "angle=11,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_11_5"
+    },
+    "angle=11,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_11_6"
+    },
+    "angle=11,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_11_7"
+    },
+    "angle=12,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_12_0"
+    },
+    "angle=12,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_12_1"
+    },
+    "angle=12,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_12_2"
+    },
+    "angle=12,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_12_3"
+    },
+    "angle=12,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_12_4"
+    },
+    "angle=12,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_12_5"
+    },
+    "angle=12,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_12_6"
+    },
+    "angle=12,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_12_7"
+    },
+    "angle=13,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_13_0"
+    },
+    "angle=13,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_13_1"
+    },
+    "angle=13,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_13_2"
+    },
+    "angle=13,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_13_3"
+    },
+    "angle=13,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_13_4"
+    },
+    "angle=13,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_13_5"
+    },
+    "angle=13,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_13_6"
+    },
+    "angle=13,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_13_7"
+    },
+    "angle=14,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_14_0"
+    },
+    "angle=14,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_14_1"
+    },
+    "angle=14,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_14_2"
+    },
+    "angle=14,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_14_3"
+    },
+    "angle=14,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_14_4"
+    },
+    "angle=14,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_14_5"
+    },
+    "angle=14,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_14_6"
+    },
+    "angle=14,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_14_7"
+    },
+    "angle=15,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_15_0"
+    },
+    "angle=15,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_15_1"
+    },
+    "angle=15,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_15_2"
+    },
+    "angle=15,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_15_3"
+    },
+    "angle=15,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_15_4"
+    },
+    "angle=15,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_15_5"
+    },
+    "angle=15,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_15_6"
+    },
+    "angle=15,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_15_7"
+    },
+    "angle=16,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_16_0"
+    },
+    "angle=16,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_16_1"
+    },
+    "angle=16,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_16_2"
+    },
+    "angle=16,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_16_3"
+    },
+    "angle=16,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_16_4"
+    },
+    "angle=16,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_16_5"
+    },
+    "angle=16,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_16_6"
+    },
+    "angle=16,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_16_7"
+    },
+    "angle=17,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_17_0"
+    },
+    "angle=17,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_17_1"
+    },
+    "angle=17,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_17_2"
+    },
+    "angle=17,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_17_3"
+    },
+    "angle=17,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_17_4"
+    },
+    "angle=17,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_17_5"
+    },
+    "angle=17,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_17_6"
+    },
+    "angle=17,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_17_7"
+    },
+    "angle=18,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_18_0"
+    },
+    "angle=18,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_18_1"
+    },
+    "angle=18,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_18_2"
+    },
+    "angle=18,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_18_3"
+    },
+    "angle=18,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_18_4"
+    },
+    "angle=18,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_18_5"
+    },
+    "angle=18,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_18_6"
+    },
+    "angle=18,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_18_7"
+    },
+    "angle=19,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_19_0"
+    },
+    "angle=19,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_19_1"
+    },
+    "angle=19,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_19_2"
+    },
+    "angle=19,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_19_3"
+    },
+    "angle=19,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_19_4"
+    },
+    "angle=19,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_19_5"
+    },
+    "angle=19,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_19_6"
+    },
+    "angle=19,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_19_7"
+    },
+    "angle=20,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_20_0"
+    },
+    "angle=20,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_20_1"
+    },
+    "angle=20,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_20_2"
+    },
+    "angle=20,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_20_3"
+    },
+    "angle=20,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_20_4"
+    },
+    "angle=20,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_20_5"
+    },
+    "angle=20,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_20_6"
+    },
+    "angle=20,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_20_7"
+    },
+    "angle=21,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_21_0"
+    },
+    "angle=21,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_21_1"
+    },
+    "angle=21,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_21_2"
+    },
+    "angle=21,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_21_3"
+    },
+    "angle=21,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_21_4"
+    },
+    "angle=21,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_21_5"
+    },
+    "angle=21,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_21_6"
+    },
+    "angle=21,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_21_7"
+    },
+    "angle=22,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_22_0"
+    },
+    "angle=22,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_22_1"
+    },
+    "angle=22,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_22_2"
+    },
+    "angle=22,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_22_3"
+    },
+    "angle=22,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_22_4"
+    },
+    "angle=22,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_22_5"
+    },
+    "angle=22,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_22_6"
+    },
+    "angle=22,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_22_7"
+    },
+    "angle=23,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_23_0"
+    },
+    "angle=23,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_23_1"
+    },
+    "angle=23,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_23_2"
+    },
+    "angle=23,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_23_3"
+    },
+    "angle=23,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_23_4"
+    },
+    "angle=23,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_23_5"
+    },
+    "angle=23,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_23_6"
+    },
+    "angle=23,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_23_7"
+    },
+    "angle=24,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_24_0"
+    },
+    "angle=24,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_24_1"
+    },
+    "angle=24,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_24_2"
+    },
+    "angle=24,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_24_3"
+    },
+    "angle=24,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_24_4"
+    },
+    "angle=24,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_24_5"
+    },
+    "angle=24,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_24_6"
+    },
+    "angle=24,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_24_7"
+    },
+    "angle=25,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_25_0"
+    },
+    "angle=25,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_25_1"
+    },
+    "angle=25,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_25_2"
+    },
+    "angle=25,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_25_3"
+    },
+    "angle=25,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_25_4"
+    },
+    "angle=25,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_25_5"
+    },
+    "angle=25,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_25_6"
+    },
+    "angle=25,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_25_7"
+    },
+    "angle=26,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_26_0"
+    },
+    "angle=26,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_26_1"
+    },
+    "angle=26,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_26_2"
+    },
+    "angle=26,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_26_3"
+    },
+    "angle=26,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_26_4"
+    },
+    "angle=26,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_26_5"
+    },
+    "angle=26,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_26_6"
+    },
+    "angle=26,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_26_7"
+    },
+    "angle=27,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_27_0"
+    },
+    "angle=27,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_27_1"
+    },
+    "angle=27,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_27_2"
+    },
+    "angle=27,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_27_3"
+    },
+    "angle=27,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_27_4"
+    },
+    "angle=27,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_27_5"
+    },
+    "angle=27,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_27_6"
+    },
+    "angle=27,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_27_7"
+    },
+    "angle=28,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_28_0"
+    },
+    "angle=28,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_28_1"
+    },
+    "angle=28,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_28_2"
+    },
+    "angle=28,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_28_3"
+    },
+    "angle=28,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_28_4"
+    },
+    "angle=28,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_28_5"
+    },
+    "angle=28,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_28_6"
+    },
+    "angle=28,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_28_7"
+    },
+    "angle=29,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_29_0"
+    },
+    "angle=29,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_29_1"
+    },
+    "angle=29,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_29_2"
+    },
+    "angle=29,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_29_3"
+    },
+    "angle=29,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_29_4"
+    },
+    "angle=29,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_29_5"
+    },
+    "angle=29,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_29_6"
+    },
+    "angle=29,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_29_7"
+    },
+    "angle=30,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_30_0"
+    },
+    "angle=30,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_30_1"
+    },
+    "angle=30,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_30_2"
+    },
+    "angle=30,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_30_3"
+    },
+    "angle=30,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_30_4"
+    },
+    "angle=30,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_30_5"
+    },
+    "angle=30,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_30_6"
+    },
+    "angle=30,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_30_7"
+    },
+    "angle=31,offset=0": {
+      "model": "citybuilder:block/curb_edge/curb_edge_31_0"
+    },
+    "angle=31,offset=1": {
+      "model": "citybuilder:block/curb_edge/curb_edge_31_1"
+    },
+    "angle=31,offset=2": {
+      "model": "citybuilder:block/curb_edge/curb_edge_31_2"
+    },
+    "angle=31,offset=3": {
+      "model": "citybuilder:block/curb_edge/curb_edge_31_3"
+    },
+    "angle=31,offset=4": {
+      "model": "citybuilder:block/curb_edge/curb_edge_31_4"
+    },
+    "angle=31,offset=5": {
+      "model": "citybuilder:block/curb_edge/curb_edge_31_5"
+    },
+    "angle=31,offset=6": {
+      "model": "citybuilder:block/curb_edge/curb_edge_31_6"
+    },
+    "angle=31,offset=7": {
+      "model": "citybuilder:block/curb_edge/curb_edge_31_7"
+    }
+  }
+}
