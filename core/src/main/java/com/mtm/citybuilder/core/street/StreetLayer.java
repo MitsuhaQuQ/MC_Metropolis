@@ -1373,6 +1373,20 @@ public final class StreetLayer {
                 }
             }
         }
+        // Arterials stay within their grade, however their pieces came to be (a split, a join, a stretch replaced): a
+        // piece on the ground that is steeper becomes a ramp or stairs as any street would, or goes where steeper still
+        for (int k = segments.size() - 1; k >= 0; k--) {
+            StreetSegment g = segments.get(k);
+            if (g.streetClass() != StreetClass.ARTERIAL || g.structure() != StreetStructure.GROUND) {
+                continue;
+            }
+            StreetSegment kept = sloped(window, g.x1(), g.z1(), g.x2(), g.z2(), g.streetClass(), g.era(), g.width());
+            if (kept == null) {
+                segments.remove(k);
+            } else if (kept.streetClass() != g.streetClass()) {
+                segments.set(k, kept);
+            }
+        }
         clearEstates(window, segments);
         List<Promenade> promenades = formation == Formation.VILLAGE ? List.of()
                 : promenades(settlement, window, canals, segments);

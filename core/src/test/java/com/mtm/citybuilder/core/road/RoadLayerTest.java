@@ -5,6 +5,7 @@ import com.mtm.citybuilder.core.CitySettings;
 import com.mtm.citybuilder.core.culture.Style;
 import com.mtm.citybuilder.core.settlement.Settlement;
 import com.mtm.citybuilder.core.settlement.SettlementTier;
+import com.mtm.citybuilder.core.terrain.EscarpmentTerrain;
 import com.mtm.citybuilder.core.terrain.HillTerrain;
 import com.mtm.citybuilder.core.terrain.SyntheticTerrain;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class RoadLayerTest {
             }
             double horizontal = Math.hypot(route.x(i) - route.x(i - 1), route.z(i) - route.z(i - 1));
             double rise = Math.abs(route.road(i) - route.road(i - 1));
-            assertTrue(rise <= SETTINGS.roads.maxGrade * horizontal + 1e-3, "grade " + rise / horizontal + " at " + i);
+            assertTrue(rise <= SETTINGS.roads.trunkMountainGrade * horizontal + 1e-3, "grade " + rise / horizontal + " at " + i);
         }
     }
 
@@ -55,6 +56,48 @@ class RoadLayerTest {
         assertTrue(Math.abs(atCrest - 3000) < 1500, "crosses the ridge at z " + atCrest);
         assertTrue(route.length(RoadKind.TUNNEL) < 300, () -> "tunnel " + route.length(RoadKind.TUNNEL));
         assertGentle(route);
+        assertCurves(route, SETTINGS.roads.trunkMinRadius);
+        assertTrue(route.width() == SETTINGS.roads.trunkWidth, () -> "width " + route.width());
+    }
+
+    /** Curves other than hairpins keep to the class's least radius, all but one in ten. */
+    private static void assertCurves(RoadRoute route, double minRadius) {
+        int curves = 0;
+        int tight = 0;
+        for (double[] arc : route.arcs()) {
+            if (RoadRoute.turn(arc) > Math.PI / 2) {
+                continue;
+            }
+            curves++;
+            tight += arc[4] < minRadius - 1e-6 ? 1 : 0;
+        }
+        int all = curves;
+        int under = tight;
+        assertTrue(under * 10 <= all, () -> under + " of " + all + " curves under radius " + minRadius);
+    }
+
+    @Test
+    void aRoadZigzagsUpAnEscarpment() {
+        EscarpmentTerrain terrain = new EscarpmentTerrain(90, 300);
+        CityLogic logic = new CityLogic(5L, SETTINGS, terrain);
+        Settlement west = new Settlement(1, SettlementTier.TOWN, 0, 0, -4000, 0, Style.ASIA, 0.6);
+        Settlement east = new Settlement(2, SettlementTier.TOWN, 0, 0, 4000, 0, Style.ASIA, 0.6);
+        RoadRoute route = logic.route(new RoadEdge(west, east, RoadClass.LOCAL));
+        assertTrue(route.exists(), "a route");
+        assertTrue(route.length(RoadKind.TUNNEL) == 0, () -> "tunnel " + route.length(RoadKind.TUNNEL));
+        long hairpins = route.arcs().stream().filter(arc -> RoadRoute.turn(arc) > Math.PI / 2).count();
+        assertTrue(hairpins >= 2, () -> "hairpins " + hairpins);
+        assertTrue(route.length(RoadKind.SWITCHBACK) > 300, () -> "switchbacks " + route.length(RoadKind.SWITCHBACK));
+        // Up the escarpment the road keeps near the ground: switchbacks, not a deep cutting and a high bank
+        double worst = 0;
+        for (int i = 0; i < route.samples(); i++) {
+            if (Math.abs(route.x(i)) < 150) {
+                worst = Math.max(worst, Math.abs(route.road(i) - route.ground(i)));
+            }
+        }
+        double deepest = worst;
+        assertTrue(deepest < SETTINGS.roads.switchbackTrigger + 3, () -> "off the ground by " + deepest);
+        assertTrue(route.width() == SETTINGS.roads.localWidth, () -> "width " + route.width());
     }
 
     @Test

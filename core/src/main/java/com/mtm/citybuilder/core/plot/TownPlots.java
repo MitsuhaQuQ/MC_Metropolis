@@ -421,10 +421,35 @@ public final class TownPlots {
     /** A position on a lot along the street, as built: joined to a neighbour, a remnant, or part of a parcel. */
     private Plot front(Plot plot, double x, double z) {
         Plot lot = frontLot(plot, x, z);
-        if (lot != null && !lot.interior() && !lot.remnant() && parcel(lot.chain(), lot.side(), lot.index())) {
-            return use(lot, Plot.Use.PARCEL);
+        if (lot == null || lot.interior() || lot.remnant()) {
+            return lot;
         }
-        return lot;
+        lot = deepened(lot, reachBack(lot));
+        return parcel(lot.chain(), lot.side(), lot.index()) ? use(lot, Plot.Use.PARCEL) : lot;
+    }
+
+    /**
+     * How deep a lot along the street runs: to the block's middle where it takes the land behind it (a parcel, works'
+     * or quay land, or a lot with no back lots behind), else its own depth; the same wherever on the lot it is asked,
+     * as a lot has one building.
+     */
+    private double reachBack(Plot lot) {
+        Plot nominal = nominal(lot, lot.index());
+        boolean deep = parcel(lot.chain(), lot.side(), lot.index()) || nominal.district() == District.INDUSTRIAL
+                || nominal.district() == District.PORT;
+        if ((deep || rows(nominal) == 0) && absorber(nominal) >= 0) {
+            return Math.max(lot.maxDepth(), backDepth(nominal));
+        }
+        return lot.maxDepth();
+    }
+
+    private static Plot deepened(Plot p, double maxDepth) {
+        if (maxDepth == p.maxDepth()) {
+            return p;
+        }
+        return new Plot(p.id(), p.chain(), p.side(), p.index(), p.start(), p.end(), p.along(), Math.min(p.depth(), maxDepth),
+                maxDepth, p.district(), p.street(), p.streetWidth(), p.heading(), p.interior(), p.remnant(), p.row(),
+                p.use(), p.pole());
     }
 
     private Plot frontLot(Plot plot, double x, double z) {
@@ -490,9 +515,10 @@ public final class TownPlots {
             if (f == null || f.interior() || f.remnant() || f.chain() != raw.chain() || f.side() != raw.side()) {
                 return f;
             }
-            // To the block's middle: as found behind the lot's middle, or as deep as the position lies
-            return new Plot(f.id(), f.chain(), f.side(), f.index(), f.start(), f.end(), raw.along(), raw.depth(),
-                    Math.max(back, raw.depth()),
+            // To the block's middle as found behind the lot's middle: the same for every position on the lot (a
+            // building is made once a lot), a position past it taken as at it
+            return new Plot(f.id(), f.chain(), f.side(), f.index(), f.start(), f.end(), raw.along(),
+                    Math.min(raw.depth(), f.maxDepth()), f.maxDepth(),
                     f.district(), f.street(), f.streetWidth(), f.heading(), false, false, 0, f.use(), false);
         }
         double rowDepth = rowDepth(raw.chain(), raw.side());

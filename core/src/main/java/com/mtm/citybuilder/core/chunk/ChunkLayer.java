@@ -253,6 +253,35 @@ public final class ChunkLayer {
     }
 
     /**
+     * The paving of an intercity road (L4), Japanese: on a trunk road (12 wide) a yellow centre line, no overtaking,
+     * and white edge lines with shoulders outside them; on a four-lane one (20 wide) white dashed lines between each
+     * way's lanes too; on a local road (8 wide) a white dashed centre line and white edge lines a block in.
+     *
+     * @param across how far the column's middle lies from the centre line, positive to its left
+     * @param along  the column's middle along the road, for dashes
+     */
+    public static Mark drawRoad(double width, double across, double heading, double along) {
+        double half = 0.5 * width;
+        List<Line> lines = new ArrayList<>();
+        if (width >= 20) {
+            lines.add(new Line(0.0, Paving.YELLOW_LINE, false));
+            lines.add(new Line(3.25, Paving.WHITE_LINE, true));
+            lines.add(new Line(-3.25, Paving.WHITE_LINE, true));
+            lines.add(new Line(half - 3.0, Paving.WHITE_LINE, false));
+            lines.add(new Line(-(half - 3.0), Paving.WHITE_LINE, false));
+        } else if (width >= 12) {
+            lines.add(new Line(0.0, Paving.YELLOW_LINE, false));
+            lines.add(new Line(half - 2.25, Paving.WHITE_LINE, false));
+            lines.add(new Line(-(half - 2.25), Paving.WHITE_LINE, false));
+        } else {
+            lines.add(new Line(0.0, Paving.WHITE_LINE, true));
+            lines.add(new Line(half - 1.0, Paving.WHITE_LINE, false));
+            lines.add(new Line(-(half - 1.0), Paving.WHITE_LINE, false));
+        }
+        return draw(lines, across, heading, along, false);
+    }
+
+    /**
      * The asphalt of a column with lines along it: the line whose centre crosses the block (at the angle of the
      * {@link #ANGLES} nearest the heading, at the position it crosses at), or plain asphalt.
      *
@@ -407,6 +436,14 @@ public final class ChunkLayer {
         return false;
     }
 
+    /**
+     * The intercity roads' columns in a chunk outside the towns' built land, beside the streets already given by
+     * {@link #columns} for it (see {@link RoadChunks}); null where none is.
+     */
+    public RoadChunks.Cell[] roads(int chunkX, int chunkZ, Column[] streets) {
+        return roads.cells(chunkX, chunkZ, streets);
+    }
+
     /** The direction of the {@link #ANGLES} nearest a heading, a line having no sense. */
     public static int angle(double heading) {
         double steps = heading / Math.PI * ANGLES;
@@ -446,6 +483,7 @@ public final class ChunkLayer {
     private static final int INDEXES = 16;
 
     private final CityLogic logic;
+    private final RoadChunks roads;
     private final Map<Long, Index> indexes = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<Long, Index> eldest) {
@@ -455,6 +493,7 @@ public final class ChunkLayer {
 
     public ChunkLayer(CityLogic logic) {
         this.logic = logic;
+        this.roads = new RoadChunks(logic);
     }
 
     /** The columns of a chunk, x-major: column (x, z) of the chunk is at x * 16 + z. */

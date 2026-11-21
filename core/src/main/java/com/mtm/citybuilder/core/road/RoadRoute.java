@@ -1,5 +1,7 @@
 package com.mtm.citybuilder.core.road;
 
+import java.util.List;
+
 /**
  * A routed road: samples every {@code sampleSpacing} blocks along its line, each with its position, the ground, the
  * road's own height and how the two meet. Empty when no route was found within the window.
@@ -13,18 +15,39 @@ public final class RoadRoute {
     private final float[] ground;
     private final float[] road;
     private final byte[] kind;
+    private final List<double[]> arcs;
+    private final double width;
 
-    RoadRoute(RoadEdge edge, double[] x, double[] z, float[] ground, float[] road, byte[] kind) {
+    RoadRoute(RoadEdge edge, double[] x, double[] z, float[] ground, float[] road, byte[] kind, List<double[]> arcs,
+              double width) {
         this.edge = edge;
         this.x = x;
         this.z = z;
         this.ground = ground;
         this.road = road;
         this.kind = kind;
+        this.arcs = List.copyOf(arcs);
+        this.width = width;
     }
 
     static RoadRoute none(RoadEdge edge) {
-        return new RoadRoute(edge, new double[0], new double[0], new float[0], new float[0], new byte[0]);
+        return new RoadRoute(edge, new double[0], new double[0], new float[0], new float[0], new byte[0], List.of(), 0.0);
+    }
+
+    /** The curves of the plan, each {start x, start z, end x, end z, radius}. */
+    public List<double[]> arcs() {
+        return arcs;
+    }
+
+    /** How far each curve turns, in radians, from its chord and radius. */
+    public static double turn(double[] arc) {
+        double chord = Math.hypot(arc[2] - arc[0], arc[3] - arc[1]);
+        return 2.0 * Math.asin(Math.min(1.0, chord / (2.0 * arc[4])));
+    }
+
+    /** Width curb to curb, in blocks. */
+    public double width() {
+        return width;
     }
 
     public RoadEdge edge() {

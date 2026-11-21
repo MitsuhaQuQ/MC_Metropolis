@@ -417,6 +417,41 @@ public final class CitySettings {
         /** Ground this far above the road makes a tunnel; the road this far above the ground, a bridge. */
         public double tunnelDepth = 15.0;
         public double bridgeHeight = 8.0;
+        /**
+         * Geometry by Japan's road structure ordinance (道路構造令), trunk roads as class 3 type 1 at 60 km/h, local
+         * roads as class 3 type 3 at 40 km/h: least curve radius, the radius curves get where there is room, grade, the
+         * grade allowed in hills and mountains (the ordinance's exception for hard terrain), and width curb to curb;
+         * trunk roads between two metropolises have four lanes.
+         */
+        public double trunkMinRadius = 150.0;
+        public double trunkRadius = 200.0;
+        public double trunkGrade = 0.05;
+        public double trunkMountainGrade = 0.07;
+        public double trunkWidth = 12.0;
+        public double trunkWideWidth = 20.0;
+        public double localMinRadius = 60.0;
+        public double localRadius = 100.0;
+        public double localGrade = 0.07;
+        public double localMountainGrade = 0.09;
+        public double localWidth = 8.0;
+        /** Straightening the routed line may move it at most this far from the route, nor onto ground this much higher or lower. */
+        public double alignShift = 160.0;
+        public double alignRelief = 12.0;
+        /** Switchbacks zigzag across a band this wide; their hairpins (the ordinance's exception) are at least this radius. */
+        public double switchbackWidth = 100.0;
+        public double hairpinRadius = 15.0;
+        /**
+         * Switchbacks go where the profile leaves the ground by more than {@code switchbackTrigger} on a slope that
+         * climbs at least {@code switchbackMinClimb}, one climb a round for at most {@code switchbackRounds} rounds.
+         */
+        public double switchbackTrigger = 9.0;
+        public double switchbackMinClimb = 15.0;
+        public int switchbackRounds = 8;
+        /** Shorter tunnels are cuttings, shorter dry bridges embankments. */
+        public double tunnelMinLength = 64.0;
+        public double bridgeMinLength = 24.0;
+        /** Vertical curves: passes of a five-sample moving average over the heights. */
+        public int verticalSmoothing = 2;
     }
 
     /**

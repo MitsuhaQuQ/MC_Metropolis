@@ -1065,6 +1065,12 @@ public final class CityMap {
             double straight = 0;
             double slowest = 0;
             Map<RoadKind, Double> kinds = new EnumMap<>(RoadKind.class);
+            // Curves by radius, hairpins (turning more than 90 degrees) apart; the steepest grade over 48 blocks
+            int[] radii = new int[5];
+            double[] bounds = {30, 60, 100, 150, 200.5};
+            int hairpins = 0;
+            double steepest = 0;
+            double viaduct = 0;
             start = System.nanoTime();
             for (RoadEdge edge : edges) {
                 if (edge.roadClass() != roadClass) {
@@ -1083,10 +1089,44 @@ public final class CityMap {
                 for (RoadKind kind : RoadKind.values()) {
                     kinds.merge(kind, route.length(kind), Double::sum);
                 }
+                for (double[] arc : route.arcs()) {
+                    if (RoadRoute.turn(arc) > Math.PI / 2) {
+                        if (hairpins++ % 10 == 0) {
+                            System.out.printf("  hairpin at %.0f %.0f, radius %.0f%n", arc[0], arc[1], arc[4]);
+                        }
+                        continue;
+                    }
+                    for (int b = 0; b < bounds.length; b++) {
+                        if (arc[4] < bounds[b]) {
+                            radii[b]++;
+                            break;
+                        }
+                    }
+                }
+                for (int i = 1; i < route.samples(); i++) {
+                    if (route.kind(i) == RoadKind.BRIDGE && route.road(i) - route.ground(i) > 8) {
+                        viaduct += Math.hypot(route.x(i) - route.x(i - 1), route.z(i) - route.z(i - 1));
+                    }
+                }
+                double[] along = new double[route.samples()];
+                for (int i = 1; i < along.length; i++) {
+                    along[i] = along[i - 1] + Math.hypot(route.x(i) - route.x(i - 1), route.z(i) - route.z(i - 1));
+                }
+                for (int i = 0, j = 0; i < along.length; i++) {
+                    while (j < along.length && along[j] - along[i] < 48) {
+                        j++;
+                    }
+                    if (j < along.length) {
+                        steepest = Math.max(steepest, Math.abs(route.road(j) - route.road(i)) / (along[j] - along[i]));
+                    }
+                }
             }
             System.out.printf("L4 %-5s %3d roads (%d not found) in %.1f s, the slowest %.1f s: %.0f km, %.2f times the straight line%n",
                     roadClass, count, missing, (System.nanoTime() - start) / 1e9, slowest, length / 1000,
                     straight == 0 ? 0.0 : length / straight);
+            System.out.printf("  curves by radius: <30 %d, 30-60 %d, 60-100 %d, 100-150 %d, 150-200 %d; hairpins %d; steepest %.1f%% over 48 blocks%n",
+                    radii[0], radii[1], radii[2], radii[3], radii[4], hairpins, 100 * steepest);
+            System.out.printf("  bridges standing over 8 above the ground (viaducts, not over water): %.1f%%%n", 100 * viaduct / Math.max(1, length));
             double all = Math.max(1, length);
             kinds.forEach((kind, value) -> System.out.printf("  %-10s %5.1f%%%n", kind, 100 * value / all));
         }

@@ -9,13 +9,13 @@ import java.util.PriorityQueue;
 /**
  * Laying out a line that must keep to a least curve radius and a steepest grade, shared by the rail corridors and the
  * high-speed lines: a search on a grid with the heading in its state, a plan of straights and arcs fitted to the
- * route, samples along it, and a profile within the grade.
+ * route, samples along it, and a profile within the grade. The intercity roads fit their plans with it too.
  * <p>
  * The search keeps 16 headings. Every step runs straight in its heading and may turn at most to a neighbouring one,
  * and is long enough that the turn's arc of the least radius fits in half of it either side, so the route always fits
  * curves no tighter than that radius.
  */
-final class Alignment {
+public final class Alignment {
     /** The 16 headings, as steps on the grid, anticlockwise from +x. */
     static final int[][] DIRECTIONS = {{1, 0}, {2, 1}, {1, 1}, {1, 2}, {0, 1}, {-1, 2}, {-1, 1}, {-2, 1},
             {-1, 0}, {-2, -1}, {-1, -1}, {-1, -2}, {0, -1}, {1, -2}, {1, -1}, {2, -1}};
@@ -28,7 +28,7 @@ final class Alignment {
     }
 
     /** A plan: points along its straights and arcs, and each arc as {start x, start z, end x, end z, radius}. */
-    record Plan(List<double[]> line, List<double[]> arcs) {
+    public record Plan(List<double[]> line, List<double[]> arcs) {
     }
 
     private Alignment() {
@@ -147,7 +147,7 @@ final class Alignment {
      * Straights and arcs through a route's vertices: runs in one direction become one straight, and each turn gets the
      * widest arc the straights either side allow (half of each where both its ends turn), up to {@code maxRadius}.
      */
-    static Plan fit(List<double[]> vertices, double maxRadius) {
+    public static Plan fit(List<double[]> vertices, double maxRadius) {
         List<double[]> points = new ArrayList<>();
         for (double[] point : vertices) {
             if (points.size() >= 2) {
@@ -205,7 +205,7 @@ final class Alignment {
     }
 
     /** Points every {@code spacing} blocks along a line, its two ends included. */
-    static List<double[]> resample(List<double[]> line, double spacing) {
+    public static List<double[]> resample(List<double[]> line, double spacing) {
         List<double[]> samples = new ArrayList<>();
         samples.add(line.get(0));
         double carry = 0.0;

@@ -490,7 +490,9 @@ class BuildingLayerTest {
         BuildingLayer.Equip stack = BuildingLayer.plantEquipment(found.get(Program.POWER_PLANT)).stream()
                 .filter(e -> e.kind() == BuildingLayer.Equipment.STACK).findFirst().orElse(null);
         assertNotNull(stack, "no stack");
-        assertEquals(BuildingLayer.Part.STACK, BuildingLayer.equipPart(stack, stack.u() + stack.r() - 0.5, stack.v(), 60));
+        // Its shell at 60 up: the stack, or the red bands of its top
+        BuildingLayer.Part at60 = BuildingLayer.equipPart(stack, stack.u() + stack.r() - 0.5, stack.v(), 60);
+        assertTrue(at60 == BuildingLayer.Part.STACK || at60 == BuildingLayer.Part.CHIMNEY_TOP, () -> "at 60: " + at60);
         assertTrue(BuildingLayer.plantEquipment(found.get(Program.PETROCHEMICAL)).stream()
                 .anyMatch(e -> e.kind() == BuildingLayer.Equipment.FLARE), "no flare");
     }

@@ -6,6 +6,9 @@ import com.mtm.citybuilder.block.MarkingBlock;
 import com.mtm.citybuilder.block.PavingBlock;
 import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.chunk.ChunkLayer;
+import com.mtm.citybuilder.core.chunk.RoadChunks;
+import com.mtm.citybuilder.block.EdgeBlock;
+import net.minecraft.core.Direction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
@@ -106,10 +109,15 @@ public final class CityChunks {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int top = chunk.getMaxBuildHeight() - 1;
         ChunkLayer.AirportCell[] airports = airports(level, chunk);
+        RoadChunks.Cell[] roads = roads(level, chunk, columns);
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 if (airports != null && airports[x * 16 + z] != null) {
                     airport(chunk, airports[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
+                    continue;
+                }
+                if (roads != null && roads[x * 16 + z] != null) {
+                    road(chunk, roads[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
                     continue;
                 }
                 ChunkLayer.Column column = columns[x * 16 + z];
@@ -179,6 +187,129 @@ public final class CityChunks {
                 }
             }
         }
+    }
+
+    private static RoadChunks.Cell[] roads(WorldGenLevel level, ChunkAccess chunk, ChunkLayer.Column[] columns) {
+        try {
+            CityLogic logic = CityWorlds.of(level.getLevel());
+            return logic == null ? null : logic.chunks().roads(chunk.getPos().x, chunk.getPos().z, columns);
+        } catch (RuntimeException e) {
+            failed = true;
+            CityBuilder.LOGGER.error("City logic failed at chunk {}; no more cities are built this session", chunk.getPos(), e);
+            return null;
+        }
+    }
+
+    /**
+     * An intercity road's column (see {@link RoadChunks}). On the ground: the ground cut down or filled up to the road,
+     * stone under the paving, headroom cleared; beside it, the slopes graded to the ground, a cutting's 1 in 1, an
+     * embankment's 1 in 1.5, grassed. In a tunnel: the paving, the bore cleared over it and roofed in stone where the
+     * rock would show the sky. On a bridge: the deck over a concrete slab, parapets along its edges, concrete piers down
+     * to the ground (through water to its bed).
+     */
+    private static void road(ChunkAccess chunk, RoadChunks.Cell cell, int wx, int wz, int x, int z,
+                             BlockPos.MutableBlockPos pos, int top) {
+        int min = chunk.getMinBuildHeight() + 2;
+        int level = cell.level();
+        if (level < min || level + RoadChunks.BORE + 2 > top) {
+            return;
+        }
+        // The ground: the first solid block down from the top, past air, plants and water
+        int ground = Math.min(top, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
+        BlockState state = chunk.getBlockState(pos.set(wx, ground, wz));
+        while (ground > min && !state.blocksMotion()) {
+            state = chunk.getBlockState(pos.set(wx, --ground, wz));
+        }
+        BlockState air = Blocks.AIR.defaultBlockState();
+        BlockState stone = Blocks.STONE.defaultBlockState();
+        if (!cell.onRoad()) {
+            // The slopes: cut down to 1 in 1 above the road's level, filled up to 1 in 1.5 below it
+            double out = cell.outside();
+            int cut = level + (int) Math.floor(out);
+            int fill = level - (int) Math.floor(out / 1.5);
+            if (ground > cut) {
+                for (int y = cut + 1; y <= Math.min(top, ground + 1); y++) {
+                    chunk.setBlockState(pos.set(wx, y, wz), air, false);
+                }
+                chunk.setBlockState(pos.set(wx, cut, wz), Blocks.GRASS_BLOCK.defaultBlockState(), false);
+                chunk.setBlockState(pos.set(wx, cut - 1, wz), Blocks.DIRT.defaultBlockState(), false);
+            } else if (ground < fill) {
+                for (int y = ground + 1; y < fill; y++) {
+                    chunk.setBlockState(pos.set(wx, y, wz), y >= fill - 3 ? Blocks.DIRT.defaultBlockState() : stone, false);
+                }
+                chunk.setBlockState(pos.set(wx, fill, wz), Blocks.GRASS_BLOCK.defaultBlockState(), false);
+            }
+            return;
+        }
+        BlockState paving = paving(cell.mark());
+        if (paving == null) {
+            paving = CityBlocks.ASPHALT.get().defaultBlockState();
+        }
+        switch (cell.kind()) {
+            case TUNNEL -> {
+                chunk.setBlockState(pos.set(wx, level, wz), paving, false);
+                if (!chunk.getBlockState(pos.set(wx, level - 1, wz)).blocksMotion()) {
+                    chunk.setBlockState(pos, stone, false);
+                }
+                for (int y = level + 1; y <= level + RoadChunks.BORE; y++) {
+                    chunk.setBlockState(pos.set(wx, y, wz), air, false);
+                }
+                // A roof where the rock above is thin, so no hole opens to the sky
+                if (ground > level + RoadChunks.BORE && !chunk.getBlockState(pos.set(wx, level + RoadChunks.BORE + 1, wz)).blocksMotion()) {
+                    chunk.setBlockState(pos, stone, false);
+                }
+            }
+            case BRIDGE -> {
+                if (ground >= level) {
+                    // The bridge's end on high ground: a cutting
+                    for (int y = level + 1; y <= Math.min(top, ground + 1); y++) {
+                        chunk.setBlockState(pos.set(wx, y, wz), air, false);
+                    }
+                }
+                chunk.setBlockState(pos.set(wx, level, wz), paving, false);
+                chunk.setBlockState(pos.set(wx, level - 1, wz), Blocks.LIGHT_GRAY_CONCRETE.defaultBlockState(), false);
+                for (int y = level + 1; y <= level + HEADROOM; y++) {
+                    chunk.setBlockState(pos.set(wx, y, wz), air, false);
+                }
+                if (cell.parapet()) {
+                    chunk.setBlockState(pos.set(wx, level + 1, wz), CityBlocks.CONCRETE_PARAPET.get().defaultBlockState()
+                            .setValue(EdgeBlock.FACING, direction(cell.outward())), false);
+                }
+                if (cell.pier()) {
+                    // Down to the ground, through water to its bed
+                    for (int y = level - 2; y > min && y > ground; y--) {
+                        chunk.setBlockState(pos.set(wx, y, wz), Blocks.LIGHT_GRAY_CONCRETE.defaultBlockState(), false);
+                    }
+                }
+            }
+            default -> {
+                if (ground > level) {
+                    for (int y = level + 1; y <= Math.min(top, ground + 1); y++) {
+                        chunk.setBlockState(pos.set(wx, y, wz), air, false);
+                    }
+                } else {
+                    // An embankment, through water too
+                    for (int y = ground + 1; y < level; y++) {
+                        chunk.setBlockState(pos.set(wx, y, wz), stone, false);
+                    }
+                }
+                chunk.setBlockState(pos.set(wx, level - 1, wz), stone, false);
+                chunk.setBlockState(pos.set(wx, level, wz), paving, false);
+                for (int y = level + 1; y <= level + HEADROOM; y++) {
+                    chunk.setBlockState(pos.set(wx, y, wz), air, false);
+                }
+            }
+        }
+    }
+
+    /** The horizontal direction nearest an angle from +x towards +z. */
+    private static Direction direction(double angle) {
+        double dx = Math.cos(angle);
+        double dz = Math.sin(angle);
+        if (Math.abs(dx) > Math.abs(dz)) {
+            return dx > 0 ? Direction.EAST : Direction.WEST;
+        }
+        return dz > 0 ? Direction.SOUTH : Direction.NORTH;
     }
 
     private static ChunkLayer.AirportCell[] airports(WorldGenLevel level, ChunkAccess chunk) {
@@ -317,6 +448,36 @@ public final class CityChunks {
                     return;
                 }
                 clearOver(chunk, columns);
+                try {
+                    clearOverRoads(chunk, logic.chunks().roads(cx + dx, cz + dz, columns));
+                } catch (RuntimeException e) {
+                    return;
+                }
+            }
+        }
+    }
+
+    /** Whatever grew over an intercity road on the ground or a bridge, a bridge's parapets kept; not in a tunnel. */
+    private static void clearOverRoads(ChunkAccess chunk, RoadChunks.Cell[] cells) {
+        if (cells == null) {
+            return;
+        }
+        int baseX = chunk.getPos().getMinBlockX();
+        int baseZ = chunk.getPos().getMinBlockZ();
+        int max = chunk.getMaxBuildHeight() - 1;
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int c = 0; c < 256; c++) {
+            RoadChunks.Cell cell = cells[c];
+            if (cell == null || !cell.onRoad() || cell.kind() == com.mtm.citybuilder.core.road.RoadKind.TUNNEL) {
+                continue;
+            }
+            int x = baseX + c / 16;
+            int z = baseZ + c % 16;
+            for (int y = cell.level() + (cell.parapet() ? 2 : 1); y <= Math.min(max, cell.level() + CLEAR_REACH); y++) {
+                BlockState state = chunk.getBlockState(pos.set(x, y, z));
+                if (!state.isAir() && state.getFluidState().isEmpty()) {
+                    chunk.setBlockState(pos, Blocks.AIR.defaultBlockState(), false);
+                }
             }
         }
     }

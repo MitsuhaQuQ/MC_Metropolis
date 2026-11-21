@@ -1,8 +1,10 @@
 package com.mtm.citybuilder.core.road;
 
 import com.mtm.citybuilder.core.CitySettings;
+import com.mtm.citybuilder.core.rail.Alignment;
 import com.mtm.citybuilder.core.settlement.Settlement;
 import com.mtm.citybuilder.core.settlement.SettlementTier;
+import com.mtm.citybuilder.core.terrain.Landform;
 import com.mtm.citybuilder.core.terrain.RiverSample;
 import com.mtm.citybuilder.core.terrain.TerrainView;
 
@@ -187,6 +189,28 @@ public final class RoadLayer {
 
         boolean inside(int i, int j) {
             return i >= 0 && j >= 0 && i < width && j < height;
+        }
+
+        /** The kind of the node nearest to a position; blocked outside the window. */
+        byte kindAt(double x, double z) {
+            int i = (int) Math.round(x / grid) - originX;
+            int j = (int) Math.round(z / grid) - originZ;
+            return inside(i, j) ? kind[index(i, j)] : BLOCKED;
+        }
+
+        /** The smooth ground between the nodes, bilinear. */
+        double groundAt(double x, double z) {
+            double fx = Math.max(0.0, Math.min(width - 1.0, x / grid - originX));
+            double fz = Math.max(0.0, Math.min(height - 1.0, z / grid - originZ));
+            int i = Math.min(width - 2, (int) fx);
+            int j = Math.min(height - 2, (int) fz);
+            double tx = fx - i;
+            double tz = fz - j;
+            double g00 = ground[index(i, j)];
+            double g10 = ground[index(i + 1, j)];
+            double g01 = ground[index(i, j + 1)];
+            double g11 = ground[index(i + 1, j + 1)];
+            return (g00 * (1 - tx) + g10 * tx) * (1 - tz) + (g01 * (1 - tx) + g11 * tx) * tz;
         }
 
         /** The land node nearest to a position within a few nodes, or -1. */
@@ -396,148 +420,727 @@ public final class RoadLayer {
         return Math.hypot(k / w.height - goalI, k % w.height - goalJ) * grid;
     }
 
+    /** Segment tags of a planned line: what the segment after each vertex is. */
+    private static final byte PLAIN = 0;
+    private static final byte BORE = 1;
+    private static final byte ZIGZAG = 2;
+
+    /** The design of a road's class: least and preferred radius, grade on plain and on hard ground, width. */
+    private record Design(double minRadius, double radius, double grade, double mountainGrade, double width) {
+    }
+
+    private Design design(RoadEdge edge) {
+        if (edge.roadClass() == RoadClass.TRUNK) {
+            boolean wide = edge.a().tier() == SettlementTier.METROPOLIS && edge.b().tier() == SettlementTier.METROPOLIS;
+            return new Design(config.trunkMinRadius, config.trunkRadius, config.trunkGrade, config.trunkMountainGrade,
+                    wide ? config.trunkWideWidth : config.trunkWidth);
+        }
+        return new Design(config.localMinRadius, config.localRadius, config.localGrade, config.localMountainGrade,
+                config.localWidth);
+    }
+
+    /** The grade a road may take here: steeper in hills and mountains. */
+    private double gradeAt(Design design, double x, double z) {
+        Landform landform = terrain.landform(x, z);
+        return landform == Landform.HILLS || landform == Landform.MOUNTAINS ? design.mountainGrade() : design.grade();
+    }
+
     private RoadRoute profile(RoadEdge edge, Window w, Path path) {
-        // Runs of ordinary steps, smoothed; tunnels straight between them
-        List<List<double[]>> runs = new ArrayList<>();
-        List<double[]> run = new ArrayList<>();
-        for (int p = 0; p < path.nodes().size(); p++) {
+        Design design = design(edge);
+        int count = path.nodes().size();
+        double[][] nodes = new double[count][];
+        boolean[] boreBefore = new boolean[count];
+        for (int p = 0; p < count; p++) {
             int k = path.nodes().get(p);
-            double[] point = {(double) (w.originX + k / w.height) * grid, (double) (w.originZ + k % w.height) * grid};
-            if (p > 0 && path.steps().get(p) == TUNNEL) {
-                runs.add(run);
-                run = new ArrayList<>();
-            }
-            run.add(point);
-        }
-        runs.add(run);
-        List<double[]> line = new ArrayList<>();
-        List<Boolean> tunnelBefore = new ArrayList<>();
-        for (int r = 0; r < runs.size(); r++) {
-            List<double[]> smooth = chaikin(chaikin(runs.get(r)));
-            for (int p = 0; p < smooth.size(); p++) {
-                line.add(smooth.get(p));
-                tunnelBefore.add(r > 0 && p == 0);
-            }
+            nodes[p] = new double[]{(double) (w.originX + k / w.height) * grid, (double) (w.originZ + k % w.height) * grid};
+            boreBefore[p] = p > 0 && path.steps().get(p) == TUNNEL;
         }
 
-        // Samples along the line
-        List<double[]> samples = new ArrayList<>();
-        List<Boolean> jump = new ArrayList<>();
-        samples.add(line.get(0));
-        jump.add(false);
-        double carry = 0.0;
-        for (int p = 1; p < line.size(); p++) {
-            double[] a = line.get(p - 1);
-            double[] b = line.get(p);
-            double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
-            double at = config.sampleSpacing - carry;
-            while (at <= length) {
-                double t = at / length;
-                samples.add(new double[]{a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t});
-                jump.add(tunnelBefore.get(p));
-                at += config.sampleSpacing;
-            }
-            carry = length - (at - config.sampleSpacing);
-        }
-        double[] end = line.get(line.size() - 1);
-        double[] last = samples.get(samples.size() - 1);
-        if (Math.hypot(end[0] - last[0], end[1] - last[1]) > 1e-6) {
-            samples.add(end);
-            jump.add(false);
+        // Straighten: the farthest vertex each straight can reach, tunnels kept as the search found them; then widen
+        // tight curves
+        List<Integer> kept = straighten(w, nodes, boreBefore);
+        relieve(w, nodes, boreBefore, kept, design);
+        List<double[]> vertices = new ArrayList<>();
+        List<Byte> tags = new ArrayList<>();
+        for (int v = 0; v < kept.size(); v++) {
+            vertices.add(nodes[kept.get(v)]);
+            tags.add(v + 1 < kept.size() && boreBefore[kept.get(v + 1)] ? BORE : PLAIN);
         }
 
-        int n = samples.size();
-        double[] xs = new double[n];
-        double[] zs = new double[n];
-        double[] ground = new double[n];
+        // Switchbacks where the profile leaves the ground up a slope too steep for the road: one climb a round, the
+        // deepest first, each adding the length the road falls short by there
+        List<double[]> hairpins = new ArrayList<>();
+        List<double[]> refused = new ArrayList<>();
+        List<double[]> arcs;
+        double[] xs;
+        double[] zs;
+        double[] ground;
+        double[] grade;
+        double[] height;
+        boolean[] switchback;
+        int n;
+        for (int round = 0; ; round++) {
+            arcs = new ArrayList<>(hairpins);
+            List<double[]> samples = Alignment.resample(build(vertices, tags, design, arcs), config.sampleSpacing);
+            n = samples.size();
+            xs = new double[n];
+            zs = new double[n];
+            ground = new double[n];
+            grade = new double[n];
+            switchback = new boolean[n];
+            int[] segmentOf = new int[n];
+            int cursor = 0;
+            for (int i = 0; i < n; i++) {
+                xs[i] = samples.get(i)[0];
+                zs[i] = samples.get(i)[1];
+                // Smooth ground: the detailed ground costs erosion, milliseconds a point; the block layer refines
+                ground[i] = terrain.smoothHeight(xs[i], zs[i]);
+                grade[i] = gradeAt(design, xs[i], zs[i]);
+                // The segment of the vertices the sample lies on: the nearest among the next few
+                double best = Double.POSITIVE_INFINITY;
+                int nearest = cursor;
+                for (int s = cursor; s < Math.min(vertices.size() - 1, cursor + 16); s++) {
+                    double d = segmentDistance(xs[i], zs[i], vertices.get(s), vertices.get(s + 1));
+                    if (d < best - 1e-6) {
+                        best = d;
+                        nearest = s;
+                    }
+                }
+                cursor = nearest;
+                segmentOf[i] = nearest;
+                switchback[i] = tags.get(nearest) == ZIGZAG;
+            }
+            height = heights(xs, zs, ground, grade);
+            if (round == config.switchbackRounds) {
+                break;
+            }
+            // The deepest cut or highest fill on plain land not tried already
+            int worst = -1;
+            double worstDeviation = config.switchbackTrigger;
+            for (int i = 0; i < n; i++) {
+                double deviation = Math.abs(height[i] - ground[i]);
+                if (deviation <= worstDeviation || tags.get(segmentOf[i]) != PLAIN || w.kindAt(xs[i], zs[i]) != LAND
+                        || near(refused, xs[i], zs[i], 200.0)) {
+                    continue;
+                }
+                worst = i;
+                worstDeviation = deviation;
+            }
+            if (worst < 0) {
+                break;
+            }
+            // Out from it while the road is off the ground, on plain land
+            int s = worst;
+            int e = worst;
+            while (s > 0 && worst - s < 40 && tags.get(segmentOf[s - 1]) == PLAIN
+                    && Math.abs(height[s - 1] - ground[s - 1]) > 2.0) {
+                s--;
+            }
+            while (e < n - 1 && e - worst < 40 && tags.get(segmentOf[e + 1]) == PLAIN
+                    && Math.abs(height[e + 1] - ground[e + 1]) > 2.0) {
+                e++;
+            }
+            double length = 0.0;
+            for (int i = s + 1; i <= e; i++) {
+                length += Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]);
+            }
+            double climb = Math.abs(ground[e] - ground[s]);
+            // Enough to climb the ground's whole rise here, and the shortfall at its worst both ways
+            double needed = 1.25 * Math.max(climb / grade[worst], length + 2.0 * worstDeviation / grade[worst]);
+            double[] start = onPolyline(vertices, segmentOf[s], xs[s], zs[s]);
+            double[] end = onPolyline(vertices, segmentOf[e], xs[e], zs[e]);
+            double chord = Math.hypot(end[0] - start[0], end[1] - start[1]);
+            // A valley crossed or a ridge cut through, its two ends at one height, is a bridge or a cutting
+            Switchbacks laid = climb < Math.max(config.switchbackMinClimb, worstDeviation)
+                    || chord < 6.0 * config.hairpinRadius ? null : legs(w, occupied(xs, zs, s, e), start, end, chord, needed,
+                    s > 0 ? new double[]{xs[s] - xs[s - 1], zs[s] - zs[s - 1]} : new double[]{end[0] - start[0], end[1] - start[1]});
+            if (laid == null) {
+                refused.add(new double[]{xs[worst], zs[worst]});
+                continue;
+            }
+            splice(vertices, tags, start[2], end[2], start, end, laid.points());
+            hairpins.addAll(laid.arcs());
+        }
+        // Water: lakes are crossed at their level, rivers and lakes on bridges
         boolean[] water = new boolean[n];
+        boolean lakes = false;
         for (int i = 0; i < n; i++) {
-            xs[i] = samples.get(i)[0];
-            zs[i] = samples.get(i)[1];
-            // Smooth ground: the detailed ground costs erosion, milliseconds a point; the block layer refines
-            double smoothGround = terrain.smoothHeight(xs[i], zs[i]);
             double lake = terrain.lakeLevel(xs[i], zs[i]);
             RiverSample river = terrain.nearestRiver(xs[i], zs[i]);
-            boolean inLake = !Double.isNaN(lake) && lake > smoothGround;
+            boolean inLake = !Double.isNaN(lake) && lake > ground[i];
             water[i] = inLake || (river != null && river.inWater());
-            ground[i] = inLake ? lake : smoothGround;
-        }
-        // Switchbacks where the ground, smoothed over a few samples, is steeper than the road may be
-        double[] smooth = new double[n];
-        for (int i = 0; i < n; i++) {
-            double sum = 0.0;
-            int count = 0;
-            for (int d = Math.max(0, i - 4); d <= Math.min(n - 1, i + 4); d++) {
-                sum += ground[d];
-                count++;
-            }
-            smooth[i] = sum / count;
-        }
-        boolean[] switchback = new boolean[n];
-        double[] along = new double[n];
-        for (int i = 1; i < n; i++) {
-            double horizontal = Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]);
-            double rise = Math.abs(smooth[i] - smooth[i - 1]);
-            if (!jump.get(i) && !water[i] && rise > config.maxGrade * horizontal) {
-                switchback[i] = true;
-                along[i] = along[i - 1] + rise / config.maxGrade;
-            } else {
-                along[i] = along[i - 1] + horizontal;
+            if (inLake) {
+                ground[i] = lake;
+                lakes = true;
             }
         }
-        // Halfway between the highest line no steeper than maxGrade under the ground and the lowest one over it
-        double[] under = ground.clone();
-        double[] over = ground.clone();
-        for (int i = 1; i < n; i++) {
-            double step = config.maxGrade * (along[i] - along[i - 1]);
-            under[i] = Math.min(under[i], under[i - 1] + step);
-            over[i] = Math.max(over[i], over[i - 1] - step);
+        if (lakes) {
+            height = heights(xs, zs, ground, grade);
         }
-        for (int i = n - 2; i >= 0; i--) {
-            double step = config.maxGrade * (along[i + 1] - along[i]);
-            under[i] = Math.min(under[i], under[i + 1] + step);
-            over[i] = Math.max(over[i], over[i + 1] - step);
+        // Vertical curves: a moving average rounds the changes of grade and keeps within it on even spacing
+        for (int pass = 0; pass < config.verticalSmoothing; pass++) {
+            double[] smooth = height.clone();
+            for (int i = 2; i < n - 2; i++) {
+                smooth[i] = (height[i - 2] + height[i - 1] + height[i] + height[i + 1] + height[i + 2]) / 5.0;
+            }
+            height = smooth;
         }
-        float[] groundOut = new float[n];
-        float[] road = new float[n];
+
         byte[] kind = new byte[n];
         for (int i = 0; i < n; i++) {
-            double height = 0.5 * (under[i] + over[i]);
             RoadKind k;
-            if (ground[i] - height > config.tunnelDepth) {
+            if (ground[i] - height[i] > config.tunnelDepth) {
                 k = RoadKind.TUNNEL;
-            } else if (water[i] || height - ground[i] > config.bridgeHeight) {
+            } else if (water[i] || height[i] - ground[i] > config.bridgeHeight) {
                 k = RoadKind.BRIDGE;
             } else if (switchback[i]) {
                 k = RoadKind.SWITCHBACK;
             } else {
                 k = RoadKind.SURFACE;
             }
-            groundOut[i] = (float) ground[i];
-            road[i] = (float) height;
             kind[i] = (byte) k.ordinal();
         }
-        return new RoadRoute(edge, xs, zs, groundOut, road, kind);
+        // Short tunnels are cuttings, short dry bridges embankments
+        for (int i = 0; i < n; ) {
+            int j = i;
+            while (j + 1 < n && kind[j + 1] == kind[i]) {
+                j++;
+            }
+            double length = 0.0;
+            boolean wet = false;
+            for (int q = i; q <= j; q++) {
+                wet |= water[q];
+                if (q > i) {
+                    length += Math.hypot(xs[q] - xs[q - 1], zs[q] - zs[q - 1]);
+                }
+            }
+            length += config.sampleSpacing;
+            boolean shortBore = kind[i] == RoadKind.TUNNEL.ordinal() && length < config.tunnelMinLength;
+            boolean shortBridge = kind[i] == RoadKind.BRIDGE.ordinal() && !wet && length < config.bridgeMinLength;
+            if (shortBore || shortBridge) {
+                for (int q = i; q <= j; q++) {
+                    kind[q] = (byte) (switchback[q] ? RoadKind.SWITCHBACK : RoadKind.SURFACE).ordinal();
+                }
+            }
+            i = j + 1;
+        }
+
+        float[] groundOut = new float[n];
+        float[] road = new float[n];
+        for (int i = 0; i < n; i++) {
+            groundOut[i] = (float) ground[i];
+            road[i] = (float) height[i];
+        }
+        return new RoadRoute(edge, xs, zs, groundOut, road, kind, arcs, design.width());
     }
 
-    /** One round of Chaikin's corner cutting, keeping the ends. */
-    private static List<double[]> chaikin(List<double[]> points) {
-        if (points.size() < 3) {
-            return points;
-        }
-        List<double[]> out = new ArrayList<>();
-        out.add(points.get(0));
-        for (int p = 0; p < points.size() - 1; p++) {
-            double[] a = points.get(p);
-            double[] b = points.get(p + 1);
-            if (p > 0) {
-                out.add(new double[]{0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]});
+    /**
+     * The vertices a straightened line keeps: from each, the farthest later one a straight can reach without leaving the
+     * route by more than {@code alignShift}, onto ground much higher or lower than the route's, onto blocked land or
+     * across more water than the route crossed. Tunnels stay as the search found them.
+     */
+    private List<Integer> straighten(Window w, double[][] nodes, boolean[] fixed) {
+        List<Integer> kept = new ArrayList<>();
+        kept.add(0);
+        int last = nodes.length - 1;
+        int i = 0;
+        while (i < last) {
+            int reach = i + 1;
+            if (!fixed[i + 1]) {
+                for (int j = i + 2; j <= last && j - i <= 96; j++) {
+                    if (fixed[j]) {
+                        break;
+                    }
+                    if (straight(w, nodes, i, j)) {
+                        reach = j;
+                    } else if (farFrom(nodes, i, j, 2.0 * config.alignShift)) {
+                        break;
+                    }
+                }
             }
-            if (p < points.size() - 2) {
-                out.add(new double[]{0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]});
+            kept.add(reach);
+            i = reach;
+        }
+        return kept;
+    }
+
+    /** Whether some vertex between i and j lies farther than {@code limit} from the straight between them. */
+    private static boolean farFrom(double[][] nodes, int i, int j, double limit) {
+        for (int k = i + 1; k < j; k++) {
+            if (segmentDistance(nodes[k][0], nodes[k][1], nodes[i], nodes[j]) > limit) {
+                return true;
             }
         }
-        out.add(points.get(points.size() - 1));
-        return out;
+        return false;
+    }
+
+    /** Whether a straight may replace the route from vertex i to vertex j. */
+    private boolean straight(Window w, double[][] nodes, int i, int j) {
+        if (farFrom(nodes, i, j, config.alignShift)) {
+            return false;
+        }
+        int routeWater = 0;
+        for (int k = i; k <= j; k++) {
+            routeWater += w.kindAt(nodes[k][0], nodes[k][1]) == WATER ? 1 : 0;
+        }
+        double length = Math.hypot(nodes[j][0] - nodes[i][0], nodes[j][1] - nodes[i][1]);
+        int steps = Math.max(1, (int) Math.ceil(length / (0.5 * grid)));
+        int water = 0;
+        for (int q = 0; q <= steps; q++) {
+            double t = (double) q / steps;
+            double x = nodes[i][0] + (nodes[j][0] - nodes[i][0]) * t;
+            double z = nodes[i][1] + (nodes[j][1] - nodes[i][1]) * t;
+            byte kind = w.kindAt(x, z);
+            if (kind == BLOCKED) {
+                return false;
+            }
+            water += kind == WATER ? 1 : 0;
+            // The route's ground nearest to this point
+            double best = Double.POSITIVE_INFINITY;
+            double routeGround = 0.0;
+            for (int k = i; k < j; k++) {
+                double[] a = nodes[k];
+                double[] b = nodes[k + 1];
+                double dx = b[0] - a[0];
+                double dz = b[1] - a[1];
+                double u = Math.max(0.0, Math.min(1.0, ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz)));
+                double px = a[0] + dx * u;
+                double pz = a[1] + dz * u;
+                double d = Math.hypot(x - px, z - pz);
+                if (d < best) {
+                    best = d;
+                    routeGround = w.groundAt(px, pz);
+                }
+            }
+            if (Math.abs(w.groundAt(x, z) - routeGround) > config.alignRelief) {
+                return false;
+            }
+        }
+        return water <= 2 * routeWater;
+    }
+
+    /** Drops kept vertices whose curve cannot reach the least radius, where the straight past them is allowed. */
+    private void relieve(Window w, double[][] nodes, boolean[] fixed, List<Integer> kept, Design design) {
+        for (int pass = 0; pass < 4; pass++) {
+            boolean changed = false;
+            for (int v = 1; v < kept.size() - 1; v++) {
+                double radius = radiusAt(nodes, kept, v, design.radius());
+                if (radius >= design.minRadius()) {
+                    continue;
+                }
+                int a = kept.get(v - 1);
+                int b = kept.get(v + 1);
+                boolean bore = false;
+                for (int k = a + 1; k <= b; k++) {
+                    bore |= fixed[k];
+                }
+                if (!bore && straight(w, nodes, a, b)) {
+                    kept.remove(v);
+                    v--;
+                    changed = true;
+                }
+            }
+            if (!changed) {
+                return;
+            }
+        }
+    }
+
+    /** The radius {@link Alignment#fit} gives the curve at a kept vertex. */
+    private static double radiusAt(double[][] nodes, List<Integer> kept, int v, double maxRadius) {
+        double[] a = nodes[kept.get(v - 1)];
+        double[] p = nodes[kept.get(v)];
+        double[] b = nodes[kept.get(v + 1)];
+        double inLength = Math.hypot(p[0] - a[0], p[1] - a[1]);
+        double outLength = Math.hypot(b[0] - p[0], b[1] - p[1]);
+        double cos = ((p[0] - a[0]) * (b[0] - p[0]) + (p[1] - a[1]) * (b[1] - p[1])) / (inLength * outLength);
+        double turn = Math.acos(Math.max(-1.0, Math.min(1.0, cos)));
+        if (turn < 1e-3) {
+            return Double.POSITIVE_INFINITY;
+        }
+        double inShare = v == 1 ? inLength : 0.5 * inLength;
+        double outShare = v == kept.size() - 2 ? outLength : 0.5 * outLength;
+        return Math.min(maxRadius, Math.min(inShare, outShare) / Math.tan(0.5 * turn));
+    }
+
+    /**
+     * The line of the vertices: straights and arcs fitted between switchbacks, which are laid as they are; the fitted
+     * arcs added to {@code arcs}.
+     */
+    private static List<double[]> build(List<double[]> vertices, List<Byte> tags, Design design, List<double[]> arcs) {
+        List<double[]> line = new ArrayList<>();
+        int v = 0;
+        while (true) {
+            // Each plain piece takes in the switchbacks' first and last legs either side, so the corners where it
+            // meets them are fitted with curves too
+            List<double[]> piece = new ArrayList<>();
+            boolean fromSwitchbacks = v > 0;
+            if (fromSwitchbacks) {
+                piece.add(vertices.get(v - 1));
+                line.remove(line.size() - 1);
+            }
+            piece.add(vertices.get(v));
+            while (v + 1 < vertices.size() && tags.get(v) != ZIGZAG) {
+                v++;
+                piece.add(vertices.get(v));
+            }
+            boolean intoSwitchbacks = v + 1 < vertices.size();
+            if (intoSwitchbacks) {
+                piece.add(vertices.get(v + 1));
+            }
+            if (piece.size() >= 2) {
+                Alignment.Plan fitted = Alignment.fit(piece, design.radius());
+                List<double[]> points = fitted.line();
+                points = points.subList(fromSwitchbacks ? 1 : 0, points.size() - (intoSwitchbacks ? 1 : 0));
+                line.addAll(points);
+                arcs.addAll(fitted.arcs());
+            } else if (line.isEmpty()) {
+                line.add(piece.get(0));
+            }
+            while (v + 1 < vertices.size() && tags.get(v) == ZIGZAG) {
+                v++;
+                line.add(vertices.get(v));
+            }
+            if (v + 1 >= vertices.size()) {
+                return line;
+            }
+        }
+    }
+
+    /**
+     * Heights within per-sample grades: halfway between the highest such line under the ground and the lowest one over
+     * it, which is the ground itself where the ground is gentle, cuts under ridges and fills over valleys where not.
+     */
+    private static double[] heights(double[] xs, double[] zs, double[] ground, double[] grade) {
+        int n = ground.length;
+        double[] under = ground.clone();
+        double[] over = ground.clone();
+        for (int i = 1; i < n; i++) {
+            double step = Math.max(grade[i], grade[i - 1]) * Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]);
+            under[i] = Math.min(under[i], under[i - 1] + step);
+            over[i] = Math.max(over[i], over[i - 1] - step);
+        }
+        for (int i = n - 2; i >= 0; i--) {
+            double step = Math.max(grade[i], grade[i + 1]) * Math.hypot(xs[i + 1] - xs[i], zs[i + 1] - zs[i]);
+            under[i] = Math.min(under[i], under[i + 1] + step);
+            over[i] = Math.max(over[i], over[i + 1] - step);
+        }
+        double[] height = new double[n];
+        for (int i = 0; i < n; i++) {
+            height[i] = 0.5 * (under[i] + over[i]);
+        }
+        return height;
+    }
+
+    /** The point of a polyline's segment nearest to a position, and its distance along the polyline: {x, z, along}. */
+    private static double[] onPolyline(List<double[]> vertices, int segment, double x, double z) {
+        double[] cumulative = cumulative(vertices);
+        double[] a = vertices.get(segment);
+        double[] b = vertices.get(segment + 1);
+        double dx = b[0] - a[0];
+        double dz = b[1] - a[1];
+        double lengthSquared = dx * dx + dz * dz;
+        double t = lengthSquared < 1e-12 ? 0.0 : Math.max(0.0, Math.min(1.0, ((x - a[0]) * dx + (z - a[1]) * dz) / lengthSquared));
+        return new double[]{a[0] + dx * t, a[1] + dz * t, cumulative[segment] + t * Math.sqrt(lengthSquared)};
+    }
+
+    /** Whether a position lies within a distance of any of some points. */
+    private static boolean near(List<double[]> points, double x, double z, double distance) {
+        for (double[] p : points) {
+            if (Math.hypot(p[0] - x, p[1] - z) < distance) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Distances along a polyline to each of its vertices. */
+    private static double[] cumulative(List<double[]> vertices) {
+        double[] cumulative = new double[vertices.size()];
+        for (int v = 1; v < vertices.size(); v++) {
+            double[] a = vertices.get(v - 1);
+            double[] b = vertices.get(v);
+            cumulative[v] = cumulative[v - 1] + Math.hypot(b[0] - a[0], b[1] - a[1]);
+        }
+        return cumulative;
+    }
+
+    /**
+     * Puts switchbacks into a polyline between two distances along it: the vertices before, the stretch's start, the
+     * legs' turning points, its end, the vertices after, the stretch's segments tagged as switchbacks.
+     */
+    private static void splice(List<double[]> vertices, List<Byte> tags, double from, double to, double[] start,
+                               double[] end, List<double[]> legs) {
+        double[] cumulative = cumulative(vertices);
+        List<double[]> spliced = new ArrayList<>();
+        List<Byte> splicedTags = new ArrayList<>();
+        int v = 0;
+        while (v < vertices.size() && cumulative[v] < from - 1e-6) {
+            spliced.add(vertices.get(v));
+            splicedTags.add(tags.get(v));
+            v++;
+        }
+        spliced.add(start);
+        splicedTags.add(ZIGZAG);
+        for (double[] leg : legs) {
+            spliced.add(leg);
+            splicedTags.add(ZIGZAG);
+        }
+        spliced.add(end);
+        int after = v;
+        while (after < vertices.size() && cumulative[after] <= to + 1e-6) {
+            after++;
+        }
+        splicedTags.add(after > 0 ? tags.get(after - 1) : PLAIN);
+        for (int q = after; q < vertices.size(); q++) {
+            spliced.add(vertices.get(q));
+            splicedTags.add(tags.get(q));
+        }
+        vertices.clear();
+        tags.clear();
+        for (int q = 0; q < spliced.size(); q++) {
+            double[] p = spliced.get(q);
+            if (!vertices.isEmpty()) {
+                double[] previous = vertices.get(vertices.size() - 1);
+                if (Math.hypot(p[0] - previous[0], p[1] - previous[1]) < 0.5) {
+                    tags.set(tags.size() - 1, splicedTags.get(q));
+                    continue;
+                }
+            }
+            vertices.add(p);
+            tags.add(splicedTags.get(q));
+        }
+    }
+
+    /** Switchbacks laid out: the points from the climb's start to its end, both left out, and their hairpins' arcs. */
+    private record Switchbacks(List<double[]> points, List<double[]> arcs, double length) {
+    }
+
+    /**
+     * Switchbacks from {@code start} to {@code end} developing {@code needed} blocks. The legs run along the slope's
+     * contours (square to the fall line, taken from the ground's gradient over the climb), so each climbs little ground
+     * of its own, across a band around the chord, turning at its edges on half circles of {@code hairpinRadius}, the
+     * hairpins spaced evenly along the chord, at least two radii apart up the fall line: the fewest hairpins on the
+     * narrowest band that develop the length, the band centred on the chord or to one side of it (off a valley floor,
+     * away from its river). Where none develops it all, the longest that
+     * develops at least 1.3 times the chord; null where no band stays on dry land.
+     */
+    private Switchbacks legs(Window w, java.util.Set<Long> occupied, double[] start, double[] end, double chord, double needed,
+                             double[] inward) {
+        double r = config.hairpinRadius;
+        double dx = end[0] - start[0];
+        double dz = end[1] - start[1];
+        // The fall line: the ground's gradient at the climb's middle, pointing from start towards end
+        double mx = 0.5 * (start[0] + end[0]);
+        double mz = 0.5 * (start[1] + end[1]);
+        double gx = w.groundAt(mx + 32, mz) - w.groundAt(mx - 32, mz);
+        double gz = w.groundAt(mx, mz + 32) - w.groundAt(mx, mz - 32);
+        double norm = Math.hypot(gx, gz);
+        if (norm < 1e-6) {
+            gx = dx;
+            gz = dz;
+            norm = chord;
+        }
+        gx /= norm;
+        gz /= norm;
+        if (dx * gx + dz * gz < 0) {
+            gx = -gx;
+            gz = -gz;
+        }
+        double up = dx * gx + dz * gz;
+        // The first hairpin on the side the road comes in heading for, so it turns into the first leg gently
+        int first = inward[0] * -gz + inward[1] * gx >= 0 ? 1 : -1;
+        // The ground's rise along the chord, so the hairpins gather where it climbs
+        int steps = 64;
+        double[] rise = new double[steps + 1];
+        double previousGround = w.groundAt(start[0], start[1]);
+        for (int j = 1; j <= steps; j++) {
+            double t = (double) j / steps;
+            double g = w.groundAt(start[0] + dx * t, start[1] + dz * t);
+            rise[j] = rise[j - 1] + Math.abs(g - previousGround);
+            previousGround = g;
+        }
+        int most = Math.min(40, (int) Math.floor(up / (2.0 * r + 4.0)) - 1);
+        Switchbacks best = null;
+        double[] scales = {1.0, 1.5, 2.2, 3.0, 4.0};
+        for (double scale : scales) {
+            double width = config.switchbackWidth * scale;
+            for (int hairpins = 2; hairpins <= most; hairpins++) {
+                double[] at = spread(rise, hairpins, (2.0 * r + 4.0) / chord);
+                // Hairpins crowded off the steep ground onto the gentle: a wider band, with fewer, first
+                if (at[hairpins] * chord > 2.0 * (2.0 * r + 4.0) && scale < scales[scales.length - 1]) {
+                    break;
+                }
+                at = java.util.Arrays.copyOf(at, hairpins);
+                for (double centre : new double[]{0.0, 0.5, -0.5}) {
+                    for (int side : new int[]{first, -first}) {
+                        Switchbacks laid = lay(w, occupied, start, end, gx, gz, at, width, centre * width, side);
+                        if (laid == null) {
+                            continue;
+                        }
+                        if (laid.length >= needed) {
+                            return laid;
+                        }
+                        if (laid.length >= 1.3 * chord && (best == null || laid.length > best.length)) {
+                            best = laid;
+                        }
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
+     * One layout of switchbacks: hairpins at {@code at} (0 to 1) along the chord from {@code start} to {@code end}, alternately
+     * either side of it at the edges of a band {@code width} across along the contours (square to the fall line
+     * {@code (gx, gz)}), its middle {@code centre} off the chord; the first hairpin on the side {@code side} of the
+     * contour direction. Each turns on a half circle whose diameter runs up the fall line. Null where it leaves dry land.
+     */
+    private Switchbacks lay(Window w, java.util.Set<Long> occupied, double[] start, double[] end, double gx, double gz, double[] at, double width,
+                            double centre, int side) {
+        double r = config.hairpinRadius;
+        double nx = -gz;
+        double nz = gx;
+        List<double[]> points = new ArrayList<>();
+        List<double[]> arcs = new ArrayList<>();
+        double[] previous = start;
+        double length = 0.0;
+        for (int k = 1; k <= at.length; k++) {
+            double t = at[k - 1];
+            int s = k % 2 == 1 ? side : -side;
+            double offset = centre + s * (0.5 * width - r);
+            double cx = start[0] + (end[0] - start[0]) * t + nx * offset;
+            double cz = start[1] + (end[1] - start[1]) * t + nz * offset;
+            double[] arcStart = null;
+            double[] arcEnd = null;
+            int pieces = 12;
+            for (int q = 0; q <= pieces; q++) {
+                double theta = Math.PI * (1.0 - (double) q / pieces);
+                double pu = r * Math.cos(theta);
+                double pv = s * r * Math.sin(theta);
+                double[] p = {cx + gx * pu + nx * pv, cz + gz * pu + nz * pv};
+                if (q == 0) {
+                    if (!onLand(w, occupied, previous, p)) {
+                        return null;
+                    }
+                    arcStart = p;
+                } else if (!clear(w, occupied, p[0], p[1])) {
+                    return null;
+                }
+                length += Math.hypot(p[0] - previous[0], p[1] - previous[1]);
+                points.add(p);
+                previous = p;
+                arcEnd = p;
+            }
+            arcs.add(new double[]{arcStart[0], arcStart[1], arcEnd[0], arcEnd[1], r});
+        }
+        if (!onLand(w, occupied, previous, end)) {
+            return null;
+        }
+        length += Math.hypot(end[0] - previous[0], end[1] - previous[1]);
+        return new Switchbacks(points, arcs, length);
+    }
+
+    /**
+     * Where along a chord (0 to 1) hairpins go so each climbs an equal share of the ground's rise, given as running
+     * totals at even steps, at least {@code gap} apart; evenly where the ground hardly rises. One entry more than
+     * hairpins: the farthest any was pushed from its share to keep the gap.
+     */
+    private static double[] spread(double[] rise, int hairpins, double gap) {
+        int steps = rise.length - 1;
+        double total = rise[steps];
+        double[] at = new double[hairpins + 1];
+        for (int k = 1; k <= hairpins; k++) {
+            double share = (double) k / (hairpins + 1);
+            if (total < 1.0) {
+                at[k - 1] = share;
+                continue;
+            }
+            double target = share * total;
+            int j = 1;
+            while (j < steps && rise[j] < target) {
+                j++;
+            }
+            double span = rise[j] - rise[j - 1];
+            at[k - 1] = (j - 1 + (span < 1e-9 ? 0.5 : (target - rise[j - 1]) / span)) / steps;
+        }
+        // Pushed apart: forward from the start, then back from the end; the last entry how far the most pushed moved
+        double[] ideal = at.clone();
+        for (int k = 0; k < hairpins; k++) {
+            at[k] = Math.max(at[k], (k == 0 ? 0.0 : at[k - 1]) + gap);
+        }
+        for (int k = hairpins - 1; k >= 0; k--) {
+            at[k] = Math.min(at[k], (k == hairpins - 1 ? 1.0 : at[k + 1]) - gap);
+        }
+        for (int k = 0; k < hairpins; k++) {
+            at[hairpins] = Math.max(at[hairpins], Math.abs(at[k] - ideal[k]));
+        }
+        return at;
+    }
+
+    /** Whether a straight between two points stays on dry land of the window, clear of the rest of the road. */
+    private static boolean onLand(Window w, java.util.Set<Long> occupied, double[] a, double[] b) {
+        double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        int steps = Math.max(1, (int) Math.ceil(length / 8.0));
+        for (int q = 0; q <= steps; q++) {
+            double t = (double) q / steps;
+            if (!clear(w, occupied, a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Whether a point is on dry land of the window and clear of the rest of the road. */
+    private static boolean clear(Window w, java.util.Set<Long> occupied, double x, double z) {
+        return w.kindAt(x, z) == LAND && !occupied.contains(cell(x, z));
+    }
+
+    /** The 16-block cell of a point, for keeping switchbacks clear of the rest of their road. */
+    private static long cell(double x, double z) {
+        return ((long) Math.floor(x / 16.0) << 32) | ((long) Math.floor(z / 16.0) & 0xFFFFFFFFL);
+    }
+
+    /**
+     * The cells within a cell of the road's samples, those of a stretch and four samples either side left out: where
+     * switchbacks replacing the stretch must not go, so they neither cross nor crowd the rest of the road.
+     */
+    private static java.util.Set<Long> occupied(double[] xs, double[] zs, int s, int e) {
+        java.util.Set<Long> cells = new java.util.HashSet<>();
+        for (int i = 0; i < xs.length; i++) {
+            if (i >= s - 4 && i <= e + 4) {
+                continue;
+            }
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    cells.add(cell(xs[i] + 16.0 * dx, zs[i] + 16.0 * dz));
+                }
+            }
+        }
+        return cells;
+    }
+
+    /** The point at a distance along a polyline. */
+    private static double[] pointAt(List<double[]> vertices, double[] cumulative, double at) {
+        for (int v = 1; v < vertices.size(); v++) {
+            if (cumulative[v] >= at || v == vertices.size() - 1) {
+                double[] a = vertices.get(v - 1);
+                double[] b = vertices.get(v);
+                double length = cumulative[v] - cumulative[v - 1];
+                double t = length < 1e-9 ? 0.0 : Math.max(0.0, Math.min(1.0, (at - cumulative[v - 1]) / length));
+                return new double[]{a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t};
+            }
+        }
+        return vertices.get(0);
+    }
+
+    /** Distance from a point to a segment. */
+    private static double segmentDistance(double x, double z, double[] a, double[] b) {
+        double dx = b[0] - a[0];
+        double dz = b[1] - a[1];
+        double lengthSquared = dx * dx + dz * dz;
+        double u = lengthSquared < 1e-12 ? 0.0 : Math.max(0.0, Math.min(1.0, ((x - a[0]) * dx + (z - a[1]) * dz) / lengthSquared));
+        return Math.hypot(x - a[0] - dx * u, z - a[1] - dz * u);
     }
 }
