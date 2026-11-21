@@ -4,8 +4,9 @@ import java.util.List;
 
 /**
  * The materials of a building, by the role a block plays, as block ids (the Minecraft side looks them up; the city
- * logic knows no Minecraft classes). Vanilla blocks only, of 1.20.1. The palettes, like the materials of the smaller
- * parts, are listed in the catalogue ({@link Catalog}).
+ * logic knows no Minecraft classes): this mod's own wall finishes, roofing, windows and doors (citybuilder:...) and
+ * vanilla blocks of 1.20.1. The palettes, like the materials of the smaller parts, are listed in the catalogue
+ * ({@link Catalog}).
  *
  * @param wall       the walls
  * @param accent     upper walls where they differ from the ground floor (a machiya's plastered upper storey), bands
@@ -39,7 +40,7 @@ public record Palette(String wall, String accent, String trim, String window, St
         if (building.type() == Building.Type.OFFICE) {
             frame = "dark";
         } else if (trim.endsWith("_planks") || trim.endsWith("_log") || trim.endsWith("_wood")
-                || building.type() == Building.Type.MACHIYA) {
+                || trim.contains(":timber_") || trim.contains(":board_") || building.type() == Building.Type.MACHIYA) {
             frame = "wood";
         } else if (building.type() == Building.Type.HOUSE
                 && (wall.contains("white") || wall.contains("calcite") || wall.contains("quartz"))) {

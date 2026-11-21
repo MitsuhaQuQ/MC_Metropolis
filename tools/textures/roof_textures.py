@@ -36,8 +36,8 @@ ROOFS = {
     'slate_black': ('slate', (50, 52, 56), 'Black Slate', '黑色彩钢板瓦'),
     'metal_silver': ('metal', (164, 168, 172), 'Silver Steel Roofing', '银色钢板屋面'),
     'metal_green': ('metal', (66, 108, 92), 'Green Steel Roofing', '绿色钢板屋面'),
-    'metal_red': ('metal', (146, 60, 50), 'Red Steel Roofing', '红色钢板屋面'),
-    'copper': ('copper', (184, 106, 68), 'Copper Roofing', '铜板屋面'),
+    'metal_red': ('metal', (126, 72, 62), 'Red Steel Roofing', '红色钢板屋面'),
+    'copper': ('copper', (150, 102, 76), 'Copper Roofing', '铜板屋面'),
     'copper_green': ('copper', (92, 156, 136), 'Green Copper Roofing', '绿锈铜板屋面'),
 }
 
