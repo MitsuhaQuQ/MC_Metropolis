@@ -381,6 +381,10 @@ public final class BuildingLayer {
             }
         }
         Building building = make(plots, plot);
+        if (building != null && overWater(building)) {
+            // On a stream the planning cannot see (the plans know the rivers, not every brook): no building in it
+            building = null;
+        }
         if (building != null && crossesFootpath(plots, building)) {
             // A footpath's open land runs across the lot, laid after the lots were cut: no building is split by it,
             // the lot left a yard
@@ -402,6 +406,32 @@ public final class BuildingLayer {
         Plot plot = plots.at(x, z);
         Building b = building(plots, plot);
         return b != null && inside(b, plot, x, z) ? b : null;
+    }
+
+    /**
+     * Whether any of a building's footprint stands in water the world has: the fine terrain (eroded, with its
+     * streams), sampled every few blocks and at the corners. The street plans know the rivers and lakes; a brook a few
+     * blocks wide they do not, and a house planned over it would stand in it.
+     */
+    private boolean overWater(Building b) {
+        double w = b.width();
+        double back = Math.max(b.back(), b.wingBack());
+        com.mtm.citybuilder.core.terrain.TerrainView terrain = logic.terrain();
+        for (double u = 0.5; u <= w - 0.5 + 1e-9; u += Math.max(1.0, Math.min(3.0, w - 1.0))) {
+            for (double v = b.front() + 0.5; v <= back - 0.5 + 1e-9; v += Math.max(1.0, Math.min(3.0, back - b.front() - 1.0))) {
+                if (!b.covers(u, v)) {
+                    continue;
+                }
+                double s = u - 0.5 * w;
+                double x = b.ox() + b.tx() * s + b.nx() * v;
+                double z = b.oz() + b.tz() * s + b.nz() * v;
+                double water = terrain.waterLevel(x, z);
+                if (!Double.isNaN(water) && water > terrain.surfaceHeight((int) Math.floor(x), (int) Math.floor(z))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Whether any of a building's footprint lies in the open land along a footpath, sampled every block or so. */
@@ -1785,7 +1815,9 @@ public final class BuildingLayer {
             if (low && solar(b, c)) {
                 return Part.SOLAR;
             }
-            return low ? Part.ROOF_LOW : Part.ROOF_HIGH;
+            // Over a wall (a gable's face), a step in the top half of its block would leave half a block open over the
+            // wall's top: the step's block filled, a whole block of roofing
+            return low ? Part.ROOF_LOW : c.edge() ? Part.RIDGE : Part.ROOF_HIGH;
         }
         if (above > roof) {
             Part over = overRoof(b, c, above - roof);
@@ -4038,8 +4070,9 @@ public final class BuildingLayer {
                 return Part.ACCENT;
             }
         }
-        // Outdoor units against the sides and back of houses, flats and shops, on the ground
-        boolean beside = !inFront && (u < 0 || u >= w || v >= b.back());
+        // Outdoor units against the sides and back of houses, flats and shops, on the ground: against the wall, the
+        // block next to it, not out across the yard
+        boolean beside = !inFront && c.adjacent() && (u >= -1 && u < 0 || u >= w && u < w + 1 || v >= b.back() && v < b.back() + 1);
         if (beside && dy == 1 && (b.type() == Building.Type.HOUSE || b.type() == Building.Type.APARTMENT
                 || b.type() == Building.Type.SHOP) && detail(b, c, 4) < 0.1) {
             return Part.EQUIPMENT;

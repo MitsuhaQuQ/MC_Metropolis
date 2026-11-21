@@ -113,8 +113,10 @@ class PlotLayerTest {
                 default -> CitySettings.DEFAULT.plots.residential;
             };
             // A lot is cut to its district's range (the last on a street taking what is left, up to half again) and
-            // may take in a small neighbour either side
-            assertTrue(plot.frontage() <= 3 * 1.5 * range[4] + 1e-6 && plot.frontage() > 0, () -> "frontage " + plot + " " + range[4]);
+            // may take in a small neighbour either side; the towns' measured frontages are scaled up for the game
+            double scale = plot.district() == District.INDUSTRIAL || plot.district() == District.PORT ? 1.0
+                    : CitySettings.DEFAULT.plots.frontageScale;
+            assertTrue(plot.frontage() <= 3 * 1.5 * scale * range[4] + 1e-6 && plot.frontage() > 0, () -> "frontage " + plot + " " + range[4]);
         }
         // The old town's machiya are narrower than the houses of the modern town
         if (frontage.containsKey(District.OLD_TOWN) && frontage.containsKey(District.RESIDENTIAL)) {

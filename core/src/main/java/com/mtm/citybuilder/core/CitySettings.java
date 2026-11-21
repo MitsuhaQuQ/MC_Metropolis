@@ -1040,7 +1040,15 @@ public final class CitySettings {
          * 0.15) to leave rooms of a real width inside; and none narrower than a house with a room in it.
          */
         public double wallAllowance = 1.7;
-        public double minFrontage = 6.0;
+        public double minFrontage = 9.0;
+        /**
+         * The measured frontages (Kyoto's, Kanazawa's) times this, and the depths times {@code depthScale}, for the
+         * houses, shops and offices of the town (not works' and quays' land): a house as narrow as a real machiya,
+         * its walls a block thick, is all wall and window in the game, and a street of them reads as fragments. The
+         * measured shares hold; the lots are simply larger, the buildings on them whole.
+         */
+        public double frontageScale = 1.6;
+        public double depthScale = 1.2;
         /**
          * Land goes to the street whose edge is nearest, a wider street's edge counting this much nearer: its lots
          * run deeper, the front street (omotedori) taking the corners from the back streets.

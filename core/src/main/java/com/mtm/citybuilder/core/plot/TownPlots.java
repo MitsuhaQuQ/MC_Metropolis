@@ -293,16 +293,34 @@ public final class TownPlots {
      */
     private double[] range(District district, StreetClass street) {
         if (street == StreetClass.LANE) {
-            return config.lane;
+            return scaled(config.lane);
         }
         return switch (district) {
-            case CENTRAL -> config.central;
-            case STATION_FRONT -> config.stationFront;
-            case OLD_TOWN -> config.oldTown;
+            case CENTRAL -> scaled(config.central);
+            case STATION_FRONT -> scaled(config.stationFront);
+            case OLD_TOWN -> scaled(config.oldTown);
             case INDUSTRIAL -> config.industrial;
             case PORT -> config.port;
-            default -> config.residential;
+            default -> scaled(config.residential);
         };
+    }
+
+    private final Map<double[], double[]> scaledRanges = new java.util.IdentityHashMap<>();
+
+    /**
+     * A measured range of frontages (five percentiles) and depths (least, most) as the game's lots are cut: the
+     * frontages times {@code frontageScale}, the depths times {@code depthScale}.
+     */
+    private double[] scaled(double[] measured) {
+        synchronized (scaledRanges) {
+            return scaledRanges.computeIfAbsent(measured, m -> {
+                double[] r = m.clone();
+                for (int k = 0; k < r.length; k++) {
+                    r[k] *= k < 5 ? config.frontageScale : config.depthScale;
+                }
+                return r;
+            });
+        }
     }
 
     /** Cuts both sides of every chain into lots, each drawn from the range of the district behind its start. */
@@ -674,7 +692,7 @@ public final class TownPlots {
     }
 
     private double rowDepth(int chain, int side) {
-        return config.backRow[0] + (config.backRow[1] - config.backRow[0]) * Hash.unit(Hash.of(seed ^ 0x7055L, chain, side));
+        return config.depthScale * (config.backRow[0] + (config.backRow[1] - config.backRow[0]) * Hash.unit(Hash.of(seed ^ 0x7055L, chain, side)));
     }
 
     /** The front lots' cuts of a position's street and side. */
@@ -706,9 +724,9 @@ public final class TownPlots {
             double position = 0.0;
             int index = 0;
             while (position < length - 1e-6) {
-                double width = Math.max(config.minFrontage, frontage(config.backFrontage,
+                double width = Math.max(config.minFrontage, frontage(scaled(config.backFrontage),
                         Hash.unit(Hash.of(seed ^ 0xBAC7L, chain, side * 64L + row, index))) + config.wallAllowance);
-                if (length - (position + width) < 0.5 * config.backFrontage[0]) {
+                if (length - (position + width) < 0.5 * scaled(config.backFrontage)[0]) {
                     width = length - position;
                 }
                 at.add(position);

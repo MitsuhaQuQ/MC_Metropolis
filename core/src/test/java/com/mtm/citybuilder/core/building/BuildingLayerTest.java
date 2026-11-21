@@ -121,7 +121,8 @@ class BuildingLayerTest {
                 }
             }
         }
-        assertTrue(seen.size() > 50, () -> "buildings " + seen.size());
+        // Lots are cut larger than the measured towns' for the game, so fewer, whole buildings
+        assertTrue(seen.size() > 25, () -> "buildings " + seen.size());
         for (Building b : seen.values()) {
             if (b.type() == Building.Type.WORKS || b.program() != null) {
                 continue;
@@ -685,7 +686,9 @@ class BuildingLayerTest {
                     continue;
                 }
                 int[][] steps = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-                for (int y = c.building().base() + 1; y < c.building().base() + c.building().wallHeight(); y++) {
+                // Below any storeys set back over a terrace (above it the wall's air is the terrace's)
+                int setBack = c.building().base() + c.building().floorOf(c.building().step());
+                for (int y = c.building().base() + 1; y < Math.min(setBack, c.building().base() + c.building().wallHeight()); y++) {
                     if (BuildingLayer.part(c, y) != BuildingLayer.Part.AIR) {
                         continue;
                     }
