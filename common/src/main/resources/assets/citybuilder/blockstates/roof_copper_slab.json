@@ -1,0 +1,25 @@
+{
+  "variants": {
+    "axis=x,type=bottom": {
+      "model": "citybuilder:block/roof/copper_slab"
+    },
+    "axis=x,type=top": {
+      "model": "citybuilder:block/roof/copper_slab_top"
+    },
+    "axis=x,type=double": {
+      "model": "citybuilder:block/roof/copper"
+    },
+    "axis=z,type=bottom": {
+      "model": "citybuilder:block/roof/copper_slab",
+      "y": 90
+    },
+    "axis=z,type=top": {
+      "model": "citybuilder:block/roof/copper_slab_top",
+      "y": 90
+    },
+    "axis=z,type=double": {
+      "model": "citybuilder:block/roof/copper",
+      "y": 90
+    }
+  }
+}

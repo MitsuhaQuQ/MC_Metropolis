@@ -1,0 +1,11 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "citybuilder:block/roof/metal_red"
+    },
+    "axis=z": {
+      "model": "citybuilder:block/roof/metal_red",
+      "y": 90
+    }
+  }
+}

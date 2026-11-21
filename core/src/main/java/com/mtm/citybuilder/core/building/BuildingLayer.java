@@ -1224,6 +1224,34 @@ public final class BuildingLayer {
         return (int) Math.floor(c.eave() * b.slope()) + 1;
     }
 
+    /**
+     * Whether a pitched roof over a column runs along the world's x axis at its eaves: whether the eave it falls to
+     * (the nearest, as {@link #columns} measures the roof) lies along x, its tiles' courses with it. A hip roof's ends
+     * fall to the eaves across them; a gable's slopes to the eaves along the ridge.
+     */
+    public static boolean eaveAlongX(Column c) {
+        Building b = c.building();
+        double uu = c.u() - b.upFrom();
+        double uw = b.upTo() - b.upFrom();
+        double v = c.v();
+        double inAcross = Math.min(v - (b.front() + b.stepBack()), b.back() - b.upBack() - v);
+        double inAlong = Math.min(uu, uw - uu);
+        // Whether the eave it falls to runs along u (the building's frontage) rather than across it
+        boolean alongU = switch (b.roof()) {
+            case HIP -> inAcross <= inAlong;
+            case IRIMOYA -> {
+                double across = b.ridgeAlong() ? inAcross : inAlong;
+                double ends = b.ridgeAlong() ? inAlong : inAcross;
+                boolean toEnds = ends < IRIMOYA_HIP && ends < across;
+                yield b.ridgeAlong() != toEnds;
+            }
+            default -> b.ridgeAlong();
+        };
+        double x = alongU ? b.tx() : b.nx();
+        double z = alongU ? b.tz() : b.nz();
+        return Math.abs(x) >= Math.abs(z);
+    }
+
     /** Height above the base of a pitched roof's block over a column. */
     private static int roofRow(Building b, Column c) {
         return b.wallHeight() + 1 + Math.floorDiv(halves(b, c) - 1, 2);

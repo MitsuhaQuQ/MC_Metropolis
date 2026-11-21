@@ -1,0 +1,25 @@
+{
+  "variants": {
+    "axis=x,type=bottom": {
+      "model": "citybuilder:block/roof/slate_gray_slab"
+    },
+    "axis=x,type=top": {
+      "model": "citybuilder:block/roof/slate_gray_slab_top"
+    },
+    "axis=x,type=double": {
+      "model": "citybuilder:block/roof/slate_gray"
+    },
+    "axis=z,type=bottom": {
+      "model": "citybuilder:block/roof/slate_gray_slab",
+      "y": 90
+    },
+    "axis=z,type=top": {
+      "model": "citybuilder:block/roof/slate_gray_slab_top",
+      "y": 90
+    },
+    "axis=z,type=double": {
+      "model": "citybuilder:block/roof/slate_gray",
+      "y": 90
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "variants": {
+    "axis=x,type=bottom": {
+      "model": "citybuilder:block/roof/kawara_black_slab"
+    },
+    "axis=x,type=top": {
+      "model": "citybuilder:block/roof/kawara_black_slab_top"
+    },
+    "axis=x,type=double": {
+      "model": "citybuilder:block/roof/kawara_black"
+    },
+    "axis=z,type=bottom": {
+      "model": "citybuilder:block/roof/kawara_black_slab",
+      "y": 90
+    },
+    "axis=z,type=top": {
+      "model": "citybuilder:block/roof/kawara_black_slab_top",
+      "y": 90
+    },
+    "axis=z,type=double": {
+      "model": "citybuilder:block/roof/kawara_black",
+      "y": 90
+    }
+  }
+}

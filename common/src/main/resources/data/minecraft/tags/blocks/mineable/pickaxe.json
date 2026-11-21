@@ -36,6 +36,26 @@
     "citybuilder:thin_terracotta",
     "citybuilder:thin_white_concrete",
     "citybuilder:thin_white_terracotta",
-    "citybuilder:thin_yellow_terracotta"
+    "citybuilder:thin_yellow_terracotta",
+    "citybuilder:roof_kawara",
+    "citybuilder:roof_kawara_slab",
+    "citybuilder:roof_kawara_black",
+    "citybuilder:roof_kawara_black_slab",
+    "citybuilder:roof_kawara_brown",
+    "citybuilder:roof_kawara_brown_slab",
+    "citybuilder:roof_slate_gray",
+    "citybuilder:roof_slate_gray_slab",
+    "citybuilder:roof_slate_black",
+    "citybuilder:roof_slate_black_slab",
+    "citybuilder:roof_metal_silver",
+    "citybuilder:roof_metal_silver_slab",
+    "citybuilder:roof_metal_green",
+    "citybuilder:roof_metal_green_slab",
+    "citybuilder:roof_metal_red",
+    "citybuilder:roof_metal_red_slab",
+    "citybuilder:roof_copper",
+    "citybuilder:roof_copper_slab",
+    "citybuilder:roof_copper_green",
+    "citybuilder:roof_copper_green_slab"
   ]
 }

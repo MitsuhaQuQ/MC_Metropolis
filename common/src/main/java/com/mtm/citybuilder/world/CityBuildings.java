@@ -111,6 +111,13 @@ public final class CityBuildings {
                     String id = palette.id(part, b, position, y);
                     if (id != null) {
                         BlockState placed = state(block(id), part, facing, outward);
+                        if (placed.hasProperty(com.mtm.citybuilder.block.RoofBlock.AXIS)) {
+                            // Roofing's courses along its eaves; a hood's along its wall
+                            boolean alongX = part == BuildingLayer.Part.HOOD
+                                    ? outward.getClockWise().getAxis() == Direction.Axis.X : BuildingLayer.eaveAlongX(column);
+                            placed = placed.setValue(com.mtm.citybuilder.block.RoofBlock.AXIS,
+                                    alongX ? Direction.Axis.X : Direction.Axis.Z);
+                        }
                         if (thin != null && THIN_PARTS.contains(part) && thinOf(id) instanceof ThinWallBlock wall
                                 && closed(columns, column, x, z, y)) {
                             placed = wall.state(thin);

@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/slab_top",
+  "textures": {
+    "bottom": "citybuilder:block/roof/slate_black",
+    "top": "citybuilder:block/roof/slate_black",
+    "side": "citybuilder:block/roof/slate_black"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "citybuilder:block/roof/kawara"
+    },
+    "axis=z": {
+      "model": "citybuilder:block/roof/kawara",
+      "y": 90
+    }
+  }
+}

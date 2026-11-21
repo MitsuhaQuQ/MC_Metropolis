@@ -1,0 +1,15 @@
+{
+  "replace": false,
+  "values": [
+    "citybuilder:roof_kawara_slab",
+    "citybuilder:roof_kawara_black_slab",
+    "citybuilder:roof_kawara_brown_slab",
+    "citybuilder:roof_slate_gray_slab",
+    "citybuilder:roof_slate_black_slab",
+    "citybuilder:roof_metal_silver_slab",
+    "citybuilder:roof_metal_green_slab",
+    "citybuilder:roof_metal_red_slab",
+    "citybuilder:roof_copper_slab",
+    "citybuilder:roof_copper_green_slab"
+  ]
+}

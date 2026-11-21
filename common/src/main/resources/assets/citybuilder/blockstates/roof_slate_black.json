@@ -1,0 +1,11 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "citybuilder:block/roof/slate_black"
+    },
+    "axis=z": {
+      "model": "citybuilder:block/roof/slate_black",
+      "y": 90
+    }
+  }
+}

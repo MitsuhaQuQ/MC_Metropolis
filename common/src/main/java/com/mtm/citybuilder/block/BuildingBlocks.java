@@ -35,6 +35,12 @@ public final class BuildingBlocks {
             "polished_blackstone", "polished_deepslate", "polished_diorite", "sandstone", "smooth_quartz",
             "smooth_sandstone", "spruce_planks", "stone", "stone_bricks", "stripped_dark_oak_log", "stripped_spruce_log",
             "terracotta", "white_concrete", "white_terracotta", "yellow_terracotta"};
+    /**
+     * The roofings ({@link RoofBlock} roof_<name>, {@link RoofSlabBlock} roof_<name>_slab): smoked, black and brown
+     * glazed tile, grey and black slate, silver, green and red steel, new and green copper.
+     */
+    public static final String[] ROOFS = {"kawara", "kawara_black", "kawara_brown", "slate_gray", "slate_black",
+            "metal_silver", "metal_green", "metal_red", "copper", "copper_green"};
     /** The adjuster ({@code item.AdjusterItem}). */
     public static Supplier<net.minecraft.world.item.Item> ADJUSTER;
     /** The windows, drawn translucent (Forge reads that from their models; Fabric from this list). */
@@ -56,6 +62,11 @@ public final class BuildingBlocks {
             // blocks of the same)
             TRANSLUCENT.add(p.registerBlock("curtain_" + glass,
                     () -> new net.minecraft.world.level.block.GlassBlock(BlockBehaviour.Properties.copy(Blocks.GLASS))));
+        }
+        for (String name : ROOFS) {
+            p.registerBlock("roof_" + name, () -> new RoofBlock(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE_TILES)));
+            p.registerBlock("roof_" + name + "_slab",
+                    () -> new RoofSlabBlock(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE_TILE_SLAB)));
         }
         for (String name : THIN_WALLS) {
             Block material = net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
