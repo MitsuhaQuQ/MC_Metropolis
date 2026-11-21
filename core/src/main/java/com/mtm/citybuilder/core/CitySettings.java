@@ -33,6 +33,7 @@ public final class CitySettings {
     public Airports airports = new Airports();
     public Functions functions = new Functions();
     public Sanctuaries sanctuaries = new Sanctuaries();
+    public Ports ports = new Ports();
 
     /**
      * What a town's streets and facilities are for (see core.function and the design document, "城市细部功能"),
@@ -51,6 +52,36 @@ public final class CitySettings {
      * within 30 m of each other) has 17 school sites a km2 (kindergartens and crammers included), 14 clinics and
      * hospitals, 29 temples and shrines (most small), 9 government (police boxes too), 1.8 bathhouses.
      */
+    /**
+     * The ports' terminals, built out over the sea (see {@code port.PortLayer}). Each kind {width along the shore,
+     * reach out to sea, least depth of the sea within {@code fairway} off its face, a berth's length, shore land
+     * behind it}: a container terminal's quay
+     * along its face (Japanese container berths about 300-350 long, 14-16 deep; in blocks the sea is shallower, so
+     * less), general cargo finger piers (berths along both sides), a fishing harbour's pier behind a breakwater
+     * {@code breakwaterOff} beyond its head reaching {@code breakwaterSpan} past it either side, a ferry's landing pier
+     * with its hall and car park on the shore. A metropolis has a container terminal, {@code generalMetropolis} piers
+     * and a ferry; a city {@code generalCity} piers, a ferry, a container terminal at {@code cityContainer}; a town a
+     * fishing harbour, a ferry at {@code townFerry}. Terminals {@code spacing} apart besides their widths; the shore
+     * looked at every {@code shoreStep} along the embankments.
+     */
+    public static final class Ports {
+        public double[] containerMetropolis = {900.0, 350.0, 10.0, 300.0, 0.0};
+        public double[] containerCity = {600.0, 300.0, 8.0, 300.0, 0.0};
+        public double[] general = {80.0, 220.0, 6.0, 110.0, 0.0};
+        public double[] fishing = {30.0, 70.0, 2.0, 15.0, 0.0};
+        public double[] ferry = {30.0, 90.0, 5.0, 90.0, 20.0};
+        public int generalMetropolis = 4;
+        public int generalCity = 2;
+        public double cityContainer = 0.4;
+        public double townFerry = 0.4;
+        public double breakwaterOff = 40.0;
+        public double breakwaterSpan = 60.0;
+        public double spacing = 120.0;
+        public double shoreStep = 16.0;
+        /** How far out to sea the deep water may lie, a fairway dredged to it from the terminal's face. */
+        public double fairway = 1500.0;
+    }
+
     /**
      * The temples and shrines on the mountains out of town (Enryakuji on Hiei, Kurama, Atago, Fushimi Inari's mountain,
      * Kiyomizu on its slope): each town's, on the hills and mountains round it, larger than the town's own.
@@ -732,6 +763,11 @@ public final class CitySettings {
         public double streetSpacingCastle = 110.0;
         public double streetSpacingTown = 80.0;
         public double streetSpacingResort = 160.0;
+        /**
+         * Streets in the industrial and port districts this many times as far apart: works' and quays' blocks a few
+         * hundred blocks across (Japanese industrial zones' plants on 0.5-5 ha), not a town's.
+         */
+        public double industrialSpacing = 2.5;
         public double denseSpacing = 0.8;
         public double thinSpacing = 1.5;
         /**
@@ -941,8 +977,8 @@ public final class CitySettings {
         public double[] stationFront = {4.4, 6, 9.5, 17.5, 30, 20, 30};
         public double[] oldTown = {4, 4.8, 6.6, 10.9, 18.6, 18, 30};
         public double[] residential = {4.2, 5.9, 8.5, 13.1, 21.2, 12, 20};
-        public double[] industrial = {30, 40, 50, 60, 70, 30, 60};
-        public double[] port = {30, 38, 45, 52, 60, 30, 50};
+        public double[] industrial = {40, 60, 80, 110, 160, 50, 100};
+        public double[] port = {40, 55, 75, 100, 150, 50, 90};
         public double[] lane = {3.5, 4.3, 5.8, 9.2, 13.8, 8, 12};
         /**
          * Land goes to the street whose edge is nearest, a wider street's edge counting this much nearer: its lots
@@ -958,7 +994,8 @@ public final class CitySettings {
          * The land behind the lots, filled as real blocks' insides are (tools/assets/plateau_interior.py: 23-35% of
          * Kyoto's, Kanazawa's and Himeji's buildings stand deep in their blocks, neither on a street nor on a lane; the
          * land 15-25 m back 43-67% covered, beyond 60 m 21-41%). Where no more than {@code backToBack} is left between
-         * a lot's back and the block's middle (looked for up to {@code backReach} from the street), the lot runs on to
+         * a lot's back and the block's middle (looked for up to {@code backReach} from the street, {@code industrialReach}
+         * along the works' and quays' streets), the lot runs on to
          * the middle (back to back, sewari); else rows of back lots, each {@code backRow} deep (from, to: by street
          * side), their widths drawn from {@code backFrontage} (5th to 95th percentiles), each reached by a lane within
          * {@code laneAccess} of its middle or else by a pole {@code poleWidth} wide along its first edge, between the
@@ -972,6 +1009,8 @@ public final class CitySettings {
          */
         public double backToBack = 10.0;
         public double backReach = 90.0;
+        /** How far back from its street the land of a works' or quay's lot is looked for: their blocks are large. */
+        public double industrialReach = 200.0;
         public double[] backRow = {11.0, 15.0};
         public double[] backFrontage = {6.0, 7.5, 9.0, 11.0, 15.0};
         public double laneAccess = 10.0;

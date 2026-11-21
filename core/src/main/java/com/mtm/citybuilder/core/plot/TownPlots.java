@@ -85,8 +85,9 @@ public final class TownPlots {
             }
         }
         double deepest = 0.0;
+        // (The works' and quays' lots reach further, by their own reach: see works)
         for (double[] range : new double[][]{config.central, config.stationFront, config.oldTown, config.residential,
-                config.industrial, config.port, config.lane}) {
+                config.lane}) {
             deepest = Math.max(deepest, range[6]);
         }
         double widest = 0.0;
@@ -112,12 +113,30 @@ public final class TownPlots {
         }
         for (int p = 0; p < pieces.size(); p++) {
             StreetSegment g = pieces.get(p);
+            // A works' or quay's street reaches further back: their blocks are large
+            double reach = works(g) ? this.reach - config.backReach + config.industrialReach : this.reach;
             for (long cx = (long) Math.floor((Math.min(g.x1(), g.x2()) - reach) / CELL); cx <= (long) Math.floor((Math.max(g.x1(), g.x2()) + reach) / CELL); cx++) {
                 for (long cz = (long) Math.floor((Math.min(g.z1(), g.z2()) - reach) / CELL); cz <= (long) Math.floor((Math.max(g.z1(), g.z2()) + reach) / CELL); cz++) {
                     cells.computeIfAbsent((cx << 32) ^ (cz & 0xFFFFFFFFL), k -> new ArrayList<>()).add(p);
                 }
             }
         }
+    }
+
+    /** Whether a piece runs through the works or the quays: the district beside it, either side, is. */
+    private boolean works(StreetSegment g) {
+        double mx = 0.5 * (g.x1() + g.x2());
+        double mz = 0.5 * (g.z1() + g.z2());
+        double len = Math.max(1e-9, g.length());
+        double nx = -(g.z2() - g.z1()) / len * (0.5 * g.width() + 20.0);
+        double nz = (g.x2() - g.x1()) / len * (0.5 * g.width() + 20.0);
+        for (int side = -1; side <= 1; side += 2) {
+            District d = plan.districts().at(mx + side * nx, mz + side * nz);
+            if (d == District.INDUSTRIAL || d == District.PORT) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static long node(double x, double z) {
@@ -642,8 +661,10 @@ public final class TownPlots {
         double[] p = pointAt(lot.chain(), 0.5 * (lot.start() + lot.end()));
         double nx = -p[3] * lot.side();
         double nz = p[2] * lot.side();
-        double found = config.backReach;
-        for (double v = lot.maxDepth(); v < config.backReach; v += 2.0) {
+        double limit = lot.district() == District.INDUSTRIAL || lot.district() == District.PORT
+                ? config.industrialReach : config.backReach;
+        double found = limit;
+        for (double v = lot.maxDepth(); v < limit; v += 2.0) {
             double back = 0.5 * lot.streetWidth() + v;
             Plot at = raw(p[0] + nx * back, p[1] + nz * back);
             if (at == null || at.chain() != lot.chain() || at.side() != lot.side()) {

@@ -117,6 +117,21 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = StreetMap.render(logic, plan, centerX, centerZ, scale, size, layer.equals("districts"));
             }
+            case "ports" -> {
+                StreetPlan plan = streetStats(logic, centerX, centerZ);
+                long t0 = System.nanoTime();
+                List<com.mtm.citybuilder.core.port.Terminal> terminals = logic.ports().town(plan.settlement());
+                System.out.printf("Port of the %s: %d terminals, sited in %.1f s%n", plan.settlement().tier(), terminals.size(),
+                        (System.nanoTime() - t0) / 1e9);
+                for (var t : terminals) {
+                    System.out.printf("  %-9s at %.0f %.0f, %.0f wide, %.0f out to sea, %.0f deep off it, %d berths%s%n",
+                            t.kind(), t.x(), t.z(), t.width(), t.length(), t.depth(), t.berths(),
+                            t.shore() > 0 ? String.format(", %.0f of shore land", t.shore()) : "");
+                }
+                start = System.nanoTime();
+                image = com.mtm.citybuilder.core.debug.PortMap.overlay(StreetMap.render(logic, plan, centerX, centerZ, scale, size),
+                        terminals, centerX, centerZ, scale);
+            }
             case "plots" -> {
                 StreetPlan plan = streetStats(logic, centerX, centerZ);
                 com.mtm.citybuilder.core.plot.TownPlots plots = logic.plots().town(plan.settlement());
@@ -185,7 +200,7 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = RoadMap.render(logic, edges, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed, streets, districts, plots, functions, airports or sanctuaries");
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed, streets, districts, plots, functions, airports, sanctuaries or ports");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();

@@ -504,6 +504,18 @@ public final class CityLogic {
 
     private com.mtm.citybuilder.core.sacred.SanctuaryLayer sanctuaries;
 
+    /** The towns' ports: their cargo and passenger terminals. */
+    public com.mtm.citybuilder.core.port.PortLayer ports() {
+        synchronized (this) {
+            if (ports == null) {
+                ports = new com.mtm.citybuilder.core.port.PortLayer(this);
+            }
+            return ports;
+        }
+    }
+
+    private com.mtm.citybuilder.core.port.PortLayer ports;
+
     private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {
     }
 }

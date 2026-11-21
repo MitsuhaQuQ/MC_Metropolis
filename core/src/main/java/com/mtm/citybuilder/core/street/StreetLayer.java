@@ -1318,6 +1318,7 @@ public final class StreetLayer {
                 Tracer streets = new Tracer(window, field, StreetClass.STREET, config.streetWidth, streetSpacing,
                         true, walls, false);
                 streets.teeChance = config.teeChance;
+                streets.districts = districts;
                 // A grid keeps its lines a full spacing apart: seeds from lines not on its lattice would squeeze in
                 // between and halve blocks
                 streets.clearance = 0.7;
@@ -6434,6 +6435,8 @@ public final class StreetLayer {
         }
         /** Whether lines may climb past {@code maxGrade} as ramps and stairs (streets may, arterials not). */
         boolean climbing;
+        /** The town's districts, for the works' and quays' wider spacing; none for the arterials. */
+        Districts districts;
         /** Share of crossings with a street of the other family where a street ends instead, and their hash's seed. */
         double teeChance;
         long teeSeed;
@@ -6462,14 +6465,17 @@ public final class StreetLayer {
 
         /** The spacing at a position: the base, or for streets wider where the town is less intense. */
         double spacing(double x, double z) {
+            // Works and quays: few streets, large blocks (an industrial zone's blocks a few hundred across)
+            District district = districts == null ? District.NONE : districts.at(x, z);
+            double works = district == District.INDUSTRIAL || district == District.PORT ? config.industrialSpacing : 1.0;
             if (!thinning || grid(x, z)) {
-                return base;
+                return base * works;
             }
             double t = Math.max(0.0, Math.min(1.0, window.intensity(x, z)));
             // Quarters laid out apart, each its own: a smooth field widens the spacing here and narrows it there
             double quarter = 2.0 * ValueNoise.twoOctaves(teeSeed ^ 0x5BAC1L, x, z, config.spacingWavelength) - 1.0;
             return base * (config.thinSpacing - (config.thinSpacing - config.denseSpacing) * t)
-                    * Math.exp(config.spacingVariation * quarter);
+                    * Math.exp(config.spacingVariation * quarter) * works;
         }
 
         private long bucket(double x, double z) {
