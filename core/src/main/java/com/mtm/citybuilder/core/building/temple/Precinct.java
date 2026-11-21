@@ -203,8 +203,12 @@ public record Precinct(Kind kind, Rank rank, int width, int depth, long seed, Te
             frontDepth = (rk == Rank.LARGE ? 0 : rise) + 3 + forward + 2 + gateRoom + (k.ring ? 4 : 0);
             boolean fitsDepth = backMargin + innerDepth + frontDepth + minApproach <= depth;
             boolean fitsWidth = widthOf(k.main) + 2 <= courtW && widthOf(k.fore) + 2 <= courtW;
-            if (fitsDepth && fitsWidth || s <= 0.6 && essentials) {
+            if (fitsDepth && fitsWidth || s <= 0.6 && essentials && (rise == 0 || rk == Rank.LARGE)) {
                 break;
+            }
+            if (s <= 0.6 && essentials) { // last: a lower step up to the inner terrace, so its stairs need less room
+                rise--;
+                continue;
             }
             if (s <= 0.6) {
                 essentials = true;
@@ -221,7 +225,7 @@ public record Precinct(Kind kind, Rank rank, int width, int depth, long seed, Te
         keep.add(court);
         // A large precinct's corridor runs round the whole court on one level; smaller ones step up to the inner terrace.
         int lc = Earthwork.level(ground, rk == Rank.LARGE ? court : front);
-        int li = rk == Rank.LARGE ? lc : Math.max(lc, Math.min(lc + 6, Earthwork.level(ground, inner)));
+        int li = rk == Rank.LARGE ? lc : Math.max(lc, Math.min(lc + rise, Earthwork.level(ground, inner)));
         Earthwork.terrace(m, ground, front, lc, gravel());
         Earthwork.terrace(m, ground, inner, li, gravel());
         if (li > lc) {
@@ -303,8 +307,27 @@ public record Precinct(Kind kind, Rank rank, int width, int depth, long seed, Te
             }
         }
         if (k.torii != null) {
-            int tz = depth - 3;
-            put(m, k.torii, cx, tz, path[tz - court.z1()], "torii", keep, placed);
+            // On level ground near the street: the first place back from it where the path is flat under the torii and
+            // a block either side; failing that at the street, at the higher level, its pillars carried down.
+            int td = depthOf(k.torii), tz = depth - 3, level = Integer.MIN_VALUE;
+            for (int z = depth - 3; z >= Math.max(court.z1() + td + 2, depth - 12) && level == Integer.MIN_VALUE; z--) {
+                int l = path[z - court.z1()];
+                boolean flat = true;
+                for (int zz = z - td; zz <= Math.min(depth - 1, z + 1); zz++) {
+                    flat &= path[zz - court.z1()] == l;
+                }
+                if (flat) {
+                    tz = z;
+                    level = l;
+                }
+            }
+            if (level == Integer.MIN_VALUE) {
+                for (int zz = tz - td; zz <= Math.min(depth - 1, tz + 1); zz++) {
+                    level = Math.max(level, path[zz - court.z1()]);
+                }
+            }
+            Rect tr = put(m, k.torii, cx, tz, level, "torii", keep, placed);
+            feet(m, tr, level);
         }
         // The forest: an avenue along the approach, trees everywhere nothing is built.
         long trees = Hash.of(seed, 11);
@@ -433,6 +456,25 @@ public record Precinct(Kind kind, Rank rank, int width, int depth, long seed, Te
         m.place(t, x0, l, z0, false);
         keep.add(r);
         placed.add(new Placed("temizuya", r, l));
+    }
+
+    /** Carries down to the ground whatever stands at {@code level} in r over air (a torii's pillars on a step). */
+    private static void feet(Model m, Rect r, int level) {
+        for (int x = r.x0(); x < r.x1(); x++) {
+            for (int z = r.z0(); z < r.z1(); z++) {
+                String b = m.get(x, level, z);
+                if (b == null || b.equals(Model.AIR)) {
+                    continue;
+                }
+                for (int y = level - 1; y >= level - 4; y--) {
+                    String below = m.get(x, y, z);
+                    if (below != null && !below.equals(Model.AIR)) {
+                        break;
+                    }
+                    m.set(x, y, z, b);
+                }
+            }
+        }
     }
 
     static void fence(Model m, int x0, int z0, int x1, int z1, int level, String rail, int gapX, int gapHalf) {

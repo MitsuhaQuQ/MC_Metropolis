@@ -61,7 +61,7 @@ final class Earthwork {
                 }
                 int s = g.surface(x, z);
                 for (int y = level; y <= s; y++) {
-                    m.setIfEmpty(x, y, z, wall(x, y, z));
+                    m.setIfAbsent(x, y, z, wall(x, y, z));
                 }
             }
         }
@@ -147,7 +147,7 @@ final class Earthwork {
                 }
                 m.set(x, l - 1, z, Math.abs(x - cx) <= paveHalf || stair && !side ? paving : gravel);
                 for (int y = l; y <= Math.max(s, l + 3); y++) {
-                    m.setIfEmpty(x, y, z, AIR);
+                    m.setIfAbsent(x, y, z, AIR);
                 }
                 if (!side) {
                     if (stepDown) {
@@ -163,7 +163,7 @@ final class Earthwork {
             // Where the ground beside the bed stands higher, a wall holds it back.
             for (int x : new int[]{cx - bedHalf - 1, cx + bedHalf + 1}) {
                 for (int y = l; y <= g.surface(x, z); y++) {
-                    m.setIfEmpty(x, y, z, wall(x, y, z));
+                    m.setIfAbsent(x, y, z, wall(x, y, z));
                 }
             }
         }
@@ -236,7 +236,7 @@ final class Earthwork {
             for (int z = r.z0(); z < r.z1(); z++) {
                 int s = g.surface(x, z);
                 for (int y = bottom; y <= s; y++) {
-                    m.setIfEmpty(x, y, z, y == s ? "minecraft:grass_block" : FILL);
+                    m.setIfAbsent(x, y, z, y == s ? "minecraft:grass_block" : FILL);
                 }
             }
         }

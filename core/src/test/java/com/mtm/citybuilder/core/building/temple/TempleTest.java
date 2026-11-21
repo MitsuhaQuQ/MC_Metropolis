@@ -557,6 +557,22 @@ class TempleTest {
                         }
                         prev = top;
                     }
+                    // Nothing placed loses its foot to the earthworks: each building and torii has blocks in its
+                    // lowest rows (the terraces' cuts leave air there, which must not keep a building out).
+                    for (Precinct.Placed pl : placed) {
+                        if (pl.name().contains("garden") || pl.name().equals("karesansui")) {
+                            continue;
+                        }
+                        int n = 0;
+                        for (int x = pl.area().x0(); x < pl.area().x1(); x++) {
+                            for (int z = pl.area().z0(); z < pl.area().z1(); z++) {
+                                for (int y = pl.level(); y < pl.level() + 3; y++) {
+                                    n += solid(m, x, y, z) ? 1 : 0;
+                                }
+                            }
+                        }
+                        assertTrue(n >= 4, what + ": " + pl.name() + " has lost its foot (" + n + " blocks)");
+                    }
                     // Every building stands on something: its footprint's middle has ground under it.
                     for (Precinct.Placed pl : placed) {
                         int x = (pl.area().x0() + pl.area().x1()) / 2, z = (pl.area().z0() + pl.area().z1()) / 2;
@@ -578,8 +594,11 @@ class TempleTest {
                                     + placed.get(j).name() + " " + b);
                         }
                     }
-                    // No tree grows inside a building.
+                    // No tree grows inside a building (a moss garden has its own maples).
                     for (Precinct.Placed pl : placed) {
+                        if (pl.name().equals("moss_garden")) {
+                            continue;
+                        }
                         Rect r = pl.area();
                         m.forEach((x, y, z, s) -> {
                             if (r.contains(x, z) && y >= pl.level() && (s.startsWith("minecraft:spruce_log")

@@ -9,6 +9,8 @@ import java.util.Map;
  * parses them. y is up; x and z may go negative while building.
  */
 public final class Model {
+    static final String AIR = "minecraft:air";
+
     private static final int OFF = 1 << 20;
     private final Map<Long, String> blocks = new HashMap<>();
     private int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
@@ -35,8 +37,21 @@ public final class Model {
         maxZ = Math.max(maxZ, z);
     }
 
-    /** Sets a block only where there is none yet. */
+    /**
+     * Sets a block only where there is none yet. Air put there (an earthwork's cut, a doorway) counts as none: what
+     * is placed later fills it, so a building set on a terrace keeps its walls where the cut cleared the hill.
+     */
     public void setIfEmpty(int x, int y, int z, String state) {
+        if (!has(x, y, z) || AIR.equals(get(x, y, z))) {
+            set(x, y, z, state);
+        }
+    }
+
+    /**
+     * Sets a block only where nothing at all is recorded, not even air: for earthworks and trees, which must not
+     * fill back what a cut has cleared.
+     */
+    public void setIfAbsent(int x, int y, int z, String state) {
         if (!has(x, y, z)) {
             set(x, y, z, state);
         }

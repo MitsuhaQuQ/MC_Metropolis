@@ -36,7 +36,7 @@ final class Grove {
     /** A tall conical tree: a straight trunk, leaves in rings narrowing to the top, the lower third bare. */
     private static void conifer(Model m, int x, int y, int z, int height, String log, String leaves, int maxR) {
         for (int i = 0; i < height; i++) {
-            m.setIfEmpty(x, y + i, z, log + "[axis=y]");
+            m.setIfAbsent(x, y + i, z, log + "[axis=y]");
         }
         int crownFrom = height / 3;
         for (int i = crownFrom; i <= height; i++) {
@@ -45,18 +45,18 @@ final class Grove {
             for (int dx = -r; dx <= r; dx++) {
                 for (int dz = -r; dz <= r; dz++) {
                     if (dx * dx + dz * dz <= r * r + 1 && (dx != 0 || dz != 0 || i >= height)) {
-                        m.setIfEmpty(x + dx, y + i, z + dz, leaves);
+                        m.setIfAbsent(x + dx, y + i, z + dz, leaves);
                     }
                 }
             }
         }
-        m.setIfEmpty(x, y + height, z, leaves);
+        m.setIfAbsent(x, y + height, z, leaves);
     }
 
     /** A broad tree: a short trunk under a round crown. */
     private static void broad(Model m, int x, int y, int z, int trunk, int r, String log, String leaves) {
         for (int i = 0; i < trunk + 1; i++) {
-            m.setIfEmpty(x, y + i, z, log + "[axis=y]");
+            m.setIfAbsent(x, y + i, z, log + "[axis=y]");
         }
         int cy = y + trunk + 1;
         for (int dx = -r; dx <= r; dx++) {
@@ -64,7 +64,7 @@ final class Grove {
                 for (int dz = -r; dz <= r; dz++) {
                     double d = dx * dx + dz * dz + 1.6 * dy * dy;
                     if (d <= r * r + 0.5) {
-                        m.setIfEmpty(x + dx, cy + dy, z + dz, leaves);
+                        m.setIfAbsent(x + dx, cy + dy, z + dz, leaves);
                     }
                 }
             }
