@@ -13,5 +13,9 @@
   "block.citybuilder.bridge_bearing": "Bridge Bearing",
   "block.citybuilder.expansion_joint": "Expansion Joint",
   "block.citybuilder.deck_drain": "Deck Drain",
-  "block.citybuilder.drain_pipe": "Drain Pipe"
+  "block.citybuilder.drain_pipe": "Drain Pipe",
+  "block.citybuilder.catenary_pole": "Catenary Pole",
+  "block.citybuilder.catenary_beam": "Catenary Portal Beam",
+  "block.citybuilder.catenary_arm": "Catenary Cantilever Arm",
+  "block.citybuilder.catenary_hanger": "Catenary Drop Hanger"
 }

@@ -9,7 +9,8 @@ import net.minecraft.client.renderer.RenderType;
 public final class CityBuilderFabricClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
-        BlockRenderLayerMap.INSTANCE.putBlock(CityBlocks.BRIDGE_RAILING.get(), RenderType.cutout());
+        BlockRenderLayerMap.INSTANCE.putBlocks(RenderType.cutout(), CityBlocks.BRIDGE_RAILING.get(),
+                CityBlocks.CATENARY_BEAM.get(), CityBlocks.CATENARY_HANGER.get());
         BlockRenderLayerMap.INSTANCE.putBlock(CityBlocks.SOUND_BARRIER_CLEAR.get(), RenderType.translucent());
     }
 }

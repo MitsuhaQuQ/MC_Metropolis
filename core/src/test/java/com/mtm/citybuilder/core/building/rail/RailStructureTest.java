@@ -390,6 +390,36 @@ class RailStructureTest {
     }
 
     @Test
+    void catenaryPortalsSpanTheTracksAndCantileversReachOne() {
+        for (int tracks = 1; tracks <= 4; tracks++) {
+            Viaduct v = Viaduct.builder(Viaduct.Deck.RAIL, 120, 9).tracks(tracks).build();
+            Model m = v.build();
+            int h = v.halfWidth(), beam = 9 + Catenary.BEAM_HEIGHT;
+            int found = 0;
+            for (int x = 0; x <= 120; x++) {
+                if (!(Catenary.POLE).equals(m.get(x, 10, -h + 1))) {
+                    continue;
+                }
+                found++;
+                for (int tc : v.trackCentres()) {
+                    if (tracks == 1) {  // a cantilever: the arm out to the track, the hanger under it
+                        assertEquals(Catenary.ARM + "[axis=z]", m.get(x, beam - 1, tc));
+                        assertEquals(Catenary.HANGER, m.get(x, beam - 2, tc));
+                    } else {  // a portal: the beam across, a hanger over every track
+                        assertEquals(Catenary.BEAM + "[axis=z]", m.get(x, beam, tc));
+                        assertEquals(Catenary.HANGER, m.get(x, beam - 1, tc));
+                        assertEquals(Catenary.POLE, m.get(x, beam - 1, h - 1));
+                    }
+                    for (int y = 9; y < 9 + Catenary.TRAIN_HEIGHT; y++) {
+                        assertFalse(m.has(x, y, tc), "the train's way under the catenary");
+                    }
+                }
+            }
+            assertTrue(found >= 3, tracks + " tracks: portals along the viaduct: " + found);
+        }
+    }
+
+    @Test
     void decksFollowMtrsVerticalCurves() {
         for (int[] lv : new int[][] {{4, 11}, {12, 6}, {9, 10}}) {
             Viaduct v = Viaduct.builder(Viaduct.Deck.RAIL, 140, lv[0]).levelEnd(lv[1]).tracks(1).catenary(false).build();

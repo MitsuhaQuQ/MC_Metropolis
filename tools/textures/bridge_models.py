@@ -29,6 +29,10 @@ NAMES = {
     'expansion_joint': ('Expansion Joint', '伸缩缝'),
     'deck_drain': ('Deck Drain', '桥面排水口'),
     'drain_pipe': ('Drain Pipe', '排水管'),
+    'catenary_pole': ('Catenary Pole', '接触网支柱'),
+    'catenary_beam': ('Catenary Portal Beam', '接触网门架横梁'),
+    'catenary_arm': ('Catenary Cantilever Arm', '接触网腕臂'),
+    'catenary_hanger': ('Catenary Drop Hanger', '接触网吊柱'),
 }
 FACING_Y = {'north': 0, 'east': 90, 'south': 180, 'west': 270}
 
@@ -81,6 +85,44 @@ def edge(name, side, top, x0, x1, depth, render=None):
         for f, y in FACING_Y.items()}})
 
 
+def single(name, elements, side, top, render=None):
+    write(os.path.join(MODELS, name + '.json'), model(elements, side, top, render=render))
+    write(os.path.join(BLOCKSTATES, name + '.json'), {'variants': {'': {'model': 'citybuilder:block/' + name}}})
+
+
+def along(name, elements, side, top, render=None):
+    """A piece running along x, turned for axis=z."""
+    write(os.path.join(MODELS, name + '.json'), model(elements, side, top, render=render))
+    write(os.path.join(BLOCKSTATES, name + '.json'), {'variants': {
+        'axis=x': {'model': 'citybuilder:block/' + name},
+        'axis=z': {'model': 'citybuilder:block/' + name, 'y': 90}}})
+
+
+def catenary():
+    single('catenary_pole', [box((5, 0, 5), (11, 16, 11), 'catenary_pole', 'catenary_pole_top')],
+           'catenary_pole', 'catenary_pole_top')
+    beam = box((0, 4, 4), (16, 12, 12), 'catenary_beam', 'catenary_beam')
+    for face in ('east', 'west'):  # the ends show the beam's square section
+        beam['faces'][face]['texture'] = '#top'
+        beam['faces'][face]['uv'] = [0, 0, 16, 16]
+    for face in ('up', 'down'):  # the top and bottom chords seen from above: the lattice again
+        beam['faces'][face]['texture'] = '#side'
+        beam['faces'][face]['uv'] = [0, 4, 16, 12]
+    write(os.path.join(MODELS, 'catenary_beam.json'), {
+        'parent': 'minecraft:block/block', 'render_type': 'minecraft:cutout',
+        'textures': {'particle': tex('catenary_beam'), 'side': tex('catenary_beam'), 'top': tex('catenary_beam_end'),
+                     'bottom': tex('catenary_beam_end')},
+        'elements': [beam]})
+    write(os.path.join(BLOCKSTATES, 'catenary_beam.json'), {'variants': {
+        'axis=x': {'model': 'citybuilder:block/catenary_beam'},
+        'axis=z': {'model': 'citybuilder:block/catenary_beam', 'y': 90}}})
+    along('catenary_arm', [box((0, 7, 7), (16, 9, 9), 'catenary_arm', 'catenary_arm')], 'catenary_arm', 'catenary_arm')
+    single('catenary_hanger', [box((7, 8, 7), (9, 16, 9), 'catenary_hanger', 'catenary_hanger'),
+                               box((5, 2, 5), (11, 8, 11), 'catenary_hanger', 'catenary_hanger'),
+                               box((5, 0, 5), (11, 2, 11), 'catenary_hanger', 'catenary_hanger')],
+           'catenary_hanger', 'catenary_hanger', 'cutout')
+
+
 def main():
     edge('concrete_parapet', 'concrete_parapet', 'concrete_parapet_top', 0, 16, 5)
     edge('bridge_railing', 'bridge_railing', 'bridge_railing_top', 0, 16, 2, 'cutout')
@@ -106,6 +148,7 @@ def main():
     write(os.path.join(MODELS, 'deck_drain.json'), {'parent': 'minecraft:block/cube_bottom_top', 'textures': {
         'top': tex('deck_drain'), 'bottom': tex('deck_side'), 'side': tex('deck_side')}})
     write(os.path.join(BLOCKSTATES, 'deck_drain.json'), {'variants': {'': {'model': 'citybuilder:block/deck_drain'}}})
+    catenary()
     for name in NAMES:
         write(os.path.join(ITEMS, name + '.json'), {'parent': 'citybuilder:block/' + name})
         write(os.path.join(LOOT, name + '.json'), {'type': 'minecraft:block', 'pools': [{

@@ -140,7 +140,7 @@ public final class BrickViaduct {
             int last = -1000;
             for (int x : supports) {
                 if (x - last >= 30) {
-                    Viaduct.catenary(m, p, Math.min(Math.max(x, 1), length - 1), level, h);
+                    Catenary.place(m, Math.min(Math.max(x, 1), length - 1), level, h, trackZ);
                     last = x;
                 }
             }

@@ -9,7 +9,8 @@ import java.util.function.Supplier;
 
 /**
  * This mod's own blocks: the streets' paving and markings, and the details of bridges and viaducts (parapets,
- * railings, sound barriers, steel girders, bearings, joints, drains). Their textures are drawn for this mod (see
+ * railings, sound barriers, steel girders, bearings, joints, drains) and the catenary portals (poles, lattice beams,
+ * cantilever arms, drop hangers). Their textures are drawn for this mod (see
  * {@code assets/citybuilder/ATTRIBUTION}).
  */
 public final class CityBlocks {
@@ -43,6 +44,15 @@ public final class CityBlocks {
     /** A drain pipe (排水管) down a pier's side. */
     public static Supplier<Block> DRAIN_PIPE;
 
+    /** A catenary pole: a galvanised steel H section. */
+    public static Supplier<Block> CATENARY_POLE;
+    /** A catenary portal's lattice beam across the tracks. */
+    public static Supplier<Block> CATENARY_BEAM;
+    /** A cantilever's arm reaching from its pole over the track. */
+    public static Supplier<Block> CATENARY_ARM;
+    /** A drop hanger with its string of insulators, holding the wires over a track. */
+    public static Supplier<Block> CATENARY_HANGER;
+
     private CityBlocks() {
     }
 
@@ -71,6 +81,14 @@ public final class CityBlocks {
         EXPANSION_JOINT = platform.registerBlock("expansion_joint", () -> new JointBlock(properties()));
         DECK_DRAIN = platform.registerBlock("deck_drain", () -> new Block(properties()));
         DRAIN_PIPE = platform.registerBlock("drain_pipe", () -> new EdgeBlock(thin(Blocks.IRON_BARS), 6, 10, 16, 4));
+        CATENARY_POLE = platform.registerBlock("catenary_pole",
+                () -> new ShapedBlock(thin(Blocks.IRON_BARS), Block.box(5, 0, 5, 11, 16, 11)));
+        CATENARY_BEAM = platform.registerBlock("catenary_beam",
+                () -> new AxisShapedBlock(thin(Blocks.IRON_BARS), 4, 12, 4, 12));
+        CATENARY_ARM = platform.registerBlock("catenary_arm",
+                () -> new AxisShapedBlock(thin(Blocks.IRON_BARS), 7, 9, 7, 9));
+        CATENARY_HANGER = platform.registerBlock("catenary_hanger",
+                () -> new ShapedBlock(thin(Blocks.IRON_BARS), Block.box(5, 0, 5, 11, 16, 11)));
     }
 
     /** Properties of a block that does not fill its cube (light and faces behind it show). */

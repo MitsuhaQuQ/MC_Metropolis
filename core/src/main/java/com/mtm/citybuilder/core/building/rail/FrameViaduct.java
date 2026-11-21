@@ -155,7 +155,7 @@ public final class FrameViaduct {
         int last = -1000;
         for (Spans.Span s : spans) {
             if (s.from() - last >= 48 && s.from() > 0) {
-                Viaduct.catenary(m, p, s.from(), level + wallHeight - 1, half);
+                Catenary.place(m, s.from(), level, half, trackZ);
                 last = s.from();
             }
         }

@@ -13,5 +13,9 @@
   "block.citybuilder.bridge_bearing": "桥梁支座",
   "block.citybuilder.expansion_joint": "伸缩缝",
   "block.citybuilder.deck_drain": "桥面排水口",
-  "block.citybuilder.drain_pipe": "排水管"
+  "block.citybuilder.drain_pipe": "排水管",
+  "block.citybuilder.catenary_pole": "接触网支柱",
+  "block.citybuilder.catenary_beam": "接触网门架横梁",
+  "block.citybuilder.catenary_arm": "接触网腕臂",
+  "block.citybuilder.catenary_hanger": "接触网吊柱"
 }

@@ -583,19 +583,7 @@ public final class Viaduct {
     }
 
     private void pole(Model m, int x) {
-        catenary(m, p, x, levelAt(x), halfWidth());
+        Catenary.place(m, x, levelAt(x), halfWidth(), trackZ);
     }
 
-    /** A catenary portal at x: poles a block in from both edges of a deck of half-width h, a beam across them. */
-    static void catenary(Model m, RailPalette p, int x, int lv, int h) {
-        int height = 6;
-        for (int side : new int[] {-h + 1, h - 1}) {
-            for (int y = lv; y < lv + height; y++) {
-                m.set(x, y, side, p.pole());
-            }
-        }
-        for (int z = -h + 1; z <= h - 1; z++) {
-            m.set(x, lv + height, z, p.pole());
-        }
-    }
 }

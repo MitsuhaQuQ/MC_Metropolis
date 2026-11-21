@@ -651,7 +651,16 @@ def build(out):
         blocks = {(x, y, z): state(st) for x, y, z, st in model['blocks']}
         size = tuple(model['size'])
         write_nbt(os.path.join(out, slug + '.nbt'), blocks, size)
-        pv.render(blocks, size, os.path.join(out, slug + '.png'), bc)
+        # The catenary's thin steel drawn as posts (the renderer takes names ending in _fence for those)
+        thin = {}
+        for k, (name, props) in blocks.items():
+            if name in ('citybuilder:catenary_beam', 'citybuilder:catenary_arm'):  # a bar across: drawn as a top slab
+                props = {'type': 'top'}
+            elif name.startswith('citybuilder:catenary_'):
+                bc[name + '_fence'] = bc.get(name, (168, 172, 174))
+                name = name + '_fence'
+            thin[k] = (name, props)
+        pv.render(thin, size, os.path.join(out, slug + '.png'), bc)
         spec = names.get(slug, {})
         e = {'slug': slug, 'name': spec.get('name', slug), 'kind': spec.get('kind'), 'size': list(size),
              'origin': model['origin'], 'level': model['level'], 'tracks': model['tracks'], 'spans': model['spans'],
