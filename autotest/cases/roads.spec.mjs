@@ -17,6 +17,8 @@ async function around(p) {
 }
 
 test('a road on the ground is paved and marked, graded to its height, clear overhead', async () => {
+  // Routed ahead on the planner's thread, as for a player there
+  await server.planAround(TOWN.x, TOWN.z);
   const p = await server.road(TOWN.x, TOWN.z, 'SURFACE');
   console.log('road', JSON.stringify(p));
   expect(p.found).toBe(true);

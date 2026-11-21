@@ -444,6 +444,11 @@ public final class ChunkLayer {
         return roads.cells(chunkX, chunkZ, streets);
     }
 
+    /** Routes the intercity roads that may reach a rectangle ahead of its chunks (see {@link RoadChunks#prepare}). */
+    public int prepareRoads(double minX, double minZ, double maxX, double maxZ) {
+        return roads.prepare(minX, minZ, maxX, maxZ);
+    }
+
     /** The direction of the {@link #ANGLES} nearest a heading, a line having no sense. */
     public static int angle(double heading) {
         double steps = heading / Math.PI * ANGLES;

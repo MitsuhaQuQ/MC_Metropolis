@@ -15,7 +15,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Plans towns ahead of the players, on a background thread, so the chunks of a town find its plan ready when they are
+ * Plans towns, and routes the intercity roads, ahead of the players, on a background thread, so the chunks of a town find its plan ready when they are
  * generated instead of holding up the world generator's threads while it is made. Every {@link #INTERVAL} ticks, for
  * each player, the towns whose built land may come within {@link #AHEAD} blocks of them are queued, nearest first;
  * one thread plans them in turn. A chunk of a town not yet planned (a player outrunning the planner, a teleport) still
@@ -104,6 +104,13 @@ public final class CityPlanner {
             logic.streetPlan(town);
             CityBuilder.LOGGER.info("Planned the {} at {} {} ahead of the players in {} s", town.tier(),
                     Math.round(town.x()), Math.round(town.z()), String.format("%.1f", (System.nanoTime() - start) / 1e9));
+        }
+        // The intercity roads that may pass within AHEAD, routed and indexed for the chunks
+        long roadStart = System.nanoTime();
+        int routed = logic.chunks().prepareRoads(x - AHEAD, z - AHEAD, x + AHEAD, z + AHEAD);
+        double roadSeconds = (System.nanoTime() - roadStart) / 1e9;
+        if (routed > 0) {
+            CityBuilder.LOGGER.info("Routed {} roads ahead of the players in {} s", routed, String.format("%.1f", roadSeconds));
         }
         // The airports whose fields may reach within AHEAD (sited once per town, then kept): their siting reads the
         // terrain all round a town, tens of seconds when it is new

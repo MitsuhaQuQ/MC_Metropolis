@@ -57,7 +57,7 @@ public final class RoadChunks {
 
     private final CityLogic logic;
     private final Map<Long, List<RoadEdge>> edges = lru(64);
-    private final Map<String, Index> indexes = lru(512);
+    private final Map<String, Index> indexes = lru(2048);
 
     public RoadChunks(CityLogic logic) {
         this.logic = logic;
@@ -114,6 +114,34 @@ public final class RoadChunks {
             }
         }
         return any ? cells : null;
+    }
+
+    /**
+     * Routes and indexes ahead of time every road whose routing window touches a rectangle, so the chunks there find
+     * them ready: for a planner thread, as routing a road takes a tenth of a second or more. Returns how many roads it
+     * routed that were not ready.
+     */
+    public int prepare(double minX, double minZ, double maxX, double maxZ) {
+        int routed = 0;
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (int rx = Math.floorDiv((int) Math.floor(minX), REGION); rx <= Math.floorDiv((int) Math.floor(maxX), REGION); rx++) {
+            for (int rz = Math.floorDiv((int) Math.floor(minZ), REGION); rz <= Math.floorDiv((int) Math.floor(maxZ), REGION); rz++) {
+                for (RoadEdge edge : edges(rx * (REGION / 16), rz * (REGION / 16))) {
+                    if (!seen.add(edge.key())) {
+                        continue;
+                    }
+                    boolean ready;
+                    synchronized (indexes) {
+                        ready = indexes.containsKey(edge.key());
+                    }
+                    if (!ready) {
+                        index(edge);
+                        routed++;
+                    }
+                }
+            }
+        }
+        return routed;
     }
 
     /** The cell of the road nearest a position, measured from its edge, or null beyond every road's slopes. */
