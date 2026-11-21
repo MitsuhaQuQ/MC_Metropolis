@@ -257,6 +257,10 @@ public final class BuildingLayer {
         FLOOD,
         /** A bollard on a quay. */
         BOLLARD,
+        /** A car's body. */
+        CAR,
+        /** A car's windows. */
+        CAR_GLASS,
         /** Shelves, chests and barrels against a wall. */
         SHELF,
         /** A low table (a slab). */
@@ -613,6 +617,7 @@ public final class BuildingLayer {
                 case PETROCHEMICAL -> 0.3;
                 case WAREHOUSE -> 0.6;
                 case PORT -> 0.25;
+                case FERRY_TERMINAL -> 0.4;
                 case TANK_FARM, CONTAINER_YARD -> 0.12;
                 default -> 0.25;
             };
@@ -1839,7 +1844,8 @@ public final class BuildingLayer {
     /** Kinds of a plant's equipment. */
     public enum Equipment {
         TANK, SPHERE, COLUMN, RACK, FLARE, STACK, BOILER, COAL, GANTRY, TRANSFORMER,
-        BIG_TANK, CONTAINERS, CONTAINERS_RTG, STS, JIB, TRUCK, LIGHT_TOWER
+        BIG_TANK, CONTAINERS, CONTAINERS_RTG, STS, JIB, TRUCK, LIGHT_TOWER,
+        GANGWAY, LANES, PARKING, BUS_SHELTER
     }
 
     /**
@@ -1875,14 +1881,17 @@ public final class BuildingLayer {
             case TRANSFORMER, LIGHT_TOWER -> e.r() + 0.5;
             case BIG_TANK -> e.r() + 2.5;
             case CONTAINERS_RTG -> e.r() + 1.0;
+            case LANES, PARKING, BUS_SHELTER -> e.r();
+            case GANGWAY -> 1.5;
         };
     }
 
     /** How far an elongated piece reaches across the frontage's direction (v): a lorry, a pipe rack. */
     private static double reachAcross(Equip e) {
         return switch (e.kind()) {
-            case TRUCK -> 1.0;
+            case TRUCK, BUS_SHELTER -> 1.0;
             case RACK -> 1.6;
+            case GANGWAY -> e.r();
             default -> reach(e);
         };
     }
@@ -1907,6 +1916,9 @@ public final class BuildingLayer {
             case JIB -> new Equip(kind, u, v, 7.0, 14 + (int) Math.floor(4.0 * size));
             case TRUCK -> new Equip(kind, u, v, 3.0, 0);
             case LIGHT_TOWER -> new Equip(kind, u, v, 0.6, 18 + (int) Math.floor(4.0 * size));
+            case LANES, PARKING -> new Equip(kind, u, v, size < 0.4 ? 4.0 : 6.0, 0);
+            case BUS_SHELTER -> new Equip(kind, u, v, 3.0, 3);
+            case GANGWAY -> new Equip(kind, u, v, 1.0, 6);
         };
     }
 
@@ -1937,6 +1949,24 @@ public final class BuildingLayer {
         java.util.List<double[]> quay = new java.util.ArrayList<>(points);
         quay.sort(java.util.Comparator.comparingDouble(p -> -p[1]));
         int k = 0;
+        if (program == Program.FERRY_TERMINAL) {
+            // Boarding bridges from the terminal's back out to the quay, one or (on a wide terminal) two
+            double from = b.back() + 1.0;
+            double to = b.lotDepth() - 1.0;
+            if (to - from >= 4.0) {
+                double[] at = w >= 16.0 ? new double[]{Math.floor(0.25 * w) + 0.5, Math.floor(0.75 * w) + 0.5} : new double[]{Math.floor(0.5 * w) + 0.5};
+                for (double gu : at) {
+                    Equip g = new Equip(Equipment.GANGWAY, gu, 0.5 * (from + to), 0.5 * (to - from), 6);
+                    boolean on = true;
+                    for (double dv = -g.r(); dv <= g.r() && on; dv += 1.0) {
+                        on = onLot(b, plots, plot, g.u(), g.v() + dv);
+                    }
+                    if (on) {
+                        out.add(g);
+                    }
+                }
+            }
+        }
         for (Equipment kind : first) {
             java.util.List<double[]> order = kind == Equipment.STS || kind == Equipment.JIB ? quay : points;
             if (kind == Equipment.FLARE) {
@@ -1960,8 +1990,15 @@ public final class BuildingLayer {
                 case PORT -> a < 0.4 ? Equipment.CONTAINERS_RTG : a < 0.65 ? Equipment.CONTAINERS
                         : a < 0.9 ? Equipment.TRUCK : Equipment.LIGHT_TOWER;
                 case WAREHOUSE -> a < 0.8 ? Equipment.TRUCK : Equipment.LIGHT_TOWER;
+                case FERRY_TERMINAL -> a < 0.35 ? Equipment.LANES : a < 0.65 ? Equipment.PARKING
+                        : a < 0.85 ? Equipment.BUS_SHELTER : Equipment.LIGHT_TOWER;
                 default -> a < 0.55 ? Equipment.GANTRY : Equipment.TRANSFORMER;
             };
+            if (kind == Equipment.LIGHT_TOWER && out.stream().filter(e -> e.kind() == Equipment.LIGHT_TOWER).count() >= 3) {
+                // Floodlights are few, however much room is left
+                k++;
+                continue;
+            }
             Equip placed = place(b, plots, plot, out, points, kind, Hash.unit(Hash.of(b.variant(), k, 2)));
             k++;
             if (placed != null) {
@@ -2023,14 +2060,15 @@ public final class BuildingLayer {
         double u = c.u();
         double v = c.v();
         double w = b.width();
-        if (b.program() == Program.PORT && c.lot() == Face.BACK) {
+        boolean ferry = b.program() == Program.FERRY_TERMINAL;
+        if ((b.program() == Program.PORT || ferry) && c.lot() == Face.BACK) {
             // The quay's edge on the water, bollards along it
             if (dy == 0) {
                 return Part.BANK;
             }
             return dy == 1 && Math.floorMod((long) Math.floor(u), 8L) == 0 ? Part.BOLLARD : Part.NONE;
         }
-        if (c.lot() != Face.NONE || v < 1.0) {
+        if (!ferry && (c.lot() != Face.NONE || v < 1.0)) {
             boolean gate = v < 1.0 && Math.abs(u - 0.5 * w) < 4.0;
             if (dy == 0) {
                 return gate ? Part.PAVING : Part.GRAVEL;
@@ -2047,8 +2085,8 @@ public final class BuildingLayer {
             return null;
         }
         if (dy == 0) {
-            // A road from the gate to the building's front, gravel elsewhere
-            return v < b.front() && Math.abs(u - 0.5 * w) < 4.0 ? Part.PAVING : Part.GRAVEL;
+            // A road from the gate to the building's front, gravel elsewhere; a ferry terminal's forecourt paved
+            return ferry || v < b.front() && Math.abs(u - 0.5 * w) < 4.0 ? Part.PAVING : Part.GRAVEL;
         }
         return Part.NONE;
     }
@@ -2253,6 +2291,42 @@ public final class BuildingLayer {
                 }
                 return dy <= 3 ? container(e, 0, (int) Math.floor(du), 0) : Part.NONE;
             }
+            case GANGWAY -> {
+                // A boarding bridge: a glazed corridor on legs, open at the quay end
+                if (Math.abs(du) >= 1.5 || Math.abs(dv) > r + 0.5) {
+                    return null;
+                }
+                boolean side = Math.abs(du) >= 1.0;
+                if (dy == 0) {
+                    return Part.PAVING;
+                }
+                if (dy < h) {
+                    return side && Math.floorMod((long) Math.floor(dv + r), 5L) == 0 ? Part.POLE : Part.NONE;
+                }
+                if (dy == h || dy == h + 3) {
+                    return Part.FLAT;
+                }
+                if (dy <= h + 2) {
+                    return side ? Part.WINDOW : Part.AIR;
+                }
+                return Part.NONE;
+            }
+            case LANES, PARKING -> {
+                return carLot(e, du, dv, dy);
+            }
+            case BUS_SHELTER -> {
+                if (Math.abs(du) >= r || Math.abs(dv) >= 1.0) {
+                    return null;
+                }
+                if (dy == 0) {
+                    return Part.PAVING;
+                }
+                boolean post = Math.abs(du) >= r - 1.0;
+                if (dy < h) {
+                    return post ? Part.POLE : dy == 1 && dv >= 0.0 ? Part.ENGAWA : Part.NONE;
+                }
+                return dy == h ? Part.HOOD : Part.NONE;
+            }
             case LIGHT_TOWER -> {
                 if (d >= r + 0.5) {
                     return null;
@@ -2269,6 +2343,37 @@ public final class BuildingLayer {
                 return null;
             }
         }
+    }
+
+    /**
+     * Cars on painted asphalt: a ferry's queuing lanes (cars nose to tail along the frontage's direction, lanes three
+     * blocks apart) or a car park (bays three wide across, cars in some).
+     */
+    private static Part carLot(Equip e, double du, double dv, int dy) {
+        double r = e.r();
+        if (Math.abs(du) >= r || Math.abs(dv) >= r) {
+            return null;
+        }
+        boolean lanes = e.kind() == Equipment.LANES;
+        long seed = (long) Math.floor(e.u() * 2.0) * 31L + (long) Math.floor(e.v() * 2.0);
+        double along = lanes ? du + r : dv + r;
+        double across = lanes ? dv + r : du + r;
+        int lane = (int) Math.floor(across / 3.0);
+        double inLane = across - 3.0 * lane;
+        if (dy == 0) {
+            return inLane < 0.5 ? Part.LINE : Part.PAVING;
+        }
+        // A car five long and two wide, a block's gap between
+        int slot = (int) Math.floor(along / 5.0);
+        double inSlot = along - 5.0 * slot;
+        boolean parked = Hash.unit(Hash.of(seed, lane, slot)) < (lanes ? 0.7 : 0.55);
+        if (!parked || inLane < 0.5 || inLane >= 2.5 || inSlot >= 4.0) {
+            return Part.NONE;
+        }
+        if (dy == 1) {
+            return Part.CAR;
+        }
+        return dy == 2 && inSlot >= 1.0 && inSlot < 3.0 ? Part.CAR_GLASS : Part.NONE;
     }
 
     /** A container's colour, by where it stands in its block and its tier. */

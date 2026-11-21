@@ -226,7 +226,7 @@ public final class Catalog {
             "kitchen", "counter", "desk", "storage", "outerStairs", "mesh", "chimney", "chimneyTop",
             "danchiNumber", "crest", "tankShell", "pipe", "deck", "stack", "coal", "steel",
             "transformer", "flareTop", "container", "crane", "craneHouse",
-            "bund", "truckCab", "flood", "bollard");
+            "bund", "truckCab", "flood", "bollard", "car", "carGlass");
 
     /** Gson is used here only. */
     private static final class Json {

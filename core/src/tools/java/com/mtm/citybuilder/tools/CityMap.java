@@ -145,9 +145,9 @@ public final class CityMap {
                 // preview:FLATS, WORKS, DANCHI look for the nearest block of flats with open corridors, works, danchi
                 // (built the Kanto way), and centre on it
                 String find = "FLATS".equals(quarter) || "WORKS".equals(quarter) || "DANCHI".equals(quarter)
-                        || "PLANTS".equals(quarter) || "PORTS".equals(quarter) ? quarter : null;
+                        || "PLANTS".equals(quarter) || "PORTS".equals(quarter) || "FERRIES".equals(quarter) ? quarter : null;
                 boolean flats = find != null;
-                if (flats && !"PLANTS".equals(find) && !"PORTS".equals(find)) {
+                if (flats && !"PLANTS".equals(find) && !"PORTS".equals(find) && !"FERRIES".equals(find)) {
                     quarter = "DANCHI".equals(find) ? "KANTO" : null;
                 }
                 if (quarter != null && quarter.endsWith("_CUT")) {
@@ -199,8 +199,11 @@ public final class CityMap {
                             return plot.side() > 0 && !plot.interior();
                         }
                     });
-                } else if (quarter != null && quarter.equals("PORTS")) {
-                    // preview:PORTS makes big lots cargo wharves, and centres on one with its quay cranes
+                } else if (quarter != null && (quarter.equals("PORTS") || quarter.equals("FERRIES"))) {
+                    // preview:PORTS (FERRIES) makes big lots cargo wharves (ferry terminals), and centres on one with its
+                    // quay cranes (boarding bridges)
+                    com.mtm.citybuilder.core.building.Program wharf = quarter.equals("FERRIES")
+                            ? com.mtm.citybuilder.core.building.Program.FERRY_TERMINAL : com.mtm.citybuilder.core.building.Program.PORT;
                     logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
                         @Override
                         public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {
@@ -209,8 +212,7 @@ public final class CityMap {
 
                         @Override
                         public com.mtm.citybuilder.core.building.Program program(com.mtm.citybuilder.core.plot.Plot plot) {
-                            return plot.frontage() < 24.0 || plot.maxDepth() < 26.0 ? null
-                                    : com.mtm.citybuilder.core.building.Program.PORT;
+                            return plot.frontage() < 24.0 || plot.maxDepth() < 26.0 ? null : wharf;
                         }
                     });
                 } else if (quarter != null && quarter.equals("PLANTS")) {
@@ -234,7 +236,8 @@ public final class CityMap {
                                     com.mtm.citybuilder.core.building.Program.TANK_FARM,
                                     com.mtm.citybuilder.core.building.Program.CONTAINER_YARD,
                                     com.mtm.citybuilder.core.building.Program.PORT,
-                                    com.mtm.citybuilder.core.building.Program.WAREHOUSE};
+                                    com.mtm.citybuilder.core.building.Program.WAREHOUSE,
+                                    com.mtm.citybuilder.core.building.Program.FERRY_TERMINAL};
                             return plants[(int) Math.floorMod(plot.id(), (long) plants.length)];
                         }
                     });
@@ -274,6 +277,9 @@ public final class CityMap {
                             com.mtm.citybuilder.core.building.Building b = p == null ? null : logic.buildings().building(town, p);
                             boolean wanted = b != null && switch (find) {
                                 case "WORKS" -> b.type() == com.mtm.citybuilder.core.building.Building.Type.WORKS;
+                                case "FERRIES" -> b.program() == com.mtm.citybuilder.core.building.Program.FERRY_TERMINAL
+                                        && com.mtm.citybuilder.core.building.BuildingLayer.plantEquipment(b).stream().anyMatch(e ->
+                                        e.kind() == com.mtm.citybuilder.core.building.BuildingLayer.Equipment.GANGWAY);
                                 case "PORTS" -> b.program() == com.mtm.citybuilder.core.building.Program.PORT
                                         && com.mtm.citybuilder.core.building.BuildingLayer.plantEquipment(b).stream().anyMatch(e ->
                                         e.kind() == com.mtm.citybuilder.core.building.BuildingLayer.Equipment.STS);
