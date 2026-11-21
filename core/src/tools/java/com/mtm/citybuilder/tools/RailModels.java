@@ -10,6 +10,8 @@ import com.mtm.citybuilder.core.building.rail.CrossSection;
 import com.mtm.citybuilder.core.building.rail.Curve;
 import com.mtm.citybuilder.core.building.rail.CurveMarker;
 import com.mtm.citybuilder.core.building.rail.CutCoverTunnel;
+import com.mtm.citybuilder.core.building.rail.DeepStation;
+import com.mtm.citybuilder.core.building.rail.ShieldTunnel;
 import com.mtm.citybuilder.core.building.rail.UndergroundStation;
 import com.mtm.citybuilder.core.building.rail.CurvedStation;
 import com.mtm.citybuilder.core.building.rail.ElevatedStation;
@@ -193,6 +195,41 @@ public final class RailModels {
                             i(o, "carSpacing", CurvedStation.CAR_SPACING), CurvedStation.CAR_WIDTH, p));
                 }
                 return s.build();
+            }
+            case "deep_station" -> {
+                List<UndergroundStation.Exit> exits = new ArrayList<>();
+                if (o.has("exits")) {
+                    for (JsonElement e : o.getAsJsonArray("exits")) {
+                        JsonArray a = e.getAsJsonArray();
+                        exits.add(new UndergroundStation.Exit(a.get(0).getAsInt(), a.get(1).getAsInt(),
+                                a.get(2).getAsInt(), a.get(3).getAsInt(), a.size() > 4 ? a.get(4).getAsInt() : 3));
+                    }
+                }
+                DeepStation s = new DeepStation(i(o, "platformLength"), i(o, "platformWidth", 9), i(o, "approach", 14),
+                        i(o, "level", -30), o.has("trackRadius") ? o.get("trackRadius").getAsDouble() : 3.5,
+                        i(o, "columnSpacing", 5), i(o, "cover", 3), i(o, "concourseHeight", 4),
+                        i(o, "concourseLength", 0), exits, p, ground);
+                describe(meta, List.of(), s.trackCentres(), s.level());
+                meta.addProperty("platformStart", s.platformStart());
+                meta.addProperty("platformEnd", s.platformEnd());
+                meta.addProperty("concourseFloor", s.concourseFloor());
+                Plan pl = plan(o, s.length(), s.trackCentres(), s.level(), s.level(), meta);
+                if (pl != null) {
+                    return pl.mark(CurvedStation.underground(s, pl.curve(), pl.rails(),
+                            i(o, "carSpacing", CurvedStation.CAR_SPACING), CurvedStation.CAR_WIDTH, p));
+                }
+                return s.build();
+            }
+            case "shield_tunnel" -> {
+                int off = i(o, "trackOffset", 6);
+                int[] tz = {-off, off};
+                ShieldTunnel t = new ShieldTunnel(i(o, "length"), tz,
+                        o.has("radius") ? o.get("radius").getAsDouble() : 3.5, i(o, "level", -30),
+                        i(o, "levelEnd", i(o, "level", -30)), p);
+                describe(meta, List.of(), t.trackCentres(), i(o, "level", -30));
+                Plan pl = plan(o, i(o, "length"), t.trackCentres(), i(o, "level", -30),
+                        i(o, "levelEnd", i(o, "level", -30)), meta);
+                return pl == null ? t.build() : pl.mark(pl.curve().apply(t.build()));
             }
             case "cut_cover_tunnel" -> {
                 int tracks = i(o, "tracks", 2);

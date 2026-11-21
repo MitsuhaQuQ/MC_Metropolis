@@ -519,6 +519,7 @@ class RailStructureTest {
                             assertTrue(solid(m, lowest, f.bottom() + 1 + 3, zc), "ceiling over the foot");
                         }
                     }
+                    assertWatertight(m, g, 0, st.length(), "underground station " + layout);
                     assertStates(m);
                 }
             }
@@ -578,6 +579,92 @@ class RailStructureTest {
                 assertTrue(b != null, "the open edge is air, not ground, at " + s);
             }
         }
+    }
+
+    /**
+     * Below the ground's surface, every air block's six neighbours are written: nothing the structure opens touches the
+     * ground it leaves alone (x0 and x1, open tunnel ends, left out).
+     */
+    private static void assertWatertight(Model m, Ground g, int x0, int x1, String what) {
+        int[][] around = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+        List<String> leaks = new ArrayList<>();
+        m.forEach((x, y, z, s) -> {
+            if (!s.equals(Flights.AIR) || y >= g.at(x, z) || x <= x0 || x >= x1) {
+                return;
+            }
+            for (int[] d : around) {
+                int nx = x + d[0], ny = y + d[1], nz = z + d[2];
+                if (ny < g.at(nx, nz) && !m.has(nx, ny, nz) && leaks.size() < 5) {
+                    leaks.add(x + "," + y + "," + z + " -> " + nx + "," + ny + "," + nz);
+                }
+            }
+        });
+        assertTrue(leaks.isEmpty(), what + ": air against the ground at " + leaks);
+    }
+
+    @Test
+    void deepStationsHoldTheirTubesAndClimbToTheConcourse() {
+        for (int pw : new int[] {9, 11}) {
+            for (int[] k : new int[][] {{80, -28}, {140, -36}}) {
+                DeepStation st = new DeepStation(k[0], pw, 14, k[1], 3.5, 5, 3, 4, 0, List.of(), P, Ground.FLAT);
+                Model m = st.build();
+                int lv = st.level();
+                for (int tc : st.trackCentres()) {
+                    for (int x = 1; x < st.length(); x++) {
+                        assertEquals("minecraft:smooth_stone", m.get(x, lv - 1, tc), "slab track at " + x);
+                        for (int y = lv; y <= lv + 4; y++) {
+                            for (int z = tc - 1; z <= tc + 1; z++) {
+                                assertFalse(solid(m, x, y, z), pw + " train at " + x + "," + y + "," + z);
+                            }
+                        }
+                    }
+                    assertTrue(solid(m, st.platformStart() + 3, lv, tc + (tc < 0 ? StationParts.EDGE : -StationParts.EDGE)),
+                            "the island beside track " + tc);
+                }
+                // Walking space on the island along its length, under the circles
+                for (int x = st.platformStart(); x <= st.platformEnd() - 3; x++) {
+                    for (int y = lv + 1; y <= lv + 3; y++) {
+                        assertTrue(Flights.AIR.equals(m.get(x, y, 0)) || solid(m, x, y, 0), "island at " + x);
+                    }
+                }
+                surface(m, Ground.FLAT);
+                int[] counted = steps(m);
+                assertTrue(counted[0] > (st.concourseFloor() - lv) * 3, "a long stair up: " + counted[0]);
+                assertEquals(counted[0], counted[1], pw + ": climbable steps");
+                // The long flights reach the concourse floor
+                boolean reached = false;
+                for (Flights.Flight f : st.flights()) {
+                    if (!f.escalator() && !f.buried() || !f.escalator() && f.top() == st.concourseFloor() + 1) {
+                        reached |= base(m.get(f.x() + f.run() - 1, f.top() - 1, f.z0()) + "").endsWith("_stairs");
+                    }
+                }
+                assertTrue(reached, "stairs arrive in the concourse");
+                assertWatertight(m, Ground.FLAT, 0, st.length(), "deep station " + pw + " " + k[0]);
+                assertStates(m);
+            }
+        }
+    }
+
+    @Test
+    void shieldTunnelsAreRoundAndWatertight() {
+        for (int[] lv : new int[][] {{-30, -30}, {-26, -34}}) {
+            ShieldTunnel t = new ShieldTunnel(120, new int[] {-6, 6}, 3.5, lv[0], lv[1], P);
+            Model m = t.build();
+            for (int x = 0; x <= 120; x++) {
+                int l = t.levelAt(x);
+                for (int tc : t.trackCentres()) {
+                    for (int y = l + 1; y <= l + 4; y++) {
+                        for (int z = tc - 1; z <= tc + 1; z++) {
+                            assertFalse(solid(m, x, y, z), "train in the tube at " + x);
+                        }
+                    }
+                    assertTrue(solid(m, x, l + 6, tc), "the crown over track " + tc + " at " + x);
+                }
+                assertFalse(m.has(x, l + 2, 0), "ground left between the tubes at " + x);
+            }
+            assertWatertight(m, Ground.FLAT, 0, 120, "shield tunnel");
+        }
+        assertThrows(IllegalArgumentException.class, () -> new ShieldTunnel(50, new int[] {-2, 2}, 3.5, -30, -30, P));
     }
 
     @Test

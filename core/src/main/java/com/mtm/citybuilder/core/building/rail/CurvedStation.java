@@ -74,7 +74,7 @@ public final class CurvedStation {
      * An underground station on a curve: as the others, but everything taken out of it is air (the box takes the
      * ground away), and no building rule (the box itself is the station).
      */
-    public static Model underground(UndergroundStation st, Curve c, List<? extends Path> trackRails, int carSpacing,
+    public static Model underground(BuriedStation st, Curve c, List<? extends Path> trackRails, int carSpacing,
                                     int carWidth, RailPalette p) {
         List<Path> rails = rails(st.section().tracks(), c, trackRails);
         Model m = c.apply(st.buildWithoutFlights(), edges(rails, st.level(), carSpacing, carWidth, p, Flights.AIR));

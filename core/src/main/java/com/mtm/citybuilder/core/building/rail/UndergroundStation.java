@@ -22,7 +22,7 @@ import java.util.List;
  * {@code tools/assets/plateau_underground.py}): passages 2.0/3.0/5.0 m wide (quartiles), 2.5/2.9/3.9 m clear, 10-35 m
  * long; concourse halls about 3.4 m clear. The defaults: exits' passages 3 wide and 3 clear, the concourse 4 clear.
  */
-public final class UndergroundStation {
+public final class UndergroundStation implements BuriedStation {
     /**
      * An exit: a passage from the box's side ({@code side}: -1 or +1 across) at {@code x}, {@code out} blocks out to
      * the middle of the stairs' lane under the pavement, then stairs climbing towards {@code dir} along x to the
@@ -139,16 +139,21 @@ public final class UndergroundStation {
             }
         }
         for (Exit e : exits) {
-            int zc = e.side() * (half + e.out());
-            int w = Math.max(2, e.width());
-            int z0 = zc - (w - 1) / 2, z1 = z0 + w - 1;
-            int foot = e.dir() > 0 ? e.x() + w : e.x() - 1;
-            int g = ground.at(foot + e.dir() * 12, zc);
-            int steps = g + 1 - (floor1 + 1);
-            out.add(new Flights.Flight(foot, e.dir(), z0, z1, floor1 + 1, g + 1, Flights.landingEvery(steps), false,
-                    false, floor1 + 1, g + 3, Integer.MIN_VALUE, null, g));
+            out.add(exitFlight(e, half, floor1, ground));
         }
         return out;
+    }
+
+    /** An exit's stairs: from the concourse floor at {@code floor1} up to the ground, an entrance house on top. */
+    static Flights.Flight exitFlight(Exit e, int half, int floor1, Ground ground) {
+        int zc = e.side() * (half + e.out());
+        int w = Math.max(2, e.width());
+        int z0 = zc - (w - 1) / 2, z1 = z0 + w - 1;
+        int foot = e.dir() > 0 ? e.x() + w : e.x() - 1;
+        int g = ground.at(foot + e.dir() * 12, zc);
+        int steps = g + 1 - (floor1 + 1);
+        return new Flights.Flight(foot, e.dir(), z0, z1, floor1 + 1, g + 1, Flights.landingEvery(steps), false,
+                false, floor1 + 1, g + 3, Integer.MIN_VALUE, null, g);
     }
 
     public Model build() {
@@ -219,7 +224,7 @@ public final class UndergroundStation {
             }
         }
         for (Exit e : exits) {
-            passage(m, e);
+            passage(m, p, e, half, floor1);
         }
         // Everything else inside the box is air: the ground taken away
         for (int x = 1; x < len; x++) {
@@ -244,7 +249,7 @@ public final class UndergroundStation {
     }
 
     /** An exit's passage at the concourse level: out through the box's wall to the stairs' lane, 3 clear. */
-    private void passage(Model m, Exit e) {
+    static void passage(Model m, RailPalette p, Exit e, int half, int floor1) {
         int w = Math.max(2, e.width());
         int zc = e.side() * (half + e.out());
         int lane0 = zc - (w - 1) / 2, lane1 = lane0 + w - 1;
