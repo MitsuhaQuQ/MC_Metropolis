@@ -922,7 +922,11 @@ public final class ChunkLayer {
     /** Town intensity from which no tree grows: the built-up town, not its leafy edge. */
     public static final double TREELESS = 0.3;
 
-    /** The towns whose built land touches a chunk: the owners at its corners and middle. */
+    /**
+     * The towns whose streets may cross a chunk: the owners at its corners and middle; and over water, which belongs to
+     * no town's built land, the owners of the banks round it, out to {@link #WATER_REACH}, so a bridge is laid all the
+     * way across a river or a lake, not only over its edges.
+     */
     private Set<Settlement> towns(double minX, double minZ) {
         Set<Settlement> towns = new LinkedHashSet<>();
         for (double[] p : new double[][]{{minX + 8, minZ + 8}, {minX, minZ}, {minX + 16, minZ}, {minX, minZ + 16},
@@ -932,8 +936,27 @@ public final class ChunkLayer {
                 towns.add(sample.owner());
             }
         }
+        double cx = minX + 8;
+        double cz = minZ + 8;
+        com.mtm.citybuilder.core.terrain.RiverSample river = logic.terrain().nearestRiver(cx, cz);
+        boolean water = !Double.isNaN(logic.terrain().lakeLevel(cx, cz))
+                || river != null && river.distance() < 0.5 * river.width() + 16.0;
+        if (water) {
+            for (double r = 32.0; r <= WATER_REACH; r *= 2.0) {
+                for (int k = 0; k < 8; k++) {
+                    double a = Math.PI / 4.0 * k;
+                    UrbanSample sample = logic.urban(cx + r * Math.cos(a), cz + r * Math.sin(a));
+                    if (sample.owner() != null) {
+                        towns.add(sample.owner());
+                    }
+                }
+            }
+        }
         return towns;
     }
+
+    /** How far from a chunk over water the banks' towns are looked for: wider than the rivers towns bridge. */
+    private static final double WATER_REACH = 512.0;
 
     private Index index(Settlement town) {
         synchronized (indexes) {

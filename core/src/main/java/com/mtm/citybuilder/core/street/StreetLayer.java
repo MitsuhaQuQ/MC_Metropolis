@@ -1134,6 +1134,90 @@ public final class StreetLayer {
     }
 
     /**
+     * Bridges left reaching no street: a run of bridge pieces (joined end to end) one of whose banks no street on the
+     * land meets, at its end or across its middle, goes, and again until none is left; a bridge over to nothing is
+     * worse than none. Its street was cut back after it was laid (a piece too steep dropped, an estate cleared, an old
+     * road leaving the built land, where the intercity road is laid instead).
+     */
+    static void dropLooseBridges(List<StreetSegment> segments) {
+        boolean removed = true;
+        while (removed) {
+            removed = false;
+            Map<Long, List<Integer>> ends = new HashMap<>();
+            for (int p = 0; p < segments.size(); p++) {
+                StreetSegment g = segments.get(p);
+                ends.computeIfAbsent(bridgeEnd(g.x1(), g.z1()), k -> new ArrayList<>()).add(p);
+                ends.computeIfAbsent(bridgeEnd(g.x2(), g.z2()), k -> new ArrayList<>()).add(p);
+            }
+            boolean[] seen = new boolean[segments.size()];
+            java.util.Set<Integer> loose = new java.util.HashSet<>();
+            for (int start = 0; start < segments.size(); start++) {
+                if (seen[start] || segments.get(start).structure() != StreetStructure.BRIDGE) {
+                    continue;
+                }
+                List<Integer> run = new ArrayList<>();
+                java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>(List.of(start));
+                seen[start] = true;
+                while (!queue.isEmpty()) {
+                    int p = queue.poll();
+                    run.add(p);
+                    StreetSegment g = segments.get(p);
+                    for (long end : new long[]{bridgeEnd(g.x1(), g.z1()), bridgeEnd(g.x2(), g.z2())}) {
+                        for (int q : ends.get(end)) {
+                            if (!seen[q] && segments.get(q).structure() == StreetStructure.BRIDGE) {
+                                seen[q] = true;
+                                queue.add(q);
+                            }
+                        }
+                    }
+                }
+                for (int p : run) {
+                    StreetSegment g = segments.get(p);
+                    for (double[] e : new double[][]{{g.x1(), g.z1()}, {g.x2(), g.z2()}}) {
+                        List<Integer> at = ends.get(bridgeEnd(e[0], e[1]));
+                        if (at.stream().anyMatch(q -> q != p && segments.get(q).structure() == StreetStructure.BRIDGE)) {
+                            continue;
+                        }
+                        // A bank: met by a street on the land at its end, or running past it
+                        boolean met = at.stream().anyMatch(q -> segments.get(q).structure() != StreetStructure.BRIDGE);
+                        if (!met) {
+                            for (StreetSegment o : segments) {
+                                if (o.structure() != StreetStructure.BRIDGE && o.streetClass() != StreetClass.PATH
+                                        && pointDistance(o, e[0], e[1]) <= 0.5 * o.width()) {
+                                    met = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!met) {
+                            loose.addAll(run);
+                        }
+                    }
+                }
+            }
+            if (!loose.isEmpty()) {
+                List<Integer> order = new ArrayList<>(loose);
+                order.sort(java.util.Comparator.reverseOrder());
+                for (int p : order) {
+                    segments.remove(p);
+                }
+                removed = true;
+            }
+        }
+    }
+
+    private static long bridgeEnd(double x, double z) {
+        return (Math.round(x * 10.0) << 32) ^ (Math.round(z * 10.0) & 0xFFFFFFFFL);
+    }
+
+    private static double pointDistance(StreetSegment g, double x, double z) {
+        double dx = g.x2() - g.x1();
+        double dz = g.z2() - g.z1();
+        double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+        return Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z);
+    }
+
+    /**
      * A piece laid straight rather than traced (moat-side street, approaches, avenues), built as its grade allows: as
      * given up to {@code maxGrade}; steeper, a street ramp or stairs; null where steeper than stairs.
      */
@@ -1388,6 +1472,7 @@ public final class StreetLayer {
             }
         }
         clearEstates(window, segments);
+        dropLooseBridges(segments);
         List<Promenade> promenades = formation == Formation.VILLAGE ? List.of()
                 : promenades(settlement, window, canals, segments);
         List<StationPlaza> plazas = plazas(fronts, railways, urban, segments);

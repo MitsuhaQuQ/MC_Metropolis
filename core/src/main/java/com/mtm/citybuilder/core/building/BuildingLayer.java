@@ -381,6 +381,11 @@ public final class BuildingLayer {
             }
         }
         Building building = make(plots, plot);
+        if (building != null && crossesFootpath(plots, building)) {
+            // A footpath's open land runs across the lot, laid after the lots were cut: no building is split by it,
+            // the lot left a yard
+            building = null;
+        }
         synchronized (cache) {
             cache.put(plot.id(), Optional.ofNullable(building));
         }
@@ -397,6 +402,35 @@ public final class BuildingLayer {
         Plot plot = plots.at(x, z);
         Building b = building(plots, plot);
         return b != null && inside(b, plot, x, z) ? b : null;
+    }
+
+    /** Whether any of a building's footprint lies in the open land along a footpath, sampled every block or so. */
+    private static boolean crossesFootpath(TownPlots plots, Building b) {
+        double w = b.width();
+        double back = Math.max(b.back(), b.wingBack());
+        // Only the footpaths near enough to reach it
+        double reach = 0.5 * w + Math.max(Math.abs(b.front()), Math.abs(back)) + 1.0;
+        List<com.mtm.citybuilder.core.street.Promenade> near = plots.footpathsNear(b.ox() - reach, b.oz() - reach,
+                b.ox() + reach, b.oz() + reach);
+        if (near.isEmpty()) {
+            return false;
+        }
+        for (double u = 0.5; u < w; u += 1.0) {
+            for (double v = b.front() + 0.5; v < back; v += 1.0) {
+                if (!b.covers(u, v)) {
+                    continue;
+                }
+                double s = u - 0.5 * w;
+                double x = b.ox() + b.tx() * s + b.nx() * v;
+                double z = b.oz() + b.tz() * s + b.nz() * v;
+                for (com.mtm.citybuilder.core.street.Promenade p : near) {
+                    if (p.open(x, z)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /** Whether a position of a lot lies in its building's footprint. */

@@ -74,10 +74,26 @@ public final class TownPlots {
     /** The footpaths' pieces, which front no lots. */
     private final List<StreetSegment> paths = new ArrayList<>();
 
+    /** Each footpath's bounds widened by its open land: {minX, minZ, maxX, maxZ}. */
+    private final double[][] footpathBounds;
+
     public TownPlots(CitySettings.Plots config, StreetPlan plan, long seed) {
         this.config = config;
         this.plan = plan;
         this.seed = seed;
+        footpathBounds = new double[plan.promenades().size()][];
+        for (int k = 0; k < footpathBounds.length; k++) {
+            com.mtm.citybuilder.core.street.Promenade p = plan.promenades().get(k);
+            double reach = Math.max(p.left(), p.right());
+            double[] b = {Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY};
+            for (double[] q : p.points()) {
+                b[0] = Math.min(b[0], q[0] - reach);
+                b[1] = Math.min(b[1], q[1] - reach);
+                b[2] = Math.max(b[2], q[0] + reach);
+                b[3] = Math.max(b[3], q[1] + reach);
+            }
+            footpathBounds[k] = b;
+        }
         for (StreetSegment g : plan.segments()) {
             if (g.streetClass() == com.mtm.citybuilder.core.street.StreetClass.PATH) {
                 paths.add(g);
@@ -398,12 +414,28 @@ public final class TownPlots {
     }
 
     /**
+     * The footpaths whose open land (the path and the land from it to the water) may reach into a rectangle: those
+     * whose bounds, widened by their open land, meet it.
+     */
+    public List<com.mtm.citybuilder.core.street.Promenade> footpathsNear(double minX, double minZ, double maxX, double maxZ) {
+        List<com.mtm.citybuilder.core.street.Promenade> near = new ArrayList<>();
+        List<com.mtm.citybuilder.core.street.Promenade> all = plan.promenades();
+        for (int k = 0; k < all.size(); k++) {
+            double[] b = footpathBounds[k];
+            if (b[0] <= maxX && b[2] >= minX && b[1] <= maxZ && b[3] >= minZ) {
+                near.add(all.get(k));
+            }
+        }
+        return near;
+    }
+
+    /**
      * The plot at a position: null on a street (between its edges) or where the town has none (outside its districts,
      * in grounds and corridors kept clear). A lot too small to build on is joined to its neighbour, or is a remnant.
      */
     public Plot at(double x, double z) {
         // The footpaths and the open land along them, to the water
-        for (com.mtm.citybuilder.core.street.Promenade promenade : plan.promenades()) {
+        for (com.mtm.citybuilder.core.street.Promenade promenade : footpathsNear(x, z, x, z)) {
             if (promenade.open(x, z)) {
                 return null;
             }
