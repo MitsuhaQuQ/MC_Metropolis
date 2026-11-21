@@ -142,6 +142,11 @@ public final class CityMap {
                 // quarters really lie is for the layers that lay out the town to say
                 // preview:PROGRAMS gives one lot in ten a program (convenience store, fast food, post office), to see
                 // them; where they really are is for the layers before to say
+                if (quarter != null && quarter.endsWith("_CUT")) {
+                    // preview:<QUARTER>_CUT cuts every building away over its ground floor's furniture, to see inside
+                    BuildingPreview.cut = 2;
+                    quarter = quarter.substring(0, quarter.length() - 4);
+                }
                 if (quarter != null && quarter.equals("PROGRAMS")) {
                     logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
                         @Override

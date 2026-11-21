@@ -287,6 +287,47 @@
    "sudare",
    "balcony"
   ],
+  "AMADO": [
+   "none",
+   "boxes"
+  ],
+  "SOLAR": [
+   "none",
+   "panels"
+  ],
+  "ANTENNA": [
+   "none",
+   "antenna"
+  ],
+  "HEATER": [
+   "none",
+   "heater"
+  ],
+  "GATEPOST": [
+   "none",
+   "posts"
+  ],
+  "FUTON": [
+   "none",
+   "futon"
+  ],
+  "TATAMI": [
+   "none",
+   "upper",
+   "both"
+  ],
+  "AGEMISE": [
+   "none",
+   "agemise"
+  ],
+  "YAGO": [
+   "none",
+   "board"
+  ],
+  "KEMURIDASHI": [
+   "none",
+   "vent"
+  ],
   "ARCADE": [
    "none",
    "canopy",
@@ -2381,6 +2422,102 @@
   "tactile": [
    "minecraft:yellow_concrete"
   ],
+  "tobukuro": [
+   "minecraft:light_gray_concrete",
+   "minecraft:white_concrete",
+   "minecraft:smooth_stone",
+   "minecraft:iron_block"
+  ],
+  "gatepost": [
+   "minecraft:polished_andesite",
+   "minecraft:bricks",
+   "minecraft:stone_bricks",
+   "minecraft:smooth_stone",
+   "minecraft:polished_granite"
+  ],
+  "gateLight": [
+   "minecraft:lantern"
+  ],
+  "futon": [
+   "minecraft:white_carpet",
+   "minecraft:light_blue_carpet",
+   "minecraft:pink_carpet",
+   "minecraft:yellow_carpet",
+   "minecraft:white_carpet"
+  ],
+  "solar": [
+   "minecraft:daylight_detector"
+  ],
+  "antenna": [
+   "minecraft:lightning_rod"
+  ],
+  "heater": [
+   "minecraft:white_concrete",
+   "minecraft:smooth_quartz"
+  ],
+  "oni": [
+   "minecraft:polished_blackstone_brick_wall",
+   "minecraft:deepslate_tile_wall"
+  ],
+  "yago": [
+   "minecraft:dark_oak_planks",
+   "minecraft:stripped_dark_oak_log",
+   "minecraft:spruce_planks"
+  ],
+  "tatami": [
+   "minecraft:stripped_bamboo_block"
+  ],
+  "earth": [
+   "minecraft:packed_mud"
+  ],
+  "partition": [
+   "minecraft:white_concrete",
+   "minecraft:smooth_quartz",
+   "minecraft:white_terracotta",
+   "minecraft:birch_planks"
+  ],
+  "fusuma": [
+   "minecraft:birch_planks",
+   "minecraft:stripped_birch_log"
+  ],
+  "stairs": [
+   "minecraft:spruce_stairs",
+   "minecraft:oak_stairs",
+   "minecraft:dark_oak_stairs"
+  ],
+  "shelf": [
+   "minecraft:bookshelf",
+   "minecraft:barrel",
+   "minecraft:chest",
+   "minecraft:bookshelf",
+   "minecraft:barrel"
+  ],
+  "table": [
+   "minecraft:spruce_slab",
+   "minecraft:oak_slab",
+   "minecraft:dark_oak_slab"
+  ],
+  "kitchen": [
+   "minecraft:smoker",
+   "minecraft:furnace",
+   "minecraft:cauldron"
+  ],
+  "counter": [
+   "minecraft:spruce_planks",
+   "minecraft:smooth_quartz",
+   "minecraft:polished_andesite"
+  ],
+  "desk": [
+   "minecraft:birch_slab",
+   "minecraft:smooth_quartz_slab",
+   "minecraft:oak_slab"
+  ],
+  "storage": [
+   "minecraft:barrel",
+   "minecraft:chest",
+   "minecraft:barrel",
+   "minecraft:hay_block"
+  ],
   "andon": [
    "minecraft:shroomlight",
    "minecraft:shroomlight",
@@ -2633,6 +2770,35 @@
      "none": 0.4,
      "one": 0.6
     },
+    "AMADO": {
+     "none": 0.35,
+     "boxes": 0.65
+    },
+    "SOLAR": {
+     "none": 0.85,
+     "panels": 0.15
+    },
+    "ANTENNA": {
+     "none": 0.5,
+     "antenna": 0.5
+    },
+    "HEATER": {
+     "none": 0.4,
+     "heater": 0.6
+    },
+    "GATEPOST": {
+     "none": 0.5,
+     "posts": 0.5
+    },
+    "FUTON": {
+     "none": 0.6,
+     "futon": 0.4
+    },
+    "TATAMI": {
+     "none": 0.3,
+     "upper": 0.5,
+     "both": 0.2
+    },
     "PINE": {
      "none": 0.65,
      "pine": 0.35
@@ -2727,6 +2893,35 @@
      "none": 0.4,
      "one": 0.6
     },
+    "AMADO": {
+     "none": 0.35,
+     "boxes": 0.65
+    },
+    "SOLAR": {
+     "none": 0.85,
+     "panels": 0.15
+    },
+    "ANTENNA": {
+     "none": 0.5,
+     "antenna": 0.5
+    },
+    "HEATER": {
+     "none": 0.4,
+     "heater": 0.6
+    },
+    "GATEPOST": {
+     "none": 0.5,
+     "posts": 0.5
+    },
+    "FUTON": {
+     "none": 0.6,
+     "futon": 0.4
+    },
+    "TATAMI": {
+     "none": 0.3,
+     "upper": 0.5,
+     "both": 0.2
+    },
     "PINE": {
      "none": 0.65,
      "pine": 0.35
@@ -2804,6 +2999,35 @@
     },
     "TREES": {
      "two": 1.0
+    },
+    "AMADO": {
+     "none": 0.35,
+     "boxes": 0.65
+    },
+    "SOLAR": {
+     "none": 0.85,
+     "panels": 0.15
+    },
+    "ANTENNA": {
+     "none": 0.5,
+     "antenna": 0.5
+    },
+    "HEATER": {
+     "none": 0.4,
+     "heater": 0.6
+    },
+    "GATEPOST": {
+     "none": 0.5,
+     "posts": 0.5
+    },
+    "FUTON": {
+     "none": 0.6,
+     "futon": 0.4
+    },
+    "TATAMI": {
+     "none": 0.3,
+     "upper": 0.5,
+     "both": 0.2
     },
     "PINE": {
      "none": 0.65,
@@ -2883,6 +3107,30 @@
     "TREES": {
      "two": 1.0
     },
+    "AMADO": {
+     "none": 0.35,
+     "boxes": 0.65
+    },
+    "SOLAR": {
+     "none": 1.0
+    },
+    "ANTENNA": {
+     "none": 0.5,
+     "antenna": 0.5
+    },
+    "HEATER": {
+     "none": 0.7,
+     "heater": 0.3
+    },
+    "GATEPOST": {
+     "none": 1.0
+    },
+    "FUTON": {
+     "none": 1.0
+    },
+    "TATAMI": {
+     "both": 1.0
+    },
     "PINE": {
      "pine": 0.6,
      "none": 0.4
@@ -2959,6 +3207,18 @@
     "TREES": {
      "none": 0.4,
      "one": 0.6
+    },
+    "AGEMISE": {
+     "none": 0.7,
+     "agemise": 0.3
+    },
+    "YAGO": {
+     "none": 0.55,
+     "board": 0.45
+    },
+    "KEMURIDASHI": {
+     "none": 0.5,
+     "vent": 0.5
     },
     "UPPER_FRONT": {
      "mushiko": 0.45,
@@ -3045,6 +3305,18 @@
      "none": 0.4,
      "one": 0.6
     },
+    "AGEMISE": {
+     "none": 0.7,
+     "agemise": 0.3
+    },
+    "YAGO": {
+     "none": 0.55,
+     "board": 0.45
+    },
+    "KEMURIDASHI": {
+     "none": 0.5,
+     "vent": 0.5
+    },
     "UPPER_FRONT": {
      "sudare": 0.7,
      "railing": 0.2,
@@ -3124,6 +3396,18 @@
      "none": 0.4,
      "one": 0.6
     },
+    "AGEMISE": {
+     "none": 0.7,
+     "agemise": 0.3
+    },
+    "YAGO": {
+     "none": 0.55,
+     "board": 0.45
+    },
+    "KEMURIDASHI": {
+     "none": 0.5,
+     "vent": 0.5
+    },
     "UPPER_FRONT": {
      "glazed": 0.7,
      "railing": 0.2,
@@ -3199,6 +3483,18 @@
     "TREES": {
      "none": 0.4,
      "one": 0.6
+    },
+    "AGEMISE": {
+     "none": 0.7,
+     "agemise": 0.3
+    },
+    "YAGO": {
+     "none": 0.55,
+     "board": 0.45
+    },
+    "KEMURIDASHI": {
+     "none": 0.5,
+     "vent": 0.5
     },
     "UPPER_FRONT": {
      "mushiko": 0.7,
@@ -3766,6 +4062,35 @@
     "TREES": {
      "none": 0.6,
      "one": 0.4
+    },
+    "AMADO": {
+     "none": 0.35,
+     "boxes": 0.65
+    },
+    "SOLAR": {
+     "none": 0.85,
+     "panels": 0.15
+    },
+    "ANTENNA": {
+     "none": 0.5,
+     "antenna": 0.5
+    },
+    "HEATER": {
+     "none": 0.4,
+     "heater": 0.6
+    },
+    "GATEPOST": {
+     "none": 0.5,
+     "posts": 0.5
+    },
+    "FUTON": {
+     "none": 0.6,
+     "futon": 0.4
+    },
+    "TATAMI": {
+     "none": 0.3,
+     "upper": 0.5,
+     "both": 0.2
     },
     "PINE": {
      "none": 0.65,

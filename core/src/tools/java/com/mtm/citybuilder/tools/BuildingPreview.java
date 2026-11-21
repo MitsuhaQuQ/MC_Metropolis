@@ -25,6 +25,9 @@ final class BuildingPreview {
     /** Approximate colours of the blocks the palettes use. */
     private static final Map<String, Integer> COLOURS = new HashMap<>();
 
+    /** Draw nothing more than this many blocks over each building's base (a cut-away, to see inside); -1 for all. */
+    public static int cut = -1;
+
     static {
         Object[][] table = {
                 {"white_terracotta", 0xD1B2A1}, {"calcite", 0xDFE0DC}, {"light_gray_concrete", 0x7D7D73},
@@ -68,7 +71,13 @@ final class BuildingPreview {
                 {"bookshelf", 0x6B5839}, {"magenta_concrete", 0xA9309F}, {"pink_concrete", 0xD5658E},
                 {"green_concrete", 0x495B24}, {"cyan_terracotta", 0x565B5B}, {"polished_granite", 0x9A6A59},
                 {"cyan_stained_glass", 0x4C7F99}, {"brown_stained_glass", 0x664C33}, {"blue_stained_glass", 0x334CB2},
-                {"polished_deepslate", 0x484848}, {"brick", 0x976253}, {"cobbled_deepslate", 0x4D4D50}, {"mossy_cobblestone", 0x6E775E}, {"water", 0x3F76E4}, {"shroomlight", 0xF09A4D}, {"ochre_froglight", 0xF6E9A9}, {"cut_copper", 0xBF6B50}, {"exposed_cut_copper", 0xA17E68},
+                {"polished_deepslate", 0x484848}, {"brick", 0x976253}, {"cobbled_deepslate", 0x4D4D50}, {"mossy_cobblestone", 0x6E775E}, {"water", 0x3F76E4}, {"daylight_detector", 0x3B4A6B}, {"lightning_rod", 0xB0703F},
+                {"polished_blackstone_brick_wall", 0x302A30}, {"deepslate_tile_wall", 0x36363A}, {"white_carpet", 0xE9ECEC},
+                {"light_blue_carpet", 0x3AAFD9}, {"pink_carpet", 0xED8DAC}, {"yellow_carpet", 0xF8C527},
+                {"stripped_bamboo_block", 0xC0AE53}, {"bookshelf", 0x6B5839}, {"chest", 0xA06F2C}, {"smoker", 0x5A5652},
+                {"furnace", 0x6E6E6E}, {"cauldron", 0x3E3E3E}, {"spruce_stairs", 0x72542F}, {"oak_stairs", 0xA2834F},
+                {"dark_oak_stairs", 0x42291A}, {"spruce", 0x72542F}, {"oak", 0xA2834F}, {"dark_oak", 0x42291A},
+                {"birch", 0xC0AF79}, {"stripped_birch_log", 0xC5B077}, {"hay_block", 0xA68B0C}, {"iron_block", 0xDCDCDC}, {"shroomlight", 0xF09A4D}, {"ochre_froglight", 0xF6E9A9}, {"cut_copper", 0xBF6B50}, {"exposed_cut_copper", 0xA17E68},
                 {"weathered_cut_copper", 0x6C9C73}, {"oxidized_cut_copper", 0x50997F}, {"red_nether_brick", 0x45090A},
                 {"cracked_stone_bricks", 0x767676}, {"cracked_deepslate_tiles", 0x343437}, {"gray_terracotta", 0x3A2A24},
                 {"red_terracotta", 0x8E3C2E}, {"yellow_concrete", 0xF0AF15}, {"diorite", 0xBDBCBD}, {"andesite", 0x888889}, {"blackstone", 0x2A2328}, {"cracked_polished_blackstone_bricks", 0x2C262B}, {"granite", 0x956755}, {"red_nether_bricks", 0x45090A}, {"sandstone", 0xD8CB9B}, {"stone", 0x7E7E7E}, {"terracotta", 0x985E43}, {"decorated_pot", 0x8C4F3C}, {"oak_sign", 0xA2834F}, {"composter", 0x7D5A33}, {"stone_brick", 0x7A7A7A}, {"pink_terracotta", 0xA14E4E},
@@ -109,7 +118,9 @@ final class BuildingPreview {
             case ROOF_HIGH -> new Voxel(colour(id), 0.5, 0.5);
             case PLANT, SHRUB, STAND -> new Voxel(colour(id), 0.5, 0);
             case CARPORT -> new Voxel(colour(id), 0.5, 0.5);
-            case HOOD, LANTERN, ENGAWA, TORO_CAP, TORO_LIGHT -> new Voxel(colour(id), 0.5, 0);
+            case HOOD, LANTERN, ENGAWA, TORO_CAP, TORO_LIGHT, TABLE, DESK -> new Voxel(colour(id), 0.5, 0);
+            case SOLAR -> new Voxel(colour(id), 0.375, 0);
+            case FUTON -> new Voxel(colour(id), 0.125, 0);
             default -> new Voxel(colour(id), 1, 0);
         };
     }
@@ -186,7 +197,8 @@ final class BuildingPreview {
                 Palette palette = Palette.get(column.building().palette());
                 int from = Math.min(gy + 1, BuildingLayer.bottom(column));
                 cube(g, originX, originY, px, a, b, Math.min(gy, from - 1) - floorY, 1, 0, groundColour);
-                for (int y = from; y <= BuildingLayer.top(column); y++) {
+                int last = cut >= 0 ? Math.min(BuildingLayer.top(column), column.building().base() + cut) : BuildingLayer.top(column);
+                for (int y = from; y <= last; y++) {
                     BuildingLayer.Part part = BuildingLayer.part(column, y);
                     if (part == BuildingLayer.Part.FOUNDATION && y <= gy) {
                         continue;

@@ -166,6 +166,25 @@ public record Palette(String wall, String accent, String trim, String window, St
             case ARCADE_GLASS -> c.material("arcadeGlass", variant);
             case LOUVRE -> c.material("louvre", variant);
             case ANDON -> c.material("andon", variant ^ 0x606);
+            case TOBUKURO -> c.material("tobukuro", variant);
+            case GATEPOST -> c.material("gatepost", variant);
+            case GATE_LIGHT -> c.material("gateLight", variant);
+            case FUTON -> c.material("futon", position);
+            case SOLAR -> c.material("solar", variant);
+            case ANTENNA -> c.material("antenna", variant);
+            case HEATER -> c.material("heater", variant);
+            case ONI -> c.material("oni", variant);
+            case YAGO -> c.material("yago", variant);
+            case TATAMI -> c.material("tatami", variant);
+            case EARTH -> c.material("earth", variant);
+            case PARTITION -> c.material(building.type() == Building.Type.MACHIYA ? "fusuma" : "partition", variant);
+            case STAIRS -> c.material("stairs", variant);
+            case SHELF -> c.material("shelf", position);
+            case TABLE -> c.material("table", variant);
+            case KITCHEN -> c.material("kitchen", position);
+            case COUNTER -> c.material("counter", variant);
+            case DESK -> c.material("desk", variant);
+            case STORAGE -> c.material("storage", position);
         };
     }
 

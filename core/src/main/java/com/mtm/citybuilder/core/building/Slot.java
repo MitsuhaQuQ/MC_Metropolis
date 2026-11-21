@@ -137,6 +137,26 @@ public enum Slot {
      * across it.
      */
     KANBAN("none", "kanban"),
+    /** Boxes beside a house's windows that its rain shutters slide into (戸袋). */
+    AMADO("none", "boxes"),
+    /** Solar panels on a house's front slope. */
+    SOLAR("none", "panels"),
+    /** A television aerial on a house's ridge. */
+    ANTENNA("none", "antenna"),
+    /** A water heater's tank against a house's side, at the back (エコキュート). */
+    HEATER("none", "heater"),
+    /** Gate posts either side of the path in a house's front wall, a lamp on one. */
+    GATEPOST("none", "posts"),
+    /** Futons aired over a house's balcony rail. */
+    FUTON("none", "futon"),
+    /** Tatami rooms: none, the back rooms upstairs, or the back rooms on every floor. */
+    TATAMI("none", "upper", "both"),
+    /** A machiya's fold-down bench along its front (揚げ見世). */
+    AGEMISE("none", "agemise"),
+    /** A machiya's name board over its door (屋号看板). */
+    YAGO("none", "board"),
+    /** A small raised vent on a machiya's roof over its kitchen (煙出し). */
+    KEMURIDASHI("none", "vent"),
     /** A samurai house's gate in its street wall: none (a gap), or two posts under a beam and a small roof (冠木門). */
     GATE("none", "kabuki"),
     /** A stone-lined ditch along the street in front of the wall (側溝), bridged at the gate. */

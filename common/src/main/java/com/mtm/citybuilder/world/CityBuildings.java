@@ -146,6 +146,9 @@ public final class CityBuildings {
         } else if (block instanceof DoorBlock) {
             state = state.setValue(DoorBlock.FACING, facing)
                     .setValue(DoorBlock.HALF, part == BuildingLayer.Part.DOOR_UPPER ? DoubleBlockHalf.UPPER : DoubleBlockHalf.LOWER);
+        } else if (block instanceof net.minecraft.world.level.block.StairBlock) {
+            // Rising away from the street
+            state = state.setValue(net.minecraft.world.level.block.StairBlock.FACING, facing.getOpposite());
         } else if (block instanceof LeavesBlock) {
             state = state.setValue(LeavesBlock.PERSISTENT, true);
         }
