@@ -5,49 +5,52 @@ whose source or licence is unknown are not added.
 
 Made for this mod (no outside sources), under the mod's licence (MIT, see LICENSE):
 
-textures/block/asphalt.png, sidewalk.png, sidewalk_side.png (the kerb)
-textures/block/line/<colour>_<angle>_<offset>.png (the road markings, white and yellow, at 16 angles and 8 offsets:
-256 in all)
-  Drawn by tools/textures/road_textures.py.
+Textures (textures/block/), each drawn by a script in tools/textures/:
 
-blockstates/*.json, models/block/*.json, models/item/*.json (the paving and marking blocks, and their sunken _low
-models)
-  Written by tools/textures/road_models.py.
+  road_textures.py
+    asphalt.png, asphalt_white.png, asphalt_hatch.png, road_arrow_shaft.png, road_arrow_head.png, manhole.png,
+    drain_grate.png, tactile_line.png, tactile_dot.png, sidewalk.png, sidewalk_side.png (the kerb),
+    sidewalk_interlocking.png, sidewalk_granite.png, curb.png, and line/<colour>_<angle>_<offset>.png (the road
+    markings, white and yellow, at 16 angles and 8 offsets)
 
-lang/*.json, and everything under data/citybuilder
-  Written for this mod.
+  landmark_textures.py
+    track.png, turf.png, turf_dark.png, turf_side.png, soil.png, seat_<colour>.png, fresnel_lens.png, led_panel.png,
+    and line/{track,turf,turf_dark,soil}_white_*.png. The stadium seat's steel bracket uses the game's own light grey
+    concrete texture by reference (nothing copied).
+
+  temple_blocks.py
+    ishidatami.png, shirasu.png, tamajari.png, koke*.png, raked_gravel*.png, tobiishi_stone.png, niwaishi.png,
+    bamboo_fence*.png, tatami*.png, fusuma*.png, shoji*.png, ranma*.png, coffered_ceiling*.png, zabuton.png, koro*.png,
+    chochin*.png, shimenawa.png, shide.png, saisen_bako*.png. The moss block's bottom refers to the game's own dirt
+    texture (nothing copied).
+
+  airport_textures.py
+    curtain_wall_*.png, metal_roof*.png, ceiling_light.png, terminal_tile.png, carpet_tile_*.png, seat_fabric.png,
+    seat_frame.png, sign/*.png, flight_board.png, panel_side.png, bridge_bellows.png and bridge_cladding.png (the
+    boarding bridges), baggage_belt*.png, escalator_*.png. The pictograms are drawn there in the manner of airport
+    signs, not copied from any standard's artwork.
+
+  bridge_textures.py
+    concrete_parapet*.png, bridge_railing*.png, bridge_bearing*.png, sound_barrier*.png, steel_girder_*.png,
+    expansion_joint.png, deck_side.png, deck_drain.png, drain_pipe.png
+
+  catenary_textures.py
+    catenary_*.png, curve_marker_*.png
+
+Block states, block and item models (blockstates/, models/), loot tables (data/citybuilder/loot_tables/) and the
+translations (lang/): written for this mod, by the *_models.py scripts in tools/textures/ or by hand.
+
+Not shipped: the building library's structure templates are generated from parameters (core.building) or from
+PLATEAU's city models (tools/assets/plateau_voxel.py) into the build folder; any of them shipped later is listed here
+with its source and the credit its licence asks for.
 
 Data used for statistics only (nothing of it is shipped):
 
 PLATEAU (Japan's Ministry of Land, Infrastructure, Transport and Tourism, and the cities; the cities' site policies,
 compatible with CC BY 4.0): building footprints, heights and uses of Kyoto, Kanazawa, Himeji, Tokyo's Taito and Chuo,
-measured by tools/assets/plateau_*.py for the lots' sizes, the streets' uses and the blocks' insides.
+measured by tools/assets/plateau_*.py for the lots' sizes, the streets' uses, the blocks' insides and the buildings'
+sizes.
 
-OpenStreetMap (OpenStreetMap contributors, ODbL 1.0): streets of Kyoto, Kanazawa, Takayama, Hida-Furukawa, Shimoda,
-Karuizawa, Nikko, Himeji and Tokyo, measured by the cityMap and osmStats tools for the street network's targets.
-
-textures/block/asphalt.png, asphalt_line_white.png, asphalt_line_yellow.png, asphalt_white.png, sidewalk.png,
-asphalt_hatch.png, road_arrow_shaft.png, road_arrow_head.png, manhole.png, drain_grate.png, tactile_line.png,
-tactile_dot.png, sidewalk_interlocking.png, sidewalk_granite.png, curb.png
-  Drawn for this mod by tools/textures/road_textures.py (no outside sources); the mod's own licence.
-
-textures/block/track.png, turf.png, turf_dark.png, turf_side.png, soil.png, seat_*.png, fresnel_lens.png,
-led_panel.png and textures/block/line/{track,turf,turf_dark,soil}_white_*.png
-  Drawn for this mod by tools/textures/landmark_textures.py (no outside sources); the mod's own licence.
-  Their models and block states are written by tools/textures/landmark_models.py; the seat's steel bracket uses
-  the vanilla light grey concrete texture by reference (not copied).
-textures/block/ishidatami.png, shirasu.png, tamajari.png, koke*.png, raked_gravel*.png, tobiishi_stone.png,
-niwaishi.png, bamboo_fence*.png, tatami*.png, fusuma*.png, shoji*.png, ranma*.png, coffered_ceiling*.png,
-zabuton.png, koro*.png, chochin*.png, shimenawa.png, shide.png, saisen_bako*.png
-  Drawn for this mod by tools/textures/temple_blocks.py (no outside sources); the mod's own licence. The moss
-  block's bottom refers to the game's own dirt texture (nothing copied).
-textures/block/curtain_wall_*.png, metal_roof*.png, ceiling_light.png, terminal_tile.png, carpet_tile_*.png,
-seat_*.png, sign/*.png, flight_board.png, panel_side.png, bridge_*.png, baggage_belt*.png, escalator_*.png
-  Drawn for this mod by tools/textures/airport_textures.py (no outside sources; the pictograms drawn there in the
-  manner of airport signs, not copied from any standard's artwork); the mod's own licence.
-textures/block/concrete_parapet*.png, bridge_railing*.png, sound_barrier*.png, steel_girder_*.png, bridge_bearing*.png,
-expansion_joint.png, deck_side.png, deck_drain.png, drain_pipe.png
-  Drawn for this mod by tools/textures/bridge_textures.py (no outside sources); the mod's own licence.
-
-textures/block/catenary_*.png, curve_marker_*.png
-  Drawn for this mod by tools/textures/catenary_textures.py (no outside sources); the mod's own licence.
+OpenStreetMap (OpenStreetMap contributors, ODbL 1.0): streets and buildings of Kyoto, Kanazawa, Takayama,
+Hida-Furukawa, Shimoda, Karuizawa, Nikko, Himeji and Tokyo, measured by the cityMap and osmStats tools and
+tools/assets/osm_buildings.py for the street network's and the buildings' targets.
