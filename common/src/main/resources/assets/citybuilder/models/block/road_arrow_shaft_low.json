@@ -1,0 +1,7 @@
+{
+  "parent": "citybuilder:block/lowered",
+  "textures": {
+    "top": "citybuilder:block/road_arrow_shaft",
+    "side": "citybuilder:block/asphalt"
+  }
+}

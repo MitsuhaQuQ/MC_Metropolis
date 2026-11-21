@@ -32,5 +32,7 @@ export const server = {
   canal: (x, z) => call('/canal', { x, z }),
   /** The airport nearest a point within 40 km, as this world sited it: {found, kind, x, z, heading, length, width, elevation, threshold, apron}. */
   airport: (x, z) => call('/airport', { x, z }),
+  /** The main station's square of the town owning a point: {found, template, x, z, heading, outward, depth, along, middle, loop, mouth, ground once loaded}. */
+  station: (x, z) => call('/station', { x, z }),
   stop: () => call('/stop'),
 };

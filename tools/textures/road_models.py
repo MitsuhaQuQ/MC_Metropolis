@@ -14,6 +14,8 @@ MODELS = os.path.join(ASSETS, 'models', 'block')
 ANGLES = 16
 OFFSETS = 8
 LOW = 13
+# A block drawn facing north, turned for the other facings
+FACINGS = (('north', 0), ('east', 90), ('south', 180), ('west', 270))
 
 
 def write(path, data):
@@ -46,6 +48,48 @@ def main():
     write(os.path.join(BLOCKSTATES, 'asphalt.json'), {'variants': {
         'low=false': {'model': 'citybuilder:block/asphalt'},
         'low=true': {'model': 'citybuilder:block/asphalt_low'}}})
+    # Asphalt painted white all over (a zebra crossing's stripe)
+    write(os.path.join(MODELS, 'asphalt_white.json'), {'parent': 'minecraft:block/cube_bottom_top',
+                                                       'textures': {'top': 'citybuilder:block/asphalt_white',
+                                                                    'side': 'citybuilder:block/asphalt',
+                                                                    'bottom': 'citybuilder:block/asphalt'}})
+    write(os.path.join(MODELS, 'asphalt_white_low.json'), {'parent': 'citybuilder:block/lowered',
+                                                           'textures': {'top': 'citybuilder:block/asphalt_white',
+                                                                        'side': 'citybuilder:block/asphalt'}})
+    write(os.path.join(BLOCKSTATES, 'asphalt_white.json'), {'variants': {
+        'low=false': {'model': 'citybuilder:block/asphalt_white'},
+        'low=true': {'model': 'citybuilder:block/asphalt_white_low'}}})
+    # The streets' details: painted or fitted asphalt, full height or lowered, some turned by facing
+    for name, facing in (('asphalt_hatch', True), ('road_arrow_shaft', True), ('road_arrow_head', True),
+                         ('manhole', False), ('drain_grate', True)):
+        top = f'citybuilder:block/{name}'
+        write(os.path.join(MODELS, f'{name}.json'), {'parent': 'minecraft:block/cube_bottom_top',
+                                                     'textures': {'top': top, 'side': 'citybuilder:block/asphalt',
+                                                                  'bottom': 'citybuilder:block/asphalt'}})
+        write(os.path.join(MODELS, f'{name}_low.json'), {'parent': 'citybuilder:block/lowered',
+                                                         'textures': {'top': top, 'side': 'citybuilder:block/asphalt'}})
+        variants = {}
+        for low in ('false', 'true'):
+            model = f'citybuilder:block/{name}' + ('_low' if low == 'true' else '')
+            if facing:
+                for direction, y in FACINGS:
+                    variants[f'facing={direction},low={low}'] = dict({'model': model}, **({'y': y} if y else {}))
+            else:
+                variants[f'low={low}'] = {'model': model}
+        write(os.path.join(BLOCKSTATES, f'{name}.json'), {'variants': variants})
+    # Paving: their own tops, kerb stones on the sides; tactile guide bars turned by facing
+    for name, facing in (('tactile_line', True), ('tactile_dot', False), ('sidewalk_interlocking', False),
+                         ('sidewalk_granite', False), ('curb', False)):
+        write(os.path.join(MODELS, f'{name}.json'), {'parent': 'minecraft:block/cube_bottom_top',
+                                                     'textures': {'top': f'citybuilder:block/{name}',
+                                                                  'side': 'citybuilder:block/sidewalk_side',
+                                                                  'bottom': 'citybuilder:block/sidewalk_side'}})
+        if facing:
+            variants = {f'facing={d}': dict({'model': f'citybuilder:block/{name}'}, **({'y': y} if y else {}))
+                        for d, y in FACINGS}
+        else:
+            variants = {'': {'model': f'citybuilder:block/{name}'}}
+        write(os.path.join(BLOCKSTATES, f'{name}.json'), {'variants': variants})
     # Marked asphalt
     for colour in ('white', 'yellow'):
         variants = {}

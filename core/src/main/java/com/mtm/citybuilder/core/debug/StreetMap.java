@@ -20,6 +20,7 @@ import java.awt.image.BufferedImage;
  * Renders a town's street skeleton over its urban intensity: old roads brown, arterials of the old town black and of
  * the modern town dark blue, as wide as they are at least a pixel; anchors marked, the castle, palace or temple as a
  * red square, gates as yellow squares, bridges orange, culverts cyan, ramps yellow, stairs magenta, moats blue (wet) or brown (dry), irrigation canals bright blue, stations as white squares, the centre as a white disc.
+ * The station squares are drawn as the chunk layer paves them (see {@link #plaza}).
  */
 public final class StreetMap {
     private StreetMap() {
@@ -27,6 +28,44 @@ public final class StreetMap {
 
     public static BufferedImage render(CityLogic logic, StreetPlan plan, double centerX, double centerZ, int scale, int size) {
         return render(logic, plan, centerX, centerZ, scale, size, false);
+    }
+
+    /**
+     * A station's square, pixel by pixel as the chunk layer paves the block at each pixel's middle: asphalt dark grey,
+     * lines and zebra stripes white or yellow, paving slabs light grey, shelters' places blue, islands green, the station
+     * building's land brown.
+     */
+    public static void plaza(BufferedImage image, com.mtm.citybuilder.core.street.StationPlaza plaza, double left, double top,
+                             int scale) {
+        double[] b = plaza.bounds();
+        int x0 = Math.max(0, (int) Math.floor((b[0] - left) / scale));
+        int x1 = Math.min(image.getWidth() - 1, (int) Math.ceil((b[2] - left) / scale));
+        int y0 = Math.max(0, (int) Math.floor((b[1] - top) / scale));
+        int y1 = Math.min(image.getHeight() - 1, (int) Math.ceil((b[3] - top) / scale));
+        for (int px = x0; px <= x1; px++) {
+            for (int py = y0; py <= y1; py++) {
+                double wx = Math.floor(left + (px + 0.5) * scale) + 0.5;
+                double wz = Math.floor(top + (py + 0.5) * scale) + 0.5;
+                com.mtm.citybuilder.core.street.StationPlaza.Part part = plaza.part(wx, wz);
+                if (part == com.mtm.citybuilder.core.street.StationPlaza.Part.NONE) {
+                    continue;
+                }
+                Color color;
+                if (part == com.mtm.citybuilder.core.street.StationPlaza.Part.BUILDING) {
+                    color = new Color(150, 90, 60);
+                } else {
+                    color = switch (com.mtm.citybuilder.core.chunk.ChunkLayer.plazaMark(plaza, wx, wz).paving()) {
+                        case WHITE_LINE, PAINT -> new Color(240, 240, 235);
+                        case YELLOW_LINE -> new Color(230, 180, 40);
+                        case SIDEWALK -> new Color(195, 192, 185);
+                        case SHELTER -> new Color(90, 140, 220);
+                        case MEDIAN -> new Color(70, 150, 60);
+                        default -> new Color(60, 62, 66);
+                    };
+                }
+                image.setRGB(px, py, color.getRGB());
+            }
+        }
     }
 
     /** The colour a district is painted in on the districts map. */
@@ -189,6 +228,9 @@ public final class StreetMap {
                 g.setColor(new Color(150, 40, 190));
                 g.drawOval(px - 4, py - 4, 8, 8);
             }
+        }
+        for (com.mtm.citybuilder.core.street.StationPlaza plaza : plan.plazas()) {
+            plaza(image, plaza, left, top, scale);
         }
         // The reserved high-speed lines: dashed dark green
         g.setColor(new Color(20, 110, 40));

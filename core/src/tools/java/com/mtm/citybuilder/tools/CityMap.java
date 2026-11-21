@@ -62,7 +62,7 @@ public final class CityMap {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 5) {
-            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements|extent|roads|rail|highspeed|streets]");
+            System.err.println("Usage: CityMap <seed> <x> <z> <blocks per pixel> <out.png> [size] [suitability|culture|settlements|extent|roads|rail|highspeed|streets|plaza]");
             System.exit(2);
         }
         long seed = Long.parseLong(args[0]);
@@ -131,6 +131,31 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = com.mtm.citybuilder.core.debug.PortMap.overlay(StreetMap.render(logic, plan, centerX, centerZ, scale, size),
                         terminals, centerX, centerZ, scale);
+            }
+            case "plaza" -> {
+                // The station squares of the town nearest, the map centred on the first
+                StreetPlan plan = streetStats(logic, centerX, centerZ);
+                for (com.mtm.citybuilder.core.street.StationPlaza plaza : plan.plazas()) {
+                    long buses = plaza.berths().stream().filter(b -> b.use() == com.mtm.citybuilder.core.street.StationPlaza.Use.BUS).count();
+                    double[] mouth = plaza.mouth();
+                    String radii = plaza.loops().stream().map(q -> String.format("r %.0f straight %.0f", q.radius(), 2 * q.half()))
+                            .collect(java.util.stream.Collectors.joining(", "));
+                    System.out.printf("Station square %s at (%.0f, %.0f), heading %.0f deg, side %d: %.0f deep, %.0f along the platforms;"
+                                    + " loops %s; %d bus berths, %d taxi pools, %d crossings; mouth (%.0f, %.0f)%n",
+                            plaza.template(), plaza.x(), plaza.z(), Math.toDegrees(plaza.heading()), plaza.side(), plaza.depth(),
+                            plaza.to() - plaza.from(), radii, buses, plaza.taxiPools().size(),
+                            plaza.crossings().size(), mouth[0], mouth[1]);
+                }
+                double cx = centerX;
+                double cz = centerZ;
+                if (!plan.plazas().isEmpty()) {
+                    com.mtm.citybuilder.core.street.StationPlaza first = plan.plazas().get(0);
+                    double[] middle = first.world(0.5 * (first.from() + first.to()), first.front() + 0.5 * first.depth());
+                    cx = middle[0];
+                    cz = middle[1];
+                }
+                start = System.nanoTime();
+                image = StreetMap.render(logic, plan, cx, cz, scale, size, false);
             }
             case "plots" -> {
                 StreetPlan plan = streetStats(logic, centerX, centerZ);

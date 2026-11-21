@@ -34,24 +34,8 @@ public final class CitySettings {
     public Functions functions = new Functions();
     public Sanctuaries sanctuaries = new Sanctuaries();
     public Ports ports = new Ports();
+    public Plazas plazas = new Plazas();
 
-    /**
-     * What a town's streets and facilities are for (see core.function and the design document, "城市细部功能"),
-     * calibrated on PLATEAU's buildings along OpenStreetMap's streets (tools/assets/plateau_uses.py).
-     * <p>
-     * Shopping streets by distance from the town's middle {0-0.5, 0.5-1, 1-2, over 2 km}, the chance a street, a lane
-     * or an old road is one (Kanazawa and Himeji: 38-49% of the streets within 0.5 km, 4-15% to 1 km, next to none
-     * beyond; lanes more), the chance doubled in the station front and half again downtown. A metropolis's downtown
-     * streets are office streets at {@code officeMetropolis} (Tokyo's Chuo: 60-90%), a city's at {@code officeCity}.
-     * A castle town lines {@code templeStreets} streets at its old town's edge with temples; its streets within
-     * {@code samuraiReach} of the castle are samurai streets at {@code samuraiChance}.
-     * <p>
-     * Area facilities take whole blocks: {per km2 of built land, least area, greatest area} in hectares (a Japanese
-     * primary school's site is 1-2 ha, a junior high's 1.5-3, a high school's 2-4); temples per km2 of old town. Lot
-     * facilities per km2 of built land. Landmarks by chance. Tokyo's Taito (PLATEAU's detailed uses, sites of buildings
-     * within 30 m of each other) has 17 school sites a km2 (kindergartens and crammers included), 14 clinics and
-     * hospitals, 29 temples and shrines (most small), 9 government (police boxes too), 1.8 bathhouses.
-     */
     /**
      * The ports' terminals, built out over the sea (see {@code port.PortLayer}). Each kind {width along the shore,
      * reach out to sea, least depth of the sea within {@code fairway} off its face, a berth's length, shore land
@@ -122,6 +106,23 @@ public final class CitySettings {
         public double stairGrade = 0.12;
     }
 
+    /**
+     * What a town's streets and facilities are for (see core.function and the design document, "城市细部功能"),
+     * calibrated on PLATEAU's buildings along OpenStreetMap's streets (tools/assets/plateau_uses.py).
+     * <p>
+     * Shopping streets by distance from the town's middle {0-0.5, 0.5-1, 1-2, over 2 km}, the chance a street, a lane
+     * or an old road is one (Kanazawa and Himeji: 38-49% of the streets within 0.5 km, 4-15% to 1 km, next to none
+     * beyond; lanes more), the chance doubled in the station front and half again downtown. A metropolis's downtown
+     * streets are office streets at {@code officeMetropolis} (Tokyo's Chuo: 60-90%), a city's at {@code officeCity}.
+     * A castle town lines {@code templeStreets} streets at its old town's edge with temples; its streets within
+     * {@code samuraiReach} of the castle are samurai streets at {@code samuraiChance}.
+     * <p>
+     * Area facilities take whole blocks: {per km2 of built land, least area, greatest area} in hectares (a Japanese
+     * primary school's site is 1-2 ha, a junior high's 1.5-3, a high school's 2-4); temples per km2 of old town. Lot
+     * facilities per km2 of built land. Landmarks by chance. Tokyo's Taito (PLATEAU's detailed uses, sites of buildings
+     * within 30 m of each other) has 17 school sites a km2 (kindergartens and crammers included), 14 clinics and
+     * hospitals, 29 temples and shrines (most small), 9 government (police boxes too), 1.8 bathhouses.
+     */
     public static final class Functions {
         public double[] shoppingStreet = {0.4, 0.10, 0.03, 0.01};
         public double[] shoppingLane = {0.35, 0.15, 0.07, 0.03};
@@ -564,12 +565,11 @@ public final class CitySettings {
          */
         public double lineOffset = 1200.0;
         /**
-         * Station land: the main station's platform length, width and square; a town line station's width; a suburban
-         * or reserved site's width; an interchange's square.
+         * Station land: the main station's platform length and width (its square is laid by {@link Plazas}); a town
+         * line station's width; a suburban or reserved site's width; an interchange's square.
          */
         public double mainLength = 300.0;
         public double mainWidth = 40.0;
-        public double mainPlaza = 80.0;
         public double townLineWidth = 14.0;
         public double siteWidth = 20.0;
         public double interchangePlaza = 30.0;
@@ -1064,6 +1064,40 @@ public final class CitySettings {
         public double distanceWeight = 0.5;
         /** An airport keeps this many times a town's target radius from its middle (villages aside). */
         public double townClearance = 1.25;
+    }
+
+    /**
+     * The squares in front of the main stations (L5, ekimae), after Toyama's south square: a template by the town's
+     * tier, laid on the station's front toward its avenue (design document L5, "站前广场"). Every template has the
+     * station building's land against the platforms, a pedestrian forecourt in front of it, and a nearly round one-way
+     * loop ({@code lane} wide: a lane to stop in and one to drive on) round an island, ringed by a pavement
+     * {@code walk} wide, its throat on the avenue split by a planted {@code median}. Per template {building width,
+     * building depth, forecourt depth, loop radius}: a town's small turning circle with a {@code taxiBay} and a bus
+     * stop; a city's rotary with {@code cityBerths} bus berths ({@code berth} long each, two more for every line
+     * meeting at the station) round its outer edge, a taxi stand, a drop-off and a taxi pool of {@code poolLanes} lanes
+     * of {@code poolLane} in stalls {@code stall} long in its island; a metropolis's split terminal, a bus loop (its last
+     * number its radius) with berths all round and a car loop with the taxi pool, {@code gap} apart, both on a frontage
+     * road {@code frontage} wide that the avenue meets. The loops' straights are as short as the berths allow, so the
+     * squares are compact. The avenue leaves the throat straight out for {@code approach} before turning to the
+     * network.
+     */
+    public static final class Plazas {
+        public double lane = 7.0;
+        public double walk = 4.0;
+        public double berth = 15.0;
+        public double taxiBay = 10.0;
+        public double median = 4.0;
+        public double poolLane = 3.0;
+        public int poolLanes = 4;
+        public double stall = 6.0;
+        public double frontage = 14.0;
+        public double gap = 16.0;
+        public double approach = 30.0;
+        public int[] cityBerths = {4, 8};
+        public int[] metropolisBerths = {6, 10};
+        public double[] town = {30, 12, 8, 12};
+        public double[] city = {70, 20, 14, 22};
+        public double[] metropolis = {110, 25, 18, 20, 24};
     }
 
     /** One tier of settlements. */

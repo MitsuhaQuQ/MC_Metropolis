@@ -1,6 +1,17 @@
 {
   "block.citybuilder.asphalt": "Asphalt",
+  "block.citybuilder.asphalt_hatch": "Asphalt with Zebra Zone Hatching",
   "block.citybuilder.asphalt_line_white": "Asphalt with White Line",
   "block.citybuilder.asphalt_line_yellow": "Asphalt with Yellow Line",
-  "block.citybuilder.sidewalk": "Sidewalk Paving"
+  "block.citybuilder.asphalt_white": "Asphalt with White Paint",
+  "block.citybuilder.curb": "Curb Stone",
+  "block.citybuilder.drain_grate": "Drain Grate",
+  "block.citybuilder.manhole": "Manhole Cover",
+  "block.citybuilder.road_arrow_head": "Road Arrow Head",
+  "block.citybuilder.road_arrow_shaft": "Road Arrow Shaft",
+  "block.citybuilder.sidewalk": "Sidewalk Paving",
+  "block.citybuilder.sidewalk_granite": "Granite Paving",
+  "block.citybuilder.sidewalk_interlocking": "Interlocking Pavers",
+  "block.citybuilder.tactile_dot": "Tactile Paving (Warning)",
+  "block.citybuilder.tactile_line": "Tactile Paving (Guide)"
 }

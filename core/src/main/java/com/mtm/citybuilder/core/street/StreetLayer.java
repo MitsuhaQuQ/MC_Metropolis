@@ -1253,6 +1253,7 @@ public final class StreetLayer {
         List<UrbanLine> urban = new ArrayList<>();
         List<Canal> canals = new ArrayList<>();
         List<StreetSegment> segments = new ArrayList<>();
+        List<Front> fronts = new ArrayList<>();
         List<double[]> oldRoad = oldRoads(settlement, window, segments);
         if (formation != Formation.VILLAGE) {
             for (Ground ground : window.grounds) {
@@ -1296,9 +1297,12 @@ public final class StreetLayer {
                     sando(anchor, extent, window, segments);
                 }
             }
+            // Each station's square faces its avenue's way, the avenue leaving from the square's mouth
             for (Anchor anchor : List.copyOf(anchors)) {
                 if (anchor.kind() == Anchor.Kind.STATION) {
-                    avenue(anchor, anchors, extent, window, segments);
+                    Front front = front(settlement, anchor, anchors, extent, railways, segments);
+                    fronts.add(front);
+                    avenue(anchor, front, anchors, extent, window, segments);
                 }
             }
             // The town's own railway along the arterials, and roads along its stretches at grade
@@ -1372,13 +1376,14 @@ public final class StreetLayer {
         clearEstates(window, segments);
         List<Promenade> promenades = formation == Formation.VILLAGE ? List.of()
                 : promenades(settlement, window, canals, segments);
+        List<StationPlaza> plazas = plazas(fronts, railways, urban, segments);
         List<StationSite> sites = formation == Formation.VILLAGE ? List.of()
-                : sites(settlement, window, anchors, railways, urban, segments);
+                : sites(settlement, window, anchors, railways, urban, segments, fronts, plazas);
         List<List<double[]>> highSpeed = highSpeedCorridor(settlement, window, districts, anchors);
         return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments, urban,
                 window.capital == null ? null : window.capital.clone(), sites, highSpeed, canals, window.estates,
                 promenades, new WaterField((double) window.originX * grid, (double) window.originZ * grid, FINE,
-                window.fineSize, window.edge.clone()));
+                window.fineSize, window.edge.clone()), plazas);
     }
 
     /**
@@ -1802,6 +1807,127 @@ public final class StreetLayer {
             }
         }
         return best;
+    }
+
+    /**
+     * A station's front, decided before its avenue is laid: the platforms' heading, the side toward the avenue's
+     * goal, the square's template and depth.
+     */
+    private record Front(Anchor station, double heading, int side, StationPlaza.Template template, double depth) {
+        /** Where the avenue leaves the square: the middle of its far edge. */
+        double[] mouth(double siteWidth) {
+            double out = 0.5 * siteWidth + depth;
+            return new double[]{station.x() - side * out * Math.sin(heading), station.z() + side * out * Math.cos(heading)};
+        }
+
+        /** The direction out of the square, {x, z}. */
+        double[] outward() {
+            return new double[]{-side * Math.sin(heading), side * Math.cos(heading)};
+        }
+    }
+
+    private Front front(Settlement settlement, Anchor station, List<Anchor> anchors, CityExtent extent,
+                        List<CityRailway> railways, List<StreetSegment> segments) {
+        double heading = stationHeading(settlement, station, extent, railways, segments);
+        double[] goal = avenueGoal(station, anchors, extent);
+        double toward = -(goal[0] - station.x()) * Math.sin(heading) + (goal[1] - station.z()) * Math.cos(heading);
+        int side = toward < 0 ? -1 : 1;
+        StationPlaza.Template template = StationPlaza.template(settlement.tier());
+        return new Front(station, heading, side, template, StationPlaza.depth(template, logic.settings().plazas));
+    }
+
+    /**
+     * The platforms' direction at a station: along the intercity lines ending there, else along the line passing
+     * through it, else along the main road nearest.
+     */
+    private double stationHeading(Settlement settlement, Anchor station, CityExtent extent, List<CityRailway> railways,
+                                  List<StreetSegment> segments) {
+        for (CityRailway railway : railways) {
+            List<double[]> line = railway.line();
+            double[] last = line.get(line.size() - 1);
+            if (Math.hypot(last[0] - station.x(), last[1] - station.z()) < 1.0 && line.size() > 1) {
+                double[] before = line.get(line.size() - 2);
+                return Math.atan2(last[1] - before[1], last[0] - before[0]);
+            }
+        }
+        double reach = 4000.0;
+        for (RailEdge edge : logic.railLines(extent.coreX() - reach, extent.coreZ() - reach, extent.coreX() + reach,
+                extent.coreZ() + reach)) {
+            if (edge.a().id() == settlement.id() || edge.b().id() == settlement.id()) {
+                continue;
+            }
+            RailRoute route = logic.railRoute(edge);
+            if (!route.exists() || route.samples() < 2) {
+                continue;
+            }
+            for (RailStation stop : route.stations()) {
+                int k = stop.sample();
+                if (stop.settlement().id() != settlement.id()
+                        || Math.hypot(route.x(k) - station.x(), route.z(k) - station.z()) > 1.0) {
+                    continue;
+                }
+                int a = Math.max(0, k - 1);
+                int b = Math.min(route.samples() - 1, k + 1);
+                return Math.atan2(route.z(b) - route.z(a), route.x(b) - route.x(a));
+            }
+        }
+        return roadHeading(segments, station.x(), station.z(), 0.0);
+    }
+
+    /** Where a station's avenue heads: the castle gate nearest the station (the ote-mon), else the town's centre. */
+    private static double[] avenueGoal(Anchor station, List<Anchor> anchors, CityExtent extent) {
+        double tx = extent.coreX();
+        double tz = extent.coreZ();
+        double nearestGate = Double.POSITIVE_INFINITY;
+        for (Anchor anchor : anchors) {
+            if (anchor.kind() == Anchor.Kind.GATE) {
+                double d = Math.hypot(anchor.x() - station.x(), anchor.z() - station.z());
+                if (d < nearestGate) {
+                    nearestGate = d;
+                    tx = anchor.x();
+                    tz = anchor.z();
+                }
+            }
+        }
+        return new double[]{tx, tz};
+    }
+
+    /**
+     * The stations' squares, each with two more bus berths for every railway line meeting at it, its throat as wide as
+     * the avenue leaving it (a boulevard's median running on as the throat's).
+     */
+    private List<StationPlaza> plazas(List<Front> fronts, List<CityRailway> railways, List<UrbanLine> urban,
+                                      List<StreetSegment> segments) {
+        List<StationPlaza> plazas = new ArrayList<>();
+        CitySettings.Transit transit = logic.settings().transit;
+        for (Front front : fronts) {
+            Anchor station = front.station();
+            int lines = 0;
+            for (CityRailway railway : railways) {
+                double[] last = railway.line().get(railway.line().size() - 1);
+                if (Math.hypot(last[0] - station.x(), last[1] - station.z()) < 1.0) {
+                    lines++;
+                }
+            }
+            for (UrbanLine line : urban) {
+                for (double[] st : line.stations()) {
+                    if (Math.hypot(st[0] - station.x(), st[1] - station.z()) < 300.0) {
+                        lines++;
+                        break;
+                    }
+                }
+            }
+            double[] mouth = front.mouth(transit.mainWidth);
+            double avenue = config.stationAvenueWidth;
+            for (StreetSegment g : segments) {
+                if (Math.hypot(g.x1() - mouth[0], g.z1() - mouth[1]) < 1.0 || Math.hypot(g.x2() - mouth[0], g.z2() - mouth[1]) < 1.0) {
+                    avenue = Math.max(avenue, g.width());
+                }
+            }
+            plazas.add(StationPlaza.lay(front.template(), station.x(), station.z(), front.heading(), front.side(),
+                    transit.mainWidth, Math.max(1, lines), logic.settings().plazas, avenue));
+        }
+        return plazas;
     }
 
     /** Points every {@code spacing} blocks along a line, its two ends included, as {x, z}. */
@@ -4965,7 +5091,8 @@ public final class StreetLayer {
      * every station first and then about every {@code busSpacing}.
      */
     private List<StationSite> sites(Settlement settlement, Window window, List<Anchor> anchors, List<CityRailway> railways,
-                                    List<UrbanLine> urban, List<StreetSegment> segments) {
+                                    List<UrbanLine> urban, List<StreetSegment> segments, List<Front> fronts,
+                                    List<StationPlaza> plazas) {
         CitySettings.Transit transit = logic.settings().transit;
         List<StationSite> sites = new ArrayList<>();
         // The main station, along the lines arriving at it; a station of a line passing through, along the nearest road
@@ -4973,21 +5100,13 @@ public final class StreetLayer {
             if (anchor.kind() != Anchor.Kind.STATION) {
                 continue;
             }
-            double heading = Double.NaN;
-            for (CityRailway railway : railways) {
-                List<double[]> line = railway.line();
-                double[] last = line.get(line.size() - 1);
-                if (Math.hypot(last[0] - anchor.x(), last[1] - anchor.z()) < 1.0 && line.size() > 1) {
-                    double[] before = line.get(line.size() - 2);
-                    heading = Math.atan2(last[1] - before[1], last[0] - before[0]);
-                    break;
-                }
+            // Along the platforms as the square was laid, the square's depth beside it
+            int f = 0;
+            while (fronts.get(f).station() != anchor) {
+                f++;
             }
-            if (Double.isNaN(heading)) {
-                heading = roadHeading(segments, anchor.x(), anchor.z(), 0.0);
-            }
-            sites.add(new StationSite(StationSite.Kind.MAIN, anchor.x(), anchor.z(), heading, transit.mainLength,
-                    transit.mainWidth, transit.mainPlaza));
+            sites.add(new StationSite(StationSite.Kind.MAIN, anchor.x(), anchor.z(), fronts.get(f).heading(),
+                    transit.mainLength, transit.mainWidth, plazas.get(f).depth()));
         }
         // The town lines' stations; an interchange gets a square
         for (UrbanLine line : urban) {
@@ -5099,7 +5218,7 @@ public final class StreetLayer {
             StreetSegment best = null;
             double bestDistance = transit.busApart;
             for (StreetSegment g : segments) {
-                if (!busRoad(g)) {
+                if (!busRoad(g) || inPlaza(plazas, 0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2()))) {
                     continue;
                 }
                 double d = Math.hypot(0.5 * (g.x1() + g.x2()) - site.x(), 0.5 * (g.z1() + g.z2()) - site.z());
@@ -5132,6 +5251,15 @@ public final class StreetLayer {
             }
         }
         return sites;
+    }
+
+    private static boolean inPlaza(List<StationPlaza> plazas, double x, double z) {
+        for (StationPlaza plaza : plazas) {
+            if (plaza.contains(x, z)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether a class is of the main roads, arterial or collector, as the town's network counts them. */
@@ -6062,20 +6190,11 @@ public final class StreetLayer {
      * arterials and old roads, crossings included, from the node nearest the station (joined to it by a short straight
      * where it lies off the network) to the node nearest the heart. Nothing is laid where the network does not reach.
      */
-    private void avenue(Anchor station, List<Anchor> anchors, CityExtent extent, Window window, List<StreetSegment> segments) {
-        double tx = extent.coreX();
-        double tz = extent.coreZ();
-        double nearestGate = Double.POSITIVE_INFINITY;
-        for (Anchor anchor : anchors) {
-            if (anchor.kind() == Anchor.Kind.GATE) {
-                double d = Math.hypot(anchor.x() - station.x(), anchor.z() - station.z());
-                if (d < nearestGate) {
-                    nearestGate = d;
-                    tx = anchor.x();
-                    tz = anchor.z();
-                }
-            }
-        }
+    private void avenue(Anchor station, Front front, List<Anchor> anchors, CityExtent extent, Window window,
+                        List<StreetSegment> segments) {
+        double[] goal = avenueGoal(station, anchors, extent);
+        double tx = goal[0];
+        double tz = goal[1];
         if (Math.hypot(tx - station.x(), tz - station.z()) > config.stationAvenueMax) {
             return;
         }
@@ -6145,7 +6264,24 @@ public final class StreetLayer {
         if (nodes.isEmpty()) {
             return;
         }
-        int from = nearestNode(nodes, station.x(), station.z());
+        // From the square's mouth straight out, then onto the network ahead of it, not back across the square
+        double[] mouth = front.mouth(logic.settings().transit.mainWidth);
+        double[] out = front.outward();
+        double approach = logic.settings().plazas.approach;
+        double[] ahead = {mouth[0] + out[0] * approach, mouth[1] + out[1] * approach};
+        int from = -1;
+        double fromDistance = Double.POSITIVE_INFINITY;
+        for (int k = 0; k < nodes.size(); k++) {
+            double[] n = nodes.get(k);
+            double d = Math.hypot(n[0] - ahead[0], n[1] - ahead[1]);
+            if ((n[0] - mouth[0]) * out[0] + (n[1] - mouth[1]) * out[1] > 0.5 * approach && d < fromDistance) {
+                fromDistance = d;
+                from = k;
+            }
+        }
+        if (from < 0) {
+            from = nearestNode(nodes, ahead[0], ahead[1]);
+        }
         int to = nearestNode(nodes, tx, tz);
         if (from == to) {
             return;
@@ -6192,20 +6328,29 @@ public final class StreetLayer {
             segments.set(k, new StreetSegment(g.x1(), g.z1(), g.x2(), g.z2(), StreetClass.ARTERIAL, Era.MODERN,
                     Math.max(g.width(), config.stationAvenueWidth), g.structure()));
         }
-        // The station's own short way onto the network
+        // The station's own short way onto the network: out of the square's mouth straight on, then to the network
         double[] first = nodes.get(from);
-        double gap = Math.hypot(first[0] - station.x(), first[1] - station.z());
-        if (gap > 1.0) {
-            int steps = Math.max(1, (int) Math.ceil(gap / config.step));
-            for (int q = 0; q < steps; q++) {
-                double ax = station.x() + (first[0] - station.x()) * q / steps;
-                double az = station.z() + (first[1] - station.z()) * q / steps;
-                double bx = station.x() + (first[0] - station.x()) * (q + 1) / steps;
-                double bz = station.z() + (first[1] - station.z()) * (q + 1) / steps;
-                boolean over = window.water(ax, az) || window.water(bx, bz);
-                segments.add(new StreetSegment(ax, az, bx, bz, StreetClass.ARTERIAL, Era.MODERN, config.stationAvenueWidth,
-                        over ? StreetStructure.BRIDGE : StreetStructure.GROUND));
-            }
+        double straight = Math.min(approach, Math.max(0.0, (first[0] - mouth[0]) * out[0] + (first[1] - mouth[1]) * out[1]));
+        double[] bend = {mouth[0] + out[0] * straight, mouth[1] + out[1] * straight};
+        connect(mouth, bend, window, segments);
+        connect(bend, first, window, segments);
+    }
+
+    /** A straight piece of the station avenue, in steps, bridged over water. */
+    private void connect(double[] a, double[] b, Window window, List<StreetSegment> segments) {
+        double gap = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        if (gap <= 1.0) {
+            return;
+        }
+        int steps = Math.max(1, (int) Math.ceil(gap / config.step));
+        for (int q = 0; q < steps; q++) {
+            double ax = a[0] + (b[0] - a[0]) * q / steps;
+            double az = a[1] + (b[1] - a[1]) * q / steps;
+            double bx = a[0] + (b[0] - a[0]) * (q + 1) / steps;
+            double bz = a[1] + (b[1] - a[1]) * (q + 1) / steps;
+            boolean over = window.water(ax, az) || window.water(bx, bz);
+            segments.add(new StreetSegment(ax, az, bx, bz, StreetClass.ARTERIAL, Era.MODERN, config.stationAvenueWidth,
+                    over ? StreetStructure.BRIDGE : StreetStructure.GROUND));
         }
     }
 

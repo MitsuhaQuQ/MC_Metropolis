@@ -151,11 +151,15 @@ class DistrictsTest {
                 .filter(a -> a.kind() == Anchor.Kind.GATE).map(a -> Math.round(Math.hypot(a.x() - station.x(), a.z() - station.z()))).toList());
         Anchor gate = plan.anchors().stream().filter(a -> a.kind() == Anchor.Kind.GATE)
                 .min(java.util.Comparator.comparingDouble(a -> Math.hypot(a.x() - station.x(), a.z() - station.z()))).orElseThrow();
-        double nearStation = avenue.stream().mapToDouble(g -> Math.min(Math.hypot(g.x1() - station.x(), g.z1() - station.z()),
-                Math.hypot(g.x2() - station.x(), g.z2() - station.z()))).min().orElseThrow();
+        // From the mouth of the station's square
+        StationPlaza square = plan.plazas().stream().filter(q -> Math.hypot(q.x() - station.x(), q.z() - station.z()) < 1.0)
+                .findFirst().orElseThrow();
+        double[] mouth = square.mouth();
+        double nearStation = avenue.stream().mapToDouble(g -> Math.min(Math.hypot(g.x1() - mouth[0], g.z1() - mouth[1]),
+                Math.hypot(g.x2() - mouth[0], g.z2() - mouth[1]))).min().orElseThrow();
         double nearGate = avenue.stream().mapToDouble(g -> Math.min(Math.hypot(g.x1() - gate.x(), g.z1() - gate.z()),
                 Math.hypot(g.x2() - gate.x(), g.z2() - gate.z()))).min().orElseThrow();
-        assertTrue(nearStation < 1.0, "the avenue starts at the station: " + nearStation);
+        assertTrue(nearStation < 1.0, "the avenue starts at the station square's mouth: " + nearStation);
         assertTrue(nearGate < 200.0, "the avenue reaches the gate: " + nearGate);
     }
 }
