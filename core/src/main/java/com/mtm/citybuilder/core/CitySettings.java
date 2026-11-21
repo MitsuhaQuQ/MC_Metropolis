@@ -926,11 +926,18 @@ public final class CitySettings {
         public double streetBridge = 60.0;
         public double streetBridgeSpacing = 250.0;
         /**
-         * Roads along the banks of water wider than a culvert run this far from its edge, on the embankment, whose
-         * crest stands {@code leveeHeight} above the water; a run at least {@code riversideArterial} long is a
+         * Roads along the banks of water wider than a culvert run {@code bankOffset} from its edge, on the embankment,
+         * whose crest stands {@code leveeHeight} above the water; a run at least {@code riversideArterial} long is a
          * collector, a shorter one a street. An arterial ending at the water joins a bank road within {@code bankJoin} instead of ending there.
          */
-        public double leveeHeight = 3.0;
+        public double leveeHeight = 5.0;
+        /**
+         * The embankment's cross-section (Japanese rivers', the user 2026-11-22): from the water a terrace a block above
+         * it with the promenade, the revetment up to the crest, the bank road, the back slope {@code leveeSlope} across
+         * for each block it falls to the town's ground, and a road {@code leveeRoad} wide along its foot; no lots on it.
+         */
+        public double leveeSlope = 2.0;
+        public double leveeRoad = 5.0;
         public double bankOffset = 24.0;
         /**
          * Bank roads follow only water at least this wide: narrower arms, inlets and creeks are crossed on a short

@@ -1,5 +1,6 @@
 package com.mtm.citybuilder.core.chunk;
 
+import com.mtm.citybuilder.core.CitySettings;
 import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.extent.UrbanSample;
 import com.mtm.citybuilder.core.settlement.Settlement;
@@ -635,7 +636,8 @@ public final class ChunkLayer {
      */
     private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links,
                          Map<Long, List<double[]>> canals, Map<Long, List<StationPlaza>> plazas,
-                         Map<Long, List<Stop>> stops, Map<Long, Double> heights, boolean[][] round) {
+                         Map<Long, List<Stop>> stops, Map<Long, Double> heights, boolean[][] round,
+                         Map<Long, List<double[]>> banks) {
         /**
          * Whether a column lies on a piece's paving: within half its width of its line and, past an end, only where
          * that end is round (a bend's outside); a square end stops at the end's line.
@@ -1075,8 +1077,19 @@ public final class ChunkLayer {
      * the land within {@link #VERGE} of a street's edge the level of that street there and how far out it lies (NaN
      * elsewhere), x-major as {@link #columns}.
      */
-    public record Grades(double[] level, double[] verge, double[] outside) {
+    public record Grades(double[] level, double[] verge, double[] outside, double[] bank, int[] bankKind) {
     }
+
+    /** An embankment's terrace by the water, a block above it: grass, the promenade on it. */
+    public static final int BANK_TERRACE = 1;
+    /** The revetment from the terrace up to the crest: stone. */
+    public static final int BANK_REVETMENT = 2;
+    /** The crest, under and beside the bank road. */
+    public static final int BANK_CREST = 3;
+    /** The back slope down to the town's ground: grass. */
+    public static final int BANK_SLOPE = 4;
+    /** The road along the back slope's foot, at the town's ground: asphalt. */
+    public static final int BANK_ROAD = 5;
 
     /**
      * The levels of a chunk's streets: each piece runs straight between the heights of the ground at its two ends
@@ -1138,16 +1151,108 @@ public final class ChunkLayer {
                 }
             }
         }
+        // The embankments' cross-sections, over the streets' verges
+        double[] bank = new double[256];
+        int[] bankKind = new int[256];
+        java.util.Arrays.fill(bank, Double.NaN);
+        CitySettings.Streets config = logic.settings().streets;
+        for (Settlement town : towns(minX, minZ)) {
+            List<double[]> near = index(town).banks.get(key(chunkX, chunkZ));
+            if (near == null) {
+                continue;
+            }
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    int c = x * 16 + z;
+                    double cx = minX + x + 0.5;
+                    double cz = minZ + z + 0.5;
+                    double[] best = null;
+                    double bestD = Double.POSITIVE_INFINITY;
+                    double bestT = 0;
+                    for (double[] b : near) {
+                        double dx = b[2] - b[0];
+                        double dz = b[3] - b[1];
+                        double t = Math.max(0, Math.min(1, ((cx - b[0]) * dx + (cz - b[1]) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+                        double d = Math.hypot(b[0] + dx * t - cx, b[1] + dz * t - cz);
+                        if (d < bestD) {
+                            bestD = d;
+                            best = b;
+                            bestT = t;
+                        }
+                    }
+                    if (best == null) {
+                        continue;
+                    }
+                    double[] profile = bankProfile(best, bestT, cx, cz, config);
+                    if (profile != null && (Double.isNaN(bank[c]) || profile[0] > bank[c])) {
+                        bank[c] = profile[0];
+                        bankKind[c] = (int) profile[1];
+                    }
+                }
+            }
+        }
         for (int c = 0; c < 256; c++) {
             if (weight[c] > 0) {
                 level[c] = weighted[c] / weight[c];
+                verge[c] = Double.NaN;
+            }
+            if (!Double.isNaN(bank[c])) {
                 verge[c] = Double.NaN;
             }
             if (Double.isNaN(verge[c])) {
                 outside[c] = Double.NaN;
             }
         }
-        return new Grades(level, verge, outside);
+        return new Grades(level, verge, outside, bank, bankKind);
+    }
+
+    /**
+     * An embankment's cross-section at a column ({@link com.mtm.citybuilder.core.street.Embankment}): {level, kind}, or
+     * null off it. Across from the bank road's centre line, towards the water: the crest under the road, the revetment
+     * down to the terrace a block above the water, out past the promenade, the terrace to the water's edge; inland: the
+     * back slope down to the town's ground and the road along its foot, where the crest stands a block or more above
+     * the town.
+     */
+    static double[] bankProfile(double[] b, double t, double x, double z, CitySettings.Streets config) {
+        double px = b[0] + (b[2] - b[0]) * t;
+        double pz = b[1] + (b[3] - b[1]) * t;
+        double s = (x - px) * b[6] + (z - pz) * b[7];
+        // Past the piece's ends only within a little of its line (the outside of a bend), not beyond
+        double off = Math.hypot(x - px, z - pz);
+        if (off > Math.abs(s) + 2.0) {
+            return null;
+        }
+        double crest = b[4] + (b[5] - b[4]) * t;
+        double ground = b[8] + (b[9] - b[8]) * t;
+        double water = b[10] + (b[11] - b[10]) * t;
+        double half = 0.5 * b[12];
+        double terrace = Math.min(crest, water + 1.0);
+        if (s < -half) {
+            if (s < -config.bankOffset) {
+                return null;
+            }
+            double path = -config.bankOffset + config.promenadeOffset + 0.5 * config.promenadeWidth + 1.0;
+            if (s <= path || path >= -half) {
+                return new double[]{terrace, BANK_TERRACE};
+            }
+            double f = (s - path) / (-half - path);
+            return new double[]{terrace + (crest - terrace) * f, BANK_REVETMENT};
+        }
+        if (s <= half) {
+            return new double[]{crest, BANK_CREST};
+        }
+        double rise = crest - ground;
+        if (rise < 1.0) {
+            return null;
+        }
+        double run = config.leveeSlope * rise;
+        if (s <= half + run) {
+            return new double[]{crest - (s - half) / config.leveeSlope, BANK_SLOPE};
+        }
+        if (s <= half + run + config.leveeRoad) {
+            return new double[]{ground, BANK_ROAD};
+        }
+        return null;
     }
 
     /**
@@ -1156,6 +1261,11 @@ public final class ChunkLayer {
      */
     private double nodeHeight(Index index, double x, double z) {
         return index.heights.computeIfAbsent(point(x, z), k -> {
+            // On an embankment's bank road: its crest
+            double crest = crest(index, x, z, 1.5);
+            if (!Double.isNaN(crest)) {
+                return crest;
+            }
             double[] h = new double[5];
             double[][] at = {{0, 0}, {4, 0}, {-4, 0}, {0, 4}, {0, -4}};
             for (int i = 0; i < 5; i++) {
@@ -1166,11 +1276,39 @@ public final class ChunkLayer {
         });
     }
 
-    /**
-     * The towns whose streets may cross a chunk: the owners at its corners and middle; and over water, which belongs to
-     * no town's built land, the owners of the banks round it, out to {@link #WATER_REACH}, so a bridge is laid all the
-     * way across a river or a lake, not only over its edges.
-     */
+    /** The crest of an embankment whose centre line runs within {@code reach} of a position, or NaN. */
+    private static double crest(Index index, double x, double z, double reach) {
+        List<double[]> near = index.banks.get(key(Math.floorDiv((int) Math.floor(x), 16), Math.floorDiv((int) Math.floor(z), 16)));
+        double best = reach;
+        double crest = Double.NaN;
+        if (near != null) {
+            for (double[] b : near) {
+                double dx = b[2] - b[0];
+                double dz = b[3] - b[1];
+                double t = Math.max(0, Math.min(1, ((x - b[0]) * dx + (z - b[1]) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+                double d = Math.hypot(b[0] + dx * t - x, b[1] + dz * t - z);
+                if (d <= best) {
+                    best = d;
+                    crest = b[4] + (b[5] - b[4]) * t;
+                }
+            }
+        }
+        return crest;
+    }
+
+    /** The highest crest of a plan's embankments whose centre line points lie within {@code reach}, or -infinity. */
+    private static double crestNear(StreetPlan plan, double x, double z, double reach) {
+        double best = Double.NEGATIVE_INFINITY;
+        for (com.mtm.citybuilder.core.street.Embankment e : plan.embankments()) {
+            for (double[] p : e.points()) {
+                if (Math.hypot(p[0] - x, p[1] - z) <= reach) {
+                    best = Math.max(best, p[2]);
+                }
+            }
+        }
+        return best;
+    }
+
     /**
      * Whether a town lays an old road over a position on an intercity road's centre line: the intercity layer leaves
      * that stretch, its whole width and slopes, to the town.
@@ -1194,6 +1332,11 @@ public final class ChunkLayer {
         return false;
     }
 
+    /**
+     * The towns whose streets may cross a chunk: the owners at its corners and middle; and over water, which belongs to
+     * no town's built land, the owners of the banks round it, out to {@link #WATER_REACH}, so a bridge is laid all the
+     * way across a river or a lake, not only over its edges.
+     */
     private Set<Settlement> towns(double minX, double minZ) {
         Set<Settlement> towns = new LinkedHashSet<>();
         for (double[] p : new double[][]{{minX + 8, minZ + 8}, {minX, minZ}, {minX + 16, minZ}, {minX, minZ + 16},
@@ -1314,6 +1457,8 @@ public final class ChunkLayer {
                     long count = ends.getOrDefault(point(e[0], e[1]), List.of()).stream().filter(run::contains).count();
                     if (count == 1) {
                         bank = Math.max(bank, logic.terrain().smoothHeight(e[0], e[1]));
+                        // Over an embankment's crest, which the bridge lands on
+                        bank = Math.max(bank, crestNear(plan, e[0], e[1], logic.settings().streets.bankOffset + 8.0));
                     }
                 }
             }
@@ -1361,8 +1506,40 @@ public final class ChunkLayer {
                 }
             }
         }
-        return new Index(byChunk, segments, deck, links, canals, plazas, stops, new java.util.concurrent.ConcurrentHashMap<>(),
-                round(segments));
+        // The embankments' pieces by the chunks their cross-sections reach: {ax, az, bx, bz, crest a, crest b, normal
+        // x, normal z, ground a, ground b, water a, water b, road width, land}
+        Map<Long, List<double[]>> banks = new HashMap<>();
+        double offset = logic.settings().streets.bankOffset;
+        for (com.mtm.citybuilder.core.street.Embankment e : plan.embankments()) {
+            double reach = Math.max(offset, e.land()) + 2.0;
+            for (int k = 1; k < e.points().size(); k++) {
+                double[] a = e.points().get(k - 1);
+                double[] b = e.points().get(k);
+                double nx = a[3] + b[3];
+                double nz = a[4] + b[4];
+                double n = Math.hypot(nx, nz);
+                if (n < 1e-9) {
+                    continue;
+                }
+                double[] piece = {a[0], a[1], b[0], b[1], a[2], b[2], nx / n, nz / n, a[5], b[5], a[6], b[6], e.road(), e.land()};
+                for (int cx = Math.floorDiv((int) Math.floor(Math.min(a[0], b[0]) - reach), 16); cx <= Math.floorDiv((int) Math.floor(Math.max(a[0], b[0]) + reach), 16); cx++) {
+                    for (int cz = Math.floorDiv((int) Math.floor(Math.min(a[1], b[1]) - reach), 16); cz <= Math.floorDiv((int) Math.floor(Math.max(a[1], b[1]) + reach), 16); cz++) {
+                        banks.computeIfAbsent(key(cx, cz), q -> new ArrayList<>()).add(piece);
+                    }
+                }
+            }
+        }
+        Map<Long, Double> heights = new java.util.concurrent.ConcurrentHashMap<>();
+        Index index = new Index(byChunk, segments, deck, links, canals, plazas, stops, heights, round(segments), banks);
+        // A street leaving a bridge starts at its deck
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            if (g.structure() == StreetStructure.BRIDGE && !Double.isNaN(deck[p])) {
+                heights.merge(point(g.x1(), g.z1()), deck[p], Math::max);
+                heights.merge(point(g.x2(), g.z2()), deck[p], Math::max);
+            }
+        }
+        return index;
     }
 
     /**

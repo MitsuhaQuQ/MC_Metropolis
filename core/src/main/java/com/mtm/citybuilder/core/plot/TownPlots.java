@@ -80,6 +80,8 @@ public final class TownPlots {
 
     /** Each footpath's bounds widened by its open land: {minX, minZ, maxX, maxZ}. */
     private final double[][] footpathBounds;
+    /** The embankments' pieces by 64-block cell, each {embankment, piece}. */
+    private final Map<Long, List<int[]>> embankmentCells = new HashMap<>();
 
     public TownPlots(CitySettings.Plots config, StreetPlan plan, long seed) {
         this.config = config;
@@ -97,6 +99,18 @@ public final class TownPlots {
                 b[3] = Math.max(b[3], q[1] + reach);
             }
             footpathBounds[k] = b;
+        }
+        for (int k = 0; k < plan.embankments().size(); k++) {
+            var e = plan.embankments().get(k);
+            for (int i = 1; i < e.points().size(); i++) {
+                double[] a = e.points().get(i - 1);
+                double[] b = e.points().get(i);
+                for (long cx = (long) Math.floor((Math.min(a[0], b[0]) - e.land()) / 64.0); cx <= (long) Math.floor((Math.max(a[0], b[0]) + e.land()) / 64.0); cx++) {
+                    for (long cz = (long) Math.floor((Math.min(a[1], b[1]) - e.land()) / 64.0); cz <= (long) Math.floor((Math.max(a[1], b[1]) + e.land()) / 64.0); cz++) {
+                        embankmentCells.computeIfAbsent((cx << 32) ^ (cz & 0xFFFFFFFFL), q -> new ArrayList<>()).add(new int[]{k, i});
+                    }
+                }
+            }
         }
         for (StreetSegment g : plan.segments()) {
             if (g.streetClass() == com.mtm.citybuilder.core.street.StreetClass.PATH) {
@@ -470,6 +484,13 @@ public final class TownPlots {
         // The footpaths and the open land along them, to the water
         for (com.mtm.citybuilder.core.street.Promenade promenade : footpathsNear(x, z, x, z)) {
             if (promenade.open(x, z)) {
+                return null;
+            }
+        }
+        // An embankment's road, back slope and the road at its foot: the town keeps back from the water
+        long cell = ((long) Math.floor(x / 64.0) << 32) ^ ((long) Math.floor(z / 64.0) & 0xFFFFFFFFL);
+        for (int[] piece : embankmentCells.getOrDefault(cell, List.of())) {
+            if (plan.embankments().get(piece[0]).covers(piece[1], x, z)) {
                 return null;
             }
         }

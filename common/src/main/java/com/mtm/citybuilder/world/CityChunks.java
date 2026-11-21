@@ -168,6 +168,9 @@ public final class CityChunks {
             if (!Double.isNaN(grades.verge()[c])) {
                 lowest = Math.min(lowest, grades.verge()[c] - grades.outside()[c]);
             }
+            if (!Double.isNaN(grades.bank()[c])) {
+                lowest = Math.min(lowest, grades.bank()[c]);
+            }
         }
         if (Double.isInfinite(lowest)) {
             return;
@@ -231,6 +234,60 @@ public final class CityChunks {
                 chunk.setBlockState(pos.set(wx, y, wz), Blocks.DIRT.defaultBlockState(), false);
             }
             chunk.setBlockState(pos.set(wx, low, wz), topBlock, false);
+        }
+    }
+
+    /**
+     * A column of an embankment's cross-section off the streets, cut or filled to its level: the terrace and the back
+     * slope grassed (left where the river's water lies on top), the revetment in stone, the road along the slope's
+     * foot in asphalt.
+     */
+    private static void bank(ChunkAccess chunk, double level, int kind, int wx, int wz, int x, int z,
+                             BlockPos.MutableBlockPos pos, int top) {
+        int surface = Math.min(top, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
+        int ground = surface;
+        BlockState state = chunk.getBlockState(pos.set(wx, ground, wz));
+        boolean wet = false;
+        while (ground > chunk.getMinBuildHeight() && !state.blocksMotion()) {
+            wet |= !state.getFluidState().isEmpty();
+            state = chunk.getBlockState(pos.set(wx, --ground, wz));
+        }
+        if (wet && (kind == ChunkLayer.BANK_TERRACE || kind == ChunkLayer.BANK_REVETMENT && ground < level - 2)) {
+            return;
+        }
+        int y = (int) Math.floor(level);
+        if (y < chunk.getMinBuildHeight() + 3 || y + 1 > top) {
+            return;
+        }
+        for (int up = y + 1; up <= surface; up++) {
+            chunk.setBlockState(pos.set(wx, up, wz), Blocks.AIR.defaultBlockState(), false);
+        }
+        BlockState fill;
+        BlockState face;
+        switch (kind) {
+            case ChunkLayer.BANK_REVETMENT -> {
+                fill = Blocks.STONE_BRICKS.defaultBlockState();
+                face = Blocks.STONE_BRICKS.defaultBlockState();
+            }
+            case ChunkLayer.BANK_ROAD -> {
+                fill = Blocks.DIRT.defaultBlockState();
+                face = CityBlocks.ASPHALT.get().defaultBlockState();
+            }
+            default -> {
+                fill = Blocks.DIRT.defaultBlockState();
+                face = Blocks.GRASS_BLOCK.defaultBlockState();
+            }
+        }
+        for (int down = ground + 1; down < y; down++) {
+            chunk.setBlockState(pos.set(wx, down, wz), fill, false);
+        }
+        chunk.setBlockState(pos.set(wx, y, wz), face, false);
+        if (kind == ChunkLayer.BANK_REVETMENT || kind == ChunkLayer.BANK_ROAD) {
+            // A block of the same under it, as under the streets' paving: a step's face is the revetment or the road
+            BlockState under = kind == ChunkLayer.BANK_ROAD ? face : fill;
+            for (int k = 1; k <= 2; k++) {
+                chunk.setBlockState(pos.set(wx, y - k, wz), under, false);
+            }
         }
     }
 
@@ -342,6 +399,8 @@ public final class CityChunks {
                 if (block == null) {
                     if (column.canal() != 0) {
                         dig(chunk, column, baseX + x, baseZ + z, x, z, pos, top);
+                    } else if (grades != null && !Double.isNaN(grades.bank()[x * 16 + z])) {
+                        bank(chunk, grades.bank()[x * 16 + z], grades.bankKind()[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
                     } else if (grades != null && !Double.isNaN(grades.verge()[x * 16 + z])) {
                         verge(chunk, grades.verge()[x * 16 + z], grades.outside()[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
                     }
@@ -349,6 +408,10 @@ public final class CityChunks {
                 }
                 double planned = grades == null || column.plaza() != null || column.surface() == ChunkLayer.Surface.PATH
                         ? Double.NaN : grades.level()[x * 16 + z];
+                // A footpath on an embankment (the riverside promenade on its terrace) at the embankment's level
+                if (grades != null && column.surface() == ChunkLayer.Surface.PATH && !Double.isNaN(grades.bank()[x * 16 + z])) {
+                    planned = grades.bank()[x * 16 + z];
+                }
                 int y;
                 if (column.bridge()) {
                     y = (int) column.deck();

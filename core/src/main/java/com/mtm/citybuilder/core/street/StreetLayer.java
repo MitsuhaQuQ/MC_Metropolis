@@ -1567,7 +1567,7 @@ public final class StreetLayer {
         snapEnds(segments);
         dropLooseBridges(segments);
         List<Promenade> promenades = formation == Formation.VILLAGE ? List.of()
-                : promenades(settlement, window, canals, segments);
+                : promenades(settlement, window, canals, segments, embankments);
         List<StationPlaza> plazas = plazas(fronts, railways, urban, segments);
         List<StationSite> sites = formation == Formation.VILLAGE ? List.of()
                 : sites(settlement, window, anchors, railways, urban, segments, fronts, plazas);
@@ -1589,9 +1589,10 @@ public final class StreetLayer {
      * on over it. Every {@code promenadeAccess} a short path leads to the nearest street. Their pieces join the
      * segments as paths.
      */
-    private List<Promenade> promenades(Settlement settlement, Window window, List<Canal> canals, List<StreetSegment> segments) {
+    private List<Promenade> promenades(Settlement settlement, Window window, List<Canal> canals, List<StreetSegment> segments,
+                                       List<Embankment> embankments) {
         List<StreetSegment> streets = new ArrayList<>(segments);
-        Crossings crossings = new Crossings(segments);
+        Crossings crossings = new Crossings(segments, embankments);
         List<Promenade> promenades = new ArrayList<>();
         List<StreetSegment> paths = new ArrayList<>();
         float[] d = wideWaterDistance(window);
@@ -1856,7 +1857,7 @@ public final class StreetLayer {
                 double[] hit = intersection(a, b, g);
                 double deck = Math.floor(Math.max(Math.max(crossings.bridgeBank(g.x1(), g.z1()),
                         crossings.bridgeBank(g.x2(), g.z2())), terrain.seaLevel()) + 1.0);
-                if (hit != null && deck - window.height(hit[0], hit[1]) >= config.underpassClear) {
+                if (hit != null && deck - crossings.ground(window, hit[0], hit[1]) >= config.underpassClear) {
                     under.add(hit);
                 }
                 continue;
@@ -1874,7 +1875,7 @@ public final class StreetLayer {
             double landZ = onto == 1 ? g.z2() : g.z1();
             double deck = Math.floor(Math.max(Math.max(window.height(landX, landZ), crossings.bridgeBank(onto == 1
                     ? g.x1() : g.x2(), onto == 1 ? g.z1() : g.z2())), terrain.seaLevel()) + 1.0);
-            double path = window.height(hit[0], hit[1]);
+            double path = crossings.ground(window, hit[0], hit[1]);
             if (deck - path >= config.underpassClear) {
                 segments.set(i, new StreetSegment(g.x1(), g.z1(), g.x2(), g.z2(), g.streetClass(), g.era(), g.width(),
                         StreetStructure.BRIDGE));
@@ -1908,9 +1909,11 @@ public final class StreetLayer {
         private final List<StreetSegment> segments;
         private final Map<Long, List<Integer>> cells = new HashMap<>();
         private final Map<Long, Double> bridgeEnds = new HashMap<>();
+        private final List<Embankment> embankments;
 
-        Crossings(List<StreetSegment> segments) {
+        Crossings(List<StreetSegment> segments, List<Embankment> embankments) {
             this.segments = segments;
+            this.embankments = embankments;
             for (int i = 0; i < segments.size(); i++) {
                 StreetSegment g = segments.get(i);
                 double reach = 0.5 * g.width() + 8.0;
@@ -1921,10 +1924,36 @@ public final class StreetLayer {
                 }
                 if (g.structure() == StreetStructure.BRIDGE) {
                     for (double[] e : new double[][]{{g.x1(), g.z1()}, {g.x2(), g.z2()}}) {
-                        bridgeEnds.merge(endKey(e[0], e[1]), terrain.smoothHeight(e[0], e[1]), Math::max);
+                        // The bank, or the crest of an embankment there, which the chunk layer lands the bridge on
+                        double bank = terrain.smoothHeight(e[0], e[1]);
+                        double[] near = embankment(e[0], e[1], config.bankOffset + 8.0);
+                        bridgeEnds.merge(endKey(e[0], e[1]), near == null ? bank : Math.max(bank, near[Embankment.CREST]), Math::max);
                     }
                 }
             }
+        }
+
+        /** The nearest point of an embankment's centre line within {@code reach}, or null. */
+        double[] embankment(double x, double z, double reach) {
+            double[] best = null;
+            double nearest = reach;
+            for (Embankment e : embankments) {
+                for (double[] p : e.points()) {
+                    double d = Math.hypot(p[0] - x, p[1] - z);
+                    if (d <= nearest) {
+                        nearest = d;
+                        best = p;
+                    }
+                }
+            }
+            return best;
+        }
+
+        /** The ground a path lies on: an embankment's terrace a block over the water, else the town's ground. */
+        double ground(Window window, double x, double z) {
+            double[] near = embankment(x, z, config.bankOffset + 2.0);
+            double ground = window.height(x, z);
+            return near == null ? ground : Math.min(ground, near[Embankment.WATER] + 1.0);
         }
 
         private List<Integer> near(double x, double z) {
@@ -3255,25 +3284,32 @@ public final class StreetLayer {
     }
 
     /**
-     * The crest of the embankment at a point of a bank road: the water's level a little way into the water past the
-     * edge (the lake's, the sea's, or the river valley's smooth ground) plus {@code leveeHeight}, and never below the
-     * ground.
+     * The embankment at a point of a bank road (see {@link Embankment#points}): the crest at the water's level a little
+     * way into the water past the edge (the lake's, the sea's, or the river valley's smooth ground) plus
+     * {@code leveeHeight} and never below the ground; the direction inland, away from the water; the town's ground
+     * beyond the back slope; the water's level.
      */
-    private double crest(Window window, double x, double z) {
+    private double[] crest(Window window, double x, double z, double road) {
         double gx = window.edge(x + 4, z) - window.edge(x - 4, z);
         double gz = window.edge(x, z + 4) - window.edge(x, z - 4);
         double length = Math.hypot(gx, gz);
         double ground = terrain.smoothHeight(x, z);
         if (length < 1e-9) {
-            return ground;
+            return new double[]{x, z, ground, 0.0, 0.0, ground, ground - config.leveeHeight};
         }
+        double nx = gx / length;
+        double nz = gz / length;
+        // The town's ground past where the back slope would reach
+        double out = 0.5 * road + config.leveeSlope * config.leveeHeight + config.leveeRoad;
+        double town = terrain.smoothHeight(x + nx * out, z + nz * out);
         double into = window.edge(x, z) + 8.0;
         double qx = x - gx / length * into;
         double qz = z - gz / length * into;
         double lake = terrain.lakeLevel(qx, qz);
         double level = !Double.isNaN(lake) ? lake
                 : terrain.landform(qx, qz) == Landform.OCEAN ? terrain.seaLevel() : terrain.smoothHeight(qx, qz);
-        return Math.max(ground, level + config.leveeHeight);
+        double crest = Math.max(ground, level + config.leveeHeight);
+        return new double[]{x, z, crest, nx, nz, Math.min(crest, town), level};
     }
 
     private static long endKey(double x, double z) {
@@ -3677,16 +3713,20 @@ public final class StreetLayer {
             }
             pending.clear();
             if (run.size() >= 3) {
-                List<double[]> crest = new ArrayList<>();
-                for (double[] p : run) {
-                    crest.add(new double[]{p[0], p[1], crest(window, p[0], p[1])});
-                }
-                embankments.add(new Embankment(crest));
                 double length = (run.size() - 1) * config.step;
                 // A long bank road gathers traffic along the water, as a collector; a short one is a street
                 boolean arterial = length >= config.riversideArterial;
                 StreetClass bankClass = arterial ? StreetClass.COLLECTOR : StreetClass.STREET;
                 double bankWidth = arterial ? config.collectorWidth : config.streetWidth;
+                List<double[]> crest = new ArrayList<>();
+                double rise = 0.0;
+                for (double[] p : run) {
+                    double[] point = crest(window, p[0], p[1], bankWidth);
+                    crest.add(point);
+                    rise = Math.max(rise, point[Embankment.CREST] - point[Embankment.GROUND]);
+                }
+                double land = 0.5 * bankWidth + (rise >= 1.0 ? config.leveeSlope * rise + config.leveeRoad : 1.0);
+                embankments.add(new Embankment(crest, bankWidth, land));
                 for (int q = 1; q < run.size(); q++) {
                     double[] a = run.get(q - 1);
                     double[] b = run.get(q);

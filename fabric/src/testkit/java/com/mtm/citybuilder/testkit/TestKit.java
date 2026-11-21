@@ -76,6 +76,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/plan-around", this::planAround);
             route(http, "/street", this::street);
             route(http, "/canal", this::canal);
+            route(http, "/embankment", this::embankment);
             route(http, "/airport", this::airport);
             route(http, "/road", this::road);
             route(http, "/roads-near", this::roadsNear);
@@ -266,7 +267,8 @@ public final class TestKit implements DedicatedServerModInitializer {
                     int surface = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, x & 15, z & 15) - 1;
                     int y = level.getMaxBuildHeight() - 1;
                     BlockState state = chunk.getBlockState(pos.set(x, y, z));
-                    while (y > level.getMinBuildHeight() && (state.isAir() || state.getBlock() instanceof net.minecraft.world.level.block.LeavesBlock)) {
+                    while (y > level.getMinBuildHeight() && (state.isAir() || state.getBlock() instanceof net.minecraft.world.level.block.LeavesBlock
+                            || state.getBlock() == net.minecraft.world.level.block.Blocks.SNOW)) {
                         state = chunk.getBlockState(pos.set(x, --y, z));
                     }
                     top.merge(BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(), 1, Integer::sum);
@@ -470,6 +472,53 @@ public final class TestKit implements DedicatedServerModInitializer {
      * The point of a canal nearest (x, z) in the plan of the town owning that point, as this world planned it, a
      * third of the way along it at the least from either end: {found, x, z, heading in degrees, ground once loaded}.
      */
+    /**
+     * The middle point of an embankment of the town at (x, z) nearest it: {found, x, z, crest, nx, nz (inland), ground,
+     * water, road, land, heading in degrees}.
+     */
+    private Object embankment(Map<String, String> query, String body) {
+        double x = Double.parseDouble(query.get("x"));
+        double z = Double.parseDouble(query.get("z"));
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if (logic == null || logic.urban(x, z).owner() == null) {
+            return Map.of("found", false);
+        }
+        double[] best = null;
+        double heading = 0;
+        com.mtm.citybuilder.core.street.Embankment of = null;
+        double nearest = Double.POSITIVE_INFINITY;
+        for (com.mtm.citybuilder.core.street.Embankment e : logic.streetPlan(logic.urban(x, z).owner()).embankments()) {
+            java.util.List<double[]> points = e.points();
+            for (int k = points.size() / 3; k < 2 * points.size() / 3; k++) {
+                double[] p = points.get(k);
+                double[] q = points.get(k + 1);
+                double d = Math.hypot(p[0] - x, p[1] - z);
+                if (d < nearest && Math.hypot(p[3], p[4]) > 0.5) {
+                    nearest = d;
+                    best = p;
+                    of = e;
+                    heading = Math.toDegrees(Math.atan2(q[1] - p[1], q[0] - p[0]));
+                }
+            }
+        }
+        if (best == null) {
+            return Map.of("found", false);
+        }
+        Map<String, Object> found = new java.util.LinkedHashMap<>();
+        found.put("found", true);
+        found.put("x", best[0]);
+        found.put("z", best[1]);
+        found.put("crest", best[2]);
+        found.put("nx", best[3]);
+        found.put("nz", best[4]);
+        found.put("ground", best[5]);
+        found.put("water", best[6]);
+        found.put("road", of.road());
+        found.put("land", of.land());
+        found.put("heading", heading);
+        return found;
+    }
+
     private Object canal(Map<String, String> query, String body) {
         double x = Double.parseDouble(query.get("x"));
         double z = Double.parseDouble(query.get("z"));

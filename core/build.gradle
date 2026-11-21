@@ -31,6 +31,8 @@ dependencies {
     testImplementation sourceSets.worldgen.output
     testImplementation worldgenJar
     testImplementation "com.google.code.gson:gson:${rootProject.gson_version}"
+    // The plan database's driver, which the game gets from MTM_worldgen's jar
+    testRuntimeOnly "org.xerial:sqlite-jdbc:${rootProject.sqlite_jdbc_version}"
     // The tools are tested too: the OSM statistics
     testImplementation sourceSets.tools.output
 }
