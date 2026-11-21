@@ -16,7 +16,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Keeps the trees of the biome, its huge mushrooms and its forest boulders out of the towns' built land and the
- * airports: none is placed where no tree is allowed.
+ * airports: none is placed where no tree is allowed; and its lakes (lava's too) and springs out of the towns' land
+ * altogether.
  */
 @Mixin(ConfiguredFeature.class)
 abstract class ConfiguredFeatureMixin {
@@ -27,6 +28,13 @@ abstract class ConfiguredFeatureMixin {
         Object feature = ((ConfiguredFeature<?, ?>) (Object) this).feature();
         if ((feature instanceof TreeFeature || feature instanceof BlockBlobFeature || feature instanceof AbstractHugeMushroomFeature)
                 && !CityChunks.treeAllowed(level, origin)) {
+            cir.setReturnValue(false);
+        }
+        // Lava and water lakes and the springs out of a hillside: none in a town, where they would open on a street
+        // or a yard (a lake reaches 16 across from its origin's corner)
+        if ((feature instanceof net.minecraft.world.level.levelgen.feature.LakeFeature
+                || feature instanceof net.minecraft.world.level.levelgen.feature.SpringFeature)
+                && CityChunks.inTown(level, origin.offset(8, 0, 8))) {
             cir.setReturnValue(false);
         }
     }

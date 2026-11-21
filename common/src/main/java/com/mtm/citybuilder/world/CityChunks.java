@@ -68,6 +68,89 @@ public final class CityChunks {
                 || block == CityBlocks.ASPHALT_WHITE.get() || block == Blocks.SMOOTH_STONE || block == CityBlocks.CURB_EDGE.get();
     }
 
+    /**
+     * Where a chunk's streets and their verges are graded, the shallow pockets of lava in the ground (the aquifers'
+     * near the surface) turned to stone, from a few blocks under the lowest graded level up to the ground: a cut opens
+     * their side, and the lava would run out over the street once the chunk loads.
+     */
+    private static void sealLava(ChunkAccess chunk, ChunkLayer.Grades grades, BlockPos.MutableBlockPos pos, int top) {
+        if (grades == null) {
+            return;
+        }
+        double lowest = Double.POSITIVE_INFINITY;
+        for (int c = 0; c < 256; c++) {
+            if (!Double.isNaN(grades.level()[c])) {
+                lowest = Math.min(lowest, grades.level()[c]);
+            }
+            if (!Double.isNaN(grades.verge()[c])) {
+                lowest = Math.min(lowest, grades.verge()[c] - grades.outside()[c]);
+            }
+        }
+        if (Double.isInfinite(lowest)) {
+            return;
+        }
+        int baseX = chunk.getPos().getMinBlockX();
+        int baseZ = chunk.getPos().getMinBlockZ();
+        int from = Math.max(chunk.getMinBuildHeight(), (int) Math.floor(lowest) - 6);
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                int to = Math.min(top, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 1);
+                for (int y = from; y <= to; y++) {
+                    if (chunk.getBlockState(pos.set(baseX + x, y, baseZ + z)).getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) {
+                        chunk.setBlockState(pos, Blocks.STONE.defaultBlockState(), false);
+                    }
+                }
+            }
+        }
+    }
+
+    private static ChunkLayer.Grades grades(WorldGenLevel level, ChunkAccess chunk) {
+        if (failed) {
+            return null;
+        }
+        try {
+            CityLogic logic = CityWorlds.of(level.getLevel());
+            return logic == null ? null : logic.chunks().grades(chunk.getPos().x, chunk.getPos().z);
+        } catch (RuntimeException e) {
+            failed = true;
+            CityBuilder.LOGGER.error("City logic failed at chunk {}; no more cities are built this session", chunk.getPos(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Land beside a street graded to it, 1 in 1 from its edge: no higher than the street's level plus how far out it
+     * lies, no lower than its level less that; cut down, its top block moved down with it, or filled with earth under
+     * its top. Not under water.
+     */
+    private static void verge(ChunkAccess chunk, double street, double outside, int wx, int wz, int x, int z,
+                              BlockPos.MutableBlockPos pos, int top) {
+        int surface = Math.min(top, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
+        int ground = surface;
+        BlockState state = chunk.getBlockState(pos.set(wx, ground, wz));
+        while (ground > chunk.getMinBuildHeight() && !state.blocksMotion()) {
+            if (!state.getFluidState().isEmpty()) {
+                return;
+            }
+            state = chunk.getBlockState(pos.set(wx, --ground, wz));
+        }
+        int high = (int) Math.floor(street + outside);
+        int low = (int) Math.floor(street - outside);
+        if (ground > high) {
+            BlockState topBlock = state;
+            for (int y = high + 1; y <= surface; y++) {
+                chunk.setBlockState(pos.set(wx, y, wz), Blocks.AIR.defaultBlockState(), false);
+            }
+            chunk.setBlockState(pos.set(wx, high, wz), topBlock, false);
+        } else if (ground < low) {
+            BlockState topBlock = state;
+            for (int y = ground; y < low; y++) {
+                chunk.setBlockState(pos.set(wx, y, wz), Blocks.DIRT.defaultBlockState(), false);
+            }
+            chunk.setBlockState(pos.set(wx, low, wz), topBlock, false);
+        }
+    }
+
     private static ChunkLayer.Column[] columns(WorldGenLevel level, ChunkAccess chunk) {
         if (failed) {
             return null;
@@ -83,6 +166,28 @@ public final class CityChunks {
             failed = true;
             CityBuilder.LOGGER.error("City logic failed at chunk {}; no more cities are built this session", chunk.getPos(), e);
             return null;
+        }
+    }
+
+    /**
+     * Whether a position lies in a town's land, its built land or its edge (any intensity at all), or on an airport:
+     * where no lake or spring of the biome opens.
+     */
+    public static boolean inTown(WorldGenLevel level, BlockPos at) {
+        if (failed) {
+            return false;
+        }
+        try {
+            CityLogic logic = CityWorlds.of(level.getLevel());
+            if (logic == null) {
+                return false;
+            }
+            com.mtm.citybuilder.core.extent.UrbanSample sample = logic.urban(at.getX() + 0.5, at.getZ() + 0.5);
+            return sample.owner() != null && sample.intensity() > 0 || logic.chunks().airportAt(at.getX(), at.getZ());
+        } catch (RuntimeException e) {
+            failed = true;
+            CityBuilder.LOGGER.error("City logic failed at {}; no more cities are built this session", at, e);
+            return false;
         }
     }
 
@@ -113,6 +218,8 @@ public final class CityChunks {
         int top = chunk.getMaxBuildHeight() - 1;
         ChunkLayer.AirportCell[] airports = airports(level, chunk);
         RoadChunks.Cell[] roads = roads(level, chunk, columns);
+        ChunkLayer.Grades grades = grades(level, chunk);
+        sealLava(chunk, grades, pos, top);
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 if (airports != null && airports[x * 16 + z] != null) {
@@ -128,9 +235,13 @@ public final class CityChunks {
                 if (block == null) {
                     if (column.canal() != 0) {
                         dig(chunk, column, baseX + x, baseZ + z, x, z, pos, top);
+                    } else if (grades != null && !Double.isNaN(grades.verge()[x * 16 + z])) {
+                        verge(chunk, grades.verge()[x * 16 + z], grades.outside()[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
                     }
                     continue;
                 }
+                double planned = grades == null || column.plaza() != null || column.surface() == ChunkLayer.Surface.PATH
+                        ? Double.NaN : grades.level()[x * 16 + z];
                 int y;
                 if (column.bridge()) {
                     y = (int) column.deck();
@@ -148,6 +259,15 @@ public final class CityChunks {
                         state = chunk.getBlockState(pos.set(baseX + x, --floor, baseZ + z));
                     }
                     y = waterTop == Integer.MIN_VALUE ? floor : waterTop;
+                    if (!Double.isNaN(planned)) {
+                        // Laid at the street's level, the ground cut down or filled up to it; over water no lower than
+                        // its surface
+                        int at = (int) Math.floor(planned);
+                        y = waterTop == Integer.MIN_VALUE ? at : Math.max(at, waterTop);
+                        for (int cut = y + 1; cut <= Math.min(top, surface); cut++) {
+                            chunk.setBlockState(pos.set(baseX + x, cut, baseZ + z), Blocks.AIR.defaultBlockState(), false);
+                        }
+                    }
                     for (int fill = floor + 1; fill < y; fill++) {
                         chunk.setBlockState(pos.set(baseX + x, fill, baseZ + z), Blocks.STONE.defaultBlockState(), false);
                     }

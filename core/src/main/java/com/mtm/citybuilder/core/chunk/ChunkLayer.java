@@ -523,7 +523,7 @@ public final class ChunkLayer {
      */
     private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links,
                          Map<Long, List<double[]>> canals, Map<Long, List<StationPlaza>> plazas,
-                         Map<Long, List<Stop>> stops) {
+                         Map<Long, List<Stop>> stops, Map<Long, Double> heights) {
         /** Whether two pieces are of one street: the same, continuing each other, or with one piece between. */
         boolean sameStreet(int p, int q) {
             if (p == q) {
@@ -922,6 +922,100 @@ public final class ChunkLayer {
     /** Town intensity from which no tree grows: the built-up town, not its leafy edge. */
     public static final double TREELESS = 0.3;
 
+    /** How far out from a street's edge the land is graded to it, 1 in 1. */
+    public static final double VERGE = 6.0;
+
+    /**
+     * The heights a chunk's streets are laid at, and the land beside them graded to (see {@link #grades}): each
+     * column's street level (NaN off the streets, on a bridge or a footpath, which follow their own levels), and for
+     * the land within {@link #VERGE} of a street's edge the level of that street there and how far out it lies (NaN
+     * elsewhere), x-major as {@link #columns}.
+     */
+    public record Grades(double[] level, double[] verge, double[] outside) {
+    }
+
+    /**
+     * The levels of a chunk's streets: each piece runs straight between the heights of the ground at its two ends
+     * (taken round the junction, so every piece meeting there starts at the same height), the land cut and filled to
+     * it, instead of following the ground block by block; and the land beside each street graded to it, 1 in 1, out
+     * to {@link #VERGE}. Bridges keep their decks; footpaths follow the ground.
+     */
+    public Grades grades(int chunkX, int chunkZ) {
+        double[] level = new double[256];
+        double[] verge = new double[256];
+        double[] outside = new double[256];
+        double[] nearest = new double[256];
+        java.util.Arrays.fill(level, Double.NaN);
+        java.util.Arrays.fill(verge, Double.NaN);
+        java.util.Arrays.fill(outside, Double.POSITIVE_INFINITY);
+        java.util.Arrays.fill(nearest, Double.POSITIVE_INFINITY);
+        double minX = chunkX * 16.0;
+        double minZ = chunkZ * 16.0;
+        for (Settlement town : towns(minX, minZ)) {
+            Index index = index(town);
+            List<Integer> pieces = index.byChunk.get(key(chunkX, chunkZ));
+            if (pieces == null) {
+                continue;
+            }
+            for (int p : pieces) {
+                StreetSegment g = index.segments.get(p);
+                if (g.structure() == StreetStructure.BRIDGE || g.streetClass() == StreetClass.PATH) {
+                    continue;
+                }
+                double h1 = nodeHeight(index, g.x1(), g.z1());
+                double h2 = nodeHeight(index, g.x2(), g.z2());
+                double half = 0.5 * Math.max(1.0, g.width());
+                double dx = g.x2() - g.x1();
+                double dz = g.z2() - g.z1();
+                double length2 = Math.max(1e-9, dx * dx + dz * dz);
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        double cx = minX + x + 0.5;
+                        double cz = minZ + z + 0.5;
+                        double t = Math.max(0, Math.min(1, ((cx - g.x1()) * dx + (cz - g.z1()) * dz) / length2));
+                        double d = Math.hypot(g.x1() + dx * t - cx, g.z1() + dz * t - cz);
+                        int c = x * 16 + z;
+                        double at = h1 + (h2 - h1) * t;
+                        if (d <= half) {
+                            if (d < nearest[c]) {
+                                nearest[c] = d;
+                                level[c] = at;
+                            }
+                        } else if (d <= half + VERGE && d - half < outside[c]) {
+                            outside[c] = d - half;
+                            verge[c] = at;
+                        }
+                    }
+                }
+            }
+        }
+        for (int c = 0; c < 256; c++) {
+            if (!Double.isNaN(level[c])) {
+                verge[c] = Double.NaN;
+            }
+            if (Double.isNaN(verge[c])) {
+                outside[c] = Double.NaN;
+            }
+        }
+        return new Grades(level, verge, outside);
+    }
+
+    /**
+     * The height the streets meeting at a point are laid at: the ground there, the middle of five samples round it
+     * (so a lone bump or hollow does not set it), kept for the town.
+     */
+    private double nodeHeight(Index index, double x, double z) {
+        return index.heights.computeIfAbsent(point(x, z), k -> {
+            double[] h = new double[5];
+            double[][] at = {{0, 0}, {4, 0}, {-4, 0}, {0, 4}, {0, -4}};
+            for (int i = 0; i < 5; i++) {
+                h[i] = logic.terrain().surfaceHeight((int) Math.floor(x + at[i][0]), (int) Math.floor(z + at[i][1]));
+            }
+            java.util.Arrays.sort(h);
+            return h[2];
+        });
+    }
+
     /**
      * The towns whose streets may cross a chunk: the owners at its corners and middle; and over water, which belongs to
      * no town's built land, the owners of the banks round it, out to {@link #WATER_REACH}, so a bridge is laid all the
@@ -995,7 +1089,7 @@ public final class ChunkLayer {
         Map<Long, List<Integer>> byChunk = new HashMap<>();
         for (int p = 0; p < segments.size(); p++) {
             StreetSegment g = segments.get(p);
-            double half = 0.5 * Math.max(1.0, g.width()) + 1.0;
+            double half = 0.5 * Math.max(1.0, g.width()) + 1.0 + VERGE;
             int cx0 = Math.floorDiv((int) Math.floor(Math.min(g.x1(), g.x2()) - half), 16);
             int cx1 = Math.floorDiv((int) Math.floor(Math.max(g.x1(), g.x2()) + half), 16);
             int cz0 = Math.floorDiv((int) Math.floor(Math.min(g.z1(), g.z2()) - half), 16);
@@ -1094,7 +1188,7 @@ public final class ChunkLayer {
                 }
             }
         }
-        return new Index(byChunk, segments, deck, links, canals, plazas, stops);
+        return new Index(byChunk, segments, deck, links, canals, plazas, stops, new java.util.concurrent.ConcurrentHashMap<>());
     }
 
     /** Pieces continuing each other: of one class, an end shared, lines within 30 degrees. */

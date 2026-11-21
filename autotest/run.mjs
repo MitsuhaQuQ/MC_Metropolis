@@ -27,7 +27,7 @@ function properties() {
     throw new Error('fabric/run/eula.txt is missing: the Minecraft EULA must be accepted by the user first');
   }
   writeFileSync(join(RUN, 'server.properties'), [
-    'level-type=mtm_worldgen\\:realistic', 'level-seed=12345', `level-name=${WORLD}`, 'online-mode=false',
+    'level-type=mtm_worldgen\\:realistic', `level-seed=${process.env.AUTOTEST_SEED ?? '12345'}`, `level-name=${WORLD}`, 'online-mode=false',
     'enable-rcon=false', 'enable-query=false', 'server-ip=127.0.0.1', 'server-port=25566', 'spawn-protection=0',
     `view-distance=${WITH_CLIENT ? 8 : 4}`, 'simulation-distance=4', ''].join('\n'));
   rmSync(join(RUN, WORLD), { recursive: true, force: true });

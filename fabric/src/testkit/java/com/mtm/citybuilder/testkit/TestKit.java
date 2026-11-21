@@ -244,6 +244,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             int covered = 0;
             int unloaded = 0;
             Map<String, Integer> thin = new TreeMap<>();
+            java.util.List<int[]> lava = new java.util.ArrayList<>();
             // Windows: arms ending in the air, and sides along a window's run left unjoined to a wall or window
             int[] windows = new int[3];
             java.util.List<int[]> dangling = new java.util.ArrayList<>();
@@ -266,6 +267,9 @@ public final class TestKit implements DedicatedServerModInitializer {
                         state = chunk.getBlockState(pos.set(x, --y, z));
                     }
                     top.merge(BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(), 1, Integer::sum);
+                    if (!state.getFluidState().isEmpty() && state.getFluidState().is(net.minecraft.tags.FluidTags.LAVA) && lava.size() < 20) {
+                        lava.add(new int[]{x, y, z});
+                    }
                     surface = Math.max(surface, y);
                     // This mod's thin walls down the column, by shape
                     for (int ty = surface; ty > surface - 80 && ty > level.getMinBuildHeight(); ty--) {
@@ -319,6 +323,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             result.put("pavedCovered", covered);
             result.put("unloaded", unloaded);
             result.put("thinWalls", thin);
+            result.put("lavaAt", lava);
             result.put("windows", Map.of("blocks", windows[0], "dangling", windows[1], "unjoined", windows[2],
                     "danglingAt", dangling, "unjoinedAt", unjoined, "danglingInto", danglingInto, "unjoinedTo", unjoinedTo));
             return result;

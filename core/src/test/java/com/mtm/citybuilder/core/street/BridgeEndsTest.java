@@ -103,6 +103,47 @@ class BridgeEndsTest {
         assertTrue(unpaved.isEmpty(), () -> "bridge pieces left unpaved of " + bridgePieces + ": " + unpaved);
     }
 
+    @Test
+    void streetsAreLaidSmoothlyNearTheGround() {
+        WorldgenTerrainView terrain = new WorldgenTerrainView(TerrainLogic.forWorld(SEED, WorldgenSettings.DEFAULT));
+        CityLogic logic = new CityLogic(SEED, CitySettings.DEFAULT, terrain);
+        com.mtm.citybuilder.core.chunk.ChunkLayer chunks = logic.chunks();
+        int cx = Math.floorDiv(-10232, 16);
+        int cz = Math.floorDiv(-10272, 16);
+        int streets = 0;
+        double steepest = 0;
+        double furthest = 0;
+        for (int dx = -6; dx <= 6; dx++) {
+            for (int dz = -6; dz <= 6; dz++) {
+                com.mtm.citybuilder.core.chunk.ChunkLayer.Grades g = chunks.grades(cx + dx, cz + dz);
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        double here = g.level()[x * 16 + z];
+                        if (Double.isNaN(here)) {
+                            continue;
+                        }
+                        streets++;
+                        // A street steps no more than a block from one block to the next: a ramp, not a stair
+                        for (int[] n : new int[][]{{x + 1, z}, {x, z + 1}}) {
+                            if (n[0] < 16 && n[1] < 16 && !Double.isNaN(g.level()[n[0] * 16 + n[1]])) {
+                                steepest = Math.max(steepest, Math.abs(g.level()[n[0] * 16 + n[1]] - here));
+                            }
+                        }
+                        int wx = (cx + dx) * 16 + x;
+                        int wz = (cz + dz) * 16 + z;
+                        furthest = Math.max(furthest, Math.abs(here - terrain.surfaceHeight(wx, wz)));
+                    }
+                }
+            }
+        }
+        double s = steepest;
+        double f = furthest;
+        System.out.println("street columns " + streets + ", steepest step " + s + ", furthest from the ground " + f);
+        assertTrue(streets > 1000, () -> "streets " + s);
+        assertTrue(s <= 1.0, () -> "a street steps " + s + " between neighbouring blocks");
+        assertTrue(f < 8.0, () -> "a street laid " + f + " from the ground");
+    }
+
     private static long key(double x, double z) {
         return (Math.round(x * 10.0) << 32) ^ (Math.round(z * 10.0) & 0xFFFFFFFFL);
     }
