@@ -10,12 +10,14 @@ real ones.
 The first version is modelled on Japanese towns (Kyoto, Kanazawa, Himeji, Tokyo's old quarters), measured from real
 data rather than guessed.
 
-> **Early development.** The city logic is planned in full, but only the streets are built in the world so far:
-> paving, road markings, pavements and kerbs, bridges, canals, footpaths and the airports. Buildings come when the
-> building library is finished. Worlds made with one version may not match the next. Do not use it for worlds you want
-> to keep yet.
+> **Early development.** The city logic is planned in full. In the world so far: the streets (paving, road markings,
+> pavements and kerbs, stop lines, street lights, drains and side ditches, bridges, canals, footpaths), graded to
+> their own profiles, the airports, and the town's houses, shops, offices and flats with the mod's own windows,
+> roofing, doors, lanterns and fixtures. Temples, stations and landmarks from the building library come next. An
+> in-game map of the city plan opens with **K** or `/citymap`. Worlds made with one version may not match the next.
+> Do not use it for worlds you want to keep yet.
 
-中文简介见[下文](#中文简介)。
+中文简介见[下文](#中文简介)。日本語の紹介は[こちら](#日本語の紹介)。
 
 ## What it plans
 
@@ -119,7 +121,32 @@ City Builder 是 [Realistic Landforms（MTM Worldgen）](https://github.com/Mits
   - 城里的路网：按来历分城下町、门前町、港町、方格的都城等，有古道、干道、林荫大道、支路、小巷、护城河、用水和石板桥、步道，以及城市自己的铁路和车站。
   - 地块：沿街按实测面宽切开，街区内部再分后排地块和旗竿地。
   - 用地：商店街、学校、寺社、公园、地标、花街、山上的寺社、港口码头。
-- **目前状态**：处于早期开发阶段。在游戏里只铺了路面、标线、人行道、桥、水渠、步道和机场，建筑要等建筑库完成。不同版本生成的世界可能对不上，暂时不要用在想保留的存档里。
+- **目前状态**：处于早期开发阶段。游戏里已经有：
+  - 路面、标线、人行道和路缘、停止线、路灯、雨水箅和侧沟、桥、水渠、步道，按各自的纵断面平整。
+  - 机场。
+  - 住宅、商店、写字楼和公寓，用本 mod 自己的窗、屋面、门、灯笼和各种小设备。
+
+  寺社、车站和地标要等建筑库接入。按 **K** 或输入 `/citymap` 打开城市规划地图。不同版本生成的世界可能对不上，暂时不要用在想保留的存档里。
 - **依赖**：Minecraft 1.20.1，Fabric 或 Forge，Java 17。地形需要 MTM Worldgen（没装时不生成城市）；MTR 可选，只读取它的车站。
 - **构建、调试图、数据来源和许可证**见上文英文部分。设计文档是中文的：[docs/city-logic-design.md](docs/city-logic-design.md)。
 - **许可证**：代码采用 MIT；随 mod 发布的每件素材的来源和许可证都记在 ATTRIBUTION 里。PLATEAU 和 OpenStreetMap 的数据只用来做统计，不随 mod 发布。
+
+## 日本語の紹介
+
+City Builder は [Realistic Landforms（MTM Worldgen）](https://github.com/MitsuhaQuQ/MTM_worldGen) と
+[Minecraft Transit Railway（MTR Advanced フォーク）](https://github.com/MitsuhaQuQ/MTR_advanced) のための mod です。実寸（1 ブロック = 1 メートル）の地形の上に、その土地に本来育ったであろう形で町や都市を生成します。
+最初の版は日本の都市（京都、金沢、姫路、東京の下町）をモデルにしており、推測ではなく実データで調整しています。
+
+- **何を計画するか**：大きな縮尺から順に決めていきます。都市の立地、規模、広がりの後に、都市間道路、都市間鉄道の回廊、新幹線用地の確保、空港を決めます。
+  - 都市の道路網：成り立ちに応じて城下町、門前町、港町、条里の都、宿場町などに分かれます。旧街道、幹線道路、並木の大通り、片側三車線・四車線の大通り、支線道路、路地、堀、用水と石橋、遊歩道、そして都市独自の鉄道と駅があります。
+  - 敷地：通りに沿って実測の間口で区切り、街区の内側は奥の敷地と旗竿地に分けます。
+  - 土地利用：商店街、学校、寺社、公園、ランドマーク、花街、山の寺社、港の埠頭。
+- **現在の状態**：開発の初期段階です。ゲーム内には次のものがあります。
+  - 舗装、路面標示、歩道と縁石、停止線、街灯、雨水桝と側溝、橋、水路、遊歩道。どれもそれぞれの縦断面に合わせて整地します。
+  - 空港。
+  - 住宅、商店、オフィス、マンション。窓、屋根、扉、提灯、各種設備はこの mod 独自のブロックです。
+
+  寺社、駅、ランドマークは建物ライブラリの組み込み後になります。**K** キーまたは `/citymap` で都市計画の地図を開けます。版が変わると以前に生成したワールドと合わないことがあるので、残したいワールドにはまだ使わないでください。
+- **必要なもの**：Minecraft 1.20.1、Fabric または Forge、Java 17。地形には MTM Worldgen が必要です（入っていないと都市は生成されません）。MTR は任意で、その駅を読み取るだけです。
+- **ビルド、計画図、データの出典とライセンス**は上の英語の部分を見てください。設計書は中国語です：[docs/city-logic-design.md](docs/city-logic-design.md)。
+- **ライセンス**：コードは MIT です。mod に同梱する素材はすべて出典とライセンスを ATTRIBUTION に記録しています。PLATEAU と OpenStreetMap のデータは統計を取るためだけに使い、mod には同梱していません。
