@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "citybuilder:block/wall/stone_ashlar",
+    "end": "citybuilder:block/wall/stone_ashlar_top"
+  }
+}

@@ -178,13 +178,18 @@ public final class CityBuildings {
             BuildingLayer.Part.ACCENT, BuildingLayer.Part.WALL_ALT);
     private static final Map<String, java.util.Optional<Block>> THIN = new ConcurrentHashMap<>();
 
-    /** The thin wall of a material (citybuilder:thin_<name> for minecraft:<name>), null where it has none. */
+    /**
+     * The thin wall of a material (citybuilder:thin_<name> for minecraft:<name> or for this mod's citybuilder:<name>),
+     * null where it has none.
+     */
     private static Block thinOf(String id) {
         return THIN.computeIfAbsent(id, key -> {
-            if (!key.startsWith("minecraft:")) {
+            int colon = key.indexOf(':');
+            String namespace = key.substring(0, colon);
+            if (!namespace.equals("minecraft") && !namespace.equals(CityBuilder.MOD_ID)) {
                 return java.util.Optional.empty();
             }
-            ResourceLocation thin = new ResourceLocation(CityBuilder.MOD_ID, "thin_" + key.substring("minecraft:".length()));
+            ResourceLocation thin = new ResourceLocation(CityBuilder.MOD_ID, "thin_" + key.substring(colon + 1));
             return BuiltInRegistries.BLOCK.containsKey(thin) ? java.util.Optional.of(BuiltInRegistries.BLOCK.get(thin))
                     : java.util.Optional.empty();
         }).orElse(null);

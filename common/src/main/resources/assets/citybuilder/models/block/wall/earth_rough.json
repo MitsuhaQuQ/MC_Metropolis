@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "citybuilder:block/wall/earth_rough",
+    "end": "citybuilder:block/wall/earth_rough_top"
+  }
+}

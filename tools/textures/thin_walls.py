@@ -3,13 +3,18 @@ draws the adjuster's item texture. Run from the repository root: python tools/te
 
 The thin walls (see common's block.ThinWallBlock and block.BuildingBlocks.THIN_WALLS): thin_<material>, a panel a
 quarter of a block thick against one face of its block, a straight run, an outer corner or an inner corner's post,
-textured with the vanilla block's own textures by reference (nothing of Minecraft's is copied). The adjuster's texture
+textured with the vanilla block's own textures by reference (nothing of Minecraft's is copied), and the same for this
+mod's own wall finishes (tools/textures/wall_textures.py; run that first), thin_<finish>. The adjuster's texture
 is drawn here for this mod, so it carries the mod's own licence.
 """
 import json
 import os
 import struct
+import sys
 import zlib
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import wall_textures  # noqa: E402  (this mod's own wall finishes, which get thin walls too)
 
 ROOT = os.path.join('common', 'src', 'main', 'resources')
 ASSETS = os.path.join(ROOT, 'assets', 'citybuilder')
@@ -162,9 +167,12 @@ def add_tag(name, values):
 def main():
     names = {}
     pickaxe, axe, stone_tool = [], [], []
-    for material, (side, top, en, zh) in MATERIALS.items():
+    own = {name: (side, top, en, zh, wood) for name, side, top, en, zh, wood in wall_textures.thin_materials()}
+    every = {**{m: (f'minecraft:block/{side}', f'minecraft:block/{top}', en, zh, m.endswith(WOOD))
+                for m, (side, top, en, zh) in MATERIALS.items()}, **own}
+    for material, (side, top, en, zh, wood) in every.items():
         n = f'thin_{material}'
-        textures = {'particle': f'minecraft:block/{side}', 'side': f'minecraft:block/{side}', 'top': f'minecraft:block/{top}'}
+        textures = {'particle': side, 'side': side, 'top': top}
         for shape, boxes in SHAPES.items():
             write(os.path.join(MODELS, f'{material}_{shape}.json'),
                   {'parent': 'minecraft:block/block', 'textures': textures, 'elements': [box(*b) for b in boxes]})
@@ -178,7 +186,7 @@ def main():
             'pools': [{'rolls': 1, 'entries': [{'type': 'minecraft:item', 'name': f'citybuilder:{n}'}],
                        'conditions': [{'condition': 'minecraft:survives_explosion'}]}]})
         names[f'block.citybuilder.{n}'] = (f'Thin {en} Wall', f'薄墙（{zh}）')
-        (axe if material.endswith(WOOD) else pickaxe).append(f'citybuilder:{n}')
+        (axe if wood else pickaxe).append(f'citybuilder:{n}')
         if material == 'iron_block':
             stone_tool.append(f'citybuilder:{n}')
     add_tag('mineable/pickaxe', pickaxe)

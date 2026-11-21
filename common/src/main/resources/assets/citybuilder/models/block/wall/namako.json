@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "citybuilder:block/wall/namako",
+    "end": "citybuilder:block/wall/namako_top"
+  }
+}

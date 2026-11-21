@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "citybuilder:block/wall/stone_rubble"
+    }
+  }
+}

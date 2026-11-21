@@ -1,0 +1,49 @@
+{
+  "variants": {
+    "facing=north,shape=straight": {
+      "model": "citybuilder:block/thin/concrete_bluegray_straight"
+    },
+    "facing=north,shape=outer": {
+      "model": "citybuilder:block/thin/concrete_bluegray_outer"
+    },
+    "facing=north,shape=inner": {
+      "model": "citybuilder:block/thin/concrete_bluegray_inner"
+    },
+    "facing=east,shape=straight": {
+      "model": "citybuilder:block/thin/concrete_bluegray_straight",
+      "y": 90
+    },
+    "facing=east,shape=outer": {
+      "model": "citybuilder:block/thin/concrete_bluegray_outer",
+      "y": 90
+    },
+    "facing=east,shape=inner": {
+      "model": "citybuilder:block/thin/concrete_bluegray_inner",
+      "y": 90
+    },
+    "facing=south,shape=straight": {
+      "model": "citybuilder:block/thin/concrete_bluegray_straight",
+      "y": 180
+    },
+    "facing=south,shape=outer": {
+      "model": "citybuilder:block/thin/concrete_bluegray_outer",
+      "y": 180
+    },
+    "facing=south,shape=inner": {
+      "model": "citybuilder:block/thin/concrete_bluegray_inner",
+      "y": 180
+    },
+    "facing=west,shape=straight": {
+      "model": "citybuilder:block/thin/concrete_bluegray_straight",
+      "y": 270
+    },
+    "facing=west,shape=outer": {
+      "model": "citybuilder:block/thin/concrete_bluegray_outer",
+      "y": 270
+    },
+    "facing=west,shape=inner": {
+      "model": "citybuilder:block/thin/concrete_bluegray_inner",
+      "y": 270
+    }
+  }
+}

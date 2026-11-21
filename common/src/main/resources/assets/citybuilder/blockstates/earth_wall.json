@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "citybuilder:block/wall/earth_wall"
+    }
+  }
+}

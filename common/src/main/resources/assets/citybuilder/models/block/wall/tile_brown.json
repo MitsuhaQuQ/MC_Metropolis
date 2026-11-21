@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "citybuilder:block/wall/tile_brown",
+    "end": "citybuilder:block/wall/tile_brown_top"
+  }
+}

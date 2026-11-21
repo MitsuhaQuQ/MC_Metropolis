@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "citybuilder:block/wall/concrete_foundation_aged",
+    "end": "citybuilder:block/wall/concrete_foundation_aged_top"
+  }
+}

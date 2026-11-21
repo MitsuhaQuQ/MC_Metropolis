@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "citybuilder:block/wall/tile_rose",
+    "end": "citybuilder:block/wall/tile_rose_top"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "citybuilder:block/wall/concrete_cream",
+    "end": "citybuilder:block/wall/concrete_cream_top"
+  }
+}

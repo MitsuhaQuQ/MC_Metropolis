@@ -44,6 +44,81 @@ public final class BuildingBlocks {
             "smooth_sandstone", "spruce_planks", "stone", "stone_bricks", "stripped_dark_oak_log", "stripped_spruce_log",
             "terracotta", "white_concrete", "white_terracotta", "yellow_terracotta"};
     /**
+     * This mod's wall finishes, floors and foundations (tools/textures/wall_textures.py; core's building.Palette picks
+     * them from the catalogue), each with the vanilla block whose sounds, hardness and map colour it copies: plaster,
+     * earth walls, sprayed mortar, ceramic siding, facade tiles, exposed and painted concrete, ALC panels, stone
+     * cladding, fine brick, timber boards and posts, namako, corrugated steel, foundations, floors; every one but the
+     * floors also weathered (<name>_aged). Pairs: name, vanilla block.
+     */
+    public static final String[] WALLS = {
+            "plaster_white", "white_concrete", "plaster_white_aged", "white_concrete", "plaster_cream",
+            "white_concrete", "plaster_cream_aged", "white_concrete", "plaster_black", "black_concrete",
+            "plaster_black_aged", "black_concrete", "earth_wall", "terracotta", "earth_wall_aged", "terracotta",
+            "earth_rough", "terracotta", "earth_rough_aged", "terracotta", "mortar_white", "white_concrete",
+            "mortar_white_aged", "white_concrete", "mortar_beige", "white_concrete", "mortar_beige_aged",
+            "white_concrete", "mortar_gray", "light_gray_concrete", "mortar_gray_aged", "light_gray_concrete",
+            "siding_white", "white_concrete", "siding_white_aged", "white_concrete", "siding_beige",
+            "white_concrete", "siding_beige_aged", "white_concrete", "siding_gray", "light_gray_concrete",
+            "siding_gray_aged", "light_gray_concrete", "siding_dark", "gray_concrete", "siding_dark_aged",
+            "gray_concrete", "siding_brown", "brown_terracotta", "siding_brown_aged", "brown_terracotta",
+            "siding_bluegray", "light_gray_concrete", "siding_bluegray_aged", "light_gray_concrete",
+            "siding_rose", "white_concrete", "siding_rose_aged", "white_concrete", "siding_brick",
+            "brown_terracotta", "siding_brick_aged", "brown_terracotta", "siding_stone", "white_concrete",
+            "siding_stone_aged", "white_concrete", "tile_white", "white_terracotta", "tile_white_aged",
+            "white_terracotta", "tile_beige", "white_terracotta", "tile_beige_aged", "white_terracotta",
+            "tile_ochre", "white_terracotta", "tile_ochre_aged", "white_terracotta", "tile_brown",
+            "brown_terracotta", "tile_brown_aged", "brown_terracotta", "tile_dark", "brown_terracotta",
+            "tile_dark_aged", "brown_terracotta", "tile_gray", "light_gray_terracotta", "tile_gray_aged",
+            "light_gray_terracotta", "tile_bluegray", "light_gray_terracotta", "tile_bluegray_aged",
+            "light_gray_terracotta", "tile_rose", "white_terracotta", "tile_rose_aged", "white_terracotta",
+            "concrete_exposed", "light_gray_concrete", "concrete_exposed_aged", "light_gray_concrete",
+            "concrete_white", "white_concrete", "concrete_white_aged", "white_concrete", "concrete_cream",
+            "white_concrete", "concrete_cream_aged", "white_concrete", "concrete_rose", "white_concrete",
+            "concrete_rose_aged", "white_concrete", "concrete_bluegray", "light_gray_concrete",
+            "concrete_bluegray_aged", "light_gray_concrete", "concrete_light", "light_gray_concrete",
+            "concrete_light_aged", "light_gray_concrete", "concrete_gray", "gray_concrete",
+            "concrete_gray_aged", "gray_concrete", "concrete_black", "black_concrete", "concrete_black_aged",
+            "black_concrete", "alc_white", "white_concrete", "alc_white_aged", "white_concrete", "alc_gray",
+            "light_gray_concrete", "alc_gray_aged", "light_gray_concrete", "granite_gray", "polished_andesite",
+            "granite_gray_aged", "polished_andesite", "granite_black", "polished_deepslate",
+            "granite_black_aged", "polished_deepslate", "limestone", "smooth_sandstone", "limestone_aged",
+            "smooth_sandstone", "brick_red", "bricks", "brick_red_aged", "bricks", "brick_dark", "bricks",
+            "brick_dark_aged", "bricks", "board_cedar", "spruce_planks", "board_cedar_aged", "spruce_planks",
+            "board_dark", "dark_oak_planks", "board_dark_aged", "dark_oak_planks", "board_yakisugi",
+            "dark_oak_planks", "board_yakisugi_aged", "dark_oak_planks", "board_light", "birch_planks",
+            "board_light_aged", "birch_planks", "board_bengara", "mangrove_planks", "board_bengara_aged",
+            "mangrove_planks", "timber_dark", "dark_oak_planks", "timber_dark_aged", "dark_oak_planks",
+            "timber_brown", "spruce_planks", "timber_brown_aged", "spruce_planks", "timber_light", "oak_planks",
+            "timber_light_aged", "oak_planks", "namako", "deepslate_tiles", "namako_aged", "deepslate_tiles",
+            "steel_siding", "iron_block", "steel_siding_aged", "iron_block", "steel_siding_gray", "iron_block",
+            "steel_siding_gray_aged", "iron_block", "concrete_foundation", "stone", "concrete_foundation_aged",
+            "stone", "stone_ashlar", "stone_bricks", "stone_ashlar_aged", "stone_bricks", "stone_rubble",
+            "cobblestone", "stone_rubble_aged", "cobblestone", "concrete_block", "stone_bricks",
+            "concrete_block_aged", "stone_bricks", "flooring_light", "oak_planks", "flooring_dark",
+            "dark_oak_planks", "floor_pvc", "smooth_stone"};
+    /** The wall finishes with thin walls (thin_<name>, as the vanilla materials of {@link #THIN_WALLS}). */
+    public static final java.util.Set<String> THIN_FINISHES = java.util.Set.of(
+            "plaster_white", "plaster_white_aged", "plaster_cream", "plaster_cream_aged", "plaster_black",
+            "plaster_black_aged", "earth_wall", "earth_wall_aged", "earth_rough", "earth_rough_aged",
+            "mortar_white", "mortar_white_aged", "mortar_beige", "mortar_beige_aged", "mortar_gray",
+            "mortar_gray_aged", "siding_white", "siding_white_aged", "siding_beige", "siding_beige_aged",
+            "siding_gray", "siding_gray_aged", "siding_dark", "siding_dark_aged", "siding_brown",
+            "siding_brown_aged", "siding_bluegray", "siding_bluegray_aged", "siding_rose", "siding_rose_aged",
+            "siding_brick", "siding_brick_aged", "siding_stone", "siding_stone_aged", "tile_white",
+            "tile_white_aged", "tile_beige", "tile_beige_aged", "tile_ochre", "tile_ochre_aged", "tile_brown",
+            "tile_brown_aged", "tile_dark", "tile_dark_aged", "tile_gray", "tile_gray_aged", "tile_bluegray",
+            "tile_bluegray_aged", "tile_rose", "tile_rose_aged", "concrete_exposed", "concrete_exposed_aged",
+            "concrete_white", "concrete_white_aged", "concrete_cream", "concrete_cream_aged", "concrete_rose",
+            "concrete_rose_aged", "concrete_bluegray", "concrete_bluegray_aged", "concrete_light",
+            "concrete_light_aged", "concrete_gray", "concrete_gray_aged", "concrete_black",
+            "concrete_black_aged", "alc_white", "alc_white_aged", "alc_gray", "alc_gray_aged", "granite_gray",
+            "granite_gray_aged", "granite_black", "granite_black_aged", "limestone", "limestone_aged",
+            "brick_red", "brick_red_aged", "brick_dark", "brick_dark_aged", "board_cedar", "board_cedar_aged",
+            "board_dark", "board_dark_aged", "board_yakisugi", "board_yakisugi_aged", "board_light",
+            "board_light_aged", "board_bengara", "board_bengara_aged", "timber_dark", "timber_dark_aged",
+            "timber_brown", "timber_brown_aged", "timber_light", "timber_light_aged", "namako", "namako_aged",
+            "steel_siding", "steel_siding_aged", "steel_siding_gray", "steel_siding_gray_aged");
+    /**
      * The roofings ({@link RoofBlock} roof_<name>, {@link RoofSlabBlock} roof_<name>_slab): smoked, black and brown
      * glazed tile, grey and black slate, silver, green and red steel, new and green copper.
      */
@@ -87,6 +162,17 @@ public final class BuildingBlocks {
             p.registerBlock("roof_" + name, () -> new RoofBlock(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE_TILES)));
             p.registerBlock("roof_" + name + "_slab",
                     () -> new RoofSlabBlock(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE_TILE_SLAB)));
+        }
+        for (int i = 0; i < WALLS.length; i += 2) {
+            String name = WALLS[i];
+            Block template = net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                    new net.minecraft.resources.ResourceLocation("minecraft", WALLS[i + 1]));
+            p.registerBlock(name, () -> new Block(BlockBehaviour.Properties.copy(template)
+                    .mapColor(template.defaultMapColor())));
+            if (THIN_FINISHES.contains(name)) {
+                p.registerBlock("thin_" + name, () -> new ThinWallBlock(BlockBehaviour.Properties.copy(template)
+                        .mapColor(template.defaultMapColor()).noOcclusion()));
+            }
         }
         for (String name : THIN_WALLS) {
             Block material = net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(

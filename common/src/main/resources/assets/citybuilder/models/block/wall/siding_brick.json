@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "citybuilder:block/wall/siding_brick",
+    "end": "citybuilder:block/wall/siding_brick_top"
+  }
+}

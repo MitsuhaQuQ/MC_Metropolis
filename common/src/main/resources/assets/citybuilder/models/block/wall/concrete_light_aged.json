@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "citybuilder:block/wall/concrete_light_aged",
+    "end": "citybuilder:block/wall/concrete_light_aged_top"
+  }
+}
