@@ -157,6 +157,32 @@ public enum Slot {
     YAGO("none", "board"),
     /** A small raised vent on a machiya's roof over its kitchen (煙出し). */
     KEMURIDASHI("none", "vent"),
+    /** A works' saw-tooth roof (鋸屋根): rows of north lights over a flat roof. */
+    SAWTOOTH("none", "sawtooth"),
+    /** Loading bays across a works' front, rolling shutters. */
+    LOADING("none", "shutters"),
+    /** A works' chimney beside it. */
+    CHIMNEY("none", "chimney"),
+    /** A works' walls: plain, ribbed metal siding, or a band along their foot. */
+    WORKS_WALL("plain", "ribbed", "band"),
+    /** A works' windows: a high row, a band, or none. */
+    WORKS_WINDOWS("high", "band", "none"),
+    /** Pipes up a works' sides. */
+    PIPES("none", "pipes"),
+    /** A works' name board high on its front. */
+    WORKS_SIGN("none", "sign"),
+    /** A mesh fence along a works' front, a wide gate in it. */
+    WORKS_FENCE("none", "mesh"),
+    /** A water tower on a block of flats' roof (給水塔). */
+    WATER_TOWER("none", "tower"),
+    /** A danchi block's number painted high on its end wall (号棟). */
+    DANCHI_NUMBER("none", "number"),
+    /** A storehouse's front: closed, or a shop storehouse's (見世蔵) ground floor opened to the street. */
+    KURA_FRONT("closed", "mise"),
+    /** A storehouse's door: plain, or in a thick stepped frame (観音扉の枠). */
+    KURA_FRAME("plain", "thick"),
+    /** A crest on a storehouse's gable. */
+    CREST("none", "crest"),
     /** A samurai house's gate in its street wall: none (a gap), or two posts under a beam and a small roof (冠木門). */
     GATE("none", "kabuki"),
     /** A stone-lined ditch along the street in front of the wall (側溝), bridged at the gate. */

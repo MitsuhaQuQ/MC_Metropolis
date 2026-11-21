@@ -142,9 +142,12 @@ public final class CityMap {
                 // quarters really lie is for the layers that lay out the town to say
                 // preview:PROGRAMS gives one lot in ten a program (convenience store, fast food, post office), to see
                 // them; where they really are is for the layers before to say
-                boolean flats = "FLATS".equals(quarter);
+                // preview:FLATS, WORKS, DANCHI look for the nearest block of flats with open corridors, works, danchi
+                // (built the Kanto way), and centre on it
+                String find = "FLATS".equals(quarter) || "WORKS".equals(quarter) || "DANCHI".equals(quarter) ? quarter : null;
+                boolean flats = find != null;
                 if (flats) {
-                    quarter = null;
+                    quarter = "DANCHI".equals(find) ? "KANTO" : null;
                 }
                 if (quarter != null && quarter.endsWith("_CUT")) {
                     // preview:<QUARTER>_CUT cuts every building away over its ground floor's furniture, to see inside
@@ -229,15 +232,21 @@ public final class CityMap {
                             }
                             com.mtm.citybuilder.core.plot.Plot p = town.at(x, z);
                             com.mtm.citybuilder.core.building.Building b = p == null ? null : logic.buildings().building(town, p);
-                            if (b != null && b.type() == com.mtm.citybuilder.core.building.Building.Type.APARTMENT
-                                    && b.composition().is(com.mtm.citybuilder.core.building.Slot.ACCESS, "corridor") && b.step() >= 3) {
+                            boolean wanted = b != null && switch (find) {
+                                case "WORKS" -> b.type() == com.mtm.citybuilder.core.building.Building.Type.WORKS;
+                                case "DANCHI" -> b.type() == com.mtm.citybuilder.core.building.Building.Type.APARTMENT
+                                        && b.composition().is(com.mtm.citybuilder.core.building.Slot.ACCESS, "stairwell");
+                                default -> b.type() == com.mtm.citybuilder.core.building.Building.Type.APARTMENT
+                                        && b.composition().is(com.mtm.citybuilder.core.building.Slot.ACCESS, "corridor") && b.step() >= 3;
+                            };
+                            if (wanted) {
                                 best = d;
                                 cx = x;
                                 cz = z;
                             }
                         }
                     }
-                    System.out.printf("Flats with open corridors at %.0f %.0f%n", cx, cz);
+                    System.out.printf("%s at %.0f %.0f%n", find, cx, cz);
                 }
                 start = System.nanoTime();
                 int view = layer.length() > 7 ? layer.charAt(7) - '0' : 0;

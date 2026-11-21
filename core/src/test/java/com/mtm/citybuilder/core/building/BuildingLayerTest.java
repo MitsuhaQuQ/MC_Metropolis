@@ -283,8 +283,8 @@ class BuildingLayerTest {
         TownPlots plots = logic.plots().town(city);
         BuildingLayer layer = logic.buildings();
         Map<Long, Building> found = new HashMap<>();
-        for (double x = extent.coreX() - 3000; x < extent.coreX() + 3000 && found.size() < 6; x += 5) {
-            for (double z = extent.coreZ() - 3000; z < extent.coreZ() + 3000 && found.size() < 6; z += 5) {
+        for (double x = extent.coreX() - 3000; x < extent.coreX() + 3000 && found.size() < 20; x += 5) {
+            for (double z = extent.coreZ() - 3000; z < extent.coreZ() + 3000 && found.size() < 20; z += 5) {
                 Plot plot = plots.at(x, z);
                 Building b = layer.building(plots, plot);
                 if (b != null && b.type() == Building.Type.APARTMENT && b.composition().is(Slot.ACCESS, "corridor")
@@ -336,6 +336,90 @@ class BuildingLayerTest {
                 assertTrue(reached.contains(b.floorOf(k) + 1), "flats " + b.id() + " floor " + k + " not reached: " + reached);
             }
         }
+    }
+
+    @Test
+    void danchiStairwellsReachEveryFloor() {
+        CityLogic logic = logic();
+        Settlement city = city(logic);
+        CityExtent extent = logic.extent(city);
+        TownPlots plots = logic.plots().town(city);
+        BuildingLayer layer = logic.buildings();
+        // Danchi are Kanto's
+        layer.quarters(new QuarterMap() {
+            @Override
+            public Quarter at(Plot plot) {
+                return Quarter.ORDINARY;
+            }
+
+            @Override
+            public Region region(Plot plot) {
+                return Region.KANTO;
+            }
+        });
+        Map<Long, Building> found = new HashMap<>();
+        for (double x = extent.coreX() - 3000; x < extent.coreX() + 3000 && found.size() < 20; x += 5) {
+            for (double z = extent.coreZ() - 3000; z < extent.coreZ() + 3000 && found.size() < 20; z += 5) {
+                Plot plot = plots.at(x, z);
+                Building b = layer.building(plots, plot);
+                if (b != null && b.type() == Building.Type.APARTMENT && b.composition().is(Slot.ACCESS, "stairwell")
+                        && b.width() >= 9.0 && b.depth() >= 8.0) {
+                    found.putIfAbsent(b.id(), b);
+                }
+            }
+        }
+        assertTrue(!found.isEmpty(), "no danchi");
+        for (Building b : found.values()) {
+            // In the first whole stairwell: from its ground floor, up the flights, to every floor
+            double bay = 3.0;
+            Set<Long> seen = new HashSet<>();
+            java.util.ArrayDeque<int[]> queue = new java.util.ArrayDeque<>();
+            Set<Integer> reached = new HashSet<>();
+            int ox = (int) Math.floor(b.ox());
+            int oz = (int) Math.floor(b.oz());
+            for (int x = ox - 40; x < ox + 40; x++) {
+                for (int z = oz - 40; z < oz + 40; z++) {
+                    if (inWell(b, b.local(x + 0.5, z + 0.5), bay) && standIn(b, x, z, 1)) {
+                        queue.add(new int[]{x, z, 1});
+                    }
+                }
+            }
+            assertTrue(!queue.isEmpty(), "no stairwell floor in danchi " + b.id());
+            while (!queue.isEmpty()) {
+                int[] at = queue.poll();
+                long key = ((long) at[0] << 40) ^ ((long) (at[1] & 0xFFFFF) << 12) ^ at[2];
+                if (!seen.add(key)) {
+                    continue;
+                }
+                reached.add(at[2]);
+                for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                    for (int up = -1; up <= 1; up++) {
+                        int nx = at[0] + d[0];
+                        int nz = at[1] + d[1];
+                        int ny = at[2] + up;
+                        if (inWell(b, b.local(nx + 0.5, nz + 0.5), bay) && standIn(b, nx, nz, ny)) {
+                            queue.add(new int[]{nx, nz, ny});
+                        }
+                    }
+                }
+            }
+            for (int k = 0; k < b.storeys(); k++) {
+                assertTrue(reached.contains(b.floorOf(k) + 1), "danchi " + b.id() + " floor " + k + " not reached: " + reached);
+            }
+        }
+    }
+
+    /** Whether a point in a danchi's frame lies in the stairwell whose bay starts {@code bay} blocks along. */
+    private static boolean inWell(Building b, double[] l, double bay) {
+        return l[0] >= bay && l[0] < bay + 4.0 && l[1] < b.back() - 1.0 && l[1] >= b.back() - 1.0 - BuildingLayer.WELL_DEPTH;
+    }
+
+    /** Whether someone can stand inside a building, feet {@code dy} over its base. */
+    private static boolean standIn(Building b, int x, int z, int dy) {
+        BuildingLayer.Column c = BuildingLayer.column(b, x + 0.5, z + 0.5, false, false, null);
+        BuildingLayer.Part below = BuildingLayer.part(c, b.base() + dy - 1);
+        boolean floor = below == BuildingLayer.Part.STAIRS_FRONT || below == BuildingLayer.Part.FLOOR;
+        return floor && open(BuildingLayer.part(c, b.base() + dy)) && open(BuildingLayer.part(c, b.base() + dy + 1));
     }
 
     /** Whether a point in a building's frame lies on its back corridor. */

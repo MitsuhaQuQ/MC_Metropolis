@@ -203,6 +203,16 @@ public final class BuildingLayer {
         STAIRS,
         /** A flight of stairs outside (a stair block, rising towards the street). */
         STAIRS_FRONT,
+        /** A mesh fence. */
+        MESH,
+        /** A chimney. */
+        CHIMNEY,
+        /** A chimney's coloured bands at its top. */
+        CHIMNEY_TOP,
+        /** A danchi block's painted number. */
+        DANCHI_NO,
+        /** A crest on a gable. */
+        CREST,
         /** Shelves, chests and barrels against a wall. */
         SHELF,
         /** A low table (a slab). */
@@ -733,7 +743,8 @@ public final class BuildingLayer {
         }
         boolean pitchedUpper = type == Building.Type.HOUSE;
 
-        Building.Roof roof = step < storeys && !pitchedUpper ? Building.Roof.FLAT
+        Building.Roof roof = type == Building.Type.WORKS && composition.is(Slot.SAWTOOTH, "sawtooth") ? Building.Roof.FLAT
+                : step < storeys && !pitchedUpper ? Building.Roof.FLAT
                 : Building.Roof.valueOf(composition.get(storeys >= 4 ? Slot.ROOF_TALL : Slot.ROOF).toUpperCase(java.util.Locale.ROOT));
         // Machiya keep their ridge along the street (平入り); storehouses as their composition says; others along the
         // longer side of their upper volume
@@ -836,7 +847,8 @@ public final class BuildingLayer {
 
     /** How far out in front a building's ring reaches: its whole front yard for houses and flats, else a block. */
     private static double yard(Building b) {
-        return b.type() == Building.Type.HOUSE || b.type() == Building.Type.APARTMENT || b.standalone() || arcaded(b)
+        return b.type() == Building.Type.HOUSE || b.type() == Building.Type.APARTMENT || b.type() == Building.Type.WORKS
+                || b.standalone() || arcaded(b)
                 ? b.front() : 1.0;
     }
 
@@ -1285,6 +1297,12 @@ public final class BuildingLayer {
         if (b != null && !c.ring() && !c.wing() && c.face() == Face.FRONT && kanban(b)) {
             top = Math.max(top, b.base() + b.wallHeight() + kanbanRise(b));
         }
+        if (b != null && !c.ring() && !c.wing() && b.type() == Building.Type.WORKS && b.composition().is(Slot.SAWTOOTH, "sawtooth")) {
+            top = Math.max(top, b.base() + b.wallHeight() + 3);
+        }
+        if (b != null && !c.ring() && !c.wing() && waterTower(b, c)) {
+            top = Math.max(top, b.base() + b.wallHeight() + 7);
+        }
         return top;
     }
 
@@ -1306,7 +1324,8 @@ public final class BuildingLayer {
         }
         if (c.ring()) {
             int top = -1;
-            for (int dy = 0; dy <= Math.max(b.wallHeight() + 2, 11) + (c.v() < 0.0 ? 8 : 0); dy++) {
+            for (int dy = 0; dy <= Math.max(b.wallHeight() + 2, 11) + (c.v() < 0.0 ? 8 : 0)
+                    + (b.type() == Building.Type.WORKS ? 10 : 0); dy++) {
                 if (ringPart(b, c, dy) != Part.NONE) {
                     top = dy;
                 }
@@ -1455,6 +1474,12 @@ public final class BuildingLayer {
             return part == Part.WINDOW && recessed(b, storey) && !stepped ? Part.AIR : part;
         }
         int above = dy - wallTop;
+        if (b.roof() == Building.Roof.FLAT && above >= 1) {
+            Part over = overFlat(b, c, above);
+            if (over != null) {
+                return over;
+            }
+        }
         if (b.roof() == Building.Roof.FLAT) {
             double[] housing = housing(b);
             if (inHousing(housing, c)) {
@@ -1506,6 +1531,9 @@ public final class BuildingLayer {
             }
         }
         if (above < roof) {
+            if (c.edge() && crest(b, c) && above == Math.max(1, roof - 2)) {
+                return Part.CREST;
+            }
             return c.edge() ? Part.ACCENT : Part.AIR;
         }
         if (above == roof) {
@@ -1525,6 +1553,64 @@ public final class BuildingLayer {
             }
         }
         return Part.AIR;
+    }
+
+    /**
+     * What stands on a flat roof, {@code above} blocks over it at a column: a works' saw-tooth lights, in rows across it
+     * (a glazed upright face, then a slope down to the next); a water tower on a block of flats, legs and a tank.
+     * Null for the roof as it is.
+     */
+    private static Part overFlat(Building b, Column c, int above) {
+        if (b.type() == Building.Type.WORKS && b.composition().is(Slot.SAWTOOTH, "sawtooth")) {
+            int k = (int) Math.floorMod((long) Math.floor(c.v() - b.front()), 5L);
+            int h = k == 0 ? 3 : 4 - k;
+            if (above > 3) {
+                return Part.AIR;
+            }
+            if (k == 0) {
+                return above <= 2 && !c.edge() ? Part.WINDOW : Part.ACCENT;
+            }
+            if (above == h) {
+                return Part.ROOF_LOW;
+            }
+            if (above < h) {
+                return c.edge() ? Part.ACCENT : Part.AIR;
+            }
+            return Part.AIR;
+        }
+        if (waterTower(b, c)) {
+            if (above <= 4) {
+                return Math.abs(c.u() - towerU(b)) >= 1.0 && Math.abs(c.v() - towerV(b)) >= 1.0 ? Part.POLE : Part.AIR;
+            }
+            if (above <= 7) {
+                return Part.WALL;
+            }
+        }
+        return null;
+    }
+
+    private static double towerU(Building b) {
+        return b.upFrom() + 2.5;
+    }
+
+    private static double towerV(Building b) {
+        return Math.floor(0.5 * (b.front() + b.back())) + 0.5;
+    }
+
+    /** Whether a block of flats' water tower stands over a column: three by three, at one end of its roof. */
+    private static boolean waterTower(Building b, Column c) {
+        return b.type() == Building.Type.APARTMENT && b.roof() == Building.Roof.FLAT
+                && b.composition().is(Slot.WATER_TOWER, "tower") && !c.edge()
+                && Math.abs(c.u() - towerU(b)) < 1.5 && Math.abs(c.v() - towerV(b)) < 1.5;
+    }
+
+    /** Whether a storehouse's crest goes on its gable here: the middle of a gable end. */
+    private static boolean crest(Building b, Column c) {
+        if (b.type() != Building.Type.KURA || !b.composition().is(Slot.CREST, "crest") || b.roof() != Building.Roof.GABLE) {
+            return false;
+        }
+        return b.ridgeAlong() ? (c.face() == Face.SIDE && Math.abs(c.v() - 0.5 * (b.front() + b.back())) < 1.0)
+                : (c.face() != Face.SIDE && Math.abs(c.u() - 0.5 * b.width()) < 1.0);
     }
 
     /** What stands on a pitched roof, {@code k} blocks over its row at a column. */
@@ -1661,6 +1747,107 @@ public final class BuildingLayer {
 
     /** How deep the open corridor along a block of flats' back is: the walk, two blocks, and its rail and posts. */
     static final double CORRIDOR = 3.0;
+
+    /**
+     * A works' ring: the front yard paved, a mesh fence along the street with a wide gate, pallets stacked by the
+     * fence; a chimney by its back corner, banded at the top; pipes up its sides; its name board high on its front.
+     * Null elsewhere.
+     */
+    private static Part worksRing(Building b, Column c, int dy) {
+        double u = c.u();
+        double v = c.v();
+        double w = b.width();
+        if (b.composition().is(Slot.CHIMNEY, "chimney") && u >= w && u < w + 1.0 && v >= b.back() - 2.0 && v < b.back() - 1.0) {
+            int top = b.wallHeight() + 8;
+            if (dy >= 1 && dy <= top) {
+                return dy >= top - 2 && Math.floorMod(top - dy, 2) == 0 ? Part.CHIMNEY_TOP : Part.CHIMNEY;
+            }
+        }
+        if (v < b.front()) {
+            boolean gate = Math.abs(u - 0.5 * w) < 3.0;
+            if (dy == 0) {
+                return Part.PAVING;
+            }
+            if (v < 1.0 && b.composition().is(Slot.WORKS_FENCE, "mesh") && !gate && (dy == 1 || dy == 2)) {
+                return Part.MESH;
+            }
+            if (v >= 1.0 && v < 2.0 && dy == 1 && !gate && detail(b, c, 111) < 0.2) {
+                return Part.STORAGE;
+            }
+            if (c.adjacent() && v >= b.front() - 1.0 && b.composition().is(Slot.WORKS_SIGN, "sign")
+                    && (dy == b.wallHeight() - 1 || dy == b.wallHeight() - 2) && Math.abs(u - 0.5 * w) < 0.25 * w) {
+                return Part.SIGN;
+            }
+            return null;
+        }
+        if (b.composition().is(Slot.PIPES, "pipes") && c.adjacent() && (u < 0.0 || u >= w) && v < b.back()
+                && Math.floorMod((long) Math.floor(v - b.front()), 6) == 3 && dy >= 1 && dy < b.wallHeight()) {
+            return Part.DOWNPIPE;
+        }
+        return null;
+    }
+
+    /**
+     * A danchi's stairwell (階段室型), inside its open bays: every ten blocks along, four wide; a flight up from the
+     * ground beside one wall, rising away from the back, a walkway at the floor reached back along the other, a door to
+     * a flat on each side at each floor; walls between the stairwell and the flats. The rest of a bay deeper than the
+     * flights is a room. Null off it.
+     */
+    private static Part stairwell(Building b, Column c, int storey, int row) {
+        long bay = Math.floorMod((long) Math.floor(c.u()), 10);
+        int dy = b.floorOf(storey) + row;
+        double inner = b.back() - 1.0;
+        int j = (int) Math.floor(inner - c.v()) + 1;
+        if (j < 1 || j > WELL_DEPTH) {
+            return null;
+        }
+        if (bay == 2 || bay == 7) {
+            // The walls each side, a door to each flat at each floor: off the walkway on one side, the landing on the other
+            for (int k = 0; k < b.storeys(); k++) {
+                int fk = b.floorOf(k);
+                int r = k + 1 < b.storeys() ? b.floorOf(k + 1) - fk : 3;
+                int doorAt = bay == 7 ? 2 : (k == 0 ? b.floorOf(1) - fk : r) + 2;
+                if (j == Math.min(WELL_DEPTH, doorAt) && (dy == fk + 1 || dy == fk + 2)) {
+                    return dy == fk + 1 ? Part.DOOR_LOWER : Part.DOOR_UPPER;
+                }
+            }
+            return row == 0 ? null : Part.PARTITION;
+        }
+        if (bay < 3 || bay > 6) {
+            return null;
+        }
+        if (dy == 0) {
+            return Part.FLOOR;
+        }
+        // Each floor's landing runs across both lanes at the first block in from the back, the flight above it starting a
+        // block further in: wherever the building stands at an angle to the world's grid, a landing's blocks then meet
+        // the flight's and the walkway's side by side
+        int lane = bay <= 4 ? 0 : 1;
+        for (int k = 1; k < b.storeys(); k++) {
+            int f0 = b.floorOf(k - 1);
+            int f1 = b.floorOf(k);
+            int r = f1 - f0;
+            if (lane == 0) {
+                if (j >= 2 && j <= r + 1 && dy == f0 + j - 1) {
+                    return Part.STAIRS_FRONT;
+                }
+                if ((j == 1 || j == r + 2) && dy == f1) {
+                    return Part.FLOOR;
+                }
+            } else if (j <= r + 2 && dy == f1) {
+                return Part.FLOOR;
+            }
+        }
+        return Part.AIR;
+    }
+
+    /** How deep a danchi's stairwell runs in from its back wall: a landing, a flight of up to four, a landing. */
+    static final int WELL_DEPTH = 6;
+
+    /** Whether a block of flats is a danchi's, reached by stairwells. */
+    private static boolean danchi(Building b) {
+        return b.type() == Building.Type.APARTMENT && b.composition().is(Slot.ACCESS, "stairwell");
+    }
 
     /** Whether a block of flats is reached by open corridors and an outside stair. */
     private static boolean outsideAccess(Building b) {
@@ -1799,6 +1986,12 @@ public final class BuildingLayer {
         if (b.standalone() || t == Building.Type.WORKS) {
             return null;
         }
+        if (danchi(b)) {
+            Part well = stairwell(b, c, storey, row);
+            if (well != null) {
+                return well;
+            }
+        }
         double u = c.u();
         double v = c.v();
         double w = b.width();
@@ -1858,7 +2051,8 @@ public final class BuildingLayer {
         if (!shopFloor && !shopRoom && v >= mid && v < mid + 1.0) {
             return Math.abs(u - Math.floor(0.5 * w)) < 1.0 && row <= 2 ? Part.AIR : Part.PARTITION;
         }
-        if (t == Building.Type.APARTMENT && Math.floorMod((long) Math.floor(u), 7) == 0) {
+        if (t == Building.Type.APARTMENT && (danchi(b) ? Math.floorMod((long) Math.floor(u), 10) == 2
+                || Math.floorMod((long) Math.floor(u), 10) == 7 : Math.floorMod((long) Math.floor(u), 7) == 0)) {
             // Between flats
             return Part.PARTITION;
         }
@@ -2567,6 +2761,20 @@ public final class BuildingLayer {
      * cornices, fins and ledges; a shop's sign and awning and an office's canopy over the pavement; outdoor units.
      */
     private static Part ringPart(Building b, Column c, int dy) {
+        if (b.type() == Building.Type.WORKS) {
+            Part works = worksRing(b, c, dy);
+            if (works != null) {
+                return works;
+            }
+        }
+        if (b.type() == Building.Type.KURA && b.composition().is(Slot.KURA_FRAME, "thick") && c.adjacent()
+                && c.v() < b.front() && c.v() >= b.front() - 1.0) {
+            // A thick stepped frame round the door
+            double d = Math.abs(c.u() - b.door());
+            if (d >= 0.5 && d < 1.5 && dy >= 1 && dy <= 3 || d < 0.5 && dy == 3) {
+                return Part.PARAPET;
+            }
+        }
         if (outsideAccess(b)) {
             Part access = access(b, c, dy);
             if (access != null) {
@@ -2702,6 +2910,13 @@ public final class BuildingLayer {
                                     && Math.floorMod((long) Math.floor(u), 5) == 0) {
                                 // A screen between two flats' balconies
                                 return Part.ACCENT;
+                            }
+                            if (dy == f + 2 && b.composition().options().containsKey(Slot.FUTON)
+                                    && b.composition().is(Slot.FUTON, "futon") && Math.floorMod((long) Math.floor(u), 5) >= 1
+                                    && Math.floorMod((long) Math.floor(u), 5) <= 3
+                                    && Hash.unit(Hash.of(b.variant(), Math.floorDiv((long) Math.floor(u), 5L), k)) < 0.25) {
+                                // Futons aired over a flat's balcony rail
+                                return Part.FUTON;
                             }
                         }
                     }
@@ -3078,6 +3293,11 @@ public final class BuildingLayer {
 
     private static Part wall(Building b, Column c, Face face, boolean corner, int storey, int row, int height) {
         double facadeAt = face == Face.SIDE ? c.v() - b.front() : c.u();
+        if (b.type() == Building.Type.KURA && face == Face.FRONT && storey == 0 && !corner && !c.door()
+                && b.composition().is(Slot.KURA_FRONT, "mise") && row >= 1 && row < b.ground()) {
+            // A shop storehouse (見世蔵): its ground floor opened to the street behind a lattice
+            return row <= 2 ? Part.LATTICE : Part.ACCENT;
+        }
         if (b.type() == Building.Type.KURA) {
             int style = groundStyle(b);
             boolean tall = style == 1 && b.composition().is(Slot.NAMAKO, "tall");
@@ -3133,6 +3353,10 @@ public final class BuildingLayer {
             long m = (long) Math.floor(face == Face.SIDE ? c.v() - b.front() : c.u());
             return Math.floorMod(m, 3) == 0 ? Part.TRIM : row == 0 ? Part.ACCENT : Part.WINDOW;
         }
+        if (danchi(b) && face == Face.SIDE && b.composition().is(Slot.DANCHI_NUMBER, "number")
+                && storey == b.storeys() - 1 && row >= 1 && row <= 2 && Math.abs(c.v() - b.front() - 0.5 * b.depth()) < 1.5) {
+            return Part.DANCHI_NO;
+        }
         if (outsideAccess(b) && face == Face.BACK && !corner && storey < b.step()) {
             // Each flat's door off the corridor, and a small window by it
             long bay = Math.floorMod((long) Math.floor(c.u()), 7);
@@ -3149,7 +3373,10 @@ public final class BuildingLayer {
         if (b.type() == Building.Type.APARTMENT && face == Face.BACK && b.composition().is(Slot.ACCESS, "stairwell")) {
             // A danchi's stairwells (階段室型): every tenth bay open, a parapet at each landing
             long bay = Math.floorMod((long) Math.floor(c.u()), 10);
-            if (bay == 4 || bay == 5) {
+            if (bay >= 3 && bay <= 6) {
+                if (storey == 0) {
+                    return row == 0 ? Part.PAVING : row <= 2 ? Part.AIR : Part.ACCENT;
+                }
                 return row == 0 ? Part.ACCENT : row == 1 ? Part.PARAPET : Part.AIR;
             }
         }
@@ -3196,6 +3423,28 @@ public final class BuildingLayer {
                 && !b.composition().is(Slot.WATERSIDE, "plain")) {
             // Rooms opened to the water: glazing between posts
             return Math.floorMod(s, 4) == 0 ? Part.TRIM : Part.WINDOW;
+        }
+        if (b.type() == Building.Type.WORKS && !corner) {
+            if (face == Face.FRONT && storey == 0 && b.composition().is(Slot.LOADING, "shutters")
+                    && Math.floorMod(s, 8) >= 2 && Math.floorMod(s, 8) <= 4 && row >= 1 && row <= 3) {
+                // A loading bay's rolling shutter
+                return Part.SHUTTER;
+            }
+            boolean lit = switch (b.composition().get(Slot.WORKS_WINDOWS)) {
+                case "band" -> row >= 2 && row <= 3 && Math.floorMod(s, 6) != 0;
+                case "none" -> false;
+                default -> row == height - 2 && Math.floorMod(s, 2) == 0;
+            };
+            if (lit) {
+                return Part.WINDOW;
+            }
+            if (b.composition().is(Slot.WORKS_WALL, "band") && row <= 1) {
+                return Part.ACCENT;
+            }
+            if (b.composition().is(Slot.WORKS_WALL, "ribbed") && Math.floorMod(s, 2) == 1) {
+                return Part.TRIM;
+            }
+            return wall;
         }
         boolean ribbon = b.composition().is(Slot.FACADE, "ribbon");
         boolean window = switch (b.type()) {
