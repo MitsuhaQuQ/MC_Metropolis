@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "citybuilder:block/lamp/chochin_white"
+    },
+    "facing=east": {
+      "model": "citybuilder:block/lamp/chochin_white",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "citybuilder:block/lamp/chochin_white",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "citybuilder:block/lamp/chochin_white",
+      "y": 270
+    }
+  }
+}

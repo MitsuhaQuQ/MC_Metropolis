@@ -164,5 +164,17 @@
   "block.citybuilder.roof_copper": "屋面（铜板屋面）",
   "block.citybuilder.roof_copper_slab": "屋面台阶（铜板屋面）",
   "block.citybuilder.roof_copper_green": "屋面（绿锈铜板屋面）",
-  "block.citybuilder.roof_copper_green_slab": "屋面台阶（绿锈铜板屋面）"
+  "block.citybuilder.roof_copper_green_slab": "屋面台阶（绿锈铜板屋面）",
+  "block.citybuilder.chochin_red": "提灯（红）",
+  "block.citybuilder.chochin_white": "提灯（白）",
+  "block.citybuilder.andon": "行灯",
+  "block.citybuilder.andon_sign": "行灯看板",
+  "block.citybuilder.porch_light_black": "玄关灯（黑）",
+  "block.citybuilder.porch_light_silver": "玄关灯（银）",
+  "block.citybuilder.gate_light": "门柱灯",
+  "block.citybuilder.toro_light": "石灯笼火袋",
+  "block.citybuilder.koshi_door": "格子门",
+  "block.citybuilder.entrance_door_silver": "铝合金玄关门（银色）",
+  "block.citybuilder.entrance_door_bronze": "铝合金玄关门（古铜色）",
+  "block.citybuilder.shop_door": "店铺玻璃门"
 }

@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/door_bottom_left",
+  "textures": {
+    "bottom": "citybuilder:block/door/shop_door_bottom",
+    "top": "citybuilder:block/door/shop_door_top"
+  },
+  "render_type": "minecraft:translucent"
+}

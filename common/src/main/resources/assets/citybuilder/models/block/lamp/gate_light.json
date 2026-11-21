@@ -1,0 +1,256 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "citybuilder:block/lamp/metal_black",
+    "metal": "citybuilder:block/lamp/metal_black",
+    "glass": "citybuilder:block/lamp/frosted"
+  },
+  "elements": [
+    {
+      "from": [
+        5,
+        0,
+        5
+      ],
+      "to": [
+        11,
+        1,
+        11
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ],
+          "texture": "#metal"
+        },
+        "up": {
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ],
+          "texture": "#metal"
+        },
+        "north": {
+          "uv": [
+            5,
+            15,
+            11,
+            16
+          ],
+          "texture": "#metal"
+        },
+        "south": {
+          "uv": [
+            5,
+            15,
+            11,
+            16
+          ],
+          "texture": "#metal"
+        },
+        "west": {
+          "uv": [
+            5,
+            15,
+            11,
+            16
+          ],
+          "texture": "#metal"
+        },
+        "east": {
+          "uv": [
+            5,
+            15,
+            11,
+            16
+          ],
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "from": [
+        6,
+        1,
+        6
+      ],
+      "to": [
+        10,
+        7,
+        10
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            6,
+            9,
+            10,
+            15
+          ],
+          "texture": "#glass"
+        },
+        "south": {
+          "uv": [
+            6,
+            9,
+            10,
+            15
+          ],
+          "texture": "#glass"
+        },
+        "west": {
+          "uv": [
+            6,
+            9,
+            10,
+            15
+          ],
+          "texture": "#glass"
+        },
+        "east": {
+          "uv": [
+            6,
+            9,
+            10,
+            15
+          ],
+          "texture": "#glass"
+        }
+      }
+    },
+    {
+      "from": [
+        5,
+        7,
+        5
+      ],
+      "to": [
+        11,
+        8,
+        11
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ],
+          "texture": "#metal"
+        },
+        "up": {
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ],
+          "texture": "#metal"
+        },
+        "north": {
+          "uv": [
+            5,
+            8,
+            11,
+            9
+          ],
+          "texture": "#metal"
+        },
+        "south": {
+          "uv": [
+            5,
+            8,
+            11,
+            9
+          ],
+          "texture": "#metal"
+        },
+        "west": {
+          "uv": [
+            5,
+            8,
+            11,
+            9
+          ],
+          "texture": "#metal"
+        },
+        "east": {
+          "uv": [
+            5,
+            8,
+            11,
+            9
+          ],
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "from": [
+        7,
+        8,
+        7
+      ],
+      "to": [
+        9,
+        9,
+        9
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            7,
+            7,
+            9,
+            9
+          ],
+          "texture": "#metal"
+        },
+        "north": {
+          "uv": [
+            7,
+            7,
+            9,
+            8
+          ],
+          "texture": "#metal"
+        },
+        "south": {
+          "uv": [
+            7,
+            7,
+            9,
+            8
+          ],
+          "texture": "#metal"
+        },
+        "west": {
+          "uv": [
+            7,
+            7,
+            9,
+            8
+          ],
+          "texture": "#metal"
+        },
+        "east": {
+          "uv": [
+            7,
+            7,
+            9,
+            8
+          ],
+          "texture": "#metal"
+        }
+      }
+    }
+  ]
+}

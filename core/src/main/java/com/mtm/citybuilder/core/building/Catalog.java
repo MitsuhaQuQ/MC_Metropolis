@@ -221,7 +221,7 @@ public final class Catalog {
             "shed", "rail", "curtain", "curtainRed", "latticeSpruce", "latticeMangrove", "equipment", "shutter", "hedge",
             "bamboo", "post", "carport", "guard", "downpipe", "lantern", "sudare", "komayose", "engawa", "toro", "toroLight",
             "toroCap", "gravel", "board", "plaster", "spike", "fasciaLit", "display", "stand", "brandKonbini",
-            "brandFastfood", "brandPost", "postbox", "line", "pole", "ad", "baseWall", "upperWall", "step", "tenantSign", "shoki", "bank", "water", "blackBoard", "arcadePost", "arcadeRoof", "arcadePaving", "tactile", "arcadeGlass", "louvre", "rust", "andon", "tobukuro", "gatepost", "gateLight", "futon",
+            "brandFastfood", "brandPost", "postbox", "line", "pole", "ad", "baseWall", "upperWall", "step", "tenantSign", "shoki", "bank", "water", "blackBoard", "arcadePost", "arcadeRoof", "arcadePaving", "tactile", "arcadeGlass", "louvre", "rust", "andon", "tobukuro", "gatepost", "gateLight", "porchLight", "futon",
             "solar", "antenna", "heater", "oni", "yago", "tatami", "earth", "partition", "fusuma", "stairs", "shelf", "table",
             "kitchen", "counter", "desk", "storage", "outerStairs", "mesh", "chimney", "chimneyTop",
             "danchiNumber", "crest", "tankShell", "pipe", "deck", "stack", "coal", "steel",

@@ -3,6 +3,9 @@ package com.mtm.citybuilder.block;
 import com.mtm.citybuilder.platform.Platform;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.level.block.state.properties.BlockSetType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 
 import java.util.ArrayList;
@@ -17,7 +20,9 @@ import java.util.function.Supplier;
  * wall at an angle to the blocks ({@code world.CityBuildings}). Textures, models and states are drawn by
  * {@code tools/textures/window_textures.py}. Thin walls in the buildings' wall materials, and the adjuster that sets
  * any of this mod's shaped blocks by hand; their models, states and the rest are written by
- * {@code tools/textures/thin_walls.py}.
+ * {@code tools/textures/thin_walls.py}. Lamps ({@link LampBlock}: paper lanterns, andon, porch, gate post and stone
+ * lantern lights) and doors (a wooden lattice door, aluminium entrance doors, a shop's glass door), drawn and modelled
+ * by {@code tools/textures/lantern_door_textures.py}.
  */
 public final class BuildingBlocks {
     /** The frames and the glass the windows come in. */
@@ -46,7 +51,19 @@ public final class BuildingBlocks {
     /** The windows, drawn translucent (Forge reads that from their models; Fabric from this list). */
     public static final List<Supplier<Block>> TRANSLUCENT = new ArrayList<>();
 
+    /** Aluminium doors: a metal's sounds, but opened by hand (an iron door's set is not). */
+    private static final BlockSetType ALUMINIUM = new BlockSetType("citybuilder_aluminium", true, SoundType.METAL,
+            SoundEvents.IRON_DOOR_CLOSE, SoundEvents.IRON_DOOR_OPEN, SoundEvents.IRON_TRAPDOOR_CLOSE,
+            SoundEvents.IRON_TRAPDOOR_OPEN, SoundEvents.METAL_PRESSURE_PLATE_CLICK_OFF,
+            SoundEvents.METAL_PRESSURE_PLATE_CLICK_ON, SoundEvents.STONE_BUTTON_CLICK_OFF,
+            SoundEvents.STONE_BUTTON_CLICK_ON);
+
     private BuildingBlocks() {
+    }
+
+    /** A paper lamp's properties, giving {@code light}. */
+    private static BlockBehaviour.Properties paper(int light) {
+        return BlockBehaviour.Properties.copy(Blocks.WHITE_WOOL).strength(0.5f).lightLevel(s -> light).noOcclusion();
     }
 
     public static void register() {
@@ -74,6 +91,29 @@ public final class BuildingBlocks {
             // Its colour on maps fixed: a log's depends on its axis, which a thin wall has not
             p.registerBlock("thin_" + name, () -> new ThinWallBlock(BlockBehaviour.Properties.copy(material)
                     .mapColor(material.defaultMapColor()).noOcclusion()));
+        }
+        // Lamps (models and boxes drawn by tools/textures/lantern_door_textures.py, facing north)
+        double[][] chochin = {{4, 2, 4, 12, 13, 12}, {7.5, 13, 7.5, 8.5, 16, 8.5}};
+        for (String colour : new String[]{"red", "white"}) {
+            p.registerBlock("chochin_" + colour, () -> new LampBlock(paper(13), chochin));
+        }
+        double[][] andon = {{4, 0, 5, 12, 15, 11}, {3, 15, 4, 13, 16, 12}};
+        p.registerBlock("andon", () -> new LampBlock(paper(14), andon));
+        p.registerBlock("andon_sign", () -> new LampBlock(paper(14), andon));
+        for (String metal : new String[]{"black", "silver"}) {
+            p.registerBlock("porch_light_" + metal, () -> new LampBlock(BlockBehaviour.Properties.copy(Blocks.LANTERN)
+                    .lightLevel(s -> 12).noOcclusion(), new double[]{5, 3, 10, 11, 13, 16}));
+        }
+        p.registerBlock("gate_light", () -> new LampBlock(BlockBehaviour.Properties.copy(Blocks.LANTERN)
+                .lightLevel(s -> 13).noOcclusion(), new double[]{5, 0, 5, 11, 9, 11}));
+        p.registerBlock("toro_light", () -> new LampBlock(BlockBehaviour.Properties.copy(Blocks.STONE_BRICKS)
+                .lightLevel(s -> 12).noOcclusion(), new double[]{2, 0, 2, 14, 16, 14}));
+        // Doors: a wooden lattice door, aluminium entrance doors and a shop's glass door, all opened by hand
+        p.registerBlock("koshi_door", () -> new CityDoorBlock(BlockBehaviour.Properties.copy(Blocks.DARK_OAK_DOOR),
+                BlockSetType.DARK_OAK));
+        for (String name : new String[]{"entrance_door_silver", "entrance_door_bronze", "shop_door"}) {
+            TRANSLUCENT.add(p.registerBlock(name, () -> new CityDoorBlock(BlockBehaviour.Properties.copy(Blocks.IRON_DOOR)
+                    .strength(3.0f), ALUMINIUM)));
         }
         ADJUSTER = p.registerItem("adjuster",
                 () -> new com.mtm.citybuilder.item.AdjusterItem(new net.minecraft.world.item.Item.Properties().stacksTo(1)));

@@ -366,7 +366,7 @@ public final class CityBuildings {
     /**
      * A block's state for a part: slab halves; door halves, facing the street; panes and bars joined along the wall
      * (across {@code outward}), fences left as posts; trapdoors standing open against the wall; banners hung facing
-     * out; lanterns hanging; leaves kept from decaying.
+     * out; lanterns hanging, this mod's lamps facing out; leaves kept from decaying.
      */
     private static BlockState state(Block block, BuildingLayer.Part part, Direction facing, Direction outward) {
         BlockState state = block.defaultBlockState();
@@ -381,6 +381,9 @@ public final class CityBuildings {
             state = state.setValue(TrapDoorBlock.FACING, outward).setValue(TrapDoorBlock.OPEN, true);
         } else if (block instanceof WallBannerBlock) {
             state = state.setValue(WallBannerBlock.FACING, outward);
+        } else if (block instanceof com.mtm.citybuilder.block.LampBlock) {
+            // A lamp's front to the street; a porch light's plate against its wall
+            state = state.setValue(com.mtm.citybuilder.block.LampBlock.FACING, outward);
         } else if (block instanceof LanternBlock) {
             // Hung by a door; a stone lantern's light stands
             state = state.setValue(LanternBlock.HANGING, part == BuildingLayer.Part.LANTERN);

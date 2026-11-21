@@ -164,5 +164,17 @@
   "block.citybuilder.roof_copper": "Copper Roofing Roof",
   "block.citybuilder.roof_copper_slab": "Copper Roofing Roof Slab",
   "block.citybuilder.roof_copper_green": "Green Copper Roofing Roof",
-  "block.citybuilder.roof_copper_green_slab": "Green Copper Roofing Roof Slab"
+  "block.citybuilder.roof_copper_green_slab": "Green Copper Roofing Roof Slab",
+  "block.citybuilder.chochin_red": "Paper Lantern (Red)",
+  "block.citybuilder.chochin_white": "Paper Lantern (White)",
+  "block.citybuilder.andon": "Standing Paper Lamp (Andon)",
+  "block.citybuilder.andon_sign": "Andon Sign",
+  "block.citybuilder.porch_light_black": "Porch Light (Black)",
+  "block.citybuilder.porch_light_silver": "Porch Light (Silver)",
+  "block.citybuilder.gate_light": "Gate Post Light",
+  "block.citybuilder.toro_light": "Stone Lantern Fire Box",
+  "block.citybuilder.koshi_door": "Lattice Door (Koshido)",
+  "block.citybuilder.entrance_door_silver": "Aluminium Entrance Door (Silver)",
+  "block.citybuilder.entrance_door_bronze": "Aluminium Entrance Door (Bronze)",
+  "block.citybuilder.shop_door": "Shop Glass Door"
 }

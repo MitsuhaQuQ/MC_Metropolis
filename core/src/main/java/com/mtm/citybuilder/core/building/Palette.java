@@ -205,6 +205,7 @@ public record Palette(String wall, String accent, String trim, String window, St
             case TOBUKURO -> c.material("tobukuro", variant);
             case GATEPOST -> c.material("gatepost", variant);
             case GATE_LIGHT -> c.material("gateLight", variant);
+            case PORCH_LIGHT -> c.material("porchLight", variant);
             case FUTON -> c.material("futon", position);
             case SOLAR -> c.material("solar", variant);
             case ANTENNA -> c.material("antenna", variant);

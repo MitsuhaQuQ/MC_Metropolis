@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/door_top_right_open",
+  "textures": {
+    "bottom": "citybuilder:block/door/koshi_door_bottom",
+    "top": "citybuilder:block/door/koshi_door_top"
+  }
+}

@@ -181,6 +181,8 @@ public final class BuildingLayer {
         GATEPOST,
         /** A lamp standing on a gate post. */
         GATE_LIGHT,
+        /** A small light on the wall by a house's or a flat's door (玄関灯). */
+        PORCH_LIGHT,
         /** A futon aired over a rail, or laid out on a floor (a carpet). */
         FUTON,
         /** A solar panel (a daylight detector). */
@@ -2752,6 +2754,14 @@ public final class BuildingLayer {
             if (dy == 0) {
                 return Part.PAVING;
             }
+            if (v < back + 1.0 && u < w && Math.floorMod((long) Math.floor(u), 7) == 4) {
+                // A porch light on the wall beside each flat's door, at its head
+                for (int k = 0; k < floors; k++) {
+                    if (dy == b.floorOf(k) + 2) {
+                        return Part.PORCH_LIGHT;
+                    }
+                }
+            }
             boolean outer = v >= back + CORRIDOR - 1.0 || u >= w + STAIR_SIDE - 1.0;
             for (int k = 1; k < floors; k++) {
                 int f = b.floorOf(k);
@@ -4045,6 +4055,11 @@ public final class BuildingLayer {
                     return Part.FUTON;
                 }
             }
+        }
+        if (b.type() == Building.Type.HOUSE && against == Face.FRONT && Math.abs(along - b.door() + 1.0) < 0.5
+                && dy == 3 && dy < b.wallHeight()) {
+            // A porch light on the wall beside the door, over its head
+            return Part.PORCH_LIGHT;
         }
         if (b.type() == Building.Type.HOUSE) {
             Part house = houseDetail(b, c, against, along, s, dy);

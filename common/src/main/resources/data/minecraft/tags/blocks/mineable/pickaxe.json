@@ -56,6 +56,13 @@
     "citybuilder:roof_copper",
     "citybuilder:roof_copper_slab",
     "citybuilder:roof_copper_green",
-    "citybuilder:roof_copper_green_slab"
+    "citybuilder:roof_copper_green_slab",
+    "citybuilder:porch_light_black",
+    "citybuilder:porch_light_silver",
+    "citybuilder:gate_light",
+    "citybuilder:toro_light",
+    "citybuilder:entrance_door_silver",
+    "citybuilder:entrance_door_bronze",
+    "citybuilder:shop_door"
   ]
 }

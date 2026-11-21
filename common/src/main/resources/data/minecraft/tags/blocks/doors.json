@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "citybuilder:entrance_door_silver",
+    "citybuilder:entrance_door_bronze",
+    "citybuilder:shop_door"
+  ]
+}
