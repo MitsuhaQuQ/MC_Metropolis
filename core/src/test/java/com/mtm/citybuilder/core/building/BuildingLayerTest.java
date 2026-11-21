@@ -647,4 +647,88 @@ class BuildingLayerTest {
             }
         }
     }
+
+    private static String column(BuildingLayer.Column c) {
+        StringBuilder s = new StringBuilder();
+        for (int y = c.building().base(); y < c.building().base() + c.building().wallHeight(); y++) {
+            s.append(BuildingLayer.part(c, y).name(), 0, 3).append(' ');
+        }
+        return s.toString();
+    }
+
+    @Test
+    void noFloorShowsInARecess() {
+        CityLogic logic = logic();
+        Settlement city = city(logic);
+        CityExtent extent = logic.extent(city);
+        int cx = (int) Math.floor(extent.coreX() / 16) - 3;
+        int cz = (int) Math.floor(extent.coreZ() / 16) - 3;
+        int n = 6 * 16;
+        BuildingLayer.Column[][] grid = new BuildingLayer.Column[n][n];
+        for (int dx = 0; dx < 6; dx++) {
+            for (int dz = 0; dz < 6; dz++) {
+                BuildingLayer.Column[] columns = logic.buildings().columns(cx + dx, cz + dz);
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        grid[dx * 16 + x][dz * 16 + z] = columns[x * 16 + z];
+                    }
+                }
+            }
+        }
+        // Where a wall's block is open (a window set back), the block behind it is not a floor's boards: windows
+        // floor to floor have a band at each floor's level
+        int recesses = 0;
+        for (int x = 1; x < n - 1; x++) {
+            for (int z = 1; z < n - 1; z++) {
+                BuildingLayer.Column c = grid[x][z];
+                if (c.building() == null || c.ring() || !c.edge()) {
+                    continue;
+                }
+                int[][] steps = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+                for (int y = c.building().base() + 1; y < c.building().base() + c.building().wallHeight(); y++) {
+                    if (BuildingLayer.part(c, y) != BuildingLayer.Part.AIR) {
+                        continue;
+                    }
+                    for (int[] s : steps) {
+                        BuildingLayer.Column in = grid[x + s[0]][z + s[1]];
+                        // The layer just behind the wall (not a terrace's air before a storey set back above it)
+                        if (in.building() == null || in.ring() || in.building().id() != c.building().id() || in.edge()
+                                || in.inner() == BuildingLayer.Face.NONE) {
+                            continue;
+                        }
+                        recesses++;
+                        int at = y;
+                        // The glass's edges meet wall: the blocks beside it in its layer are not the room's
+                        if (BuildingLayer.part(in, y) == BuildingLayer.Part.WINDOW) {
+                            for (int side : new int[]{1, -1}) {
+                                BuildingLayer.Column by = grid[x + s[0] + side * s[1]][z + s[1] + side * s[0]];
+                                if (by.building() == null || by.building().id() != c.building().id() || by.ring() || by.edge()) {
+                                    continue;
+                                }
+                                BuildingLayer.Part p = BuildingLayer.part(by, y);
+                                assertTrue(p != BuildingLayer.Part.AIR && p != BuildingLayer.Part.FLOOR,
+                                        () -> "the room shows beside a window set back at " + at + ": " + p + "; beside u " + by.u()
+                                                + " v " + by.v() + " inner " + by.inner() + " face " + by.face() + " wing " + by.wing()
+                                                + "; window u " + in.u() + " v " + in.v() + " inner " + in.inner()
+                                                + "; building " + c.building().type() + " width " + c.building().width()
+                                                + " front " + c.building().front() + " back " + c.building().back()
+                                                + " base " + c.building().base() + "; beside " + column(by) + "; window " + column(in));
+                            }
+                        }
+                        assertTrue(BuildingLayer.part(in, y) != BuildingLayer.Part.FLOOR,
+                                () -> "a floor's boards show in a recess at " + at + " of a " + c.building().type()
+                                        + " (base " + c.building().base() + ", ground " + c.building().ground()
+                                        + ", upper " + c.building().upper() + ", wall face " + c.face() + ", corner "
+                                        + c.corner() + "): the wall " + BuildingLayer.part(c, at - 1) + "/"
+                                        + BuildingLayer.part(c, at + 1) + " below/above, behind " + BuildingLayer.part(in, at - 1)
+                                        + "/" + BuildingLayer.part(in, at + 1) + ", inner " + in.inner() + "; wall column " + column(c) + "; behind " + column(in)
+                                        + "; step " + c.building().step() + " storeys " + c.building().storeys()
+                                        + " facade " + c.building().composition().get(Slot.FACADE) + " u " + c.u() + " v " + c.v()
+                                        + " in u " + in.u() + " v " + in.v() + " width " + c.building().width());
+                    }
+                }
+            }
+        }
+        assertTrue(recesses > 0, "no recess to look into");
+    }
 }

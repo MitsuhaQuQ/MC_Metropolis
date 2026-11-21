@@ -1164,6 +1164,61 @@ public final class BuildingLayer {
         };
     }
 
+    /**
+     * Whether the glass of a window set back from its wall stands in a column of the layer behind the wall, at a
+     * height above the building's base (not at a floor's level, where a band stands).
+     */
+    private static boolean setBack(Building b, Column c, int dy) {
+        if (c == null || dy <= 0 || dy >= b.wallHeight() || terrace(b, c) && dy >= b.floorOf(b.step())) {
+            return false;
+        }
+        int storey = dy < b.ground() ? 0 : 1 + (dy - b.ground()) / b.upper();
+        int row = dy < b.ground() ? dy : (dy - b.ground()) % b.upper();
+        int height = dy < b.ground() ? b.ground() : b.upper();
+        if (row == 0 || storey == 0 && ground(b, c, Face.NONE, false, row, height) != null) {
+            return false;
+        }
+        return recessed(b, storey) && wall(b, c, c.inner(), false, storey, row, height) == Part.WINDOW;
+    }
+
+    /**
+     * The column a block from this one (along u and v), where it lies in the layer just behind the walls, which wall
+     * as {@link #columns} finds it; null elsewhere (in a wall, deeper inside, outside the footprint).
+     */
+    private static Column beside(Column c, int du, int dv) {
+        Building b = c.building();
+        double u = c.u() + du;
+        double v = c.v() + dv;
+        double w = b.width();
+        if (u < 0 || u >= w || v < b.front() || v >= b.back()) {
+            return null;
+        }
+        if (v - b.front() < 1.0 || b.back() - v < 1.0 || u < 1.0 || w - u < 1.0) {
+            return null;
+        }
+        Face inner = v - b.front() < 2.0 ? Face.FRONT : b.back() - v < 2.0 ? Face.BACK
+                : u < 2.0 || w - u < 2.0 ? Face.SIDE : Face.NONE;
+        if (inner == Face.NONE) {
+            return null;
+        }
+        return new Column(b, false, u, v, Face.NONE, false, c.eave(), c.ridge(), c.light(), false, inner, c.wing(),
+                c.lot(), c.adjacent());
+    }
+
+    /**
+     * Whether a wall column lies in its building's own front, back or side, a block in from the footprint's line, so
+     * the column behind it is marked as standing behind that wall ({@link Column#inner}); not one of a wall the lot's
+     * line or a chamfer cuts across.
+     */
+    private static boolean squareWall(Building b, Column c, Face face) {
+        return switch (face) {
+            case FRONT -> c.v() - b.front() < 1.0;
+            case BACK -> b.back() - c.v() < 1.0;
+            case SIDE -> c.u() < 1.0 || b.width() - c.u() < 1.0;
+            default -> false;
+        };
+    }
+
     /** The height of a pitched roof's surface over a column, in half blocks above the top of the walls. */
     private static int halves(Building b, Column c) {
         return (int) Math.floor(c.eave() * b.slope()) + 1;
@@ -1186,10 +1241,11 @@ public final class BuildingLayer {
     /**
      * Whether a building's windows on a storey are set back a block into the walls, a reveal round each: most blocks
      * of flats and offices, the upper storeys of shops; houses and machiya have theirs flush. Not behind ledges: the
-     * two together read as an open deck.
+     * two together read as an open deck. Only on a building square to the blocks: on one at an angle the block behind
+     * a wall's block is not the one behind its window, and a window taken out of the wall would leave a hole.
      */
     private static boolean recessed(Building b, int storey) {
-        if (articulation(b) == 2 || !b.composition().is(Slot.RECESS, "recessed")) {
+        if (articulation(b) == 2 || !b.composition().is(Slot.RECESS, "recessed") || Math.abs(b.tx() * b.tz()) > 1e-3) {
             return false;
         }
         return switch (b.type()) {
@@ -1558,9 +1614,20 @@ public final class BuildingLayer {
             }
             if (face == Face.NONE) {
                 // Just inside a wall whose windows are set back: the windows stand here
-                if (row > 0 && c.inner() != Face.NONE && recessed(b, storey)
+                if (c.inner() != Face.NONE && recessed(b, storey)
                         && wall(b, c, c.inner(), false, storey, row, height) == Part.WINDOW) {
-                    return Part.WINDOW;
+                    // At a floor's level, where the glass runs from floor to floor, the floor's edge is faced with a
+                    // band (a curtain wall's spandrel), not left showing its boards between the windows
+                    return row > 0 ? Part.WINDOW : Part.ACCENT;
+                }
+                if (c.inner() != Face.NONE && recessed(b, storey)
+                        && (setBack(b, beside(c, 1, 0), dy) || setBack(b, beside(c, -1, 0), dy)
+                        || setBack(b, beside(c, 0, 1), dy) || setBack(b, beside(c, 0, -1), dy)
+                        || setBack(b, c, dy - 1) || setBack(b, c, dy + 1))) {
+                    // Beside, over or under a window set back here: the reveal lined back to the glass, so the
+                    // glass meets the wall round it and the room does not show past its edges
+                    Part own = wall(b, c, c.inner(), false, storey, row, height);
+                    return own == Part.TRIM || own == Part.ACCENT || own == Part.WALL_ALT ? own : Part.WALL;
                 }
                 Part inside = interior(b, c, storey, row);
                 if (inside != null) {
@@ -1579,7 +1646,9 @@ public final class BuildingLayer {
                 return frame ? Part.TRIM : Part.AD;
             }
             Part part = wall(b, c, face, corner, storey, row, height);
-            return part == Part.WINDOW && recessed(b, storey) && !stepped ? Part.AIR : part;
+            // Set back into the layer behind, where that layer knows it stands behind this wall; a wall the lot's
+            // line or a chamfer cuts at an angle has no such layer, and keeps its windows in its own face
+            return part == Part.WINDOW && recessed(b, storey) && !stepped && squareWall(b, c, face) ? Part.AIR : part;
         }
         int above = dy - wallTop;
         if (b.roof() == Building.Roof.FLAT && above >= 1) {

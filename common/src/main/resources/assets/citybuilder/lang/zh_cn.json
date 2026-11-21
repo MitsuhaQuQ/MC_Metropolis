@@ -141,5 +141,8 @@
   "block.citybuilder.thin_white_concrete": "薄墙（白色混凝土）",
   "block.citybuilder.thin_white_terracotta": "薄墙（白色陶瓦）",
   "block.citybuilder.thin_yellow_terracotta": "薄墙（黄色陶瓦）",
-  "item.citybuilder.adjuster": "调整扳手"
+  "item.citybuilder.adjuster": "调整扳手",
+  "block.citybuilder.curtain_clear": "幕墙玻璃（透明）",
+  "block.citybuilder.curtain_blue": "幕墙玻璃（蓝色）",
+  "block.citybuilder.curtain_gray": "幕墙玻璃（灰色）"
 }

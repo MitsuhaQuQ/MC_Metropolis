@@ -111,7 +111,8 @@ public final class CityBuildings {
                     String id = palette.id(part, b, position, y);
                     if (id != null) {
                         BlockState placed = state(block(id), part, facing, outward);
-                        if (thin != null && THIN_PARTS.contains(part) && thinOf(id) instanceof ThinWallBlock wall) {
+                        if (thin != null && THIN_PARTS.contains(part) && thinOf(id) instanceof ThinWallBlock wall
+                                && closed(columns, column, x, z, y)) {
                             placed = wall.state(thin);
                         }
                         chunk.setBlockState(pos.set(baseX + x, y, baseZ + z), placed, false);
@@ -175,6 +176,47 @@ public final class CityBuildings {
             }
         }
         return sides == 0 && corners == 0 ? null : ThinWall.fromOutside(sides, corners);
+    }
+
+    /** The parts that close a thin wall's open side: solid wall, floors and roofs. */
+    private static final java.util.Set<BuildingLayer.Part> SOLID = java.util.EnumSet.of(BuildingLayer.Part.WALL,
+            BuildingLayer.Part.ACCENT, BuildingLayer.Part.WALL_ALT, BuildingLayer.Part.TRIM, BuildingLayer.Part.FLOOR,
+            BuildingLayer.Part.FOUNDATION, BuildingLayer.Part.PARAPET, BuildingLayer.Part.FLAT, BuildingLayer.Part.RIDGE,
+            BuildingLayer.Part.ROOF_LOW, BuildingLayer.Part.ROOF_HIGH, BuildingLayer.Part.PLASTER);
+
+    /**
+     * Whether a thin wall at a height would be closed all round: the wall's own blocks beside it along the wall, and
+     * the blocks above and below it, all solid. A thin wall lies against the outside face only, its open sides closed
+     * by solid wall round it; beside a window (its glass in the middle of its block), a window set back, a door or
+     * anything else of the wall that is not solid, the open side would show, and the reveal round the opening would be
+     * lost: there the wall stays a whole block, as the openings' reveals and what is hung round them were made for.
+     * Off the chunk the wall's blocks are not known here: a whole block.
+     */
+    private static boolean closed(BuildingLayer.Column[] columns, BuildingLayer.Column column, int x, int z, int y) {
+        for (int dy : new int[]{-1, 1}) {
+            int at = y + dy;
+            if (at >= BuildingLayer.bottom(column) && at <= BuildingLayer.top(column)
+                    && !SOLID.contains(BuildingLayer.part(column, at))) {
+                return false;
+            }
+        }
+        for (int d = 0; d < 4; d++) {
+            int nx = x + ThinWall.dx(d);
+            int nz = z + ThinWall.dz(d);
+            if (nx < 0 || nx >= 16 || nz < 0 || nz >= 16) {
+                return false;
+            }
+            BuildingLayer.Column beside = columns[nx * 16 + nz];
+            // The wall's own blocks along it: of the building's footprint, in its wall; rooms inside may be open
+            if (beside.building() == null || beside.building().id() != column.building().id() || beside.ring()
+                    || !beside.edge()) {
+                continue;
+            }
+            if (!SOLID.contains(BuildingLayer.part(beside, y))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Whether a cell lies in a building's own footprint: off the chunk, as the building layer finds it there. */

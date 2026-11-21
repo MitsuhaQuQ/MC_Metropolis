@@ -34,8 +34,7 @@ public record Palette(String wall, String accent, String trim, String window, St
         if (!id.endsWith("glass")) {
             return id;
         }
-        String glass = id.contains("blue") || id.contains("cyan") ? "blue"
-                : id.contains("gray") || id.contains("brown") || id.contains("black") ? "gray" : "clear";
+        String glass = tint(id);
         String frame;
         if (building.type() == Building.Type.OFFICE) {
             frame = "dark";
@@ -49,6 +48,17 @@ public record Palette(String wall, String accent, String trim, String window, St
             frame = "aluminum";
         }
         return "citybuilder:window_" + frame + "_" + glass;
+    }
+
+    /** The tint of this mod's glass for a vanilla glass block's id: blue, grey or clear. */
+    private static String tint(String id) {
+        return id.contains("blue") || id.contains("cyan") ? "blue"
+                : id.contains("gray") || id.contains("brown") || id.contains("black") ? "gray" : "clear";
+    }
+
+    /** Whether a building's upper storeys are a curtain wall (an office's glass from floor to floor). */
+    private static boolean curtain(Building building) {
+        return building.type() == Building.Type.OFFICE && building.composition().is(Slot.FACADE, "curtain");
     }
 
     /**
@@ -67,6 +77,10 @@ public record Palette(String wall, String accent, String trim, String window, St
      * posts. A block ages only into what the catalogue lists for it, of the same shape.
      */
     public String id(BuildingLayer.Part part, Building building, long position, int y) {
+        if (part == BuildingLayer.Part.WINDOW && curtain(building) && y - building.base() >= building.ground()) {
+            // A curtain wall, glass from floor to floor between its mullions: whole blocks of glass, one sheet
+            return "citybuilder:curtain_" + tint(window);
+        }
         String id = fresh(part, building, position);
         double age = building.age();
         if (id == null || age <= 0.0) {

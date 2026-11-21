@@ -7,7 +7,8 @@ The blocks (see common's block.BuildingBlocks; core's building.Palette picks the
 fronts): window_<frame>_<glass>, joined to the windows beside it as a pane is (its block state is the pane's), but
 framed and set back: the glass two pixels thick in the middle of the block, a head along its top, a sill a pixel proud
 of the glass along its foot, a mullion at the middle; so a wall keeps its depth round its windows, and windows side by
-side run on as one band. Frames: aluminium (the usual Japanese sash), dark (offices' black frames), wood
+side run on as one band. And curtain_<glass>: a curtain wall's glass, whole blocks (side by side one sheet, as glass
+blocks are). Frames: aluminium (the usual Japanese sash), dark (offices' black frames), wood
 (houses and machiya), white; glass: clear, blue, grey.
 """
 import json
@@ -158,6 +159,18 @@ def main():
                 'pools': [{'rolls': 1, 'entries': [{'type': 'minecraft:item', 'name': f'citybuilder:{n}'}],
                            'conditions': [{'condition': 'minecraft:survives_explosion'}]}]})
             names[n] = (f'{fen} Window ({gen})', f'窗（{fzh}、{gzh}玻璃）')
+    # A curtain wall's glass, whole blocks of the windows' glass
+    for glass, (gc, gen, gzh) in GLASS.items():
+        n = f'curtain_{glass}'
+        write(os.path.join(MODELS, f'{n}.json'), {'parent': 'minecraft:block/cube_all', 'render_type': 'minecraft:translucent',
+                                                 'textures': {'all': f'citybuilder:block/window_glass_{glass}'}})
+        write(os.path.join(BLOCKSTATES, f'{n}.json'), {'variants': {'': {'model': f'citybuilder:block/{n}'}}})
+        write(os.path.join(ITEMS, f'{n}.json'), {'parent': f'citybuilder:block/{n}'})
+        write(os.path.join(LOOT, f'{n}.json'), {
+            'type': 'minecraft:block',
+            'pools': [{'rolls': 1, 'entries': [{'type': 'minecraft:item', 'name': f'citybuilder:{n}'}],
+                       'conditions': [{'condition': 'minecraft:survives_explosion'}]}]})
+        names[n] = (f'Curtain Wall Glass ({gen})', f'幕墙玻璃（{gzh}）')
     add_names(names)
 
 

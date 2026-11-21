@@ -141,5 +141,8 @@
   "block.citybuilder.thin_white_concrete": "Thin White Concrete Wall",
   "block.citybuilder.thin_white_terracotta": "Thin White Terracotta Wall",
   "block.citybuilder.thin_yellow_terracotta": "Thin Yellow Terracotta Wall",
-  "item.citybuilder.adjuster": "Adjuster"
+  "item.citybuilder.adjuster": "Adjuster",
+  "block.citybuilder.curtain_clear": "Curtain Wall Glass (Clear)",
+  "block.citybuilder.curtain_blue": "Curtain Wall Glass (Blue)",
+  "block.citybuilder.curtain_gray": "Curtain Wall Glass (Grey)"
 }

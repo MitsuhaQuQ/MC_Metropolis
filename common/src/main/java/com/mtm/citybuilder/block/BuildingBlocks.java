@@ -51,6 +51,12 @@ public final class BuildingBlocks {
                         () -> new WindowBlock(BlockBehaviour.Properties.copy(Blocks.GLASS_PANE))));
             }
         }
+        for (String glass : GLASS) {
+            // A curtain wall's glass: whole blocks, side by side one sheet (glass does not draw its faces between
+            // blocks of the same)
+            TRANSLUCENT.add(p.registerBlock("curtain_" + glass,
+                    () -> new net.minecraft.world.level.block.GlassBlock(BlockBehaviour.Properties.copy(Blocks.GLASS))));
+        }
         for (String name : THIN_WALLS) {
             Block material = net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
                     new net.minecraft.resources.ResourceLocation("minecraft", name));

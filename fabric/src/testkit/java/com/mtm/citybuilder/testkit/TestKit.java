@@ -244,6 +244,12 @@ public final class TestKit implements DedicatedServerModInitializer {
             int covered = 0;
             int unloaded = 0;
             Map<String, Integer> thin = new TreeMap<>();
+            // Windows: arms ending in the air, and sides along a window's run left unjoined to a wall or window
+            int[] windows = new int[3];
+            java.util.List<int[]> dangling = new java.util.ArrayList<>();
+            java.util.List<int[]> unjoined = new java.util.ArrayList<>();
+            Map<String, Integer> danglingInto = new TreeMap<>();
+            Map<String, Integer> unjoinedTo = new TreeMap<>();
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
             for (int x = x1; x <= x2; x++) {
                 for (int z = z1; z <= z2; z++) {
@@ -264,6 +270,30 @@ public final class TestKit implements DedicatedServerModInitializer {
                     // This mod's thin walls down the column, by shape
                     for (int ty = surface; ty > surface - 80 && ty > level.getMinBuildHeight(); ty--) {
                         BlockState t = chunk.getBlockState(pos.set(x, ty, z));
+                        if (t.getBlock() instanceof com.mtm.citybuilder.block.WindowBlock) {
+                            windows[0]++;
+                            for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                                BlockPos next = new BlockPos(x, ty, z).relative(d);
+                                BlockState beside = level.getBlockState(next);
+                                boolean arm = t.getValue(arm(d));
+                                boolean run = t.getValue(arm(d.getOpposite()));
+                                boolean meets = beside.getBlock() instanceof net.minecraft.world.level.block.IronBarsBlock
+                                        || beside.isFaceSturdy(level, next, d.getOpposite());
+                                if (arm && !meets) {
+                                    windows[1]++;
+                                    danglingInto.merge(BuiltInRegistries.BLOCK.getKey(beside.getBlock()).getPath(), 1, Integer::sum);
+                                    if (dangling.size() < 10) {
+                                        dangling.add(new int[]{x, ty, z, d.get2DDataValue()});
+                                    }
+                                } else if (!arm && run && meets) {
+                                    windows[2]++;
+                                    unjoinedTo.merge(BuiltInRegistries.BLOCK.getKey(beside.getBlock()).getPath(), 1, Integer::sum);
+                                    if (unjoined.size() < 10) {
+                                        unjoined.add(new int[]{x, ty, z, d.get2DDataValue()});
+                                    }
+                                }
+                            }
+                        }
                         if (t.getBlock() instanceof com.mtm.citybuilder.block.ThinWallBlock) {
                             thin.merge(t.getValue(com.mtm.citybuilder.block.ThinWallBlock.SHAPE).getSerializedName(), 1, Integer::sum);
                         }
@@ -289,8 +319,19 @@ public final class TestKit implements DedicatedServerModInitializer {
             result.put("pavedCovered", covered);
             result.put("unloaded", unloaded);
             result.put("thinWalls", thin);
+            result.put("windows", Map.of("blocks", windows[0], "dangling", windows[1], "unjoined", windows[2],
+                    "danglingAt", dangling, "unjoinedAt", unjoined, "danglingInto", danglingInto, "unjoinedTo", unjoinedTo));
             return result;
         });
+    }
+
+    private static net.minecraft.world.level.block.state.properties.BooleanProperty arm(net.minecraft.core.Direction d) {
+        return switch (d) {
+            case NORTH -> net.minecraft.world.level.block.CrossCollisionBlock.NORTH;
+            case EAST -> net.minecraft.world.level.block.CrossCollisionBlock.EAST;
+            case SOUTH -> net.minecraft.world.level.block.CrossCollisionBlock.SOUTH;
+            default -> net.minecraft.world.level.block.CrossCollisionBlock.WEST;
+        };
     }
 
     private static boolean ours(Block block) {
