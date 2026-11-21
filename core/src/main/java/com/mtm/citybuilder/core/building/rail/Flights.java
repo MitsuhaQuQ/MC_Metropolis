@@ -81,7 +81,7 @@ public final class Flights {
     }
 
     /** A stair flight's landings: one every this many steps for long ones. */
-    static int landingEvery(int steps) {
+    public static int landingEvery(int steps) {
         return steps > 8 ? (steps + 1) / 2 : 0;
     }
 

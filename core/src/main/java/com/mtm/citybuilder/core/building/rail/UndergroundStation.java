@@ -22,7 +22,7 @@ import java.util.List;
  * {@code tools/assets/plateau_underground.py}): passages 2.0/3.0/5.0 m wide (quartiles), 2.5/2.9/3.9 m clear, 10-35 m
  * long; concourse halls about 3.4 m clear. The defaults: exits' passages 3 wide and 3 clear, the concourse 4 clear.
  */
-public final class UndergroundStation implements BuriedStation {
+public final class UndergroundStation implements BuriedStation, PlatformStorey {
     /**
      * An exit: a passage from the box's side ({@code side}: -1 or +1 across) at {@code x}, {@code out} blocks out to
      * the middle of the stairs' lane under the pavement, then stairs climbing towards {@code dir} along x to the
@@ -125,23 +125,31 @@ public final class UndergroundStation implements BuriedStation {
         return approach + platformLength - 1;
     }
 
-    /** The flights: each platform's stairs and escalator well up to the concourse, and each exit's stairs. */
+    /** The flights: each exit's stairs up to the street, and each platform's stairs and escalator well. */
     public List<Flights.Flight> flights() {
-        List<Flights.Flight> out = new ArrayList<>();
+        return UndergroundComplex.straight(complex().flights(ground));
+    }
+
+    /** The station as storeys: the concourse over the platform level, stairs between them. */
+    public UndergroundComplex complex() {
+        BoxPlatformStorey platforms = new BoxPlatformStorey(section, platformLength, approach, level, headroom,
+                columnSpacing, this::inWell, p);
+        ConcourseStorey concourse = new ConcourseStorey(0, length(), half, floor1, concourseHeight,
+                platforms.columns(), exits, p);
+        List<Storey.Placed> links = new ArrayList<>();
         for (int sx : stairXs) {
             int arrive = sx + stairRun;
             for (CrossSection.Platform pl : section.platforms()) {
                 int[] w = ElevatedStation.well(pl);
-                out.add(new Flights.Flight(sx, 1, w[0], w[1], level + 1, floor1 + 1,
-                        Flights.landingEvery(floor1 - level), false, false, level + 1, floor1, floor1 + 1, null));
-                out.add(new Flights.Flight(arrive + escalatorRun, -1, w[0], w[0] + Flights.ESCALATOR_WIDTH - 1,
-                        level + 1, floor1 + 1, 0, false, true, level + 1, floor1, floor1 + 1, null));
+                links.add(new Storey.Placed(new Flights.Flight(sx, 1, w[0], w[1], level + 1, floor1 + 1,
+                        Flights.landingEvery(floor1 - level), false, false, level + 1, floor1, floor1 + 1, null)));
+                links.add(new Storey.Placed(new Flights.Flight(arrive + escalatorRun, -1, w[0],
+                        w[0] + Flights.ESCALATOR_WIDTH - 1, level + 1, floor1 + 1, 0, false, true, level + 1, floor1,
+                        floor1 + 1, null)));
             }
         }
-        for (Exit e : exits) {
-            out.add(exitFlight(e, half, floor1, ground));
-        }
-        return out;
+        return new UndergroundComplex(List.of(new UndergroundComplex.Piece(concourse),
+                new UndergroundComplex.Piece(platforms)), links, p);
     }
 
     /** An exit's stairs: from the concourse floor at {@code floor1} up to the ground, an entrance house on top. */
@@ -166,77 +174,17 @@ public final class UndergroundStation implements BuriedStation {
 
     /** Everything but the flights ({@link #flights()}), for laying on a curve first. */
     public Model buildWithoutFlights() {
-        Model m = new Model();
-        int len = length();
-        int base = level - 2;
-        // The box: walls, base and top slabs, end walls; the concourse floor between the levels
-        for (int x = 0; x <= len; x++) {
-            for (int z = -half; z <= half; z++) {
-                for (int y = base; y <= topSlab; y++) {
-                    boolean shell = Math.abs(z) == half || y == base || y == topSlab || x == 0 || x == len;
-                    if (shell) {
-                        m.set(x, y, z, p.concrete());
-                    }
-                }
-                if (Math.abs(z) < half && x > 0 && x < len) {
-                    m.set(x, floor1, z, p.walk());
-                    m.set(x, level - 1, z, p.concrete());
-                }
-            }
-        }
-        for (int tc : section.tracks()) {
-            for (int x = 1; x < len; x++) {
-                for (int z = tc - 1; z <= tc + 1; z++) {
-                    m.set(x, level - 1, z, "minecraft:smooth_stone");  // slab track
-                }
-            }
-        }
-        int x0 = platformStart(), x1 = platformEnd();
-        for (CrossSection.Platform pl : section.platforms()) {
-            StationParts.platform(m, p, x0, x1, pl.z0(), pl.z1(), level, level, pl.trackLow(), pl.trackHigh());
-        }
-        // Columns down each island and through the concourse above, clear of the stair wells
-        for (CrossSection.Platform pl : section.platforms()) {
-            if (!pl.island()) {
-                continue;
-            }
-            int cz = (pl.z0() + pl.z1()) / 2;
-            for (int x = x0 + 3; x < x1 - 1; x += columnSpacing) {
-                if (inWell(x)) {
-                    continue;
-                }
-                for (int y = level + 1; y < topSlab; y++) {
-                    if (y != floor1) {
-                        m.set(x, y, cz, p.concrete());
-                    }
-                }
-            }
-        }
-        // Lights in the concourse floor's underside over the platforms, and in the top slab over the concourse
-        for (int x = 3; x < len - 2; x += 5) {
-            for (CrossSection.Platform pl : section.platforms()) {
-                if (x >= x0 && x <= x1 && !inWell(x)) {
-                    m.set(x, floor1, (pl.z0() + pl.z1()) / 2 + (pl.island() ? 1 : 0), p.light());
-                }
-            }
-            for (int z = -half + 3; z <= half - 3; z += Math.max(3, half - 3)) {
-                m.set(x, topSlab, z, p.light());
-            }
-        }
-        for (Exit e : exits) {
-            passage(m, p, e, half, floor1);
-        }
-        // Everything else inside the box is air: the ground taken away
-        for (int x = 1; x < len; x++) {
-            for (int z = -half + 1; z < half; z++) {
-                for (int y = level; y < topSlab; y++) {
-                    if (!m.has(x, y, z)) {
-                        m.set(x, y, z, Flights.AIR);
-                    }
-                }
-            }
-        }
-        return m;
+        return complex().body();
+    }
+
+    @Override
+    public Model body() {
+        return buildWithoutFlights();
+    }
+
+    @Override
+    public List<Storey.Placed> flights(Ground ground) {
+        return complex().flights(ground);
     }
 
     private boolean inWell(int x) {

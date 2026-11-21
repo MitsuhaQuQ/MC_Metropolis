@@ -530,6 +530,18 @@ SPECS = [
     {'slug': 'twin_tube_station_curve', 'name': '深層駅・単線シールド二本・曲線（半径600）', 'kind': 'twin_tube_station',
      'platformLength': 100, 'platformWidth': 5, 'level': -30,
      'mtr': {'before': 30, 'radius': 600, 'turn': 6, 'transition': 20}},
+    {'slug': 'interchange_crossing', 'name': '乗換駅・十字交差（開削2線、B線はA線の箱の真下、改札階が交わって一つに）',
+     'kind': 'interchange', 'plan': 'crossing', 'sectionA': 'TPT', 'lengthA': 100, 'sectionB': 'TPT', 'lengthB': 100},
+    {'slug': 'interchange_deep_passage', 'name': '乗換駅・深層線と連絡通路（三連形シールドの改札階から通路20mで開削駅の改札階へ）',
+     'kind': 'interchange', 'plan': 'deep_passage', 'sectionA': 'PTTP', 'platformWidthA': 5, 'lengthA': 100,
+     'lengthB': 100, 'levelB': -32, 'gap': 20},
+    {'slug': 'complex_branch', 'name': '組み合わせの例（地下駅の改札階から通路で地下広場へ、JSONで層を配置）', 'kind': 'complex',
+     'pieces': [
+         {'type': 'underground_station', 'section': 'TPT', 'platformWidth': 9, 'platformLength': 80,
+          'exits': [[20, 1, 5, 1, 3]]},
+         {'type': 'passage', 'at': [48, 0, 9, 1], 'length': 32, 'width': 5, 'floor': -9},
+         {'type': 'concourse', 'at': [0, 0, 46, 0], 'x0': 38, 'x1': 58, 'half': 6, 'floor': -9,
+          'exits': [[50, 1, 5, 1, 3]]}]},
     {'slug': 'shield_tunnel', 'name': 'シールドトンネル（単線2本、勾配と曲線）', 'kind': 'shield_tunnel', 'length': 160,
      'level': -30, 'levelEnd': -34, 'mtr': {'before': 30, 'radius': 400, 'turn': 15, 'transition': 30}},
     {'slug': 'ground_single', 'name': '地上駅・単線1面', 'kind': 'ground_station', 'section': 'TP', 'platformWidth': 5,
@@ -710,7 +722,7 @@ def build(out):
         write_nbt(os.path.join(out, slug + '.nbt'), blocks, size)
         # The catenary's thin steel drawn as posts (the renderer takes names ending in _fence for those)
         thin = {}
-        underground = spec.get('kind') in ('underground_station', 'cut_cover_tunnel', 'deep_station', 'shield_tunnel', 'twin_tube_station')
+        underground = spec.get('kind') in ('underground_station', 'cut_cover_tunnel', 'deep_station', 'shield_tunnel', 'twin_tube_station', 'interchange', 'complex')
         for k, (name, props) in blocks.items():
             if name == 'air':  # the ground taken away: nothing to draw
                 continue
@@ -726,7 +738,7 @@ def build(out):
             thin[k] = (name, props)
         pv.render(thin, size, os.path.join(out, slug + '.png'), bc)
         e = {'slug': slug, 'name': spec.get('name', slug), 'kind': spec.get('kind'), 'size': list(size),
-             'origin': model['origin'], 'level': model['level'], 'tracks': model['tracks'], 'spans': model['spans'],
+             'origin': model['origin'], 'level': model.get('level'), 'tracks': model.get('tracks'), 'spans': model.get('spans'),
              'blocks': len(blocks), 'spec': spec}
         for k in ('platformStart', 'platformEnd', 'stairLength'):
             if k in model:
@@ -746,7 +758,7 @@ def build(out):
     for e in entries:
         with open(os.path.join(out, e['slug'] + '.png'), 'rb') as fh:
             data = base64.b64encode(fh.read()).decode()
-        spans = ', '.join('%d%s' % (b - a, kinds[k]) for a, b, k in e['spans'])
+        spans = ', '.join('%d%s' % (b - a, kinds[k]) for a, b, k in e['spans'] or [])
         params = ', '.join('%s %s' % (k, v) for k, v in e['spec'].items() if k not in ('slug', 'name', 'kind'))
         html.append("<figure><img src='data:image/png;base64,%s'><figcaption><b>%s</b> %s — %s, %d blocks; "
                     "spans: %s; parameters: %s</figcaption></figure>" % (

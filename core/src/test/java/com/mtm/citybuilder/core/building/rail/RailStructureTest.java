@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -696,6 +697,80 @@ class RailStructureTest {
                 assertWatertight(m, Ground.FLAT, 0, st.length(), "twin-tube station " + pw + " " + k[0]);
                 assertStates(m);
             }
+        }
+    }
+
+    /** Whether one can walk on the level from a to b (feet at a[1]: air there and over it, something to stand on). */
+    private static boolean walkable(Model m, int[] a, int[] b) {
+        int y = a[1];
+        java.util.ArrayDeque<int[]> todo = new java.util.ArrayDeque<>();
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        todo.add(new int[] {a[0], a[2]});
+        seen.add(((long) a[0] << 32) ^ (a[2] & 0xffffffffL));
+        while (!todo.isEmpty()) {
+            int[] q = todo.poll();
+            if (q[0] == b[0] && q[1] == b[2]) {
+                return true;
+            }
+            for (int[] d : new int[][] {{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                int x = q[0] + d[0], z = q[1] + d[1];
+                if (Flights.AIR.equals(m.get(x, y, z)) && Flights.AIR.equals(m.get(x, y + 1, z)) && solid(m, x, y - 1, z)
+                        && seen.add(((long) x << 32) ^ (z & 0xffffffffL))) {
+                    todo.add(new int[] {x, z});
+                }
+            }
+        }
+        return false;
+    }
+
+    private static void assertWatertight(Model m, Ground g, java.util.function.Predicate<int[]> open, String what) {
+        int[][] around = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+        List<String> leaks = new ArrayList<>();
+        m.forEach((x, y, z, s) -> {
+            if (!s.equals(Flights.AIR) || y >= g.at(x, z) || open.test(new int[] {x, y, z})) {
+                return;
+            }
+            for (int[] d : around) {
+                int nx = x + d[0], ny = y + d[1], nz = z + d[2];
+                if (ny < g.at(nx, nz) && !m.has(nx, ny, nz) && leaks.size() < 5) {
+                    leaks.add(x + "," + y + "," + z + " -> " + nx + "," + ny + "," + nz);
+                }
+            }
+        });
+        assertTrue(leaks.isEmpty(), what + ": air against the ground at " + leaks);
+    }
+
+    @Test
+    void placementsTurnAndComposeExactly() {
+        Placement a = new Placement(5, -3, 7, 1), b = new Placement(-2, 4, 9, 3);
+        for (int[] v : new int[][] {{0, 0, 0}, {3, 1, -4}, {-6, 2, 11}}) {
+            assertArrayEquals(v, a.inner(a.outer(v[0], v[1], v[2])[0], a.outer(v[0], v[1], v[2])[1],
+                    a.outer(v[0], v[1], v[2])[2]));
+            int[] inB = b.outer(v[0], v[1], v[2]);
+            assertArrayEquals(a.outer(inB[0], inB[1], inB[2]), a.after(b).outer(v[0], v[1], v[2]));
+        }
+        assertArrayEquals(new int[] {5, -3, 8}, a.outer(1, 0, 0), "one turn: +x to +z");
+        assertEquals("minecraft:stone_stairs[facing=south,half=bottom]",
+                Curve.rotate("minecraft:stone_stairs[facing=east,half=bottom]", 1));
+    }
+
+    @Test
+    void interchangesJoinTheirConcoursesAndStayWatertight() {
+        List<Interchanges.Interchange> all = List.of(
+                Interchanges.crossing(new CrossSection("TPT", 9), 100, new CrossSection("TPT", 9), 100, 3, 4, 4, P),
+                Interchanges.crossing(new CrossSection("PTTP", 5), 120, new CrossSection("TPT", 11), 90, 2, 4, 5, P),
+                Interchanges.deepByPassage(new CrossSection("TPT", 9), 100, 100, -32, 20, 5, 3, 4, 4, P),
+                Interchanges.deepByPassage(new CrossSection("PTTP", 5), 80, 120, -36, 8, 3, 3, 4, 4, P));
+        int n = 0;
+        for (Interchanges.Interchange ic : all) {
+            String what = "interchange " + n++;
+            Model m = ic.complex().build(Ground.FLAT);
+            assertTrue(walkable(m, ic.concourseA(), ic.concourseB()), what + ": from A's concourse to B's");
+            surface(m, Ground.FLAT);
+            int[] counted = steps(m);
+            assertEquals(counted[0], counted[1], what + ": climbable steps");
+            assertWatertight(m, Ground.FLAT, ic.openEnd(), what);
+            assertStates(m);
         }
     }
 

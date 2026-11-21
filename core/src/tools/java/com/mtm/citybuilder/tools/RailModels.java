@@ -10,6 +10,16 @@ import com.mtm.citybuilder.core.building.rail.CrossSection;
 import com.mtm.citybuilder.core.building.rail.Curve;
 import com.mtm.citybuilder.core.building.rail.CurveMarker;
 import com.mtm.citybuilder.core.building.rail.CutCoverTunnel;
+import com.mtm.citybuilder.core.building.rail.BoxPlatformStorey;
+import com.mtm.citybuilder.core.building.rail.ConcourseStorey;
+import com.mtm.citybuilder.core.building.rail.Flights;
+import com.mtm.citybuilder.core.building.rail.Interchanges;
+import com.mtm.citybuilder.core.building.rail.PassageStorey;
+import com.mtm.citybuilder.core.building.rail.Placement;
+import com.mtm.citybuilder.core.building.rail.Storey;
+import com.mtm.citybuilder.core.building.rail.ThreeCircleStorey;
+import com.mtm.citybuilder.core.building.rail.TwinTubeStorey;
+import com.mtm.citybuilder.core.building.rail.UndergroundComplex;
 import com.mtm.citybuilder.core.building.rail.DeepStation;
 import com.mtm.citybuilder.core.building.rail.ShieldTunnel;
 import com.mtm.citybuilder.core.building.rail.TwinTubeStation;
@@ -248,6 +258,23 @@ public final class RailModels {
                 }
                 return s.build();
             }
+            case "complex" -> {
+                return complex(o, p).build(ground);
+            }
+            case "interchange" -> {
+                Interchanges.Interchange ic = switch (str(o, "plan", "crossing")) {
+                    case "crossing" -> Interchanges.crossing(
+                            new CrossSection(str(o, "sectionA", "TPT"), i(o, "platformWidthA", 9)), i(o, "lengthA", 100),
+                            new CrossSection(str(o, "sectionB", "TPT"), i(o, "platformWidthB", 9)), i(o, "lengthB", 100),
+                            i(o, "cover", 3), i(o, "concourseHeight", 4), i(o, "headroom", 4), p);
+                    case "deep_passage" -> Interchanges.deepByPassage(
+                            new CrossSection(str(o, "sectionA", "TPT"), i(o, "platformWidthA", 9)), i(o, "lengthA", 100),
+                            i(o, "lengthB", 100), i(o, "levelB", -32), i(o, "gap", 20), i(o, "passageWidth", 5),
+                            i(o, "cover", 3), i(o, "concourseHeight", 4), i(o, "headroom", 4), p);
+                    default -> throw new IllegalArgumentException("interchange plan " + str(o, "plan", ""));
+                };
+                return ic.complex().build(ground);
+            }
             case "shield_tunnel" -> {
                 int off = i(o, "trackOffset", 6);
                 int[] tz = {-off, off};
@@ -340,6 +367,102 @@ public final class RailModels {
         a.add(n.transition());
         a.add(n.grade());
         return a;
+    }
+
+    /**
+     * A station put together from storeys: {@code pieces}, each {"type": ..., "at": [x, y, z, quarter turns], its
+     * parameters}, and {@code links}, flights through the ground, each {"at": [...], "x", "dir", "z0", "z1",
+     * "bottom", "top", "escalator"} (standing levels; in the frame "at" gives).
+     */
+    static UndergroundComplex complex(JsonObject o, RailPalette p) {
+        List<UndergroundComplex.Piece> pieces = new ArrayList<>();
+        for (JsonElement e : o.getAsJsonArray("pieces")) {
+            JsonObject q = e.getAsJsonObject();
+            pieces.add(new UndergroundComplex.Piece(storey(q, p), at(q)));
+        }
+        List<Storey.Placed> links = new ArrayList<>();
+        if (o.has("links")) {
+            for (JsonElement e : o.getAsJsonArray("links")) {
+                JsonObject q = e.getAsJsonObject();
+                int bottom = i(q, "bottom"), top = i(q, "top");
+                boolean esc = bool(q, "escalator");
+                links.add(new Storey.Placed(Flights.Flight.through(i(q, "x"), i(q, "dir", 1), i(q, "z0"), i(q, "z1"),
+                        bottom, top, esc ? 0 : Flights.landingEvery(top - bottom), esc, top), at(q)));
+            }
+        }
+        return new UndergroundComplex(pieces, links, p);
+    }
+
+    private static Placement at(JsonObject q) {
+        if (!q.has("at")) {
+            return Placement.ORIGIN;
+        }
+        JsonArray a = q.getAsJsonArray("at");
+        return new Placement(a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt(),
+                a.size() > 3 ? a.get(3).getAsInt() : 0);
+    }
+
+    private static java.util.function.IntPredicate keepClear(JsonObject q) {
+        List<int[]> c = clear(q);
+        return x -> c.stream().anyMatch(r -> x >= r[0] && x <= r[1]);
+    }
+
+    private static Storey storey(JsonObject q, RailPalette p) {
+        String type = q.get("type").getAsString();
+        return switch (type) {
+            case "concourse" -> {
+                List<int[]> cols = new ArrayList<>();
+                if (q.has("columns")) {
+                    for (JsonElement e : q.getAsJsonArray("columns")) {
+                        cols.add(new int[] {e.getAsJsonArray().get(0).getAsInt(), e.getAsJsonArray().get(1).getAsInt()});
+                    }
+                }
+                yield new ConcourseStorey(i(q, "x0", 0), i(q, "x1"), i(q, "half"), i(q, "floor"),
+                        i(q, "height", 4), cols, exits(q), p);
+            }
+            case "box_platforms" -> new BoxPlatformStorey(new CrossSection(str(q, "section", "TPT"),
+                    i(q, "platformWidth", 9)), i(q, "platformLength"), i(q, "approach", 8), i(q, "level"),
+                    i(q, "headroom", 4), i(q, "columnSpacing", 6), keepClear(q), p);
+            case "three_circle" -> new ThreeCircleStorey(i(q, "platformLength"), i(q, "platformWidth", 9),
+                    i(q, "approach", 14), i(q, "length", 0), i(q, "level"),
+                    q.has("trackRadius") ? q.get("trackRadius").getAsDouble() : 3.5, i(q, "columnSpacing", 5),
+                    keepClear(q), p);
+            case "twin_tube" -> new TwinTubeStorey(i(q, "platformLength"), i(q, "platformWidth", 4),
+                    i(q, "approach", 14), i(q, "length", 0), i(q, "level"),
+                    q.has("stationRadius") ? q.get("stationRadius").getAsDouble() : 0,
+                    q.has("runningRadius") ? q.get("runningRadius").getAsDouble() : 3.5, i(q, "pillar", 12),
+                    i(q, "crossSpacing", 15), i(q, "hall", -1), p);
+            case "passage" -> new PassageStorey(i(q, "length"), i(q, "width", 3), i(q, "floor"), i(q, "height", 3), p);
+            case "underground_station" -> new UndergroundStation(new CrossSection(str(q, "section", "TPT"),
+                    i(q, "platformWidth", 9)), i(q, "platformLength"), i(q, "approach", 8), i(q, "cover", 3),
+                    i(q, "concourseHeight", 4), i(q, "headroom", 4), i(q, "columnSpacing", 6), exits(q), p,
+                    Ground.FLAT);
+            case "deep_station" -> new DeepStation(i(q, "platformLength"), i(q, "platformWidth", 9),
+                    i(q, "approach", 14), i(q, "level", -30),
+                    q.has("trackRadius") ? q.get("trackRadius").getAsDouble() : 3.5, i(q, "columnSpacing", 5),
+                    i(q, "cover", 3), i(q, "concourseHeight", 4), i(q, "concourseLength", 0), exits(q), p,
+                    Ground.FLAT);
+            case "twin_tube_station" -> new TwinTubeStation(i(q, "platformLength"), i(q, "platformWidth", 4),
+                    i(q, "approach", 14), i(q, "level", -30),
+                    q.has("stationRadius") ? q.get("stationRadius").getAsDouble() : 0,
+                    q.has("runningRadius") ? q.get("runningRadius").getAsDouble() : 3.5, i(q, "pillar", 12),
+                    i(q, "crossSpacing", 15), i(q, "cover", 3), i(q, "concourseHeight", 4),
+                    i(q, "concourseLength", 0), exits(q), p, Ground.FLAT);
+            case "complex" -> complex(q, p);
+            default -> throw new IllegalArgumentException("storey type " + type);
+        };
+    }
+
+    private static List<UndergroundStation.Exit> exits(JsonObject o) {
+        List<UndergroundStation.Exit> exits = new ArrayList<>();
+        if (o.has("exits")) {
+            for (JsonElement e : o.getAsJsonArray("exits")) {
+                JsonArray a = e.getAsJsonArray();
+                exits.add(new UndergroundStation.Exit(a.get(0).getAsInt(), a.get(1).getAsInt(),
+                        a.get(2).getAsInt(), a.get(3).getAsInt(), a.size() > 4 ? a.get(4).getAsInt() : 3));
+            }
+        }
+        return exits;
     }
 
     /** {@code ground}: [[x, y], ...] along x, straight between; flat without it. */
