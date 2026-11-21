@@ -74,4 +74,22 @@ test('the buildings seen from the test client', async ({}, testInfo) => {
       }
     }
   }
+  // A stop line before a junction of arterials: on the incoming driver's left, seen from above and from the lane
+  const stop = await server.stopLine(TOWN.x, TOWN.z);
+  console.log('stop', JSON.stringify(stop));
+  if (stop.found) {
+    const h = (stop.heading * Math.PI) / 180;
+    const at = (back) => [Math.round(stop.x - Math.cos(h) * back), Math.round(stop.z - Math.sin(h) * back)];
+    const [sx, sz] = at(0);
+    await server.generate(sx - 48, sz - 48, sx + 47, sz + 47);
+    const again = await server.stopLine(TOWN.x, TOWN.z);
+    const ground = Math.round(again.ground ?? 70);
+    const [ax, az] = at(6);
+    await view('road-stop-above', ax, ground + 22, az, yawOf(stop.heading), 65, testInfo);
+    // From the left lane 14 back, at a driver's eye height, looking on into the junction
+    const [lx, lz] = at(14);
+    const left = h - Math.PI / 2;
+    await view('road-stop-lane', Math.round(lx + Math.cos(left) * 2), ground + 2, Math.round(lz + Math.sin(left) * 2),
+      yawOf(stop.heading), 12, testInfo);
+  }
 });

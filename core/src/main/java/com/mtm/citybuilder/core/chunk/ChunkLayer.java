@@ -92,10 +92,25 @@ public final class ChunkLayer {
      * @param pathUnder whether a footpath runs on the ground under the column's bridge deck (a riverside promenade
      *                  passing under a high bridge)
      * @param plaza   a station square's paving here ({@link Surface#PLAZA}), null elsewhere
+     * @param stop    a stop line crossing the column ({@link #stopMark}), drawn over the street's own paving; null
+     *                where none does
      */
     public record Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
-                         double width, boolean junction, boolean carriageway, int canal, boolean pathUnder, Mark plaza) {
+                         double width, boolean junction, boolean carriageway, int canal, boolean pathUnder, Mark plaza,
+                         Mark stop) {
         public static final Column EMPTY = new Column(Surface.NONE, false, Double.NaN, 0.0, 0.0, 0.0, 0.0, false, false, 0);
+
+        /** A column without a stop line. */
+        public Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
+                      double width, boolean junction, boolean carriageway, int canal, boolean pathUnder, Mark plaza) {
+            this(surface, bridge, deck, across, heading, along, width, junction, carriageway, canal, pathUnder, plaza, null);
+        }
+
+        /** This column with a stop line crossing it. */
+        public Column withStop(Mark mark) {
+            return new Column(surface, bridge, deck, across, heading, along, width, junction, carriageway, canal,
+                    pathUnder, plaza, mark);
+        }
 
         /** A column of streets, perhaps over a canal. */
         public Column(Surface surface, boolean bridge, double deck, double across, double heading, double along,
@@ -204,6 +219,9 @@ public final class ChunkLayer {
     public static Mark mark(Column column) {
         if (column.plaza != null) {
             return column.plaza;
+        }
+        if (column.stop != null) {
+            return column.stop;
         }
         switch (column.surface) {
             case NONE:
@@ -504,7 +522,8 @@ public final class ChunkLayer {
      * continue it: of its class, sharing an end, within 30 degrees of its line.
      */
     private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links,
-                         Map<Long, List<double[]>> canals, Map<Long, List<StationPlaza>> plazas) {
+                         Map<Long, List<double[]>> canals, Map<Long, List<StationPlaza>> plazas,
+                         Map<Long, List<Stop>> stops) {
         /** Whether two pieces are of one street: the same, continuing each other, or with one piece between. */
         boolean sameStreet(int p, int q) {
             if (p == q) {
@@ -641,6 +660,30 @@ public final class ChunkLayer {
                 // Unmarked streets meeting: nothing to break off, but no parapet in a junction
                 columns[c] = new Column(column.surface, column.bridge, column.deck, column.across, column.heading,
                         column.along, column.width, true, false);
+            }
+        }
+        // Stop lines before the junctions, over the approaching streets' own paving
+        List<Stop> stops = new ArrayList<>();
+        for (Settlement town : towns(minX, minZ)) {
+            stops.addAll(index(town).stops.getOrDefault(key(chunkX, chunkZ), List.of()));
+        }
+        for (Stop stop : stops) {
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    int c = x * 16 + z;
+                    Column column = columns[c];
+                    if (column.surface == Surface.NONE || column.bridge != stop.bridge || column.junction) {
+                        continue;
+                    }
+                    Mark mark = stopMark(stop, minX + x + 0.5, minZ + z + 0.5);
+                    if (mark == null) {
+                        continue;
+                    }
+                    Paving under = mark(column).paving();
+                    if (under != Paving.SIDEWALK && under != Paving.CURB && under != Paving.MEDIAN) {
+                        columns[c] = column.withStop(mark);
+                    }
+                }
             }
         }
         // A footpath under a bridge's deck: laid on the ground beneath it
@@ -992,31 +1035,7 @@ public final class ChunkLayer {
                 deck[p] = Math.floor(level);
             }
         }
-        // Pieces continuing each other: of one class, an end shared, lines within 30 degrees
-        Map<Long, List<Integer>> allEnds = new HashMap<>();
-        for (int p = 0; p < segments.size(); p++) {
-            StreetSegment g = segments.get(p);
-            allEnds.computeIfAbsent(point(g.x1(), g.z1()), k -> new ArrayList<>()).add(p);
-            allEnds.computeIfAbsent(point(g.x2(), g.z2()), k -> new ArrayList<>()).add(p);
-        }
-        double parallel = Math.cos(Math.toRadians(30));
-        int[][] links = new int[segments.size()][];
-        for (int p = 0; p < segments.size(); p++) {
-            StreetSegment g = segments.get(p);
-            double gl = Math.max(1e-9, g.length());
-            List<Integer> linked = new ArrayList<>();
-            for (long end : new long[]{point(g.x1(), g.z1()), point(g.x2(), g.z2())}) {
-                for (int q : allEnds.get(end)) {
-                    StreetSegment o = segments.get(q);
-                    double ol = Math.max(1e-9, o.length());
-                    double cos = ((g.x2() - g.x1()) * (o.x2() - o.x1()) + (g.z2() - g.z1()) * (o.z2() - o.z1())) / (gl * ol);
-                    if (q != p && o.streetClass() == g.streetClass() && Math.abs(cos) >= parallel) {
-                        linked.add(q);
-                    }
-                }
-            }
-            links[p] = linked.stream().mapToInt(Integer::intValue).toArray();
-        }
+        int[][] links = links(segments);
         // The canals' pieces by chunk: {x1, z1, x2, z2, width}
         Map<Long, List<double[]>> canals = new HashMap<>();
         for (com.mtm.citybuilder.core.street.Canal canal : plan.canals()) {
@@ -1042,7 +1061,160 @@ public final class ChunkLayer {
                 }
             }
         }
-        return new Index(byChunk, segments, deck, links, canals, plazas);
+        // The stop lines before the junctions, by chunk
+        Map<Long, List<Stop>> stops = new HashMap<>();
+        for (Stop stop : stops(segments, links)) {
+            double reach = Math.max(Math.abs(stop.from), Math.abs(stop.to)) + 2.0;
+            for (int cx = Math.floorDiv((int) Math.floor(stop.x - reach), 16); cx <= Math.floorDiv((int) Math.floor(stop.x + reach), 16); cx++) {
+                for (int cz = Math.floorDiv((int) Math.floor(stop.z - reach), 16); cz <= Math.floorDiv((int) Math.floor(stop.z + reach), 16); cz++) {
+                    stops.computeIfAbsent(key(cx, cz), q -> new ArrayList<>()).add(stop);
+                }
+            }
+        }
+        return new Index(byChunk, segments, deck, links, canals, plazas, stops);
+    }
+
+    /** Pieces continuing each other: of one class, an end shared, lines within 30 degrees. */
+    static int[][] links(List<StreetSegment> segments) {
+        Map<Long, List<Integer>> allEnds = new HashMap<>();
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            allEnds.computeIfAbsent(point(g.x1(), g.z1()), k -> new ArrayList<>()).add(p);
+            allEnds.computeIfAbsent(point(g.x2(), g.z2()), k -> new ArrayList<>()).add(p);
+        }
+        double parallel = Math.cos(Math.toRadians(30));
+        int[][] links = new int[segments.size()][];
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            double gl = Math.max(1e-9, g.length());
+            List<Integer> linked = new ArrayList<>();
+            for (long end : new long[]{point(g.x1(), g.z1()), point(g.x2(), g.z2())}) {
+                for (int q : allEnds.get(end)) {
+                    StreetSegment o = segments.get(q);
+                    double ol = Math.max(1e-9, o.length());
+                    double cos = ((g.x2() - g.x1()) * (o.x2() - o.x1()) + (g.z2() - g.z1()) * (o.z2() - o.z1())) / (gl * ol);
+                    if (q != p && o.streetClass() == g.streetClass() && Math.abs(cos) >= parallel) {
+                        linked.add(q);
+                    }
+                }
+            }
+            links[p] = linked.stream().mapToInt(Integer::intValue).toArray();
+        }
+        return links;
+    }
+
+    /**
+     * A stop line across the approach to a junction: through ({@code x}, {@code z}) on the street's centre line, square
+     * to the direction of travel ({@code tx}, {@code tz}), from {@code from} to {@code to} measured along the driver's
+     * left, ({@code tz}, {@code -tx}) as +x is east and +z south; on a bridge's deck or on the ground; {@code low} on a
+     * carriageway laid low between pavements.
+     */
+    record Stop(double x, double z, double tx, double tz, double from, double to, boolean bridge, boolean low) {
+    }
+
+    /** How far back from the edge of the street crossed a stop line stands. */
+    static final double STOP_GAP = 2.0;
+
+    /**
+     * The stop lines before the junctions, as in Japan, where traffic keeps left. Where marked streets (arterials,
+     * collectors, boulevards) meet, the junction has signals and each marked street has a stop line across the lanes
+     * coming in to it: from the centre line (a boulevard's median) to the carriageway's edge line, on the incoming
+     * driver's left. Where a narrow street (a street or an old road, with no centre line) comes out onto a marked
+     * street, which has the right of way, the narrow street has a stop line across its whole width (Japan's
+     * ichiji teishi); the marked street none. Narrow streets meeting each other, lanes and footpaths have none. The
+     * line stands {@link #STOP_GAP} back from the edge of the widest street crossed, further at a skew junction so its
+     * far end is clear too.
+     */
+    static List<Stop> stops(List<StreetSegment> segments, int[][] links) {
+        Map<Long, List<Integer>> ends = new HashMap<>();
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            ends.computeIfAbsent(point(g.x1(), g.z1()), k -> new ArrayList<>()).add(p);
+            ends.computeIfAbsent(point(g.x2(), g.z2()), k -> new ArrayList<>()).add(p);
+        }
+        List<Stop> stops = new ArrayList<>();
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            Surface surface = surface(g);
+            boolean marked = marked(surface);
+            double length = g.length();
+            if (!marked && surface != Surface.STREET && surface != Surface.OLD_ROAD || length < 1e-6) {
+                continue;
+            }
+            double half = 0.5 * g.width();
+            double from = marked ? (surface == Surface.BOULEVARD ? 0.5 * MEDIAN : 0.0) : -half;
+            double to = marked ? half - walk(g.width()) - 0.5 : half;
+            double reach = Math.max(Math.abs(from), Math.abs(to));
+            for (int end = 0; end < 2; end++) {
+                double nx = end == 0 ? g.x1() : g.x2();
+                double nz = end == 0 ? g.z1() : g.z2();
+                // The direction of travel in towards the junction at this end
+                double tx = (end == 0 ? g.x1() - g.x2() : g.x2() - g.x1()) / length;
+                double tz = (end == 0 ? g.z1() - g.z2() : g.z2() - g.z1()) / length;
+                double back = -1.0;
+                for (int q : ends.get(point(nx, nz))) {
+                    StreetSegment o = segments.get(q);
+                    if (q == p || contains(links[p], q) || !marked(surface(o))) {
+                        continue;
+                    }
+                    double ol = Math.max(1e-9, o.length());
+                    double ox = (o.x2() - o.x1()) / ol;
+                    double oz = (o.z2() - o.z1()) / ol;
+                    double sin = Math.max(0.5, Math.abs(tx * oz - tz * ox));
+                    double cos = Math.abs(tx * ox + tz * oz);
+                    back = Math.max(back, (0.5 * o.width() + reach * cos) / sin + STOP_GAP);
+                }
+                if (back < 0 || back > length) {
+                    continue;
+                }
+                stops.add(new Stop(nx - tx * back, nz - tz * back, tx, tz, from, to,
+                        g.structure() == StreetStructure.BRIDGE, marked && walk(g.width()) > 0));
+            }
+        }
+        return stops;
+    }
+
+    /**
+     * The stop lines before a plan's junctions (see {@link #stops}), each {x, z, tx, tz, marked}: where it crosses the
+     * centre line, the direction of travel, 1 on a marked street's approach to a signalled junction and 0 on a narrow
+     * street's; for tests and tools.
+     */
+    public static List<double[]> stopLines(List<StreetSegment> segments) {
+        List<double[]> lines = new ArrayList<>();
+        for (Stop stop : stops(segments, links(segments))) {
+            lines.add(new double[]{stop.x, stop.z, stop.tx, stop.tz, stop.from >= 0 ? 1 : 0});
+        }
+        return lines;
+    }
+
+    private static boolean contains(int[] values, int value) {
+        for (int v : values) {
+            if (v == value) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * A stop line where it crosses the block whose middle is at ({@code cx}, {@code cz}): a white line square to the
+     * traffic, drawn to the pixel as the lines along the streets are; null where it does not cross the block.
+     */
+    static Mark stopMark(Stop stop, double cx, double cz) {
+        double dx = cx - stop.x;
+        double dz = cz - stop.z;
+        double side = dx * stop.tz - dz * stop.tx;
+        if (side < stop.from || side > stop.to) {
+            return null;
+        }
+        // The line runs along the driver's left, whose normal is the direction of travel
+        double heading = Math.atan2(-stop.tx, stop.tz);
+        double across = dx * stop.tx + dz * stop.tz;
+        if (Math.abs(across) > 1.0) {
+            return null;
+        }
+        Mark mark = draw(List.of(new Line(0.0, Paving.WHITE_LINE, false)), across, heading, 0.0, stop.low);
+        return mark.paving() == Paving.WHITE_LINE ? mark : null;
     }
 
     private static Surface surface(StreetSegment g) {

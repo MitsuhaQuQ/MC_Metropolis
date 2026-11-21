@@ -79,6 +79,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/airport", this::airport);
             route(http, "/road", this::road);
             route(http, "/station", this::station);
+            route(http, "/stop-line", this::stopLine);
             route(http, "/stop", this::stop);
             http.start();
             // The JDK's HTTP dispatcher thread is not a daemon: stopped with the server, or the process never exits
@@ -355,6 +356,41 @@ public final class TestKit implements DedicatedServerModInitializer {
         // The ground there (the top of the surface, plants aside), once its chunk is loaded
         int bx = (int) Math.floor(mx);
         int bz = (int) Math.floor(mz);
+        if (overworld().hasChunk(bx >> 4, bz >> 4)) {
+            found.put("ground", overworld().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz));
+        }
+        return found;
+    }
+
+    /**
+     * The stop line nearest (x, z) before a junction of marked streets in the plan of the town owning that point, as
+     * this world planned it (ChunkLayer.stopLines): {found, x, z where it crosses the centre line, heading of travel in
+     * degrees, ground once loaded}.
+     */
+    private Object stopLine(Map<String, String> query, String body) {
+        double x = Double.parseDouble(query.get("x"));
+        double z = Double.parseDouble(query.get("z"));
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if (logic == null || logic.urban(x, z).owner() == null) {
+            return Map.of("found", false);
+        }
+        double[] best = null;
+        for (double[] line : com.mtm.citybuilder.core.chunk.ChunkLayer.stopLines(
+                logic.streetPlan(logic.urban(x, z).owner()).segments())) {
+            if (line[4] > 0 && (best == null || Math.hypot(line[0] - x, line[1] - z) < Math.hypot(best[0] - x, best[1] - z))) {
+                best = line;
+            }
+        }
+        if (best == null) {
+            return Map.of("found", false);
+        }
+        Map<String, Object> found = new java.util.LinkedHashMap<>();
+        found.put("found", true);
+        found.put("x", best[0]);
+        found.put("z", best[1]);
+        found.put("heading", Math.toDegrees(Math.atan2(best[3], best[2])));
+        int bx = (int) Math.floor(best[0]);
+        int bz = (int) Math.floor(best[1]);
         if (overworld().hasChunk(bx >> 4, bz >> 4)) {
             found.put("ground", overworld().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz));
         }

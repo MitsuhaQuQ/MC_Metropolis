@@ -193,6 +193,49 @@ class ChunkLayerTest {
     }
 
     @Test
+    void stopLinesStandOnTheIncomingDriversLeft() {
+        // Two arterials 16 wide crossing at the origin, and a narrow street coming out onto the east-west one from
+        // the north at x = 60
+        com.mtm.citybuilder.core.street.Era era = com.mtm.citybuilder.core.street.Era.MODERN;
+        List<StreetSegment> segments = List.of(
+                new StreetSegment(-100, 0, 0, 0, StreetClass.ARTERIAL, era, 16),
+                new StreetSegment(0, 0, 60, 0, StreetClass.ARTERIAL, era, 16),
+                new StreetSegment(60, 0, 100, 0, StreetClass.ARTERIAL, era, 16),
+                new StreetSegment(0, -100, 0, 0, StreetClass.ARTERIAL, era, 16),
+                new StreetSegment(0, 0, 0, 100, StreetClass.ARTERIAL, era, 16),
+                new StreetSegment(60, -80, 60, 0, StreetClass.STREET, era, 6),
+                new StreetSegment(70, -80, 70, -40, StreetClass.STREET, era, 6));
+        List<ChunkLayer.Stop> stops = ChunkLayer.stops(segments, ChunkLayer.links(segments));
+        // Four arterial approaches at the crossing, the narrow street's one; none on the arterial at the side
+        // street, none where narrow streets end
+        assertEquals(5, stops.size(), () -> "stops " + stops);
+        // Coming from the west (travelling +x) the driver's left is north (-z): a line across x = -(8 + 2) there, drawn in the block on its east (a line on a block edge is drawn in one of the two)
+        ChunkLayer.Stop west = stops.stream().filter(s -> s.tx() > 0.9 && s.x() < 0).findFirst().orElseThrow();
+        assertEquals(-10.0, west.x(), 1e-6);
+        int painted = 0;
+        for (double z = -7.5; z <= 7.5; z += 1.0) {
+            ChunkLayer.Mark mark = ChunkLayer.stopMark(west, -9.5, z);
+            if (z < 0 && z > -5.0) {
+                assertTrue(mark != null && mark.paving() == ChunkLayer.Paving.WHITE_LINE, "no stop line at z " + z);
+                // Square to the street: the line runs along z
+                assertEquals(ChunkLayer.ANGLES / 2, mark.angle());
+                painted++;
+            } else if (z > 0) {
+                assertTrue(mark == null, "a stop line on the outgoing lanes at z " + z);
+            }
+        }
+        assertTrue(painted >= 4);
+        // The narrow street's line spans its whole width, 2 back from the arterial's 8-wide half
+        ChunkLayer.Stop side = stops.stream().filter(s -> s.tz() > 0.9 && s.x() > 30).findFirst().orElseThrow();
+        assertEquals(-10.0, side.z(), 1e-6);
+        assertTrue(ChunkLayer.stopMark(side, 58.5, -10.5) != null && ChunkLayer.stopMark(side, 61.5, -10.5) != null);
+        // Drawn over the street's paving
+        ChunkLayer.Column column = new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL, false, Double.NaN, 2.5, 0.0,
+                -9.5, 16.0).withStop(ChunkLayer.stopMark(west, -9.5, -2.5));
+        assertEquals(ChunkLayer.Paving.WHITE_LINE, ChunkLayer.paving(column));
+    }
+
+    @Test
     void noLineRunsOnAcrossAJunction() {
         // On the centre line, where a yellow line would be drawn, but where two arterials meet
         assertEquals(ChunkLayer.Paving.YELLOW_LINE, paving(ChunkLayer.Surface.ARTERIAL, 0.0, 0.0, 16.0));
