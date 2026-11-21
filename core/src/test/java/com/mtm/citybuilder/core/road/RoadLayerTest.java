@@ -7,6 +7,7 @@ import com.mtm.citybuilder.core.settlement.Settlement;
 import com.mtm.citybuilder.core.settlement.SettlementTier;
 import com.mtm.citybuilder.core.terrain.EscarpmentTerrain;
 import com.mtm.citybuilder.core.terrain.HillTerrain;
+import com.mtm.citybuilder.core.terrain.RiverTerrain;
 import com.mtm.citybuilder.core.terrain.SyntheticTerrain;
 import org.junit.jupiter.api.Test;
 
@@ -98,6 +99,32 @@ class RoadLayerTest {
         double deepest = worst;
         assertTrue(deepest < SETTINGS.roads.switchbackTrigger + 3, () -> "off the ground by " + deepest);
         assertTrue(route.width() == SETTINGS.roads.localWidth, () -> "width " + route.width());
+    }
+
+    @Test
+    void aBridgeClearsTheRiverAndItsApproachesKeepToTheGrade() {
+        CityLogic logic = new CityLogic(5L, SETTINGS, new RiverTerrain());
+        Settlement west = new Settlement(1, SettlementTier.TOWN, 0, 0, -3000, 0, Style.ASIA, 0.6);
+        Settlement east = new Settlement(2, SettlementTier.TOWN, 0, 0, 3000, 0, Style.ASIA, 0.6);
+        RoadRoute route = logic.route(new RoadEdge(west, east, RoadClass.LOCAL));
+        assertTrue(route.exists(), "a route");
+        int over = 0;
+        for (int i = 0; i < route.samples(); i++) {
+            if (Math.abs(route.x(i)) < 15) {
+                over++;
+                int at = i;
+                assertTrue(route.kind(i) == RoadKind.BRIDGE, () -> "not a bridge over the river at " + at);
+                assertTrue(route.road(i) >= 70.0 + SETTINGS.roads.bridgeClearance - 1e-6,
+                        () -> "deck " + route.road(at) + " over the water at 70");
+            }
+            if (i > 0) {
+                double horizontal = Math.hypot(route.x(i) - route.x(i - 1), route.z(i) - route.z(i - 1));
+                double rise = Math.abs(route.road(i) - route.road(i - 1));
+                int at = i;
+                assertTrue(rise <= SETTINGS.roads.localGrade * horizontal + 1e-3, () -> "approach grade " + rise / horizontal + " at " + at);
+            }
+        }
+        assertTrue(over > 0, "crosses the river");
     }
 
     @Test

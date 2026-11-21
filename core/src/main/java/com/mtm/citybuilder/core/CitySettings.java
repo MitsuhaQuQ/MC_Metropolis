@@ -448,6 +448,8 @@ public final class CitySettings {
         public double switchbackMinClimb = 15.0;
         public int switchbackRounds = 8;
         /** Shorter tunnels are cuttings, shorter dry bridges embankments. */
+        /** How high a bridge's deck stands over the water it crosses: room under it for boats and floods. */
+        public double bridgeClearance = 6.0;
         public double tunnelMinLength = 64.0;
         public double bridgeMinLength = 24.0;
         /** Vertical curves: passes of a five-sample moving average over the heights. */

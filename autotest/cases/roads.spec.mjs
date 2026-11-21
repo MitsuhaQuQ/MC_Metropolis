@@ -40,6 +40,8 @@ test('a bridge has its deck and parapets', async () => {
   const p = await server.road(TOWN.x, TOWN.z, 'BRIDGE');
   console.log('bridge', JSON.stringify(p));
   test.skip(!p.found, 'no bridge within 8 km');
+  // Over water the deck clears the surface, not laid on it
+  expect(p.road - p.ground).toBeGreaterThanOrEqual(5);
   const blocks = await around(p);
   const top = blocks.top;
   console.log('blocks', JSON.stringify(top));

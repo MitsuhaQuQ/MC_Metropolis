@@ -577,6 +577,9 @@ public final class RoadLayer {
         if (lakes) {
             height = heights(xs, zs, ground, grade);
         }
+        // Over water the deck clears the surface, ramped up to within grade either side
+        double[] floor = clearance(xs, zs, ground, grade, water);
+        raise(height, floor);
         // Vertical curves: a moving average rounds the changes of grade and keeps within it on even spacing
         for (int pass = 0; pass < config.verticalSmoothing; pass++) {
             double[] smooth = height.clone();
@@ -585,6 +588,7 @@ public final class RoadLayer {
             }
             height = smooth;
         }
+        raise(height, floor);
 
         byte[] kind = new byte[n];
         for (int i = 0; i < n; i++) {
@@ -830,6 +834,37 @@ public final class RoadLayer {
             height[i] = 0.5 * (under[i] + over[i]);
         }
         return height;
+    }
+
+    /**
+     * The least height the road may have at each sample: over water, the surface (a lake's level, a river's ground, or
+     * the sea's level where higher) and {@code bridgeClearance}; elsewhere that falling away at the grade, the bridge's
+     * approaches; negative infinity beyond them. Within grade itself, so raising a profile within grade to it keeps it so.
+     */
+    private double[] clearance(double[] xs, double[] zs, double[] ground, double[] grade, boolean[] water) {
+        int n = ground.length;
+        double[] floor = new double[n];
+        java.util.Arrays.fill(floor, Double.NEGATIVE_INFINITY);
+        for (int i = 0; i < n; i++) {
+            if (water[i]) {
+                floor[i] = Math.max(ground[i], terrain.seaLevel()) + config.bridgeClearance;
+            }
+        }
+        for (int i = 1; i < n; i++) {
+            double step = Math.max(grade[i], grade[i - 1]) * Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]);
+            floor[i] = Math.max(floor[i], floor[i - 1] - step);
+        }
+        for (int i = n - 2; i >= 0; i--) {
+            double step = Math.max(grade[i], grade[i + 1]) * Math.hypot(xs[i + 1] - xs[i], zs[i + 1] - zs[i]);
+            floor[i] = Math.max(floor[i], floor[i + 1] - step);
+        }
+        return floor;
+    }
+
+    private static void raise(double[] height, double[] floor) {
+        for (int i = 0; i < height.length; i++) {
+            height[i] = Math.max(height[i], floor[i]);
+        }
     }
 
     /** The point of a polyline's segment nearest to a position, and its distance along the polyline: {x, z, along}. */
