@@ -2436,6 +2436,51 @@
    "parapet": "minecraft:light_blue_terracotta",
    "foundation": "minecraft:polished_andesite"
   },
+  "ferry.1": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:light_blue_terracotta",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:light_blue_stained_glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "ferry.2": {
+   "wall": "minecraft:smooth_quartz",
+   "accent": "minecraft:cyan_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_quartz",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "ferry.3": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:blue_terracotta",
+   "window": "minecraft:light_blue_stained_glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
   "works.1": {
    "wall": "minecraft:white_concrete",
    "accent": "minecraft:light_blue_terracotta",
@@ -2893,6 +2938,18 @@
   ],
   "bollard": [
    "minecraft:polished_blackstone_wall"
+  ],
+  "car": [
+   "minecraft:white_concrete",
+   "minecraft:black_concrete",
+   "minecraft:light_gray_concrete",
+   "minecraft:white_concrete",
+   "minecraft:red_concrete",
+   "minecraft:blue_concrete",
+   "minecraft:gray_concrete"
+  ],
+  "carGlass": [
+   "minecraft:black_stained_glass"
   ],
   "chimney": [
    "minecraft:bricks",
@@ -4611,6 +4668,33 @@
     }
    }
   },
+  "plant.ferry": {
+   "type": "WORKS",
+   "storeys": 2,
+   "palettes": {
+    "ferry.1": 1.0,
+    "ferry.2": 1.0,
+    "ferry.3": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 0.6,
+     "gable": 0.4
+    },
+    "WORKS_WALL": {
+     "plain": 1.0
+    },
+    "WORKS_WINDOWS": {
+     "band": 1.0
+    },
+    "WORKS_SIGN": {
+     "sign": 1.0
+    },
+    "WORKS_FENCE": {
+     "none": 1.0
+    }
+   }
+  },
   "works.warehouse": {
    "type": "WORKS",
    "palettes": {
@@ -6057,6 +6141,10 @@
   },
   "WAREHOUSE": {
    "standalone": "plant.warehouse",
+   "brand": "brandPlant"
+  },
+  "FERRY_TERMINAL": {
+   "standalone": "plant.ferry",
    "brand": "brandPlant"
   }
  },

@@ -207,6 +207,8 @@ public record Palette(String wall, String accent, String trim, String window, St
             case TRUCK_CAB -> c.material("truckCab", position);
             case FLOOD -> c.material("flood", variant);
             case BOLLARD -> c.material("bollard", variant);
+            case CAR -> c.material("car", position);
+            case CAR_GLASS -> c.material("carGlass", variant);
             case SHELF -> c.material("shelf", position);
             case TABLE -> c.material("table", variant);
             case KITCHEN -> c.material("kitchen", position);

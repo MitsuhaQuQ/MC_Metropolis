@@ -502,7 +502,7 @@ class BuildingLayerTest {
         CityExtent extent = logic.extent(city);
         TownPlots plots = logic.plots().town(city);
         BuildingLayer layer = logic.buildings();
-        Program[] kinds = {Program.TANK_FARM, Program.CONTAINER_YARD, Program.PORT, Program.WAREHOUSE};
+        Program[] kinds = {Program.TANK_FARM, Program.CONTAINER_YARD, Program.PORT, Program.WAREHOUSE, Program.FERRY_TERMINAL};
         layer.quarters(new QuarterMap() {
             @Override
             public Quarter at(Plot plot) {
@@ -511,7 +511,7 @@ class BuildingLayerTest {
 
             @Override
             public Program program(Plot plot) {
-                return plot.frontage() < 24.0 || plot.maxDepth() < 26.0 ? null : kinds[(int) Math.floorMod(plot.id(), 4L)];
+                return plot.frontage() < 24.0 || plot.maxDepth() < 26.0 ? null : kinds[(int) Math.floorMod(plot.id(), (long) kinds.length)];
             }
         });
         // Each kind somewhere with what makes it what it is: tanks, containers, a quay crane, lorries
@@ -519,11 +519,12 @@ class BuildingLayerTest {
                 Program.TANK_FARM, java.util.Set.of(BuildingLayer.Equipment.BIG_TANK, BuildingLayer.Equipment.SPHERE),
                 Program.CONTAINER_YARD, java.util.Set.of(BuildingLayer.Equipment.CONTAINERS, BuildingLayer.Equipment.CONTAINERS_RTG),
                 Program.PORT, java.util.Set.of(BuildingLayer.Equipment.STS),
-                Program.WAREHOUSE, java.util.Set.of(BuildingLayer.Equipment.TRUCK));
+                Program.WAREHOUSE, java.util.Set.of(BuildingLayer.Equipment.TRUCK),
+                Program.FERRY_TERMINAL, java.util.Set.of(BuildingLayer.Equipment.GANGWAY));
         Map<Program, Building> found = new EnumMap<>(Program.class);
         Map<Program, Integer> lots = new EnumMap<>(Program.class);
-        for (double x = extent.coreX() - 2500; x < extent.coreX() + 2500 && found.size() < 4; x += 8) {
-            for (double z = extent.coreZ() - 2500; z < extent.coreZ() + 2500 && found.size() < 4; z += 8) {
+        for (double x = extent.coreX() - 2500; x < extent.coreX() + 2500 && found.size() < kinds.length; x += 8) {
+            for (double z = extent.coreZ() - 2500; z < extent.coreZ() + 2500 && found.size() < kinds.length; z += 8) {
                 Plot plot = plots.at(x, z);
                 Building b = layer.building(plots, plot);
                 if (b != null && BuildingLayer.plant(b)) {
@@ -534,7 +535,7 @@ class BuildingLayerTest {
                 }
             }
         }
-        assertTrue(found.size() == 4, "found: " + found.keySet() + " of lots " + lots);
+        assertTrue(found.size() == kinds.length, "found: " + found.keySet() + " of lots " + lots);
     }
 
     /** Whether a point in a building's frame lies on its back corridor. */

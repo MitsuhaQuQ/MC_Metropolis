@@ -35,7 +35,13 @@ public enum Program {
      */
     PORT,
     /** A distribution warehouse (倉庫・物流センター): a big shed with loading bays across its front, lorries in its yard. */
-    WAREHOUSE;
+    WAREHOUSE,
+    /**
+     * A passenger ferry terminal (フェリーターミナル・旅客船ターミナル): a glazed terminal building, boarding bridges on legs
+     * from it out to the quay on the lot's water side, lanes where cars queue for the ferry, a car park, bus shelters,
+     * floodlights; no fence, a quay with bollards.
+     */
+    FERRY_TERMINAL;
 
     /** Whether the program is an industrial plant, filling its lot with its equipment rather than standing in a box. */
     public boolean plant() {
