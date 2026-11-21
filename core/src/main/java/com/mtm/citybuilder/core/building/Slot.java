@@ -125,9 +125,11 @@ public enum Slot {
     WATERSIDE("plain", "sudare", "balcony"),
     /**
      * A covered walk along a shopping street's front, on the lot (as Niigata's 雁木 and Furumachi's arcades): none, a
-     * flat canopy on white posts, or the old wooden kind under a tiled pent roof. A street's lots on one side share it.
+     * flat canopy on white posts, or the old wooden kind under a tiled pent roof, a louvred fascia, a skylight; or the
+     * whole street roofed over (全蓋型アーケード), glazed between steel arches, each side building its half. A street's
+     * lots (both sides) share it.
      */
-    ARCADE("none", "canopy", "gangi", "louvre", "skylight"),
+    ARCADE("none", "canopy", "gangi", "louvre", "skylight", "full"),
     /** The covered walk's colour, its posts and fascia; a street's lots on one side share it. */
     ARCADE_COLOR("white", "ochre", "cream", "brown", "teal"),
     /**

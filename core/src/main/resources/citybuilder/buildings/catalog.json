@@ -292,7 +292,8 @@
    "canopy",
    "gangi",
    "louvre",
-   "skylight"
+   "skylight",
+   "full"
   ],
   "ARCADE_COLOR": [
    "white",
@@ -4201,9 +4202,10 @@
      "back": 0.5
     },
     "ARCADE": {
-     "canopy": 0.6,
-     "louvre": 0.2,
-     "gangi": 0.2
+     "canopy": 0.4,
+     "louvre": 0.15,
+     "gangi": 0.15,
+     "full": 0.3
     },
     "ARCADE_COLOR": {
      "white": 0.7,
@@ -4297,9 +4299,10 @@
      "back": 0.5
     },
     "ARCADE": {
-     "canopy": 0.6,
-     "louvre": 0.2,
-     "gangi": 0.2
+     "canopy": 0.4,
+     "louvre": 0.15,
+     "gangi": 0.15,
+     "full": 0.3
     },
     "ARCADE_COLOR": {
      "white": 0.7,
@@ -4374,9 +4377,10 @@
      "both": 0.15
     },
     "ARCADE": {
-     "canopy": 0.6,
-     "louvre": 0.2,
-     "gangi": 0.2
+     "canopy": 0.4,
+     "louvre": 0.15,
+     "gangi": 0.15,
+     "full": 0.3
     },
     "ARCADE_COLOR": {
      "white": 0.7,
@@ -4474,11 +4478,12 @@
      "none": 0.4
     },
     "ARCADE": {
-     "canopy": 0.3,
-     "louvre": 0.2,
+     "canopy": 0.25,
+     "louvre": 0.15,
      "skylight": 0.1,
-     "gangi": 0.15,
-     "none": 0.25
+     "gangi": 0.1,
+     "full": 0.2,
+     "none": 0.2
     },
     "ARCADE_COLOR": {
      "white": 0.25,
@@ -4578,11 +4583,12 @@
      "none": 0.4
     },
     "ARCADE": {
-     "canopy": 0.3,
-     "louvre": 0.2,
+     "canopy": 0.25,
+     "louvre": 0.15,
      "skylight": 0.1,
-     "gangi": 0.15,
-     "none": 0.25
+     "gangi": 0.1,
+     "full": 0.2,
+     "none": 0.2
     },
     "ARCADE_COLOR": {
      "white": 0.25,
@@ -4655,11 +4661,12 @@
      "back": 0.5
     },
     "ARCADE": {
-     "canopy": 0.3,
-     "louvre": 0.2,
+     "canopy": 0.25,
+     "louvre": 0.15,
      "skylight": 0.1,
-     "gangi": 0.15,
-     "none": 0.25
+     "gangi": 0.1,
+     "full": 0.2,
+     "none": 0.2
     },
     "ARCADE_COLOR": {
      "white": 0.25,

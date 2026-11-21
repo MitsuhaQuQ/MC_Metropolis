@@ -408,7 +408,8 @@ public final class BuildingLayer {
         }
         if (composition.options().containsKey(Slot.ARCADE)) {
             // A street's lots on one side share the covered walk's kind and colour
-            long street = Hash.of(logic.seed() ^ 0x5A0EL, plot.chain(), plot.side());
+            // (both sides alike: a roof over the whole street needs both its halves)
+            long street = Hash.of(logic.seed() ^ 0x5A0EL, plot.chain());
             composition = composition.with(Slot.ARCADE, Catalog.draw(style.options().get(Slot.ARCADE), Hash.unit(street)));
             if (style.options().containsKey(Slot.ARCADE_COLOR)) {
                 composition = composition.with(Slot.ARCADE_COLOR,
@@ -749,7 +750,7 @@ public final class BuildingLayer {
                 step, stepBack, upFrom, upTo, upBack, wingFrom, wingTo, wingBack, chamferLeft, chamferRight, layout, plot.start() - from,
                 plot.end() - from, plot.maxDepth(), parkFrom, parkTo, parkBack, carport, base, ox, oz, p[2], p[3], nx, nz,
                 door, quarter, region, composition, program, standalone, palette, variant, waterside,
-                age(type, quarter, project, standalone, Hash.unit(Hash.of(h, 87))));
+                age(type, quarter, project, standalone, Hash.unit(Hash.of(h, 87))), plot.streetWidth());
     }
 
     /**
@@ -793,6 +794,7 @@ public final class BuildingLayer {
         Plot[] plots = new Plot[18 * 18];
         Building[] lots = new Building[18 * 18];
         Building[] inside = new Building[18 * 18];
+        TownPlots[] towns = new TownPlots[18 * 18];
         int minX = chunkX * 16 - 1;
         int minZ = chunkZ * 16 - 1;
         for (int i = 0; i < 18; i++) {
@@ -804,6 +806,7 @@ public final class BuildingLayer {
                     continue;
                 }
                 TownPlots town = logic.plots().town(sample.owner());
+                towns[i * 18 + k] = town;
                 Plot plot = town.at(x, z);
                 plots[i * 18 + k] = plot;
                 Building b = building(town, plot);
@@ -858,6 +861,13 @@ public final class BuildingLayer {
                         if (l[0] >= 0 && l[0] < o.width() && l[1] >= o.front() - 1 && l[1] < o.front()) {
                             columns[x * 16 + z] = column(o, wx, wz, false, true, null);
                             break;
+                        }
+                    }
+                    if (columns[x * 16 + z] == Column.EMPTY && towns[c] != null) {
+                        // Out over the street: the half of a roof over the whole street that the nearer side builds
+                        Building o = roofing(towns[c], wx, wz);
+                        if (o != null) {
+                            columns[x * 16 + z] = column(o, wx, wz, false, true, null);
                         }
                     }
                 }
@@ -1237,7 +1247,7 @@ public final class BuildingLayer {
         }
         if (c.ring()) {
             int top = -1;
-            for (int dy = 0; dy <= Math.max(b.wallHeight() + 2, 11); dy++) {
+            for (int dy = 0; dy <= Math.max(b.wallHeight() + 2, 11) + (c.v() < 0.0 ? 8 : 0); dy++) {
                 if (ringPart(b, c, dy) != Part.NONE) {
                     top = dy;
                 }
@@ -1507,6 +1517,65 @@ public final class BuildingLayer {
         return null;
     }
 
+    /** How far across a street the lots are looked for whose roof over it may reach a point. */
+    private static final int ROOF_REACH = 12;
+
+    /**
+     * The building whose half of a roof over the whole street covers a point of the street, or null: the lots are
+     * looked for along the four axes, the nearest on each; a building covers what lies before its frontage out to the
+     * street's middle.
+     */
+    private Building roofing(TownPlots town, double x, double z) {
+        Building best = null;
+        double nearest = Double.MAX_VALUE;
+        int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (int[] d : dirs) {
+            for (int step = 1; step <= ROOF_REACH; step++) {
+                Plot p = town.at(x + d[0] * step, z + d[1] * step);
+                if (p == null) {
+                    continue;
+                }
+                Building b = building(town, p);
+                if (b != null && b.composition().is(Slot.ARCADE, "full") && arcaded(b)) {
+                    double[] l = b.local(x, z);
+                    if (l[0] >= 0 && l[0] < b.width() && l[1] < 0 && -l[1] < 0.5 * b.street() + 0.5 && -l[1] < nearest) {
+                        nearest = -l[1];
+                        best = b;
+                    }
+                }
+                break;
+            }
+        }
+        return best;
+    }
+
+    /** Height above a building's base of a roof over the whole street, at its edge. */
+    private static int fullRoof(Building b) {
+        return Math.max(9, b.ground() + 5);
+    }
+
+    /**
+     * A roof over the whole street, out over the street: glazing rising in steps to a ridge beam over the middle, steel
+     * arches across it every few blocks, lights hung from the ridge. The street's surface is left as it is.
+     */
+    private static Part streetRoof(Building b, Column c, int dy) {
+        double d = -c.v();
+        double half = 0.5 * b.street();
+        if (d >= half + 0.5) {
+            return Part.NONE;
+        }
+        long lu = (long) Math.floor(c.u());
+        int row = fullRoof(b) + (int) Math.floor(Math.min(d, half) / 2.0);
+        boolean ridge = d >= half - 1.0;
+        if (dy == row) {
+            return ridge || d < 1.0 || Math.floorMod(lu, 6) == 0 ? Part.ARCADE_ROOF : Part.ARCADE_GLASS;
+        }
+        if (ridge && dy == row - 1 && Math.floorMod(lu, 6) == 3) {
+            return Part.LANTERN;
+        }
+        return Part.NONE;
+    }
+
     /** Whether a building stands behind a covered walk. */
     private static boolean arcaded(Building b) {
         return !b.standalone() && b.composition().options().containsKey(Slot.ARCADE)
@@ -1525,6 +1594,25 @@ public final class BuildingLayer {
             return null;
         }
         String kind = b.composition().get(Slot.ARCADE);
+        if (kind.equals("full")) {
+            if (v < 0.0) {
+                return streetRoof(b, c, dy);
+            }
+            // Under a roof over the whole street: the walk open to it, posts at its edge carrying the arches
+            long fu = (long) Math.floor(u);
+            int high = fullRoof(b);
+            boolean edge = v < 1.0;
+            if (dy == 0) {
+                return edge ? Part.PAVING : v < 2.0 ? Part.TACTILE : Part.ARCADE_PAVING;
+            }
+            if (dy < high) {
+                return edge && Math.floorMod(fu, 6) == 0 ? Part.ARCADE_POST : Part.AIR;
+            }
+            if (dy == high) {
+                return Part.ARCADE_ROOF;
+            }
+            return Part.NONE;
+        }
         boolean gangi = kind.equals("gangi");
         int roof = b.ground();
         boolean edge = v < 1.0;
