@@ -509,6 +509,17 @@ SPECS = [
     {'slug': 'ground_over_curve', 'name': '地上駅・橋上駅舎、曲線（半径800）', 'kind': 'ground_station', 'section': 'PTTP',
      'platformWidth': 5, 'platformLength': 120, 'house': 'OVER', 'houseWidth': 6, 'houseDepth': 14,
      'mtr': {'before': 0, 'radius': 800, 'turn': 8, 'transition': 30}},
+    {'slug': 'underground_island', 'name': '地下駅・島式（開削2層、出入口4か所）', 'kind': 'underground_station',
+     'section': 'TPT', 'platformWidth': 9, 'platformLength': 120, 'cover': 3,
+     'exits': [[30, 1, 6, 1, 3], [30, -1, 6, -1, 3], [100, 1, 6, -1, 3], [100, -1, 6, 1, 3]]},
+    {'slug': 'underground_side', 'name': '地下駅・相対式（浅め、出入口2か所）', 'kind': 'underground_station',
+     'section': 'PTTP', 'platformWidth': 5, 'platformLength': 80, 'cover': 2, 'concourseHeight': 4,
+     'exits': [[20, 1, 5, 1, 3], [60, -1, 5, -1, 3]]},
+    {'slug': 'underground_curve', 'name': '地下駅・島式、曲線（半径600、MTRの軌道どおり）', 'kind': 'underground_station',
+     'section': 'TPT', 'platformWidth': 9, 'platformLength': 100, 'exits': [[20, 1, 6, 1, 3]],
+     'mtr': {'before': 40, 'radius': 600, 'turn': 6, 'transition': 20}},
+    {'slug': 'cut_cover_tunnel', 'name': '開削トンネル（複線、勾配と曲線）', 'kind': 'cut_cover_tunnel', 'length': 160,
+     'level': -14, 'levelEnd': -18, 'mtr': {'before': 30, 'radius': 300, 'turn': 20, 'transition': 30}},
     {'slug': 'ground_single', 'name': '地上駅・単線1面', 'kind': 'ground_station', 'section': 'TP', 'platformWidth': 5,
      'platformLength': 60, 'house': 'BESIDE', 'houseWidth': 12, 'houseDepth': 8, 'storeys': 1, 'palette': 'WEATHERED',
      'canopyLength': 20},
@@ -682,11 +693,17 @@ def build(out):
     entries = []
     for slug, model in models.items():
         blocks = {(x, y, z): state(st) for x, y, z, st in model['blocks']}
+        spec = names.get(slug, {})
         size = tuple(model['size'])
         write_nbt(os.path.join(out, slug + '.nbt'), blocks, size)
         # The catenary's thin steel drawn as posts (the renderer takes names ending in _fence for those)
         thin = {}
+        underground = spec.get('kind') in ('underground_station', 'cut_cover_tunnel')
         for k, (name, props) in blocks.items():
+            if name == 'air':  # the ground taken away: nothing to draw
+                continue
+            if underground and k[2] > model['origin'][2] + 1:  # cut open along the middle to show the inside
+                continue
             if props and '__nbt__' in props:
                 props = {p: v for p, v in props.items() if p != '__nbt__'} or None
             if name in ('citybuilder:catenary_beam', 'citybuilder:catenary_arm'):  # a bar across: drawn as a top slab
@@ -696,7 +713,6 @@ def build(out):
                 name = name + '_fence'
             thin[k] = (name, props)
         pv.render(thin, size, os.path.join(out, slug + '.png'), bc)
-        spec = names.get(slug, {})
         e = {'slug': slug, 'name': spec.get('name', slug), 'kind': spec.get('kind'), 'size': list(size),
              'origin': model['origin'], 'level': model['level'], 'tracks': model['tracks'], 'spans': model['spans'],
              'blocks': len(blocks), 'spec': spec}

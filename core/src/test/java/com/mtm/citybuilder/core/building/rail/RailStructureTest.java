@@ -278,7 +278,8 @@ class RailStructureTest {
     /** Whether a step has another step or a floor straight ahead of it, one up or level. */
     private static boolean ahead(Model m, int x, int y, int z, int[] d) {
         String up = m.get(x + d[0], y + 1, z + d[1]), level = m.get(x + d[0], y, z + d[1]);
-        return up != null && base(up).endsWith("_stairs") || level != null && !m.has(x + d[0], y + 1, z + d[1]);
+        return up != null && base(up).endsWith("_stairs")
+                || level != null && !level.equals(Flights.AIR) && !solid(m, x + d[0], y + 1, z + d[1]);
     }
 
     /**
@@ -444,6 +445,138 @@ class RailStructureTest {
                 }
             }
             assertTrue(found >= 3, tracks + " tracks: portals along the viaduct: " + found);
+        }
+    }
+
+    private static boolean solid(Model m, int x, int y, int z) {
+        String b = m.get(x, y, z);
+        return b != null && !b.equals(Flights.AIR);
+    }
+
+    /** The ground's top block wherever the model leaves it to the ground. */
+    private static void surface(Model m, Ground g) {
+        for (int x = m.minX(); x <= m.maxX(); x++) {
+            for (int z = m.minZ(); z <= m.maxZ(); z++) {
+                m.setIfEmpty(x, g.at(x, z), z, "minecraft:grass_block");
+            }
+        }
+    }
+
+    @Test
+    void undergroundStationsTakeTheGroundOutOfTheirWholeBox() {
+        for (Ground g : List.of(Ground.FLAT, SLOPE)) {
+            for (String layout : new String[] {"TPT", "PTTP", "TPTTPT"}) {
+                for (int[] k : new int[][] {{60, 2}, {130, 4}}) {
+                    int len = k[0], cover = k[1];
+                    List<UndergroundStation.Exit> exits = List.of(new UndergroundStation.Exit(12, 1, 5, 1, 3),
+                            new UndergroundStation.Exit(len - 4, -1, 5, -1, 3));
+                    UndergroundStation st = new UndergroundStation(new CrossSection(layout, layout.contains("TPT") ? 9 : 5),
+                            len, 8, cover, 4, 4, 6, exits, P, g);
+                    Model m = st.build();
+                    int lv = st.level(), h = st.halfWidth();
+                    assertTrue(st.topSlab() <= -cover - 1, "cover kept");
+                    // Inside the box nothing is left to the ground: every block is written
+                    for (int x = 1; x < st.length(); x++) {
+                        for (int z = -h + 1; z < h; z++) {
+                            for (int y = lv; y < st.topSlab(); y++) {
+                                assertTrue(m.has(x, y, z), layout + " gap at " + x + "," + y + "," + z);
+                            }
+                        }
+                    }
+                    for (int tc : st.trackCentres()) {
+                        for (int x = 1; x < st.length(); x++) {
+                            for (int y = lv; y <= lv + 4; y++) {
+                                for (int z = tc - 1; z <= tc + 1; z++) {
+                                    assertFalse(solid(m, x, y, z), layout + " train at " + x + "," + y + "," + z);
+                                }
+                            }
+                        }
+                        assertTrue(solid(m, st.platformStart() + 2, lv, tc + StationParts.EDGE)
+                                || solid(m, st.platformStart() + 2, lv, tc - StationParts.EDGE), "platform by " + tc);
+                    }
+                    // Stairs to the concourse from every platform, and up to the street from every exit (onto the
+                    // ground's surface, which the model leaves to the ground: put it in for the count)
+                    surface(m, g);
+                    int[] counted = steps(m);
+                    assertEquals(counted[0], counted[1], layout + ": climbable steps");
+                    for (Flights.Flight f : st.flights()) {
+                        if (f.escalator()) {
+                            for (int i = 0; i < f.run(); i++) {
+                                for (int z = f.z0(); z <= f.z1(); z++) {
+                                    for (int y = f.bottom(); y <= st.concourseFloor(); y++) {
+                                        assertFalse(solid(m, f.x() + f.dir() * i, y, z), "escalator well");
+                                    }
+                                }
+                            }
+                        } else if (f.buried()) {
+                            // Out to the street: the last step reaches the surface, a roof over the way out
+                            int top = f.x() + f.dir() * (f.run() - 1);
+                            int zc = (f.z0() + f.z1()) / 2;
+                            assertTrue(base(m.get(top, f.top() - 1, zc) + "").endsWith("_stairs"), "last step " + top);
+                            assertTrue(solid(m, f.arrival(), f.surface() + 4, zc), "entrance roof");
+                            // Underground, a ceiling over every step at head height
+                            int lowest = f.x();
+                            assertTrue(solid(m, lowest, f.bottom() + 1 + 3, zc), "ceiling over the foot");
+                        }
+                    }
+                    assertStates(m);
+                }
+            }
+        }
+    }
+
+    @Test
+    void cutAndCoverTunnelsHoldTheirTracksOnMtrsGrades() {
+        for (int[] lv : new int[][] {{-14, -14}, {-12, -20}, {-18, -10}}) {
+            CutCoverTunnel t = new CutCoverTunnel(150, new int[] {-2, 2}, lv[0], lv[1], 6, P);
+            Model m = t.build();
+            int h = t.halfWidth();
+            for (int x = 0; x <= 150; x++) {
+                int l = t.levelAt(x);
+                assertTrue(l <= t.railY(x) + 1e-6 && l > t.railY(x) - 1 - 1e-6);
+                assertTrue(solid(m, x, l + 6, 0) && solid(m, x, l - 2, 0), "roof and base at " + x);
+                assertTrue(solid(m, x, l + 2, h) && solid(m, x, l + 2, -h), "walls at " + x);
+                for (int tc : t.trackCentres()) {
+                    assertEquals("minecraft:smooth_stone", m.get(x, l - 1, tc));
+                    for (int y = l + 1; y <= l + 4; y++) {
+                        assertFalse(solid(m, x, y, tc), "train in the tunnel at " + x);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void curvedUndergroundStationsStayWholeAndOpenAtTheEdges() {
+        UndergroundStation st = new UndergroundStation(new CrossSection("TPT", 9), 100, 8, 3, 4, 4, 6,
+                List.of(new UndergroundStation.Exit(20, 1, 6, 1, 3)), P, Ground.FLAT);
+        MtrAlignment.Node[] n = MtrAlignment.design(0, 30, 400, 10, 20, 30, st.level());
+        var reference = MtrAlignment.rail(n[0], n[1]);
+        Curve c = MtrAlignment.curve(reference);
+        List<MtrAlignment.Track> tracks = MtrAlignment.tracks(reference, st.trackCentres(), n[0], n[1], st.level());
+        List<Path> rails = new ArrayList<>();
+        tracks.forEach(t -> rails.add(t.rail()));
+        Model m = CurvedStation.underground(st, c, rails, 25, 2, P);
+        // Every block between the walls written, all along the curve
+        for (double s = 2; s < st.length() - 2; s += 1) {
+            for (double d = -st.halfWidth() + 1.5; d < st.halfWidth() - 0.5; d += 1) {
+                double[] pt = c.place(s, d);
+                int x = (int) Math.floor(pt[0]), z = (int) Math.floor(pt[1]);
+                for (int y = st.level(); y < st.topSlab(); y++) {
+                    assertTrue(m.has(x, y, z), "gap in the curved box at s " + s + " d " + d + " y " + y);
+                }
+            }
+        }
+        surface(m, Ground.FLAT);
+        int[] counted = steps(m);
+        assertEquals(counted[0], counted[1], "climbable steps on the curve");
+        // The platform edges left open for MTR's platform blocks: air there, not the ground
+        for (MtrAlignment.Track t : tracks) {
+            for (double s = st.platformStart() + 2; s < st.platformEnd() - 2; s += 2) {  // along the platforms
+                double[] pt = c.place(s, t.z() + 0.5 + (t.z() < 0 ? 2 : -2));
+                String b = m.get((int) Math.floor(pt[0]), st.level(), (int) Math.floor(pt[1]));
+                assertTrue(b != null, "the open edge is air, not ground, at " + s);
+            }
         }
     }
 

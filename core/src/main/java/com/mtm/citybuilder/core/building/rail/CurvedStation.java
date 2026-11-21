@@ -45,7 +45,7 @@ public final class CurvedStation {
                                  int carWidth, int buildingMinRadius, RailPalette p) {
         check(st.concourseX(), c, buildingMinRadius, "concourse");
         List<Path> rails = rails(st.section().tracks(), c, trackRails);
-        Model m = c.apply(st.buildWithoutFlights(), edges(rails, st.platformY(), carSpacing, carWidth, p));
+        Model m = c.apply(st.buildWithoutFlights(), edges(rails, st.platformY(), carSpacing, carWidth, p, null));
         for (Flights.Flight f : st.flights()) {
             Flights.place(m, p, f, c);
         }
@@ -63,9 +63,23 @@ public final class CurvedStation {
             check(new int[] {st.bridgeX() - 12, st.bridgeX1() + 12}, c, buildingMinRadius, "footbridge");
         }
         List<Path> rails = rails(st.section().tracks(), c, trackRails);
-        Model m = c.apply(st.buildWithoutFlights(), edges(rails, st.platformY(), carSpacing, carWidth, p));
+        Model m = c.apply(st.buildWithoutFlights(), edges(rails, st.platformY(), carSpacing, carWidth, p, null));
         for (Flights.Flight f : st.flights()) {
             Flights.place(m, p, f, c);
+        }
+        return m;
+    }
+
+    /**
+     * An underground station on a curve: as the others, but everything taken out of it is air (the box takes the
+     * ground away), and no building rule (the box itself is the station).
+     */
+    public static Model underground(UndergroundStation st, Curve c, List<? extends Path> trackRails, int carSpacing,
+                                    int carWidth, RailPalette p) {
+        List<Path> rails = rails(st.section().tracks(), c, trackRails);
+        Model m = c.apply(st.buildWithoutFlights(), edges(rails, st.level(), carSpacing, carWidth, p, Flights.AIR));
+        for (Flights.Flight f : st.flights()) {
+            Flights.place(m, p, f, c, Flights.AIR);
         }
         return m;
     }
@@ -114,7 +128,8 @@ public final class CurvedStation {
     }
 
     /** Leaves the platforms' edges open where MTR's platform blocks go, the row behind them tactile. */
-    private static Curve.Filter edges(List<Path> rails, int platformY, int carSpacing, int carWidth, RailPalette p) {
+    private static Curve.Filter edges(List<Path> rails, int platformY, int carSpacing, int carWidth, RailPalette p,
+                                      String removed) {
         List<Curve> along = new ArrayList<>();
         for (Path r : rails) {
             along.add(Curve.along(r, 0, 0));
@@ -141,7 +156,7 @@ public final class CurvedStation {
                 offset = edgeOffset(rails.get(i), sd[0], sideX, sideZ, carSpacing, carWidth);
             }
             if (face < offset + 1 - 1e-6) {
-                return null;  // MTR's edge, and a block for its platform blocks
+                return removed;  // MTR's edge, and a block for its platform blocks (null: nothing; air underground)
             }
             return face < offset + 2 - 1e-6 ? p.tactile() : p.platform();
         };

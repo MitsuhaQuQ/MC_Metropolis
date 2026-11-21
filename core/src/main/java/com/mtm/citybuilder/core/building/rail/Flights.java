@@ -31,7 +31,23 @@ public final class Flights {
      * floor), except where the flight arrives.
      */
     public record Flight(int x, int dir, int z0, int z1, int bottom, int top, int landingEvery, boolean railings,
-                         boolean escalator, int clearFrom, int clearTop, int guardY, Ground ground) {
+                         boolean escalator, int clearFrom, int clearTop, int guardY, Ground ground, int surface) {
+
+        /** A flight above ground or inside a structure (not buried). */
+        public Flight(int x, int dir, int z0, int z1, int bottom, int top, int landingEvery, boolean railings,
+                      boolean escalator, int clearFrom, int clearTop, int guardY, Ground ground) {
+            this(x, dir, z0, z1, bottom, top, landingEvery, railings, escalator, clearFrom, clearTop, guardY, ground,
+                    Integer.MIN_VALUE);
+        }
+
+        /**
+         * Whether the flight climbs out of the ground (a subway exit): {@link #surface} is then the ground's top block
+         * where it comes out. Below the ground it gets a ceiling a little over head height and walls along its sides,
+         * the ground above the ceiling left as it is; where it comes out, walls and a roof (a small entrance house).
+         */
+        public boolean buried() {
+            return surface != Integer.MIN_VALUE;
+        }
 
         /** Blocks the flight runs along x, landings included. */
         public int run() {
@@ -69,11 +85,24 @@ public final class Flights {
         int steps = 0;
         while (y < f.top) {
             if (f.landingEvery > 0 && steps > 0 && steps % f.landingEvery == 0) {
-                out[i++] = -y;  // a landing at standing level y (negative: no step)
-                out[i++] = -y;
+                out[i++] = y;  // a landing at standing level y
+                out[i++] = y;
             }
             out[i++] = ++y;
             steps++;
+        }
+        return out;
+    }
+
+    /** Which rows of the run are landings (no step: the same level as the row before). */
+    private static boolean[] landings(Flight f) {
+        int[] stands = profile(f);
+        boolean[] out = new boolean[stands.length];
+        if (f.escalator) {
+            return out;
+        }
+        for (int i = 1; i < stands.length; i++) {
+            out[i] = stands[i] == stands[i - 1];
         }
         return out;
     }
@@ -138,37 +167,51 @@ public final class Flights {
 
     /** Places a flight on the straight structure. */
     public static void place(Model m, RailPalette p, Flight f) {
-        place(m, p, f, straightRows(f), f.ground);
+        place(m, p, f, straightRows(f), f.ground, null);
+    }
+
+    /**
+     * As {@link #place(Model, RailPalette, Flight)}, the blocks cleared set to {@code clearWith} (air, underground,
+     * where what is left out of the structure stays as the ground has it) instead of left out.
+     */
+    public static void place(Model m, RailPalette p, Flight f, String clearWith) {
+        place(m, p, f, straightRows(f), f.ground, clearWith);
     }
 
     /** Places a flight on the structure laid on {@code c}, keeping its shape. */
     public static void place(Model m, RailPalette p, Flight f, Curve c) {
+        place(m, p, f, c, null);
+    }
+
+    /** On a curve, the blocks cleared set to {@code clearWith} (null: left out). */
+    public static void place(Model m, RailPalette p, Flight f, Curve c, String clearWith) {
         Ground g = f.ground == null ? null : (x, z) -> {
             double[] sd = c.project(x + 0.5, z + 0.5);
             return f.ground.at((int) Math.floor(sd[0]), (int) Math.floor(sd[1]));
         };
-        place(m, p, f, curvedRows(f, c), g);
+        place(m, p, f, curvedRows(f, c), g, clearWith);
     }
 
-    private static void place(Model m, RailPalette p, Flight f, Rows rows, Ground ground) {
+    private static void place(Model m, RailPalette p, Flight f, Rows rows, Ground ground, String clearWith) {
         int[] profile = profile(f);
+        boolean[] landings = landings(f);
         for (int[][] row : rows.cells()) {
             for (int[] c : row) {
                 for (int y = f.clearFrom; y <= f.clearTop; y++) {
-                    m.remove(c[0], y, c[1]);
+                    clear(m, c[0], y, c[1], clearWith);
                 }
             }
         }
         for (int[] c : rows.arrival()) {
             for (int y = f.top; y <= f.top + 2; y++) {
-                m.remove(c[0], y, c[1]);
+                clear(m, c[0], y, c[1], clearWith);
             }
         }
         String stair = RailPalette.stairs(p.walkStairs(), rows.facing());
         String bar = RailPalette.bars(p.rail(), rows.alongX());
         for (int i = 0; i < profile.length; i++) {
-            int stand = Math.abs(profile[i]);
-            boolean landing = profile[i] < 0;
+            int stand = profile[i];
+            boolean landing = landings[i];
             if (!f.escalator) {
                 for (int[] c : rows.cells().get(i)) {
                     if (landing) {
@@ -179,7 +222,7 @@ public final class Flights {
                         support(m, p, c[0], stand - 2, c[1]);
                         if (ground != null && i % 4 == 0) {
                             for (int y = ground.at(c[0], c[1]); y < stand - 3; y++) {
-                                m.setIfEmpty(c[0], y, c[1], p.concrete());
+                                setIfVoid(m, c[0], y, c[1], p.concrete());
                             }
                         }
                     }
@@ -187,18 +230,101 @@ public final class Flights {
             }
             if (f.railings) {
                 for (int[] s : rows.sides().get(i)) {
-                    m.setIfEmpty(s[0], landing ? stand : stand, s[1], bar);
+                    setIfVoid(m, s[0], landing ? stand : stand, s[1], bar);
                 }
             }
         }
         if (f.guardY != Integer.MIN_VALUE) {
             guard(m, p, f.guardY, rows);
         }
+        if (f.buried()) {
+            bury(m, p, f, rows, profile);
+        }
+    }
+
+    /**
+     * A flight out of the ground: under it, a ceiling three blocks over each step and walls along the sides, the
+     * ground over the ceiling left alone (taken back from the air the clearing put there); where the ceiling would
+     * come out of the ground, an entrance house: walls along the sides and across the back, a roof over it all.
+     */
+    private static void bury(Model m, RailPalette p, Flight f, Rows rows, int[] profile) {
+        int g = f.surface;
+        int roof = g + 4;
+        int firstOpen = profile.length;
+        for (int i = 0; i < profile.length; i++) {
+            int stand = profile[i];
+            boolean open = stand + 3 > g;
+            if (open && firstOpen == profile.length) {
+                firstOpen = i;
+            }
+            for (int[] c : rows.cells().get(i)) {
+                if (!open) {
+                    m.set(c[0], stand + 3, c[1], p.concrete());
+                    for (int y = stand + 4; y <= f.clearTop; y++) {
+                        m.remove(c[0], y, c[1]);
+                    }
+                } else {
+                    m.set(c[0], roof, c[1], RailPalette.slab(p.roof(), false));
+                }
+            }
+            for (int[] sd : rows.sides().get(i)) {
+                for (int y = stand - 2; y <= Math.min(stand + 3, g); y++) {
+                    setIfVoid(m, sd[0], y, sd[1], p.concrete());
+                }
+                if (open) {
+                    for (int y = g + 1; y < roof; y++) {
+                        m.set(sd[0], y, sd[1], p.house());
+                    }
+                    m.set(sd[0], roof, sd[1], RailPalette.slab(p.roof(), false));
+                } else {
+                    for (int y = stand + 4; y <= f.clearTop; y++) {
+                        if (Flights.AIR.equals(m.get(sd[0], y, sd[1]))) {
+                            m.remove(sd[0], y, sd[1]);
+                        }
+                    }
+                }
+            }
+        }
+        // Over the arrival, the roof reaches out; across the back of the opening, a wall
+        for (int[] c : rows.arrival()) {
+            m.set(c[0], roof, c[1], RailPalette.slab(p.roof(), false));
+        }
+        if (firstOpen > 0 && firstOpen < profile.length) {
+            for (int[] c : rows.cells().get(firstOpen - 1)) {
+                for (int y = g + 1; y < roof; y++) {
+                    m.set(c[0], y, c[1], p.house());
+                }
+                m.set(c[0], roof, c[1], RailPalette.slab(p.roof(), false));
+            }
+        }
+    }
+
+    /** Air, written where a structure underground must take the ground away. */
+    public static final String AIR = "minecraft:air";
+
+    /** Whether a block is there that is not air. */
+    static boolean solid(Model m, int x, int y, int z) {
+        String b = m.get(x, y, z);
+        return b != null && !b.equals(AIR);
+    }
+
+    private static void setIfVoid(Model m, int x, int y, int z, String state) {
+        if (!solid(m, x, y, z)) {
+            m.set(x, y, z, state);
+        }
+    }
+
+    private static void clear(Model m, int x, int y, int z, String clearWith) {
+        if (clearWith == null) {
+            m.remove(x, y, z);
+        } else {
+            m.set(x, y, z, clearWith);
+        }
     }
 
     private static void support(Model m, RailPalette p, int x, int y, int z) {
-        m.setIfEmpty(x, y, z, p.concrete());
-        m.setIfEmpty(x, y - 1, z, p.concrete());
+        setIfVoid(m, x, y, z, p.concrete());
+        setIfVoid(m, x, y - 1, z, p.concrete());
     }
 
     /** Railings on the upper floor round the hole the flight leaves in it, open where it arrives. */
@@ -206,7 +332,7 @@ public final class Flights {
         Set<Long> hole = new HashSet<>(), arrive = new HashSet<>();
         for (int[][] row : rows.cells()) {
             for (int[] c : row) {
-                if (!m.has(c[0], guardY - 1, c[1])) {
+                if (!solid(m, c[0], guardY - 1, c[1])) {
                     hole.add(key(c[0], c[1]));
                 }
             }
@@ -226,7 +352,7 @@ public final class Flights {
                     if (hole.contains(n) || arrive.contains(n)) {
                         continue;
                     }
-                    if (m.has(nx, guardY - 1, nz) && !m.has(nx, guardY, nz)) {
+                    if (solid(m, nx, guardY - 1, nz) && !solid(m, nx, guardY, nz)) {
                         m.set(nx, guardY, nz, RailPalette.bars(p.rail(), d[0] == 0));
                     }
                 }
