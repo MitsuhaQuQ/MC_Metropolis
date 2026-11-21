@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "particle": "citybuilder:block/fixture/ditch_side",
+    "top": "citybuilder:block/fixture/ditch_grate",
+    "side": "citybuilder:block/fixture/ditch_side",
+    "bottom": "citybuilder:block/fixture/ditch_side"
+  }
+}

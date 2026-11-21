@@ -224,7 +224,7 @@ public final class Catalog {
             "brandFastfood", "brandPost", "postbox", "line", "pole", "ad", "baseWall", "upperWall", "step", "tenantSign", "shoki", "bank", "water", "blackBoard", "arcadePost", "arcadeRoof", "arcadePaving", "tactile", "arcadeGlass", "louvre", "rust", "andon", "tobukuro", "gatepost", "gateLight", "porchLight", "futon",
             "solar", "antenna", "heater", "oni", "yago", "tatami", "earth", "partition", "fusuma", "stairs", "shelf", "table",
             "kitchen", "counter", "desk", "storage", "outerStairs", "mesh", "chimney", "chimneyTop",
-            "danchiNumber", "crest", "tankShell", "pipe", "deck", "stack", "coal", "steel",
+            "danchiNumber", "crest", "tankShell", "meter", "gasMeter", "waterTank", "tankLeg", "pipe", "deck", "stack", "coal", "steel",
             "transformer", "flareTop", "container", "crane", "craneHouse",
             "bund", "truckCab", "flood", "bollard", "car", "carGlass");
 

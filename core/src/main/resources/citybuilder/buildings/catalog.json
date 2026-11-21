@@ -3015,6 +3015,18 @@
   "heater": [
    "citybuilder:water_heater"
   ],
+  "meter": [
+   "citybuilder:electric_meter"
+  ],
+  "gasMeter": [
+   "citybuilder:gas_meter"
+  ],
+  "waterTank": [
+   "citybuilder:water_tank"
+  ],
+  "tankLeg": [
+   "citybuilder:tank_leg"
+  ],
   "oni": [
    "minecraft:polished_blackstone_brick_wall",
    "minecraft:deepslate_tile_wall"

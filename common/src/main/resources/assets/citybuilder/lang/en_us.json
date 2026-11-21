@@ -203,5 +203,11 @@
   "block.citybuilder.street_light_lamp": "Lane Light",
   "key.citybuilder.map": "City map",
   "key.categories.citybuilder": "City Builder",
-  "screen.citybuilder.map": "City map"
+  "screen.citybuilder.map": "City map",
+  "block.citybuilder.electric_meter": "Electricity Meter",
+  "block.citybuilder.gas_meter": "Gas Meter",
+  "block.citybuilder.water_tank": "Water Tank Panel",
+  "block.citybuilder.tank_leg": "Water Tank Leg",
+  "block.citybuilder.side_ditch": "Side Ditch (Concrete Lids)",
+  "block.citybuilder.side_ditch_grate": "Side Ditch (Steel Grating)"
 }

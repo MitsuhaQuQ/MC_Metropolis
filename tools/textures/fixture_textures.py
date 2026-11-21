@@ -194,6 +194,66 @@ def solar_side(x, y):
     return tint((96, 100, 104), noise(x, y, 62) * 3 - (14 if x % 8 == 0 else 0))
 
 
+def meter_front(x, y):
+    # Face uv [5, 3, 11, 13]: a smart meter's grey window over its display (a dark strip with green digits) and its
+    # label, a seal at the foot
+    lx, ly = x - 5, y - 3
+    if 1 <= lx <= 4 and 2 <= ly <= 3:
+        return (40, 44, 42, 255) if (lx + ly) % 3 else (110, 200, 120, 255)
+    if 1 <= lx <= 4 and 5 <= ly <= 6:
+        return (236, 236, 230, 255) if ly == 5 else (90, 110, 160, 255)
+    if ly == 9 and lx in (2, 3):
+        return (190, 40, 40, 255)
+    return tint((224, 226, 224), noise(x, y, 71) * 2 + (10 if ly == 0 else 0))
+
+
+def gas_meter_front(x, y):
+    # Face uv [4, 3, 12, 11]: a grey case, the counter's window with black and white wheels, a yellow label
+    lx, ly = x - 4, y - 3
+    if 1 <= lx <= 6 and 1 <= ly <= 2:
+        return (30, 30, 30, 255) if lx % 2 else (236, 236, 236, 255)
+    if 2 <= lx <= 5 and 4 <= ly <= 5:
+        return (230, 196, 40, 255)
+    return tint((176, 180, 178), noise(x, y, 72) * 3 + (8 if ly == 0 else -8 if ly == 7 else 0))
+
+
+def frp_panel(top):
+    # A one-metre FRP panel of a sectional tank: its flange round the edge (bolted, a bolt every few pixels), the
+    # panel's square bulge inside; on top a manhole's round lid
+    def f(x, y):
+        edge = x in (0, 15) or y in (0, 15)
+        if edge:
+            return tint((150, 168, 176), -18 if (x + y) % 4 == 0 else 0)
+        if top and math.hypot(x - 7.5, y - 7.5) < 4.0:
+            return tint((120, 136, 144), 12 if math.hypot(x - 7.5, y - 7.5) > 3.2 else 0)
+        inset = min(x, 15 - x, y, 15 - y)
+        return tint((184, 202, 208), (8 if inset == 1 else -6 if inset == 2 else 0) + noise(x, y, 73) * 3)
+    return f
+
+
+def ditch_lid(x, y):
+    # A side ditch (側溝) seen from above, running north-south: its concrete walls down either side (x 0..2, 13..15),
+    # two concrete lids across it between them, each with a slot to lift it by
+    if x <= 1 or x >= 14:
+        return tint((136, 136, 130), noise(x, y, 74) * 6)
+    if x in (2, 13):
+        return (70, 70, 66, 255)
+    if y in (0, 8):
+        return (64, 64, 60, 255)
+    if y in (4, 12) and x in (6, 7, 8, 9):
+        return (38, 38, 36, 255)
+    return tint((166, 166, 160), noise(x, y, 75) * 6 + (-10 if noise(x // 3, y // 3, 77) > 0.75 else 0))
+
+
+def ditch_grate(x, y):
+    # The same ditch under a steel grating: fine bars across the run, dark water below
+    if x <= 1 or x >= 14:
+        return tint((136, 136, 130), noise(x, y, 78) * 6)
+    if x in (2, 13) or y % 2 == 0:
+        return tint((84, 86, 88), noise(x, y, 79) * 4)
+    return (26, 28, 30, 255)
+
+
 def pipe(colour):
     # A round pipe: lighter down its middle, darker at its sides (each face shows a three-pixel strip)
     def f(x, y):
@@ -238,6 +298,16 @@ def draw():
     tex('housing', grid(plain((70, 74, 78), 66, 3, -8)))
     tex('led', grid(lambda x, y: (255, 255, 250, 255) if 2 <= x <= 13 and 2 <= y <= 13 and (x + y) % 2 == 0
                     else (236, 242, 255, 255) if 1 <= x <= 14 and 1 <= y <= 14 else tint((70, 74, 78), -8)))
+    tex('meter_front', grid(meter_front))
+    tex('meter_body', grid(plain((214, 216, 214), 68, 2, -6)))
+    tex('gas_meter_front', grid(gas_meter_front))
+    tex('gas_meter_body', grid(plain((176, 180, 178), 69, 3, -8)))
+    tex('frp_panel', grid(frp_panel(False)))
+    tex('frp_panel_top', grid(frp_panel(True)))
+    tex('h_steel', grid(lambda x, y: tint((120, 128, 124), noise(x, y, 70) * 5 + (-18 if x in (7, 8) else 0))))
+    tex('ditch_lid', grid(ditch_lid))
+    tex('ditch_grate', grid(ditch_grate))
+    tex('ditch_side', grid(plain((150, 150, 144), 76, 6)))
     tex('lamp_glass', grid(lambda x, y: tint((255, 246, 222), -8 * (y % 5 == 0) + noise(x, y, 67) * 3)))
     tex('louvre', grid(lambda x, y: tint((214, 216, 218), noise(x, y, 64) * 3 + (14 if y == 0 else -10 if y == 15 else 0))))
 
@@ -370,6 +440,42 @@ def louvre():
     return model(t, [box((0, 10, z), (16, 16, z + 1), every('#slat')) for z in (1.5, 5.5, 9.5, 13.5)])
 
 
+def electric_meter():
+    # A wall plate, the meter on it, its cable down out of its foot to the wall
+    t = {'particle': 'citybuilder:block/fixture/meter_body', 'front': 'citybuilder:block/fixture/meter_front',
+         'body': 'citybuilder:block/fixture/meter_body', 'pipe': 'citybuilder:block/fixture/pipe_gray'}
+    return model(t, [box((4, 2, 15), (12, 14, 16), every('#body', ('south',))),
+                     box((5, 3, 12), (11, 13, 15), {'north': ('#front', (5, 3, 11, 13)), 'west': '#body',
+                                                    'east': '#body', 'up': '#body', 'down': '#body'}),
+                     box((7.5, 0, 13), (8.5, 3, 14), every('#pipe'))])
+
+
+def gas_meter():
+    # A grey case on the wall, its pipes in and out of its top and turning into the wall
+    t = {'particle': 'citybuilder:block/fixture/gas_meter_body', 'front': 'citybuilder:block/fixture/gas_meter_front',
+         'body': 'citybuilder:block/fixture/gas_meter_body', 'pipe': 'citybuilder:block/fixture/steel'}
+    parts = [box((4, 3, 11), (12, 11, 16), {'north': ('#front', (4, 3, 12, 11)), 'west': '#body', 'east': '#body',
+                                            'up': '#body', 'down': '#body'})]
+    for x in (5, 10):
+        parts += [box((x, 11, 12.5), (x + 1, 14, 13.5), every('#pipe')),
+                  box((x, 13, 13.5), (x + 1, 14, 16), every('#pipe'))]
+    return model(t, parts)
+
+
+def water_tank():
+    t = {'particle': 'citybuilder:block/fixture/frp_panel', 'side': 'citybuilder:block/fixture/frp_panel',
+         'top': 'citybuilder:block/fixture/frp_panel_top'}
+    return {'parent': 'minecraft:block/cube_bottom_top', 'textures': {'particle': t['side'], 'side': t['side'],
+                                                                      'top': t['top'], 'bottom': t['side']}}
+
+
+def tank_leg():
+    # An H-section column, its flanges east and west, a base plate at its foot
+    t = {'particle': 'citybuilder:block/fixture/h_steel', 'steel': 'citybuilder:block/fixture/h_steel'}
+    return model(t, [box((5, 0, 5), (6, 16, 11), every('#steel')), box((10, 0, 5), (11, 16, 11), every('#steel')),
+                     box((6, 0, 7.5), (10, 16, 8.5), every('#steel')), box((4, 0, 4), (12, 1, 12), every('#steel'))])
+
+
 def street_light_pole():
     t = {'particle': 'citybuilder:block/fixture/galvanised', 'pole': 'citybuilder:block/fixture/galvanised'}
     return model(t, [box((6, 0, 6), (10, 16, 10), {f: ('#pole', (6, 0, 10, 16)) if f not in ('up', 'down') else '#pole'
@@ -469,6 +575,31 @@ def main():
     block('arcade_louvre', 'Arcade Louvre', '拱廊百叶顶', {'variants': {'axis=x': {'model': m},
                                                                      'axis=z': {'model': m, 'y': 90}}}, m)
     loot('arcade_louvre')
+    for name, make, en, zh in (('electric_meter', electric_meter, 'Electricity Meter', '电表'),
+                               ('gas_meter', gas_meter, 'Gas Meter', '燃气表')):
+        m = fixture_model(name, make())
+        block(name, en, zh, facing_states(None, {None: {None: m}}), m)
+        loot(name)
+    m = fixture_model('water_tank', water_tank())
+    block('water_tank', 'Water Tank Panel', '高置水箱', {'variants': {'': {'model': m}}}, m)
+    loot('water_tank')
+    m = fixture_model('tank_leg', tank_leg())
+    block('tank_leg', 'Water Tank Leg', '水箱钢支柱', {'variants': {'': {'model': m}}}, m)
+    loot('tank_leg')
+    for name, top, en, zh in (('side_ditch', 'ditch_lid', 'Side Ditch (Concrete Lids)', '侧沟（混凝土盖板）'),
+                              ('side_ditch_grate', 'ditch_grate', 'Side Ditch (Steel Grating)', '侧沟（钢格栅）')):
+        # Paving: whole, or lowered as a carriageway beside a kerb is; facing is the ditch's run
+        whole = fixture_model(name, {'parent': 'minecraft:block/cube_bottom_top', 'textures': {
+            'particle': 'citybuilder:block/fixture/ditch_side', 'top': f'citybuilder:block/fixture/{top}',
+            'side': 'citybuilder:block/fixture/ditch_side', 'bottom': 'citybuilder:block/fixture/ditch_side'}})
+        low = fixture_model(name + '_low', {'parent': 'citybuilder:block/lowered', 'textures': {
+            'top': f'citybuilder:block/fixture/{top}', 'side': 'citybuilder:block/fixture/ditch_side'}})
+        variants = {}
+        for f, y in FACING_Y.items():
+            for lowered, m in (('false', whole), ('true', low)):
+                variants[f'facing={f},low={lowered}'] = {'model': m, 'y': y} if y else {'model': m}
+        block(name, en, zh, {'variants': variants}, whole)
+        loot(name)
     m = fixture_model('street_light_pole', street_light_pole())
     block('street_light_pole', 'Street Light Pole', '路灯杆', {'variants': {'': {'model': m}}}, m)
     loot('street_light_pole')

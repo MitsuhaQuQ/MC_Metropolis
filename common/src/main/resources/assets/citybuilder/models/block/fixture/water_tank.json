@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "particle": "citybuilder:block/fixture/frp_panel",
+    "side": "citybuilder:block/fixture/frp_panel",
+    "top": "citybuilder:block/fixture/frp_panel_top",
+    "bottom": "citybuilder:block/fixture/frp_panel"
+  }
+}

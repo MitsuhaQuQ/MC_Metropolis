@@ -20,10 +20,10 @@ import java.util.function.Predicate;
 public final class CityTabs {
     private static final String[] ROADS = {"asphalt", "sidewalk", "curb", "manhole", "drain_grate", "tactile",
             "road_", "concrete_parapet", "bridge_", "sound_barrier", "steel_girder", "expansion_joint", "deck_drain",
-            "catenary_", "curve_marker", "paving", "marking", "street_light"};
+            "catenary_", "curve_marker", "paving", "marking", "street_light", "side_ditch"};
     private static final String[] BUILDINGS = {"window_", "curtain_", "thin_", "roof_", "adjuster", "door", "lantern",
             "andon", "chochin", "ac_unit", "vending", "water_heater", "postbox", "downpipe", "solar_panel",
-            "tv_antenna", "louvre"};
+            "tv_antenna", "louvre", "meter", "water_tank", "tank_leg"};
 
     private CityTabs() {
     }

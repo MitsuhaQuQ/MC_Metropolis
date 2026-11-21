@@ -143,6 +143,19 @@ public final class BuildingBlocks {
                 .noOcclusion(), new double[]{7, 0, 7, 9, 16, 9}, new double[]{1.5, 10, 1, 14.5, 15, 15}));
         p.registerBlock("arcade_louvre", () -> new LouvreBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BARS)
                 .strength(1.0f).noOcclusion()));
+        // Meters on a house's side wall; a roof's sectional water tank (whole blocks of FRP panel) on steel legs
+        p.registerBlock("electric_meter", () -> new LampBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+                .strength(1.0f).noOcclusion(), new double[]{4, 0, 12, 12, 14, 16}));
+        p.registerBlock("gas_meter", () -> new LampBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+                .strength(1.0f).noOcclusion(), new double[]{4, 3, 11, 12, 14, 16}));
+        p.registerBlock("water_tank", () -> new Block(BlockBehaviour.Properties.copy(Blocks.WHITE_CONCRETE)
+                .strength(1.5f)));
+        p.registerBlock("tank_leg", () -> new ShapedBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BARS)
+                .strength(2.0f).noOcclusion(), new double[]{4, 0, 4, 12, 16, 12}));
+        // A narrow street's side ditch, under concrete lids or a steel grating (paving: whole or lowered; facing its run)
+        for (String name : new String[]{"side_ditch", "side_ditch_grate"}) {
+            p.registerBlock(name, () -> new DirectedPavingBlock(BlockBehaviour.Properties.copy(Blocks.GRAY_CONCRETE)));
+        }
         // Street lights: a pole of stacked segments, a head on its top whose arm reaches towards its facing (and a
         // median's two-armed head), a lane's small lantern on a post top
         p.registerBlock("street_light_pole", () -> new ShapedBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BARS)

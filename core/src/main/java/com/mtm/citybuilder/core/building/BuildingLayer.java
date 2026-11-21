@@ -191,6 +191,14 @@ public final class BuildingLayer {
         ANTENNA,
         /** A water heater's tank. */
         HEATER,
+        /** An electricity meter on a house's side wall. */
+        METER,
+        /** A gas meter under it. */
+        GAS_METER,
+        /** A roof water tank's panels (高置水槽). */
+        WATER_TANK,
+        /** A roof water tank's steel legs. */
+        TANK_LEG,
         /** A ridge's end tile (鬼瓦). */
         ONI,
         /** A machiya's name board. */
@@ -1853,10 +1861,10 @@ public final class BuildingLayer {
         }
         if (waterTower(b, c)) {
             if (above <= 4) {
-                return Math.abs(c.u() - towerU(b)) >= 1.0 && Math.abs(c.v() - towerV(b)) >= 1.0 ? Part.POLE : Part.AIR;
+                return Math.abs(c.u() - towerU(b)) >= 1.0 && Math.abs(c.v() - towerV(b)) >= 1.0 ? Part.TANK_LEG : Part.AIR;
             }
             if (above <= 7) {
-                return Part.WALL;
+                return Part.WATER_TANK;
             }
         }
         return null;
@@ -2007,6 +2015,16 @@ public final class BuildingLayer {
         if (against == Face.SIDE && c.u() < 0.0 && b.composition().is(Slot.HEATER, "heater")
                 && b.depth() - along >= 1.0 && b.depth() - along < 2.0 && dy >= 1 && dy <= 2) {
             return Part.HEATER;
+        }
+        // The meters on the other side wall, near the front: electricity at eye height, gas (where a gas heater is)
+        // under it
+        if (against == Face.SIDE && c.u() >= b.width() && along >= 1.0 && along < 2.0) {
+            if (dy == 2) {
+                return Part.METER;
+            }
+            if (dy == 1 && b.composition().is(Slot.HEATER, "heater")) {
+                return Part.GAS_METER;
+            }
         }
         return null;
     }

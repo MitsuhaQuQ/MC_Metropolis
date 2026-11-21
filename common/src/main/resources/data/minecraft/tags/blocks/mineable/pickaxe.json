@@ -81,6 +81,12 @@
     "citybuilder:street_light_pole",
     "citybuilder:street_light_head",
     "citybuilder:street_light_head_double",
-    "citybuilder:street_light_lamp"
+    "citybuilder:street_light_lamp",
+    "citybuilder:electric_meter",
+    "citybuilder:gas_meter",
+    "citybuilder:water_tank",
+    "citybuilder:tank_leg",
+    "citybuilder:side_ditch",
+    "citybuilder:side_ditch_grate"
   ]
 }

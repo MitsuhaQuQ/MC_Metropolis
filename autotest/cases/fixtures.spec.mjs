@@ -16,7 +16,7 @@ const ROWS = [
   [['ac_unit_white', ['mount=floor', 'mount=wall', 'mount=roof']], ['ac_unit_beige', ['mount=floor', 'mount=wall', 'mount=roof']]],
   [['vending_red', ['tall']], ['vending_blue', ['tall']], ['vending_white', ['tall']], ['water_heater', ['tall']]],
   [['postbox', ['']], ['downpipe_gray', ['']], ['downpipe_beige', ['']], ['downpipe_brown', ['']], ['downpipe_black', ['']],
-    ['solar_panel', ['']], ['tv_antenna', ['']]],
+    ['solar_panel', ['']], ['tv_antenna', ['']], ['electric_meter', ['']], ['gas_meter', ['']]],
 ];
 
 async function set(x, y, z, state) {
@@ -100,6 +100,21 @@ test('fixtures in the game', async ({}, testInfo) => {
       await set(x, Y + height, z, `citybuilder:${head}[facing=${FACINGS[j]}]`);
     }
   }
+  // A roof water tank: three by three by three of panels on four legs four high; side ditches in the floor, each
+  // facing and lowered or not, beside a strip of asphalt
+  await server.command(`fill -12 ${Y - 1} 38 -5 ${Y - 1} 58 minecraft:smooth_stone`);
+  await server.command(`fill -12 ${Y} 38 -5 ${Y + 7} 58 minecraft:air`);
+  for (const [dx, dz] of [[0, 0], [2, 0], [0, 2], [2, 2]]) {
+    await server.command(`fill ${-10 + dx} ${Y} ${40 + dz} ${-10 + dx} ${Y + 3} ${40 + dz} citybuilder:tank_leg`);
+  }
+  await server.command(`fill -10 ${Y + 4} 40 -8 ${Y + 6} 42 citybuilder:water_tank`);
+  for (const [k, name] of ['side_ditch', 'side_ditch_grate'].entries()) {
+    for (let j = 0; j < FACINGS.length; j++) {
+      for (const [l, low] of ['false', 'true'].entries()) {
+        await set(-10 + 2 * j, Y - 1, 48 + 4 * k + 2 * l, `citybuilder:${name}[facing=${FACINGS[j]},low=${low}]`);
+      }
+    }
+  }
   // A two-block fixture stands as two halves; its upper half taken, the lower goes with it
   const r = await server.command(`fill 0 ${Y + 1} 16 20 ${Y + 1} 28 minecraft:air replace citybuilder:vending_red[half=upper]`);
   expect(JSON.stringify(r)).toMatch(/filled 4 block/);
@@ -116,6 +131,7 @@ test('fixtures in the game', async ({}, testInfo) => {
   await view('fixtures-vending', 5, Y + 1.5, 12.5, 0, 10, testInfo);
   await view('fixtures-small', 9, Y + 1.6, 29.5, 0, 25, testInfo);
   await view('fixtures-small-above', 10, Y + 7, 50, 180, 40, testInfo);
+  await view('fixtures-tank-ditch', 0, Y + 7, 47, 90, 35, testInfo);
   await view('fixtures-louvre', 33, Y + 0.5, 1, 0, -60, testInfo);
   await view('fixtures-street-lights', 46, Y + 3, -2, 0, 15, testInfo);
   await server.command('time set 18000');

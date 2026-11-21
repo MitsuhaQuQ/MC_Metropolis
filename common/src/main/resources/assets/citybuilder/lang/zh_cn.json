@@ -203,5 +203,11 @@
   "block.citybuilder.street_light_lamp": "小路灯",
   "key.citybuilder.map": "城市地图",
   "key.categories.citybuilder": "City Builder",
-  "screen.citybuilder.map": "城市地图"
+  "screen.citybuilder.map": "城市地图",
+  "block.citybuilder.electric_meter": "电表",
+  "block.citybuilder.gas_meter": "燃气表",
+  "block.citybuilder.water_tank": "高置水箱",
+  "block.citybuilder.tank_leg": "水箱钢支柱",
+  "block.citybuilder.side_ditch": "侧沟（混凝土盖板）",
+  "block.citybuilder.side_ditch_grate": "侧沟（钢格栅）"
 }

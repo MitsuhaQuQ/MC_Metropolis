@@ -210,6 +210,10 @@ public record Palette(String wall, String accent, String trim, String window, St
             case SOLAR -> c.material("solar", variant);
             case ANTENNA -> c.material("antenna", variant);
             case HEATER -> c.material("heater", variant);
+            case METER -> c.material("meter", variant);
+            case GAS_METER -> c.material("gasMeter", variant);
+            case WATER_TANK -> c.material("waterTank", variant);
+            case TANK_LEG -> c.material("tankLeg", variant);
             case ONI -> c.material("oni", variant);
             case YAGO -> c.material("yago", variant);
             case TATAMI -> c.material("tatami", variant);
