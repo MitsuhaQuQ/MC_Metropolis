@@ -127,7 +127,14 @@ public enum Slot {
      * A covered walk along a shopping street's front, on the lot (as Niigata's 雁木 and Furumachi's arcades): none, a
      * flat canopy on white posts, or the old wooden kind under a tiled pent roof. A street's lots on one side share it.
      */
-    ARCADE("none", "canopy", "gangi"),
+    ARCADE("none", "canopy", "gangi", "louvre", "skylight"),
+    /** The covered walk's colour, its posts and fascia; a street's lots on one side share it. */
+    ARCADE_COLOR("white", "ochre", "cream", "brown", "teal"),
+    /**
+     * A shop house's false front (看板建築): its front wall carried up square past the pitched roof behind, a sign
+     * across it.
+     */
+    KANBAN("none", "kanban"),
     /** A samurai house's gate in its street wall: none (a gap), or two posts under a beam and a small roof (冠木門). */
     GATE("none", "kabuki"),
     /** A stone-lined ditch along the street in front of the wall (側溝), bridged at the gate. */

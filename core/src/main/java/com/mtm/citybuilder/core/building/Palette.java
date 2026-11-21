@@ -1,5 +1,7 @@
 package com.mtm.citybuilder.core.building;
 
+import java.util.List;
+
 /**
  * The materials of a building, by the role a block plays, as block ids (the Minecraft side looks them up; the city
  * logic knows no Minecraft classes). Vanilla blocks only, of 1.20.1. The palettes, like the materials of the smaller
@@ -34,6 +36,57 @@ public record Palette(String wall, String accent, String trim, String window, St
      * their states.
      */
     public String id(BuildingLayer.Part part, Building building, long position) {
+        return id(part, building, position, building.base());
+    }
+
+    /**
+     * The block id of a part at a height {@code y}, aged by the building's {@link Building#age()}: grime at the foot of
+     * its walls, streaks down them, stains here and there, moss and cracks in stone, oxidised copper, rust on steel
+     * posts. A block ages only into what the catalogue lists for it, of the same shape.
+     */
+    public String id(BuildingLayer.Part part, Building building, long position, int y) {
+        String id = fresh(part, building, position);
+        double age = building.age();
+        if (id == null || age <= 0.0) {
+            return id;
+        }
+        Catalog c = Catalog.get();
+        int dy = y - building.base();
+        long at = com.mtm.citybuilder.core.noise.Hash.of(position, y, 0xA6E);
+        double here = com.mtm.citybuilder.core.noise.Hash.unit(at);
+        switch (part) {
+            case ARCADE_POST -> {
+                // Rust from the foot up, in streaks down the rest
+                boolean streak = com.mtm.citybuilder.core.noise.Hash.unit(com.mtm.citybuilder.core.noise.Hash.of(position, 0x57)) < 0.5 * age;
+                if (here < (dy <= 1 ? 0.9 * age : streak ? 0.45 * age : 0.08 * age)) {
+                    return c.material("rust", at);
+                }
+                return id;
+            }
+            case WALL, ACCENT, TRIM, WALL_ALT, PARAPET, FOUNDATION, PAVING, BANK, PLASTER, ARCADE_ROOF -> {
+                List<String> aged = c.weathered(id);
+                if (aged.isEmpty()) {
+                    return id;
+                }
+                // A streak down a wall from where water runs off, grime at its foot, stains here and there
+                boolean streakColumn = com.mtm.citybuilder.core.noise.Hash.unit(com.mtm.citybuilder.core.noise.Hash.of(position, 0x58)) < 0.3 * age;
+                boolean streak = streakColumn && com.mtm.citybuilder.core.noise.Hash.unit(com.mtm.citybuilder.core.noise.Hash.of(position, 0x59, Math.floorDiv(dy, 3))) < 0.75;
+                boolean grime = dy <= 1 && here < 0.6 * age;
+                boolean stain = here < 0.1 * age;
+                return streak || grime || stain ? aged.get((int) Math.floorMod(com.mtm.citybuilder.core.noise.Hash.mix(at), (long) aged.size())) : id;
+            }
+            case ROOF_LOW, ROOF_HIGH, RIDGE, HOOD -> {
+                // Moss and oxidised patches on a roof
+                List<String> aged = c.weathered(id);
+                return !aged.isEmpty() && here < 0.25 * age ? aged.get((int) Math.floorMod(com.mtm.citybuilder.core.noise.Hash.mix(at), (long) aged.size())) : id;
+            }
+            default -> {
+                return id;
+            }
+        }
+    }
+
+    private String fresh(BuildingLayer.Part part, Building building, long position) {
         Catalog c = Catalog.get();
         Composition composition = building.composition();
         long variant = building.variant();
@@ -106,8 +159,12 @@ public record Palette(String wall, String accent, String trim, String window, St
             case BANK -> c.material("bank", position);
             case WATER -> c.material("water", variant);
             case BLACK_BOARD -> c.material("blackBoard", variant);
-            case ARCADE_POST -> c.material("arcadePost", variant ^ 0x404);
-            case ARCADE_ROOF -> c.material("arcadeRoof", variant ^ 0x505);
+            case ARCADE_POST -> c.materialAt("arcadePost", Slot.ARCADE_COLOR.options().indexOf(composition.get(Slot.ARCADE_COLOR)));
+            case ARCADE_ROOF -> c.materialAt("arcadeRoof", Slot.ARCADE_COLOR.options().indexOf(composition.get(Slot.ARCADE_COLOR)));
+            case ARCADE_PAVING -> c.material("arcadePaving", position);
+            case TACTILE -> c.material("tactile", variant);
+            case ARCADE_GLASS -> c.material("arcadeGlass", variant);
+            case LOUVRE -> c.material("louvre", variant);
         };
     }
 

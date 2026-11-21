@@ -30,6 +30,7 @@ public final class Catalog {
     private final List<Palette> palettes = new ArrayList<>();
     private final Map<String, Integer> paletteIndex = new HashMap<>();
     private final Map<String, List<String>> materials = new HashMap<>();
+    private final Map<String, List<String>> weathering = new HashMap<>();
     private final Map<String, Style> styles = new LinkedHashMap<>();
     private final Map<Quarter, Map<String, Double>> quarters = new EnumMap<>(Quarter.class);
     private final Map<Region, Map<Building.Type, Map<String, Double>>> regions = new EnumMap<>(Region.class);
@@ -176,6 +177,20 @@ public final class Catalog {
     }
 
     /** One of the material choices under a key, by a hash. */
+    /** A material of a list by its place in it (a colour named by an option), wrapping round. */
+    public String materialAt(String key, int index) {
+        List<String> options = materials.get(key);
+        if (options == null || options.isEmpty()) {
+            throw new IllegalArgumentException("No material " + key);
+        }
+        return options.get(Math.floorMod(index, options.size()));
+    }
+
+    /** What a block may age into (stains, moss, cracks, oxidised copper), or an empty list. */
+    public List<String> weathered(String id) {
+        return weathering.getOrDefault(id, List.of());
+    }
+
     public String material(String key, long hash) {
         List<String> options = materials.get(key);
         if (options == null || options.isEmpty()) {
@@ -184,7 +199,7 @@ public final class Catalog {
         return options.get((int) Math.floorMod(Hash.mix(hash), options.size()));
     }
 
-    private static String draw(Map<String, Double> weights, double u) {
+    static String draw(Map<String, Double> weights, double u) {
         double total = 0.0;
         for (double w : weights.values()) {
             total += w;
@@ -206,7 +221,7 @@ public final class Catalog {
             "shed", "rail", "curtain", "curtainRed", "latticeSpruce", "latticeMangrove", "equipment", "shutter", "hedge",
             "bamboo", "post", "carport", "guard", "downpipe", "lantern", "sudare", "komayose", "engawa", "toro", "toroLight",
             "toroCap", "gravel", "board", "plaster", "spike", "fasciaLit", "display", "stand", "brandKonbini",
-            "brandFastfood", "brandPost", "postbox", "line", "pole", "ad", "baseWall", "upperWall", "step", "tenantSign", "shoki", "bank", "water", "blackBoard", "arcadePost", "arcadeRoof");
+            "brandFastfood", "brandPost", "postbox", "line", "pole", "ad", "baseWall", "upperWall", "step", "tenantSign", "shoki", "bank", "water", "blackBoard", "arcadePost", "arcadeRoof", "arcadePaving", "tactile", "arcadeGlass", "louvre", "rust");
 
     /** Gson is used here only. */
     private static final class Json {
@@ -238,6 +253,16 @@ public final class Catalog {
                     list.add(e.getAsString());
                 }
                 c.materials.put(key, List.copyOf(list));
+            }
+            if (root.has("weathering")) {
+                com.google.gson.JsonObject aged = root.getAsJsonObject("weathering");
+                for (String key : aged.keySet()) {
+                    List<String> list = new ArrayList<>();
+                    for (com.google.gson.JsonElement e : aged.getAsJsonArray(key)) {
+                        list.add(e.getAsString());
+                    }
+                    c.weathering.put(key, List.copyOf(list));
+                }
             }
             for (String key : MATERIALS) {
                 if (!c.materials.containsKey(key) || c.materials.get(key).isEmpty()) {

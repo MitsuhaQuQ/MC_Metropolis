@@ -290,7 +290,20 @@
   "ARCADE": [
    "none",
    "canopy",
-   "gangi"
+   "gangi",
+   "louvre",
+   "skylight"
+  ],
+  "ARCADE_COLOR": [
+   "white",
+   "ochre",
+   "cream",
+   "brown",
+   "teal"
+  ],
+  "KANBAN": [
+   "none",
+   "kanban"
   ],
   "GATE": [
    "none",
@@ -1095,6 +1108,156 @@
    "roofBlock": "minecraft:smooth_stone",
    "flat": "minecraft:smooth_stone",
    "parapet": "minecraft:light_blue_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.1": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:cut_copper_slab",
+   "roofBlock": "minecraft:cut_copper",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.2": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:light_gray_terracotta",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:oxidized_cut_copper_slab",
+   "roofBlock": "minecraft:oxidized_cut_copper",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.3": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:red_nether_brick_slab",
+   "roofBlock": "minecraft:red_nether_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.4": {
+   "wall": "minecraft:bricks",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:bricks",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.5": {
+   "wall": "minecraft:orange_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:exposed_cut_copper_slab",
+   "roofBlock": "minecraft:exposed_cut_copper",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:orange_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.6": {
+   "wall": "minecraft:cyan_terracotta",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:cut_copper_slab",
+   "roofBlock": "minecraft:cut_copper",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:cyan_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.7": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:light_blue_terracotta",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:oxidized_cut_copper_slab",
+   "roofBlock": "minecraft:oxidized_cut_copper",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.8": {
+   "wall": "minecraft:light_gray_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:brick_slab",
+   "roofBlock": "minecraft:bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.9": {
+   "wall": "minecraft:brown_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:brown_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.10": {
+   "wall": "minecraft:yellow_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:weathered_cut_copper_slab",
+   "roofBlock": "minecraft:weathered_cut_copper",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:yellow_terracotta",
    "foundation": "minecraft:polished_andesite"
   },
   "apartment.1": {
@@ -2193,14 +2356,40 @@
   ],
   "arcadePost": [
    "minecraft:smooth_quartz",
-   "minecraft:white_concrete",
-   "minecraft:light_gray_concrete",
-   "minecraft:quartz_pillar"
+   "minecraft:yellow_terracotta",
+   "minecraft:white_terracotta",
+   "minecraft:brown_terracotta",
+   "minecraft:light_gray_concrete"
   ],
   "arcadeRoof": [
    "minecraft:smooth_quartz",
-   "minecraft:white_concrete",
-   "minecraft:light_gray_concrete"
+   "minecraft:yellow_terracotta",
+   "minecraft:white_terracotta",
+   "minecraft:brown_terracotta",
+   "minecraft:cyan_terracotta"
+  ],
+  "arcadePaving": [
+   "minecraft:bricks",
+   "minecraft:terracotta",
+   "minecraft:granite",
+   "minecraft:polished_granite",
+   "minecraft:light_gray_terracotta",
+   "minecraft:bricks",
+   "minecraft:red_terracotta"
+  ],
+  "tactile": [
+   "minecraft:yellow_concrete"
+  ],
+  "arcadeGlass": [
+   "minecraft:glass"
+  ],
+  "louvre": [
+   "minecraft:iron_bars"
+  ],
+  "rust": [
+   "minecraft:orange_terracotta",
+   "minecraft:brown_terracotta",
+   "minecraft:terracotta"
   ],
   "bank": [
    "minecraft:stone_bricks",
@@ -2234,6 +2423,123 @@
    "minecraft:light_blue_concrete",
    "minecraft:pink_concrete",
    "minecraft:black_concrete"
+  ]
+ },
+ "weathering": {
+  "minecraft:white_concrete": [
+   "minecraft:calcite",
+   "minecraft:light_gray_concrete",
+   "minecraft:polished_diorite"
+  ],
+  "minecraft:light_gray_concrete": [
+   "minecraft:light_gray_terracotta",
+   "minecraft:stone",
+   "minecraft:andesite"
+  ],
+  "minecraft:gray_concrete": [
+   "minecraft:gray_terracotta",
+   "minecraft:polished_andesite"
+  ],
+  "minecraft:smooth_quartz": [
+   "minecraft:calcite",
+   "minecraft:polished_diorite",
+   "minecraft:white_terracotta"
+  ],
+  "minecraft:calcite": [
+   "minecraft:polished_diorite",
+   "minecraft:diorite"
+  ],
+  "minecraft:white_terracotta": [
+   "minecraft:light_gray_terracotta",
+   "minecraft:terracotta"
+  ],
+  "minecraft:smooth_sandstone": [
+   "minecraft:sandstone",
+   "minecraft:cut_sandstone"
+  ],
+  "minecraft:yellow_terracotta": [
+   "minecraft:terracotta",
+   "minecraft:brown_terracotta"
+  ],
+  "minecraft:orange_terracotta": [
+   "minecraft:terracotta",
+   "minecraft:brown_terracotta"
+  ],
+  "minecraft:cyan_terracotta": [
+   "minecraft:gray_terracotta"
+  ],
+  "minecraft:light_blue_terracotta": [
+   "minecraft:light_gray_terracotta"
+  ],
+  "minecraft:pink_terracotta": [
+   "minecraft:white_terracotta"
+  ],
+  "minecraft:brown_terracotta": [
+   "minecraft:terracotta"
+  ],
+  "minecraft:light_gray_terracotta": [
+   "minecraft:stone",
+   "minecraft:andesite"
+  ],
+  "minecraft:bricks": [
+   "minecraft:terracotta"
+  ],
+  "minecraft:stone_bricks": [
+   "minecraft:mossy_stone_bricks",
+   "minecraft:cracked_stone_bricks"
+  ],
+  "minecraft:cobblestone": [
+   "minecraft:mossy_cobblestone"
+  ],
+  "minecraft:polished_andesite": [
+   "minecraft:andesite",
+   "minecraft:stone"
+  ],
+  "minecraft:smooth_stone": [
+   "minecraft:stone",
+   "minecraft:andesite"
+  ],
+  "minecraft:smooth_stone_slab": [
+   "minecraft:stone_slab",
+   "minecraft:andesite_slab"
+  ],
+  "minecraft:deepslate_tiles": [
+   "minecraft:cracked_deepslate_tiles"
+  ],
+  "minecraft:deepslate_tile_slab": [
+   "minecraft:cobbled_deepslate_slab"
+  ],
+  "minecraft:polished_blackstone_bricks": [
+   "minecraft:cracked_polished_blackstone_bricks"
+  ],
+  "minecraft:polished_blackstone_brick_slab": [
+   "minecraft:blackstone_slab"
+  ],
+  "minecraft:cut_copper": [
+   "minecraft:exposed_cut_copper",
+   "minecraft:weathered_cut_copper"
+  ],
+  "minecraft:cut_copper_slab": [
+   "minecraft:exposed_cut_copper_slab",
+   "minecraft:weathered_cut_copper_slab"
+  ],
+  "minecraft:exposed_cut_copper": [
+   "minecraft:weathered_cut_copper"
+  ],
+  "minecraft:exposed_cut_copper_slab": [
+   "minecraft:weathered_cut_copper_slab"
+  ],
+  "minecraft:weathered_cut_copper": [
+   "minecraft:oxidized_cut_copper"
+  ],
+  "minecraft:weathered_cut_copper_slab": [
+   "minecraft:oxidized_cut_copper_slab"
+  ],
+  "minecraft:mud_bricks": [
+   "minecraft:packed_mud"
+  ],
+  "minecraft:packed_mud": [
+   "minecraft:mud_bricks"
   ]
  },
  "styles": {
@@ -3895,8 +4201,14 @@
      "back": 0.5
     },
     "ARCADE": {
-     "canopy": 0.75,
-     "gangi": 0.25
+     "canopy": 0.6,
+     "louvre": 0.2,
+     "gangi": 0.2
+    },
+    "ARCADE_COLOR": {
+     "white": 0.7,
+     "cream": 0.2,
+     "brown": 0.1
     }
    }
   },
@@ -3985,8 +4297,14 @@
      "back": 0.5
     },
     "ARCADE": {
-     "canopy": 0.75,
-     "gangi": 0.25
+     "canopy": 0.6,
+     "louvre": 0.2,
+     "gangi": 0.2
+    },
+    "ARCADE_COLOR": {
+     "white": 0.7,
+     "cream": 0.2,
+     "brown": 0.1
     }
    }
   },
@@ -4056,8 +4374,299 @@
      "both": 0.15
     },
     "ARCADE": {
-     "canopy": 0.75,
-     "gangi": 0.25
+     "canopy": 0.6,
+     "louvre": 0.2,
+     "gangi": 0.2
+    },
+    "ARCADE_COLOR": {
+     "white": 0.7,
+     "cream": 0.2,
+     "brown": 0.1
+    }
+   }
+  },
+  "inaka.shop": {
+   "type": "SHOP",
+   "storeys": 2,
+   "palettes": {
+    "inaka.shop.1": 1.0,
+    "inaka.shop.2": 1.0,
+    "inaka.shop.3": 1.0,
+    "inaka.shop.4": 1.0,
+    "inaka.shop.5": 1.0,
+    "inaka.shop.6": 1.0,
+    "inaka.shop.7": 1.0,
+    "inaka.shop.8": 1.0,
+    "inaka.shop.9": 1.0,
+    "inaka.shop.10": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.7,
+     "flat": 0.3
+    },
+    "ROOF_TALL": {
+     "gable": 0.3,
+     "flat": 0.7
+    },
+    "GROUND": {
+     "shutter": 0.4,
+     "glass": 0.25,
+     "lowWall": 0.15,
+     "recessed": 0.2
+    },
+    "RECESS": {
+     "flush": 0.5,
+     "recessed": 0.5
+    },
+    "SIGN": {
+     "side": 0.7,
+     "none": 0.3
+    },
+    "AWNING": {
+     "none": 0.7,
+     "awning": 0.3
+    },
+    "VENDING": {
+     "none": 0.65,
+     "vending": 0.35
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "FASCIA": {
+     "plain": 0.4,
+     "sign": 0.5,
+     "lit": 0.1
+    },
+    "ROOF_SIGN": {
+     "none": 1.0
+    },
+    "UPPER_STREET": {
+     "windows": 0.8,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.6,
+     "stand": 0.4
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
+    },
+    "LANTERN": {
+     "none": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "KANBAN": {
+     "kanban": 0.6,
+     "none": 0.4
+    },
+    "ARCADE": {
+     "canopy": 0.3,
+     "louvre": 0.2,
+     "skylight": 0.1,
+     "gangi": 0.15,
+     "none": 0.25
+    },
+    "ARCADE_COLOR": {
+     "white": 0.25,
+     "ochre": 0.25,
+     "cream": 0.25,
+     "brown": 0.1,
+     "teal": 0.15
+    }
+   }
+  },
+  "inaka.shop3": {
+   "type": "SHOP",
+   "storeys": 3,
+   "palettes": {
+    "inaka.shop.1": 1.0,
+    "inaka.shop.2": 1.0,
+    "inaka.shop.3": 1.0,
+    "inaka.shop.4": 1.0,
+    "inaka.shop.5": 1.0,
+    "inaka.shop.6": 1.0,
+    "inaka.shop.7": 1.0,
+    "inaka.shop.8": 1.0,
+    "inaka.shop.9": 1.0,
+    "inaka.shop.10": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.7,
+     "flat": 0.3
+    },
+    "ROOF_TALL": {
+     "gable": 0.3,
+     "flat": 0.7
+    },
+    "GROUND": {
+     "shutter": 0.4,
+     "glass": 0.25,
+     "lowWall": 0.15,
+     "recessed": 0.2
+    },
+    "RECESS": {
+     "flush": 0.5,
+     "recessed": 0.5
+    },
+    "SIGN": {
+     "side": 0.7,
+     "none": 0.3
+    },
+    "AWNING": {
+     "none": 0.7,
+     "awning": 0.3
+    },
+    "VENDING": {
+     "none": 0.65,
+     "vending": 0.35
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "FASCIA": {
+     "plain": 0.4,
+     "sign": 0.5,
+     "lit": 0.1
+    },
+    "ROOF_SIGN": {
+     "none": 1.0
+    },
+    "UPPER_STREET": {
+     "windows": 0.8,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.6,
+     "stand": 0.4
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
+    },
+    "LANTERN": {
+     "none": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "KANBAN": {
+     "kanban": 0.6,
+     "none": 0.4
+    },
+    "ARCADE": {
+     "canopy": 0.3,
+     "louvre": 0.2,
+     "skylight": 0.1,
+     "gangi": 0.15,
+     "none": 0.25
+    },
+    "ARCADE_COLOR": {
+     "white": 0.25,
+     "ochre": 0.25,
+     "cream": 0.25,
+     "brown": 0.1,
+     "teal": 0.15
+    }
+   }
+  },
+  "inaka.block": {
+   "type": "OFFICE",
+   "minStoreys": 3,
+   "palettes": {
+    "inaka.shop.1": 1.0,
+    "inaka.shop.2": 1.0,
+    "inaka.shop.3": 1.0,
+    "inaka.shop.4": 1.0,
+    "inaka.shop.5": 1.0,
+    "inaka.shop.6": 1.0,
+    "inaka.shop.7": 1.0,
+    "inaka.shop.8": 1.0,
+    "inaka.shop.9": 1.0,
+    "inaka.shop.10": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.3333333333333333,
+     "colonnade": 0.3333333333333333,
+     "canopy": 0.3333333333333333
+    },
+    "RECESS": {
+     "flush": 0.3,
+     "recessed": 0.7
+    },
+    "ARTICULATION": {
+     "plain": 0.3333333333333333,
+     "fins": 0.3333333333333333,
+     "ledges": 0.3333333333333333
+    },
+    "SIGN": {
+     "none": 0.6,
+     "tall": 0.4
+    },
+    "FACADE": {
+     "punched": 0.4,
+     "ribbon": 0.25,
+     "curtain": 0.2,
+     "grid": 0.15
+    },
+    "PODIUM": {
+     "none": 0.6,
+     "podium": 0.4
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "ARCADE": {
+     "canopy": 0.3,
+     "louvre": 0.2,
+     "skylight": 0.1,
+     "gangi": 0.15,
+     "none": 0.25
+    },
+    "ARCADE_COLOR": {
+     "white": 0.25,
+     "ochre": 0.25,
+     "cream": 0.25,
+     "brown": 0.1,
+     "teal": 0.15
     }
    }
   }
@@ -4085,6 +4694,11 @@
    "shotengai.shop": 0.6,
    "shotengai.zakkyo": 0.25,
    "shotengai.office": 0.15
+  },
+  "LOCAL_SHOTENGAI": {
+   "inaka.shop": 0.6,
+   "inaka.shop3": 0.25,
+   "inaka.block": 0.15
   }
  },
  "districts": {

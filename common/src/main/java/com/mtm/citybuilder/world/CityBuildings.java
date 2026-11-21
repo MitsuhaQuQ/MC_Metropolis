@@ -102,7 +102,7 @@ public final class CityBuildings {
                     if (part == BuildingLayer.Part.FOUNDATION && y <= floor) {
                         continue;
                     }
-                    String id = palette.id(part, b, position);
+                    String id = palette.id(part, b, position, y);
                     if (id != null) {
                         chunk.setBlockState(pos.set(baseX + x, y, baseZ + z), state(block(id), part, facing, outward), false);
                     }

@@ -165,6 +165,14 @@ public final class BuildingLayer {
         ARCADE_POST,
         /** The roof and fascia of a covered walk. */
         ARCADE_ROOF,
+        /** A covered walk's paving, bricks of several colours. */
+        ARCADE_PAVING,
+        /** A strip of tactile paving along a covered walk. */
+        TACTILE,
+        /** A covered walk's skylight. */
+        ARCADE_GLASS,
+        /** A louvred band under a covered walk's fascia. */
+        LOUVRE,
         /** A light inside, so nothing spawns there. */
         LIGHT
     }
@@ -398,6 +406,15 @@ public final class BuildingLayer {
             // A single-storey machiya (平屋) or small storehouse
             storeys = 1;
         }
+        if (composition.options().containsKey(Slot.ARCADE)) {
+            // A street's lots on one side share the covered walk's kind and colour
+            long street = Hash.of(logic.seed() ^ 0x5A0EL, plot.chain(), plot.side());
+            composition = composition.with(Slot.ARCADE, Catalog.draw(style.options().get(Slot.ARCADE), Hash.unit(street)));
+            if (style.options().containsKey(Slot.ARCADE_COLOR)) {
+                composition = composition.with(Slot.ARCADE_COLOR,
+                        Catalog.draw(style.options().get(Slot.ARCADE_COLOR), Hash.unit(Hash.mix(street ^ 0xC0L))));
+            }
+        }
         // A program the lot was given: standalone where the lot is open (not downtown or in the old town, wide and deep
         // enough for parking in front), else the ground floor of a shop, office or block of flats
         boolean standalone = false;
@@ -489,7 +506,7 @@ public final class BuildingLayer {
             backGap = 1.0;
             depth = 9.0 + 4.0 * Hash.unit(Hash.of(h, 4));
         }
-        if (quarter == Quarter.SHOTENGAI && !standalone && (type == Building.Type.SHOP || type == Building.Type.OFFICE)) {
+        if (!standalone && composition.options().containsKey(Slot.ARCADE) && !composition.is(Slot.ARCADE, "none")) {
             // Back behind the covered walk on its own lot, wall to wall with its neighbours
             front = 3.0;
             sideGap = 0.0;
@@ -526,13 +543,8 @@ public final class BuildingLayer {
         if (quarter == Quarter.BUKE && type == Building.Type.HOUSE) {
             // A samurai house stands well back in its garden, behind its wall
             front = Math.max(3.0, Math.min(5.0 + Math.floor(4.0 * Hash.unit(Hash.of(h, 85))), plot.maxDepth() - backGap - 7.0));
-            sideGap = Math.max(sideGap, 2.0);
+            sideGap = Math.max(sideGap, Math.min(2.0, Math.max(0.0, 0.5 * (plot.frontage() - 7.0))));
             width = Math.floor(plot.frontage() - 2.0 * sideGap);
-        }
-        if (quarter == Quarter.SHOTENGAI && composition.options().containsKey(Slot.ARCADE)) {
-            // A street's lots on one side share the walk's kind
-            long street = Hash.of(logic.seed() ^ 0x5A0EL, plot.chain(), plot.side());
-            composition = composition.with(Slot.ARCADE, Hash.unit(street) < 0.75 ? "canopy" : "gangi");
         }
         depth = Math.floor(Math.min(depth, plot.maxDepth() - front - backGap));
         if (width < 4.0 || depth < 4.0) {
@@ -736,7 +748,33 @@ public final class BuildingLayer {
         return new Building(plot.id(), type, storeys, ground, upper, roof, ridgeAlong, slope, from, to, front, back,
                 step, stepBack, upFrom, upTo, upBack, wingFrom, wingTo, wingBack, chamferLeft, chamferRight, layout, plot.start() - from,
                 plot.end() - from, plot.maxDepth(), parkFrom, parkTo, parkBack, carport, base, ox, oz, p[2], p[3], nx, nz,
-                door, quarter, region, composition, program, standalone, palette, variant, waterside);
+                door, quarter, region, composition, program, standalone, palette, variant, waterside,
+                age(type, quarter, project, standalone, Hash.unit(Hash.of(h, 87))));
+    }
+
+    /**
+     * How weathered a building is: a small town's shopping street and old timber the most, a development's new houses
+     * and a chain's box the least; each building its own share of its kind's.
+     */
+    private static double age(Building.Type type, Quarter quarter, boolean project, boolean standalone, double u) {
+        double base;
+        if (standalone) {
+            base = 0.1;
+        } else if (quarter == Quarter.LOCAL_SHOTENGAI) {
+            base = 0.75;
+        } else if (quarter == Quarter.SHOTENGAI) {
+            base = 0.45;
+        } else if (project) {
+            base = 0.1;
+        } else {
+            base = switch (type) {
+                case MACHIYA, KURA, WORKS -> 0.5;
+                case APARTMENT, SHOP -> 0.35;
+                case HOUSE -> 0.3;
+                case OFFICE -> 0.2;
+            };
+        }
+        return Math.min(1.0, base * (0.3 + 1.4 * u));
     }
 
     /** How far out in front a building's ring reaches: its whole front yard for houses and flats, else a block. */
@@ -1174,6 +1212,26 @@ public final class BuildingLayer {
     /** The highest block a column of a building or its ring has; below the base where the ring carries nothing. */
     public static int top(Column c) {
         Building b = c.building();
+        int top = roofTop(c);
+        if (b != null && !c.ring() && !c.wing() && c.face() == Face.FRONT && kanban(b)) {
+            top = Math.max(top, b.base() + b.wallHeight() + kanbanRise(b));
+        }
+        return top;
+    }
+
+    /** Whether a building has a false front. */
+    private static boolean kanban(Building b) {
+        return b.composition().is(Slot.KANBAN, "kanban") && b.roof() != Building.Roof.FLAT;
+    }
+
+    /** How far a false front rises past the walls: over the gable it faces, or the slope rising behind it. */
+    private static int kanbanRise(Building b) {
+        double span = b.ridgeAlong() ? b.back() - b.front() : b.width();
+        return Math.min(6, 2 + (int) Math.ceil(0.25 * span));
+    }
+
+    private static int roofTop(Column c) {
+        Building b = c.building();
         if (c.wing()) {
             return b.base() + wingRoof(b, c);
         }
@@ -1236,6 +1294,17 @@ public final class BuildingLayer {
             return ringPart(b, c, dy);
         }
         int wallTop = b.wallHeight();
+        if (dy >= wallTop && kanban(b) && c.face() == Face.FRONT) {
+            // The false front: the front wall carried up square past the roof, a sign across it, a coping on top
+            int rise = kanbanRise(b);
+            if (dy < wallTop + rise) {
+                boolean sign = !c.corner() && dy > wallTop && chance(b, 88, 0.6);
+                return sign ? Part.SIGN : Part.WALL;
+            }
+            if (dy == wallTop + rise) {
+                return Part.PARAPET;
+            }
+        }
         if (dy < 0) {
             return Part.FOUNDATION;
         }
@@ -1440,8 +1509,8 @@ public final class BuildingLayer {
 
     /** Whether a building stands behind a covered walk. */
     private static boolean arcaded(Building b) {
-        return b.quarter() == Quarter.SHOTENGAI && !b.composition().is(Slot.ARCADE, "none")
-                && b.composition().options().containsKey(Slot.ARCADE) && b.front() >= 2.0;
+        return !b.standalone() && b.composition().options().containsKey(Slot.ARCADE)
+                && !b.composition().is(Slot.ARCADE, "none") && b.front() >= 2.0;
     }
 
     /**
@@ -1455,34 +1524,49 @@ public final class BuildingLayer {
         if (v >= b.front() || u < -1.0 || u >= b.width() + 1.0) {
             return null;
         }
-        boolean gangi = b.composition().is(Slot.ARCADE, "gangi");
+        String kind = b.composition().get(Slot.ARCADE);
+        boolean gangi = kind.equals("gangi");
         int roof = b.ground();
         boolean edge = v < 1.0;
-        boolean post = edge && Math.floorMod((long) Math.floor(u), gangi ? 3 : 5) == 0;
+        long lu = (long) Math.floor(u);
+        boolean post = edge && Math.floorMod(lu, gangi ? 3 : kind.equals("louvre") ? 4 : 5) == 0;
         if (dy == 0) {
-            return Part.PAVING;
+            if (gangi || edge) {
+                return Part.PAVING;
+            }
+            // Bricks of several colours, a strip of tactile paving down the walk
+            return v < 2.0 ? Part.TACTILE : Part.ARCADE_PAVING;
         }
         if (dy < roof - 1) {
             if (post) {
                 return gangi ? Part.LOG : Part.ARCADE_POST;
             }
-            if (!gangi && !edge && v < 2.0 && dy == roof - 2 && Math.floorMod((long) Math.floor(u), 4) == 2) {
+            if (!gangi && !edge && v < 2.0 && dy == roof - 2 && Math.floorMod(lu, 4) == 2) {
                 return Part.LANTERN;
             }
             return Part.AIR;
         }
         if (dy == roof - 1) {
             if (post || edge) {
-                // The beam, or the fascia, along the edge
-                return gangi ? Part.LOG : Part.ARCADE_ROOF;
+                // The beam, the fascia or its louvred band, along the edge
+                return gangi ? Part.LOG : kind.equals("louvre") && !post ? Part.LOUVRE : Part.ARCADE_ROOF;
             }
             return Part.AIR;
         }
         if (dy == roof) {
-            return gangi ? (v < 1.0 ? Part.ROOF_LOW : Part.ROOF_HIGH) : Part.ARCADE_ROOF;
+            if (gangi) {
+                return v < 1.0 ? Part.ROOF_LOW : Part.ROOF_HIGH;
+            }
+            // A skylight between beams, over all but the walk's edges
+            boolean open = kind.equals("skylight") && v >= 1.0 && v < b.front() - 1.0 && Math.floorMod(lu, 3) != 0;
+            return open ? Part.ARCADE_GLASS : Part.ARCADE_ROOF;
         }
         if (gangi && dy == roof + 1 && v >= b.front() - 1.0) {
             return Part.ROOF_LOW;
+        }
+        if (kind.equals("louvre") && dy == roof + 1 && edge) {
+            // The fascia stands a block proud of the roof
+            return Part.ARCADE_ROOF;
         }
         return Part.NONE;
     }

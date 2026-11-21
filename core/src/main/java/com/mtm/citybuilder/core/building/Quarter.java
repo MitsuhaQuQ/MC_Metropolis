@@ -34,6 +34,12 @@ public enum Quarter {
      */
     SHOTENGAI,
     /**
+     * A small town's shopping street (as in the towns of Tohoku and Hokuriku): two- and three-storey shop houses, many
+     * of them false-fronted (看板建築) before tin roofs, shutters down on a good share, metal siding, mortar and tiles,
+     * all of it aged; covered walks in colours (ochre, cream), with louvred fascias or skylights, or none.
+     */
+    LOCAL_SHOTENGAI,
+    /**
      * A samurai quarter (武家屋敷, as Kakunodate or Kanazawa's Nagamachi): single-storey houses set well back in gardens
      * of tall pines and cherries, behind black board fences or earthen walls on stone bases, a gate in each, a ditch
      * along the street.
