@@ -229,6 +229,34 @@ public final class BuildingLayer {
         TRANSFORMER,
         /** A flare stack's flame. */
         FLARE_TOP,
+        /** A container, one of eight colours. */
+        CONTAINER_0,
+        /** A container, one of eight colours. */
+        CONTAINER_1,
+        /** A container, one of eight colours. */
+        CONTAINER_2,
+        /** A container, one of eight colours. */
+        CONTAINER_3,
+        /** A container, one of eight colours. */
+        CONTAINER_4,
+        /** A container, one of eight colours. */
+        CONTAINER_5,
+        /** A container, one of eight colours. */
+        CONTAINER_6,
+        /** A container, one of eight colours. */
+        CONTAINER_7,
+        /** A crane's steel. */
+        CRANE,
+        /** A crane's machinery house or cab. */
+        CRANE_HOUSE,
+        /** A tank's bund wall (防油堤). */
+        BUND,
+        /** A lorry's cab. */
+        TRUCK_CAB,
+        /** A floodlight. */
+        FLOOD,
+        /** A bollard on a quay. */
+        BOLLARD,
         /** Shelves, chests and barrels against a wall. */
         SHELF,
         /** A low table (a slab). */
@@ -580,13 +608,28 @@ public final class BuildingLayer {
         if (program != null && program.plant()) {
             // The plant's building, set back from the gate, its equipment round it
             // A share of the lot, the rest for the equipment
-            double share = program == Program.POWER_PLANT ? 0.45 : program == Program.PETROCHEMICAL ? 0.3 : 0.25;
-            double most = program == Program.POWER_PLANT ? 36.0 : program == Program.PETROCHEMICAL ? 20.0 : 10.0;
+            double share = switch (program) {
+                case POWER_PLANT -> 0.45;
+                case PETROCHEMICAL -> 0.3;
+                case WAREHOUSE -> 0.6;
+                case PORT -> 0.25;
+                case TANK_FARM, CONTAINER_YARD -> 0.12;
+                default -> 0.25;
+            };
+            double most = switch (program) {
+                case POWER_PLANT -> 36.0;
+                case PETROCHEMICAL -> 20.0;
+                case WAREHOUSE -> 60.0;
+                case PORT -> 40.0;
+                default -> 10.0;
+            };
             double bw = Math.max(6.0, Math.min(Math.floor(share * plot.frontage()), most));
-            front = 6.0;
+            // A warehouse's lorries back up to it across a yard in front
+            front = program == Program.WAREHOUSE ? 10.0 : 6.0;
             sideGap = Math.max(2.0, 0.5 * (plot.frontage() - bw));
             backGap = 2.0;
-            depth = Math.max(5.0, Math.min(Math.floor((share + 0.05) * plot.maxDepth()), program == Program.POWER_PLANT ? 24.0 : 12.0));
+            double deepest = program == Program.WAREHOUSE ? 40.0 : program == Program.POWER_PLANT ? 24.0 : program == Program.PORT ? 16.0 : 12.0;
+            depth = Math.max(5.0, Math.min(Math.floor((share + 0.05) * plot.maxDepth()), deepest));
         }
         if (standalone) {
             // A box set back behind its parking, five blocks of bays and a lane
@@ -1795,7 +1838,8 @@ public final class BuildingLayer {
 
     /** Kinds of a plant's equipment. */
     public enum Equipment {
-        TANK, SPHERE, COLUMN, RACK, FLARE, STACK, BOILER, COAL, GANTRY, TRANSFORMER
+        TANK, SPHERE, COLUMN, RACK, FLARE, STACK, BOILER, COAL, GANTRY, TRANSFORMER,
+        BIG_TANK, CONTAINERS, CONTAINERS_RTG, STS, JIB, TRUCK, LIGHT_TOWER
     }
 
     /**
@@ -1827,8 +1871,19 @@ public final class BuildingLayer {
             case TANK, STACK -> e.r() + 1.0;
             case SPHERE -> e.r() + 1.0;
             case COLUMN, FLARE -> e.r() + 1.5;
-            case RACK, BOILER, COAL, GANTRY -> e.r();
-            case TRANSFORMER -> e.r() + 0.5;
+            case RACK, BOILER, COAL, GANTRY, CONTAINERS, STS, JIB, TRUCK -> e.r();
+            case TRANSFORMER, LIGHT_TOWER -> e.r() + 0.5;
+            case BIG_TANK -> e.r() + 2.5;
+            case CONTAINERS_RTG -> e.r() + 1.0;
+        };
+    }
+
+    /** How far an elongated piece reaches across the frontage's direction (v): a lorry, a pipe rack. */
+    private static double reachAcross(Equip e) {
+        return switch (e.kind()) {
+            case TRUCK -> 1.0;
+            case RACK -> 1.6;
+            default -> reach(e);
         };
     }
 
@@ -1845,6 +1900,13 @@ public final class BuildingLayer {
             case COAL -> new Equip(kind, u, v, 4.5, 3 + (int) Math.floor(2.0 * size));
             case GANTRY -> new Equip(kind, u, v, 3.5, 8 + (int) Math.floor(3.0 * size));
             case TRANSFORMER -> new Equip(kind, u, v, 1.5, 3);
+            case BIG_TANK -> new Equip(kind, u, v, 5.0 + Math.floor(3.0 * size), 8 + (int) Math.floor(6.0 * size));
+            // A block six or (where that will not fit) four blocks out from its middle, stacked two or three high
+            case CONTAINERS, CONTAINERS_RTG -> new Equip(kind, u, v, size < 0.4 ? 4.0 : 6.0, 2 + (int) Math.floorMod((long) Math.floor(size * 97.0), 2L));
+            case STS -> new Equip(kind, u, v, size < 0.4 ? 5.0 : 6.0, 22 + (int) Math.floor(4.0 * size));
+            case JIB -> new Equip(kind, u, v, 7.0, 14 + (int) Math.floor(4.0 * size));
+            case TRUCK -> new Equip(kind, u, v, 3.0, 0);
+            case LIGHT_TOWER -> new Equip(kind, u, v, 0.6, 18 + (int) Math.floor(4.0 * size));
         };
     }
 
@@ -1868,11 +1930,15 @@ public final class BuildingLayer {
         java.util.List<Equipment> first = switch (program) {
             case POWER_PLANT -> java.util.List.of(Equipment.STACK, Equipment.BOILER);
             case PETROCHEMICAL -> java.util.List.of(Equipment.FLARE);
+            case PORT -> java.util.List.of(Equipment.STS, Equipment.STS, Equipment.JIB);
             default -> java.util.List.of();
         };
+        // The quay's cranes stand along the back, on the water
+        java.util.List<double[]> quay = new java.util.ArrayList<>(points);
+        quay.sort(java.util.Comparator.comparingDouble(p -> -p[1]));
         int k = 0;
         for (Equipment kind : first) {
-            java.util.List<double[]> order = points;
+            java.util.List<double[]> order = kind == Equipment.STS || kind == Equipment.JIB ? quay : points;
             if (kind == Equipment.FLARE) {
                 order = new java.util.ArrayList<>(points);
                 java.util.Collections.reverse(order);
@@ -1882,11 +1948,18 @@ public final class BuildingLayer {
                 out.add(placed);
             }
         }
-        for (int tries = 0; tries < 60 && out.size() < 40; tries++) {
+        int most = program == Program.WAREHOUSE ? 12 : 40;
+        for (int tries = 0; tries < 60 && out.size() < most; tries++) {
             double a = Hash.unit(Hash.of(b.variant(), k, 1));
             Equipment kind = switch (program) {
                 case POWER_PLANT -> a < 0.3 ? Equipment.TANK : a < 0.55 ? Equipment.COAL : a < 0.85 ? Equipment.GANTRY : Equipment.TRANSFORMER;
                 case PETROCHEMICAL -> a < 0.3 ? Equipment.TANK : a < 0.45 ? Equipment.SPHERE : a < 0.65 ? Equipment.COLUMN : Equipment.RACK;
+                case TANK_FARM -> a < 0.55 ? Equipment.BIG_TANK : a < 0.8 ? Equipment.SPHERE : a < 0.92 ? Equipment.RACK : Equipment.LIGHT_TOWER;
+                case CONTAINER_YARD -> a < 0.45 ? Equipment.CONTAINERS_RTG : a < 0.75 ? Equipment.CONTAINERS
+                        : a < 0.92 ? Equipment.TRUCK : Equipment.LIGHT_TOWER;
+                case PORT -> a < 0.4 ? Equipment.CONTAINERS_RTG : a < 0.65 ? Equipment.CONTAINERS
+                        : a < 0.9 ? Equipment.TRUCK : Equipment.LIGHT_TOWER;
+                case WAREHOUSE -> a < 0.8 ? Equipment.TRUCK : Equipment.LIGHT_TOWER;
                 default -> a < 0.55 ? Equipment.GANTRY : Equipment.TRANSFORMER;
             };
             Equip placed = place(b, plots, plot, out, points, kind, Hash.unit(Hash.of(b.variant(), k, 2)));
@@ -1915,25 +1988,25 @@ public final class BuildingLayer {
     /** Whether a piece's square lies on the lot, clear of the building, the gate's road and the pieces placed. */
     private static boolean fits(Building b, TownPlots plots, Plot plot, java.util.List<Equip> placed, Equip e) {
         double r = reach(e);
+        double rv = reachAcross(e);
         double w = b.width();
         // Clear of the building (a block round it) and the road in from the gate
-        if (e.u() + r > -1.0 && e.u() - r < w + 1.0 && e.v() + r > b.front() - 1.0 && e.v() - r < b.back() + 1.0) {
+        if (e.u() + r > -1.0 && e.u() - r < w + 1.0 && e.v() + rv > b.front() - 1.0 && e.v() - rv < b.back() + 1.0) {
             return false;
         }
-        if (Math.abs(e.u() - 0.5 * w) - r < 4.0 && e.v() - r < b.front()) {
+        if (Math.abs(e.u() - 0.5 * w) - r < 4.0 && e.v() - rv < b.front()) {
             return false;
         }
-        if (e.v() - r < 1.5) {
+        if (e.v() - rv < 1.5) {
             return false;
         }
         for (Equip o : placed) {
-            double gap = r + reach(o) + 1.0;
-            if (Math.abs(o.u() - e.u()) < gap && Math.abs(o.v() - e.v()) < gap) {
+            if (Math.abs(o.u() - e.u()) < r + reach(o) + 1.0 && Math.abs(o.v() - e.v()) < rv + reachAcross(o) + 1.0) {
                 return false;
             }
         }
         for (double du = -r; du <= r + 0.01; du += Math.max(1.0, r / 2.0)) {
-            for (double dv = -r; dv <= r + 0.01; dv += Math.max(1.0, r / 2.0)) {
+            for (double dv = -rv; dv <= rv + 0.01; dv += Math.max(1.0, rv / 2.0)) {
                 if (!onLot(b, plots, plot, e.u() + du, e.v() + dv)) {
                     return false;
                 }
@@ -1950,6 +2023,13 @@ public final class BuildingLayer {
         double u = c.u();
         double v = c.v();
         double w = b.width();
+        if (b.program() == Program.PORT && c.lot() == Face.BACK) {
+            // The quay's edge on the water, bollards along it
+            if (dy == 0) {
+                return Part.BANK;
+            }
+            return dy == 1 && Math.floorMod((long) Math.floor(u), 8L) == 0 ? Part.BOLLARD : Part.NONE;
+        }
         if (c.lot() != Face.NONE || v < 1.0) {
             boolean gate = v < 1.0 && Math.abs(u - 0.5 * w) < 4.0;
             if (dy == 0) {
@@ -2131,10 +2211,192 @@ public final class BuildingLayer {
                 return Math.abs(du) < r && Math.abs(dv) < 1.0 && dy == 3 && Math.floorMod((long) Math.floor(du + r), 2L) == 0
                         ? Part.POLE : Part.NONE;
             }
+            case BIG_TANK -> {
+                // A big tank inside its square bund
+                double ring = Math.max(Math.abs(du), Math.abs(dv));
+                if (ring >= r + 2.5) {
+                    return null;
+                }
+                if (ring >= r + 1.5) {
+                    return dy == 0 ? Part.PAVING : dy == 1 ? Part.BUND : Part.NONE;
+                }
+                if (d >= r) {
+                    return dy == 0 ? Part.GRAVEL : Part.NONE;
+                }
+                if (dy == 0) {
+                    return Part.PAVING;
+                }
+                if (dy > h) {
+                    return Part.NONE;
+                }
+                return dy == h || d >= r - 1.0 ? Part.TANK_SHELL : Part.AIR;
+            }
+            case CONTAINERS, CONTAINERS_RTG -> {
+                return containers(e, du, dv, dy);
+            }
+            case STS -> {
+                return sts(e, du, dv, dy);
+            }
+            case JIB -> {
+                return jib(e, du, dv, dy);
+            }
+            case TRUCK -> {
+                if (Math.abs(du) >= r || Math.abs(dv) >= 1.0) {
+                    return null;
+                }
+                if (dy == 0) {
+                    return Part.PAVING;
+                }
+                boolean cab = du >= r - 2.0;
+                if (cab) {
+                    return dy <= 2 ? Part.TRUCK_CAB : Part.NONE;
+                }
+                return dy <= 3 ? container(e, 0, (int) Math.floor(du), 0) : Part.NONE;
+            }
+            case LIGHT_TOWER -> {
+                if (d >= r + 0.5) {
+                    return null;
+                }
+                if (dy == 0) {
+                    return Part.PAVING;
+                }
+                if (d >= r) {
+                    return Part.NONE;
+                }
+                return dy < h ? Part.POLE : dy == h ? Part.FLOOD : Part.NONE;
+            }
             default -> {
                 return null;
             }
         }
+    }
+
+    /** A container's colour, by where it stands in its block and its tier. */
+    private static Part container(Equip e, int row, int col, int tier) {
+        long hash = Hash.of((long) Math.floor(e.u() * 2.0) * 31L + (long) Math.floor(e.v() * 2.0), row, col * 8L + tier);
+        return switch ((int) Math.floorMod(hash, 8L)) {
+            case 0 -> Part.CONTAINER_0;
+            case 1 -> Part.CONTAINER_1;
+            case 2 -> Part.CONTAINER_2;
+            case 3 -> Part.CONTAINER_3;
+            case 4 -> Part.CONTAINER_4;
+            case 5 -> Part.CONTAINER_5;
+            case 6 -> Part.CONTAINER_6;
+            default -> Part.CONTAINER_7;
+        };
+    }
+
+    /**
+     * A block of containers: rows along the frontage, each container six long and two wide, three high a tier, stacked
+     * one to {@code h} tiers (each stack its own), lanes a block wide between rows and between containers; with a
+     * gantry crane on tyres over the block (RTG): a portal at each end of a span across the rows, its girders along.
+     */
+    private static Part containers(Equip e, double du, double dv, int dy) {
+        double r = e.r();
+        if (e.kind() == Equipment.CONTAINERS_RTG) {
+            // The crane: legs outside the rows, at two portals four blocks apart, girders across at the top
+            double span = r + 1.0;
+            if (Math.abs(du) < span && Math.abs(dv) < span) {
+                int top = 3 * e.h() + 4;
+                double cu = Math.floor(e.u()) % 5 - 2.0;
+                boolean portal = Math.abs(du - cu) < 0.5 || Math.abs(du - cu - 4.0) < 0.5;
+                boolean outside = Math.abs(dv) >= r;
+                if (portal && outside && dy >= 1 && dy <= top) {
+                    return Part.CRANE;
+                }
+                if (portal && dy == top && !outside) {
+                    return Part.CRANE;
+                }
+                if (outside && dy == top && du >= cu && du <= cu + 4.0) {
+                    return Part.CRANE;
+                }
+                if (Math.abs(du - cu - 2.0) < 1.0 && Math.abs(dv) < 1.0 && dy == top - 1) {
+                    // The trolley
+                    return Part.CRANE_HOUSE;
+                }
+                if (outside) {
+                    return dy == 0 ? Part.PAVING : Part.NONE;
+                }
+            }
+        }
+        if (Math.abs(du) >= r || Math.abs(dv) >= r) {
+            return null;
+        }
+        if (dy == 0) {
+            return Part.PAVING;
+        }
+        int row = (int) Math.floor((dv + r) / 3.0);
+        boolean inRow = (dv + r) - 3.0 * row < 2.0;
+        int col = (int) Math.floor((du + r) / 7.0);
+        boolean inCol = (du + r) - 7.0 * col < 6.0;
+        if (!inRow || !inCol) {
+            return Part.NONE;
+        }
+        int tiers = 1 + (int) Math.floorMod(Hash.of((long) Math.floor(e.u() * 2.0), row, col), (long) e.h());
+        int tier = (dy - 1) / 3;
+        return tier < tiers ? container(e, row, col, tier) : Part.NONE;
+    }
+
+    /**
+     * A ship-to-shore gantry crane (岸壁クレーン), on the quay: four legs, the girders along its boom across the lot
+     * towards the water at its top, a machinery house on them, a mast over the legs.
+     */
+    private static Part sts(Equip e, double du, double dv, int dy) {
+        double r = e.r();
+        if (Math.abs(du) >= r || Math.abs(dv) >= r) {
+            return null;
+        }
+        int h = e.h();
+        if (dy == 0) {
+            return Part.PAVING;
+        }
+        boolean legU = Math.abs(du) >= r - 2.0 && Math.abs(du) < r - 1.0;
+        boolean legV = Math.abs(dv) >= r - 2.0 && Math.abs(dv) < r - 1.0;
+        if (legU && legV && dy < h) {
+            return Part.CRANE;
+        }
+        if (legU && dy == h - 6 && Math.abs(dv) < r - 1.0) {
+            // A cross beam between each side's legs
+            return Part.CRANE;
+        }
+        if (legU && (dy == h || dy == h + 1)) {
+            // The girders, the full length of the boom
+            return Part.CRANE;
+        }
+        if (Math.abs(du) < r - 2.0 && dv >= -r + 1.0 && dv < -1.0 && dy >= h + 1 && dy <= h + 3) {
+            return Part.CRANE_HOUSE;
+        }
+        if (Math.abs(du) < 1.0 && Math.abs(dv + 0.5 * r) < 1.0 && dy > h + 3 && dy <= h + 8) {
+            return Part.CRANE;
+        }
+        return Part.NONE;
+    }
+
+    /** A harbour crane (ジブクレーン): a pedestal, a tower, a cab, its jib reaching out towards the water. */
+    private static Part jib(Equip e, double du, double dv, int dy) {
+        double r = e.r();
+        if (Math.abs(du) >= r || Math.abs(dv) >= r) {
+            return null;
+        }
+        int h = e.h();
+        if (dy == 0) {
+            return Math.abs(du) < 2.0 && Math.abs(dv) < 2.0 ? Part.PAVING : null;
+        }
+        if (Math.abs(du) < 1.5 && Math.abs(dv) < 1.5 && dy <= 4) {
+            return Part.CRANE;
+        }
+        if (Math.abs(du) < 1.0 && Math.abs(dv) < 1.0 && dy < h) {
+            return Part.CRANE;
+        }
+        if (Math.abs(du) < 1.5 && Math.abs(dv) < 1.5 && dy >= h && dy <= h + 2) {
+            return Part.CRANE_HOUSE;
+        }
+        // The jib: up from the cab towards the water
+        if (Math.abs(du) < 0.5 && dv >= 1.5) {
+            int at = h + 2 + (int) Math.floor(0.8 * (dv - 1.5));
+            return dy == at ? Part.CRANE : Part.NONE;
+        }
+        return Part.NONE;
     }
 
     /**

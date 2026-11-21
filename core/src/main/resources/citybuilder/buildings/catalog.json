@@ -2859,6 +2859,41 @@
   "brandPlant": [
    "minecraft:light_gray_concrete"
   ],
+  "container": [
+   "minecraft:red_concrete",
+   "minecraft:blue_concrete",
+   "minecraft:orange_concrete",
+   "minecraft:green_concrete",
+   "minecraft:white_concrete",
+   "minecraft:gray_concrete",
+   "minecraft:cyan_concrete",
+   "minecraft:brown_concrete"
+  ],
+  "crane": [
+   "minecraft:yellow_concrete",
+   "minecraft:white_concrete",
+   "minecraft:orange_concrete",
+   "minecraft:light_blue_concrete"
+  ],
+  "craneHouse": [
+   "minecraft:white_concrete"
+  ],
+  "bund": [
+   "minecraft:smooth_stone",
+   "minecraft:stone_bricks"
+  ],
+  "truckCab": [
+   "minecraft:white_concrete",
+   "minecraft:blue_concrete",
+   "minecraft:red_concrete",
+   "minecraft:green_concrete"
+  ],
+  "flood": [
+   "minecraft:sea_lantern"
+  ],
+  "bollard": [
+   "minecraft:polished_blackstone_wall"
+  ],
   "chimney": [
    "minecraft:bricks",
    "minecraft:light_gray_concrete",
@@ -4446,6 +4481,136 @@
     }
    }
   },
+  "plant.tankfarm": {
+   "type": "WORKS",
+   "storeys": 1,
+   "palettes": {
+    "plant.1": 1.0,
+    "plant.2": 1.0,
+    "plant.3": 1.0,
+    "plant.4": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "WORKS_WALL": {
+     "plain": 1.0
+    },
+    "WORKS_WINDOWS": {
+     "band": 1.0
+    },
+    "WORKS_FENCE": {
+     "mesh": 1.0
+    }
+   }
+  },
+  "plant.containers": {
+   "type": "WORKS",
+   "storeys": 1,
+   "palettes": {
+    "plant.1": 1.0,
+    "plant.2": 1.0,
+    "plant.3": 1.0,
+    "plant.4": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "WORKS_WALL": {
+     "plain": 1.0
+    },
+    "WORKS_WINDOWS": {
+     "band": 1.0
+    },
+    "WORKS_SIGN": {
+     "sign": 0.6,
+     "none": 0.4
+    },
+    "WORKS_FENCE": {
+     "mesh": 1.0
+    }
+   }
+  },
+  "plant.port": {
+   "type": "WORKS",
+   "storeys": 1,
+   "palettes": {
+    "works.1": 1.0,
+    "works.2": 1.0,
+    "works.3": 1.0,
+    "works.4": 1.0,
+    "works.5": 1.0,
+    "works.6": 1.0,
+    "works.7": 1.0,
+    "works.8": 1.0,
+    "works.9": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.6,
+     "flat": 0.4
+    },
+    "LOADING": {
+     "shutters": 1.0
+    },
+    "WORKS_WALL": {
+     "ribbed": 0.7,
+     "plain": 0.3
+    },
+    "WORKS_WINDOWS": {
+     "high": 1.0
+    },
+    "WORKS_SIGN": {
+     "sign": 0.7,
+     "none": 0.3
+    },
+    "WORKS_FENCE": {
+     "mesh": 1.0
+    }
+   }
+  },
+  "plant.warehouse": {
+   "type": "WORKS",
+   "storeys": 2,
+   "palettes": {
+    "works.1": 1.0,
+    "works.2": 1.0,
+    "works.3": 1.0,
+    "works.4": 1.0,
+    "works.5": 1.0,
+    "works.6": 1.0,
+    "works.7": 1.0,
+    "works.8": 1.0,
+    "works.9": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 0.7,
+     "gable": 0.3
+    },
+    "LOADING": {
+     "shutters": 1.0
+    },
+    "WORKS_WALL": {
+     "ribbed": 0.6,
+     "band": 0.4
+    },
+    "WORKS_WINDOWS": {
+     "high": 0.6,
+     "none": 0.4
+    },
+    "WORKS_SIGN": {
+     "sign": 0.8,
+     "none": 0.2
+    },
+    "WORKS_FENCE": {
+     "mesh": 0.7,
+     "none": 0.3
+    }
+   }
+  },
   "works.warehouse": {
    "type": "WORKS",
    "palettes": {
@@ -5876,6 +6041,22 @@
   },
   "SUBSTATION": {
    "standalone": "plant.substation",
+   "brand": "brandPlant"
+  },
+  "TANK_FARM": {
+   "standalone": "plant.tankfarm",
+   "brand": "brandPlant"
+  },
+  "CONTAINER_YARD": {
+   "standalone": "plant.containers",
+   "brand": "brandPlant"
+  },
+  "PORT": {
+   "standalone": "plant.port",
+   "brand": "brandPlant"
+  },
+  "WAREHOUSE": {
+   "standalone": "plant.warehouse",
    "brand": "brandPlant"
   }
  },

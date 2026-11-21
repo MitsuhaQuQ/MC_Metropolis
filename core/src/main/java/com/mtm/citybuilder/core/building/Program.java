@@ -21,10 +21,24 @@ public enum Program {
      */
     POWER_PLANT,
     /** A substation (変電所): gantries and transformers in a fenced yard, a small control building. */
-    SUBSTATION;
+    SUBSTATION,
+    /**
+     * An oil and gas tank farm (石油・ガス備蓄基地): big tanks each inside its bund (防油堤), spherical gas holders,
+     * pipe racks, floodlight masts; a small control building.
+     */
+    TANK_FARM,
+    /** A container yard (コンテナヤード): containers stacked in blocks, gantry cranes over some, lorries, floodlights. */
+    CONTAINER_YARD,
+    /**
+     * A cargo wharf (貨物埠頭): along its back, on the water, a quay with bollards and ship-to-shore gantry cranes and a
+     * harbour crane; container blocks and lorries behind; a transit shed with loading bays.
+     */
+    PORT,
+    /** A distribution warehouse (倉庫・物流センター): a big shed with loading bays across its front, lorries in its yard. */
+    WAREHOUSE;
 
     /** Whether the program is an industrial plant, filling its lot with its equipment rather than standing in a box. */
     public boolean plant() {
-        return this == PETROCHEMICAL || this == POWER_PLANT || this == SUBSTATION;
+        return ordinal() >= PETROCHEMICAL.ordinal();
     }
 }

@@ -461,8 +461,10 @@ class BuildingLayerTest {
             java.util.List<BuildingLayer.Equip> kit = BuildingLayer.plantEquipment(b);
             for (BuildingLayer.Equip e : kit) {
                 // Every piece stays on the lot and off the building
-                assertTrue(e.u() - e.r() >= b.lotFrom() && e.u() + e.r() <= b.lotTo() && e.v() + e.r() <= b.lotDepth(), "off the lot: " + e);
-                boolean clear = e.u() + e.r() <= 0.0 || e.u() - e.r() >= b.width() || e.v() + e.r() <= b.front() || e.v() - e.r() >= b.back();
+                // A rack or a lorry is narrow across the frontage's direction
+                double rv = e.kind() == BuildingLayer.Equipment.RACK ? 1.6 : e.kind() == BuildingLayer.Equipment.TRUCK ? 1.0 : e.r();
+                assertTrue(e.u() - e.r() >= b.lotFrom() && e.u() + e.r() <= b.lotTo() && e.v() + rv <= b.lotDepth(), "off the lot: " + e);
+                boolean clear = e.u() + e.r() <= 0.0 || e.u() - e.r() >= b.width() || e.v() + rv <= b.front() || e.v() - rv >= b.back();
                 assertTrue(clear, "on the building: " + e);
             }
         }
@@ -491,6 +493,48 @@ class BuildingLayerTest {
         assertEquals(BuildingLayer.Part.STACK, BuildingLayer.equipPart(stack, stack.u() + stack.r() - 0.5, stack.v(), 60));
         assertTrue(BuildingLayer.plantEquipment(found.get(Program.PETROCHEMICAL)).stream()
                 .anyMatch(e -> e.kind() == BuildingLayer.Equipment.FLARE), "no flare");
+    }
+
+    @Test
+    void logisticsLotsFillWithTheirEquipment() {
+        CityLogic logic = logic();
+        Settlement city = city(logic);
+        CityExtent extent = logic.extent(city);
+        TownPlots plots = logic.plots().town(city);
+        BuildingLayer layer = logic.buildings();
+        Program[] kinds = {Program.TANK_FARM, Program.CONTAINER_YARD, Program.PORT, Program.WAREHOUSE};
+        layer.quarters(new QuarterMap() {
+            @Override
+            public Quarter at(Plot plot) {
+                return Quarter.ORDINARY;
+            }
+
+            @Override
+            public Program program(Plot plot) {
+                return plot.frontage() < 24.0 || plot.maxDepth() < 26.0 ? null : kinds[(int) Math.floorMod(plot.id(), 4L)];
+            }
+        });
+        // Each kind somewhere with what makes it what it is: tanks, containers, a quay crane, lorries
+        Map<Program, java.util.Set<BuildingLayer.Equipment>> key = Map.of(
+                Program.TANK_FARM, java.util.Set.of(BuildingLayer.Equipment.BIG_TANK, BuildingLayer.Equipment.SPHERE),
+                Program.CONTAINER_YARD, java.util.Set.of(BuildingLayer.Equipment.CONTAINERS, BuildingLayer.Equipment.CONTAINERS_RTG),
+                Program.PORT, java.util.Set.of(BuildingLayer.Equipment.STS),
+                Program.WAREHOUSE, java.util.Set.of(BuildingLayer.Equipment.TRUCK));
+        Map<Program, Building> found = new EnumMap<>(Program.class);
+        Map<Program, Integer> lots = new EnumMap<>(Program.class);
+        for (double x = extent.coreX() - 2500; x < extent.coreX() + 2500 && found.size() < 4; x += 8) {
+            for (double z = extent.coreZ() - 2500; z < extent.coreZ() + 2500 && found.size() < 4; z += 8) {
+                Plot plot = plots.at(x, z);
+                Building b = layer.building(plots, plot);
+                if (b != null && BuildingLayer.plant(b)) {
+                    lots.merge(b.program(), 1, Integer::sum);
+                    if (BuildingLayer.plantEquipment(b).stream().anyMatch(e -> key.get(b.program()).contains(e.kind()))) {
+                        found.putIfAbsent(b.program(), b);
+                    }
+                }
+            }
+        }
+        assertTrue(found.size() == 4, "found: " + found.keySet() + " of lots " + lots);
     }
 
     /** Whether a point in a building's frame lies on its back corridor. */
