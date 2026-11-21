@@ -77,6 +77,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/street", this::street);
             route(http, "/canal", this::canal);
             route(http, "/airport", this::airport);
+            route(http, "/road", this::road);
             route(http, "/station", this::station);
             route(http, "/stop", this::stop);
             http.start();
@@ -398,6 +399,64 @@ public final class TestKit implements DedicatedServerModInitializer {
         if (overworld().hasChunk(bx >> 4, bz >> 4)) {
             found.put("ground", overworld().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz));
         }
+        return found;
+    }
+
+    /**
+     * The point of an intercity road (L4) nearest (x, z) within 8 km, outside the towns' built land and in the middle
+     * of a stretch of one kind ({@code kind}: SURFACE, SWITCHBACK, BRIDGE or TUNNEL, any if left out), as this world
+     * routed it: {found, x, z, road (its height), ground, kind, heading in degrees, width, road key}.
+     */
+    private Object road(Map<String, String> query, String body) {
+        double x = Double.parseDouble(query.get("x"));
+        double z = Double.parseDouble(query.get("z"));
+        String want = query.get("kind");
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if (logic == null) {
+            return Map.of("found", false);
+        }
+        double built = logic.settings().streets.builtIntensity;
+        com.mtm.citybuilder.core.road.RoadRoute best = null;
+        int bestIndex = -1;
+        double bestDistance = Double.POSITIVE_INFINITY;
+        for (com.mtm.citybuilder.core.road.RoadEdge edge : logic.roads(x - 8000, z - 8000, x + 8000, z + 8000)) {
+            com.mtm.citybuilder.core.road.RoadRoute route = logic.route(edge);
+            for (int i = 3; i < route.samples() - 3; i++) {
+                double d = Math.hypot(route.x(i) - x, route.z(i) - z);
+                if (d >= bestDistance || d > 8000) {
+                    continue;
+                }
+                com.mtm.citybuilder.core.road.RoadKind kind = route.kind(i);
+                if (want != null && !kind.name().equals(want)) {
+                    continue;
+                }
+                boolean run = true;
+                for (int k = i - 3; k <= i + 3; k++) {
+                    run &= route.kind(k) == kind;
+                }
+                com.mtm.citybuilder.core.extent.UrbanSample sample = logic.urban(route.x(i), route.z(i));
+                if (!run || sample.owner() != null && sample.intensity() > built) {
+                    continue;
+                }
+                best = route;
+                bestIndex = i;
+                bestDistance = d;
+            }
+        }
+        if (best == null) {
+            return Map.of("found", false);
+        }
+        int i = bestIndex;
+        Map<String, Object> found = new java.util.LinkedHashMap<>();
+        found.put("found", true);
+        found.put("x", best.x(i));
+        found.put("z", best.z(i));
+        found.put("road", best.road(i));
+        found.put("ground", best.ground(i));
+        found.put("kind", best.kind(i).name());
+        found.put("heading", Math.toDegrees(Math.atan2(best.z(i + 1) - best.z(i - 1), best.x(i + 1) - best.x(i - 1))));
+        found.put("width", best.width());
+        found.put("key", best.edge().key());
         return found;
     }
 
