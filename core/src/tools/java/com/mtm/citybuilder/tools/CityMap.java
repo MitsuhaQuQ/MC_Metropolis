@@ -142,6 +142,10 @@ public final class CityMap {
                 // quarters really lie is for the layers that lay out the town to say
                 // preview:PROGRAMS gives one lot in ten a program (convenience store, fast food, post office), to see
                 // them; where they really are is for the layers before to say
+                boolean flats = "FLATS".equals(quarter);
+                if (flats) {
+                    quarter = null;
+                }
                 if (quarter != null && quarter.endsWith("_CUT")) {
                     // preview:<QUARTER>_CUT cuts every building away over its ground floor's furniture, to see inside
                     BuildingPreview.cut = 2;
@@ -210,10 +214,34 @@ public final class CityMap {
                 }
                 // Isometric picture of the buildings: size is the area's edge in blocks, scale the pixels per block,
                 // preview1..3 turn it a quarter at a time
-                streetStats(logic, centerX, centerZ);
+                StreetPlan near = streetStats(logic, centerX, centerZ);
+                double cx = centerX;
+                double cz = centerZ;
+                if (flats) {
+                    // preview:FLATS looks for the nearest block of flats with open corridors and centres on it
+                    com.mtm.citybuilder.core.plot.TownPlots town = logic.plots().town(near.settlement());
+                    double best = Double.MAX_VALUE;
+                    for (double x = centerX - 1500; x <= centerX + 1500; x += 6) {
+                        for (double z = centerZ - 1500; z <= centerZ + 1500; z += 6) {
+                            double d = (x - centerX) * (x - centerX) + (z - centerZ) * (z - centerZ);
+                            if (d >= best) {
+                                continue;
+                            }
+                            com.mtm.citybuilder.core.plot.Plot p = town.at(x, z);
+                            com.mtm.citybuilder.core.building.Building b = p == null ? null : logic.buildings().building(town, p);
+                            if (b != null && b.type() == com.mtm.citybuilder.core.building.Building.Type.APARTMENT
+                                    && b.composition().is(com.mtm.citybuilder.core.building.Slot.ACCESS, "corridor") && b.step() >= 3) {
+                                best = d;
+                                cx = x;
+                                cz = z;
+                            }
+                        }
+                    }
+                    System.out.printf("Flats with open corridors at %.0f %.0f%n", cx, cz);
+                }
                 start = System.nanoTime();
                 int view = layer.length() > 7 ? layer.charAt(7) - '0' : 0;
-                image = BuildingPreview.render(logic, centerX, centerZ, size, scale, view);
+                image = BuildingPreview.render(logic, cx, cz, size, scale, view);
             }
             case "highspeed" -> {
                 List<HighSpeedLine> lines = highSpeedStats(logic, centerX, centerZ, half);

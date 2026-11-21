@@ -179,6 +179,7 @@ public record Palette(String wall, String accent, String trim, String window, St
             case EARTH -> c.material("earth", variant);
             case PARTITION -> c.material(building.type() == Building.Type.MACHIYA ? "fusuma" : "partition", variant);
             case STAIRS -> c.material("stairs", variant);
+            case STAIRS_FRONT -> c.material("outerStairs", variant);
             case SHELF -> c.material("shelf", position);
             case TABLE -> c.material("table", variant);
             case KITCHEN -> c.material("kitchen", position);

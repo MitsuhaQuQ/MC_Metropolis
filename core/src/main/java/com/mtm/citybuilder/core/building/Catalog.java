@@ -223,7 +223,7 @@ public final class Catalog {
             "toroCap", "gravel", "board", "plaster", "spike", "fasciaLit", "display", "stand", "brandKonbini",
             "brandFastfood", "brandPost", "postbox", "line", "pole", "ad", "baseWall", "upperWall", "step", "tenantSign", "shoki", "bank", "water", "blackBoard", "arcadePost", "arcadeRoof", "arcadePaving", "tactile", "arcadeGlass", "louvre", "rust", "andon", "tobukuro", "gatepost", "gateLight", "futon",
             "solar", "antenna", "heater", "oni", "yago", "tatami", "earth", "partition", "fusuma", "stairs", "shelf", "table",
-            "kitchen", "counter", "desk", "storage");
+            "kitchen", "counter", "desk", "storage", "outerStairs");
 
     /** Gson is used here only. */
     private static final class Json {

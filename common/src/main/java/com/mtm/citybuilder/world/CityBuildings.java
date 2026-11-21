@@ -144,11 +144,12 @@ public final class CityBuildings {
             boolean high = part == BuildingLayer.Part.ROOF_HIGH || part == BuildingLayer.Part.CARPORT;
             state = state.setValue(SlabBlock.TYPE, high ? SlabType.TOP : SlabType.BOTTOM);
         } else if (block instanceof DoorBlock) {
-            state = state.setValue(DoorBlock.FACING, facing)
+            state = state.setValue(DoorBlock.FACING, outward)
                     .setValue(DoorBlock.HALF, part == BuildingLayer.Part.DOOR_UPPER ? DoubleBlockHalf.UPPER : DoubleBlockHalf.LOWER);
         } else if (block instanceof net.minecraft.world.level.block.StairBlock) {
             // Rising away from the street
-            state = state.setValue(net.minecraft.world.level.block.StairBlock.FACING, facing.getOpposite());
+            state = state.setValue(net.minecraft.world.level.block.StairBlock.FACING,
+                    part == BuildingLayer.Part.STAIRS_FRONT ? facing : facing.getOpposite());
         } else if (block instanceof LeavesBlock) {
             state = state.setValue(LeavesBlock.PERSISTENT, true);
         }

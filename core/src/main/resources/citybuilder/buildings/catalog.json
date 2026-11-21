@@ -2485,6 +2485,11 @@
    "minecraft:oak_stairs",
    "minecraft:dark_oak_stairs"
   ],
+  "outerStairs": [
+   "minecraft:polished_andesite_stairs",
+   "minecraft:stone_stairs",
+   "minecraft:smooth_quartz_stairs"
+  ],
   "shelf": [
    "minecraft:bookshelf",
    "minecraft:barrel",

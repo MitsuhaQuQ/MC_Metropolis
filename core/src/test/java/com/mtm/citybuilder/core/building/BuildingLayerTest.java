@@ -275,6 +275,92 @@ class BuildingLayerTest {
         assertTrue(alike < 0.02 * pairs, "alike " + alike + " of " + pairs);
     }
 
+    @Test
+    void outsideStairsReachEveryFloor() {
+        CityLogic logic = logic();
+        Settlement city = city(logic);
+        CityExtent extent = logic.extent(city);
+        TownPlots plots = logic.plots().town(city);
+        BuildingLayer layer = logic.buildings();
+        Map<Long, Building> found = new HashMap<>();
+        for (double x = extent.coreX() - 3000; x < extent.coreX() + 3000 && found.size() < 6; x += 5) {
+            for (double z = extent.coreZ() - 3000; z < extent.coreZ() + 3000 && found.size() < 6; z += 5) {
+                Plot plot = plots.at(x, z);
+                Building b = layer.building(plots, plot);
+                if (b != null && b.type() == Building.Type.APARTMENT && b.composition().is(Slot.ACCESS, "corridor")
+                        && b.step() >= 3) {
+                    found.putIfAbsent(b.id(), b);
+                }
+            }
+        }
+        assertTrue(!found.isEmpty(), "no flats with open corridors");
+        for (Building b : found.values()) {
+            // Walk from the ground-floor corridor: up the stair, along the walkways, to every floor's corridor
+            Set<Long> seen = new HashSet<>();
+            java.util.ArrayDeque<int[]> queue = new java.util.ArrayDeque<>();
+            Set<Integer> reached = new HashSet<>();
+            int ox = (int) Math.floor(b.ox());
+            int oz = (int) Math.floor(b.oz());
+            int[] start = null;
+            for (int x = ox - 40; x < ox + 40 && start == null; x++) {
+                for (int z = oz - 40; z < oz + 40 && start == null; z++) {
+                    double[] l = b.local(x + 0.5, z + 0.5);
+                    if (corridor(b, l) && stand(b, x, z, 1)) {
+                        start = new int[]{x, z, 1};
+                    }
+                }
+            }
+            assertNotNull(start, "no ground corridor for flats " + b.id());
+            queue.add(start);
+            while (!queue.isEmpty()) {
+                int[] at = queue.poll();
+                long key = ((long) at[0] << 40) ^ ((long) (at[1] & 0xFFFFF) << 12) ^ at[2];
+                if (!seen.add(key)) {
+                    continue;
+                }
+                if (corridor(b, b.local(at[0] + 0.5, at[1] + 0.5))) {
+                    reached.add(at[2]);
+                }
+                for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                    for (int up = -1; up <= 1; up++) {
+                        int nx = at[0] + d[0];
+                        int nz = at[1] + d[1];
+                        int ny = at[2] + up;
+                        if (inAccess(b, b.local(nx + 0.5, nz + 0.5)) && stand(b, nx, nz, ny)) {
+                            queue.add(new int[]{nx, nz, ny});
+                        }
+                    }
+                }
+            }
+            for (int k = 1; k < b.step(); k++) {
+                assertTrue(reached.contains(b.floorOf(k) + 1), "flats " + b.id() + " floor " + k + " not reached: " + reached);
+            }
+        }
+    }
+
+    /** Whether a point in a building's frame lies on its back corridor. */
+    private static boolean corridor(Building b, double[] l) {
+        return l[1] >= b.back() && l[1] < b.back() + BuildingLayer.CORRIDOR && l[0] >= 0.0 && l[0] < b.width() + BuildingLayer.STAIR_SIDE;
+    }
+
+    /** Whether a point in a building's frame lies on its corridor or its outside stair. */
+    private static boolean inAccess(Building b, double[] l) {
+        return corridor(b, l) || l[0] >= b.width() && l[0] < b.width() + BuildingLayer.STAIR_SIDE && l[1] >= b.back() - 5.0 && l[1] < b.back();
+    }
+
+    /** Whether someone can stand at a block of a building's access, feet {@code dy} over its base. */
+    private static boolean stand(Building b, int x, int z, int dy) {
+        BuildingLayer.Column c = BuildingLayer.column(b, x + 0.5, z + 0.5, false, true, null);
+        BuildingLayer.Part below = BuildingLayer.part(c, b.base() + dy - 1);
+        boolean floor = below == BuildingLayer.Part.STAIRS_FRONT || below == BuildingLayer.Part.ACCENT
+                || below == BuildingLayer.Part.PAVING;
+        return floor && open(BuildingLayer.part(c, b.base() + dy)) && open(BuildingLayer.part(c, b.base() + dy + 1));
+    }
+
+    private static boolean open(BuildingLayer.Part p) {
+        return p == BuildingLayer.Part.AIR || p == BuildingLayer.Part.NONE || p == BuildingLayer.Part.LIGHT;
+    }
+
     /** Parts of a garden that may stand away from the house: a shed's roof, a coped wall. */
     private static boolean isGarden(Building b, BuildingLayer.Part p) {
         return b.type() == Building.Type.HOUSE && (p == BuildingLayer.Part.ROOF_LOW || p == BuildingLayer.Part.HOOD);

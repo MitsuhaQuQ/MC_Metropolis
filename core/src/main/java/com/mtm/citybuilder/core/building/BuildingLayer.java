@@ -201,6 +201,8 @@ public final class BuildingLayer {
         PARTITION,
         /** A flight of stairs (a stair block, rising away from the street). */
         STAIRS,
+        /** A flight of stairs outside (a stair block, rising towards the street). */
+        STAIRS_FRONT,
         /** Shelves, chests and barrels against a wall. */
         SHELF,
         /** A low table (a slab). */
@@ -582,6 +584,10 @@ public final class BuildingLayer {
             }
             composition = composition.with(Slot.LAYOUT, Slot.LAYOUT.options().get(layout));
         }
+        if (type == Building.Type.APARTMENT && composition.is(Slot.ACCESS, "corridor")) {
+            // Room behind for the open corridor
+            backGap = Math.max(backGap, CORRIDOR);
+        }
         if (quarter == Quarter.BUKE && type == Building.Type.HOUSE) {
             // A samurai house stands well back in its garden, behind its wall
             front = Math.max(3.0, Math.min(5.0 + Math.floor(4.0 * Hash.unit(Hash.of(h, 85))), plot.maxDepth() - backGap - 7.0));
@@ -591,6 +597,15 @@ public final class BuildingLayer {
         depth = Math.floor(Math.min(depth, plot.maxDepth() - front - backGap));
         if (width < 4.0 || depth < 4.0) {
             return null;
+        }
+        if (type == Building.Type.APARTMENT && composition.is(Slot.ACCESS, "corridor")) {
+            // The outside stair stands beside the right-hand wall: the block moves over to make room for it
+            if (width - STAIR_SIDE >= 7.0) {
+                width -= STAIR_SIDE;
+                shift -= 0.5 * STAIR_SIDE;
+            } else {
+                composition = composition.with(Slot.ACCESS, "interior");
+            }
         }
         double mid = 0.5 * (plot.start() + plot.end()) + shift;
         double from = mid - 0.5 * width;
@@ -883,8 +898,10 @@ public final class BuildingLayer {
                     double[] l = lot.local(wx, wz);
                     // A house's ring is its whole lot: the garden
                     boolean garden = lot.type() == Building.Type.HOUSE || lot.type() == Building.Type.MACHIYA;
-                    if (garden || l[0] >= -1 && l[0] < lot.width() + 1 && l[1] >= lot.front() - yard(lot)
-                            && l[1] < Math.max(lot.back(), lot.wingBack()) + 1) {
+                    boolean outside = outsideAccess(lot);
+                    if (garden || l[0] >= -1 && l[0] < lot.width() + (outside ? STAIR_SIDE : 1.0)
+                            && l[1] >= lot.front() - yard(lot)
+                            && l[1] < Math.max(lot.back(), lot.wingBack()) + (outside ? CORRIDOR : 1.0)) {
                         boolean adjacent = false;
                         for (int nb : new int[]{c - 19, c - 18, c - 17, c - 1, c + 1, c + 17, c + 18, c + 19}) {
                             adjacent |= inside[nb] != null && inside[nb].id() == lot.id();
@@ -1635,6 +1652,104 @@ public final class BuildingLayer {
         return null;
     }
 
+    /**
+     * How wide the outside stair beside a block of flats is: a flight and a walkway back, two blocks each (a block's
+     * width would not join up where the street, and the building with it, runs at an angle to the world's grid), a rail
+     * and its posts.
+     */
+    static final double STAIR_SIDE = 5.0;
+
+    /** How deep the open corridor along a block of flats' back is: the walk, two blocks, and its rail and posts. */
+    static final double CORRIDOR = 3.0;
+
+    /** Whether a block of flats is reached by open corridors and an outside stair. */
+    private static boolean outsideAccess(Building b) {
+        return b.type() == Building.Type.APARTMENT && b.composition().is(Slot.ACCESS, "corridor") && b.step() >= 2;
+    }
+
+    /**
+     * A block of flats' open corridors (外廊下) and outside stair (外階段), in its ring: along the back at every floor
+     * a corridor, two blocks of walk and a rail along its edge, posts down to the ground; beside the right-hand wall,
+     * where the corridor ends, the stair: from each floor's corridor a flight rises towards the street beside the wall,
+     * a walkway at the floor above returns beside it to that floor's corridor, a rail and posts outside them. Every
+     * flight rises one block a block, with two blocks' headroom under the next. Null off them.
+     */
+    private static Part access(Building b, Column c, int dy) {
+        double u = c.u();
+        double v = c.v();
+        double w = b.width();
+        double back = b.back();
+        int floors = b.step();
+        int top = b.floorOf(floors - 1);
+        if (v >= back && v < back + CORRIDOR && u >= 0.0 && u < w + STAIR_SIDE) {
+            if (dy == 0) {
+                return Part.PAVING;
+            }
+            boolean outer = v >= back + CORRIDOR - 1.0 || u >= w + STAIR_SIDE - 1.0;
+            for (int k = 1; k < floors; k++) {
+                int f = b.floorOf(k);
+                if (dy == f) {
+                    return Part.ACCENT;
+                }
+                if (dy == f + 1 && outer) {
+                    return Part.RAIL;
+                }
+            }
+            if (outer && dy > 0 && dy < top && Math.floorMod((long) Math.floor(u), 6) == 0) {
+                return Part.POLE;
+            }
+            return dy <= top + 1 ? Part.AIR : Part.NONE;
+        }
+        if (u < w || u >= w + STAIR_SIDE || v >= back) {
+            return null;
+        }
+        int lane = (int) Math.floor(u - w) / 2;
+        int j = (int) Math.floor(back - v) + 1;
+        if (j > 5) {
+            return null;
+        }
+        if (dy == 0) {
+            return Part.PAVING;
+        }
+        for (int k = 1; k < floors; k++) {
+            int f0 = b.floorOf(k - 1);
+            int f1 = b.floorOf(k);
+            int r = f1 - f0;
+            switch (lane) {
+                case 0 -> {
+                    // The flight, beside the wall, rising towards the street
+                    if (j <= r && dy == f0 + j) {
+                        return Part.STAIRS_FRONT;
+                    }
+                    if (j == r + 1 && dy == f1) {
+                        return Part.ACCENT;
+                    }
+                    if (j == r + 1 && dy == f1 + 1) {
+                        return Part.RAIL;
+                    }
+                }
+                case 1 -> {
+                    // The walkway at the floor reached, back to its corridor
+                    if (j <= r + 1 && dy == f1) {
+                        return Part.ACCENT;
+                    }
+                    if (j == r + 1 && dy == f1 + 1) {
+                        return Part.RAIL;
+                    }
+                }
+                default -> {
+                    if (j <= r + 1 && dy == f1 + 1) {
+                        return Part.RAIL;
+                    }
+                }
+            }
+        }
+        if (lane == 2 && (j == 1 || j == 5) && dy < top) {
+            return Part.POLE;
+        }
+        return dy <= top + 2 ? Part.AIR : Part.NONE;
+    }
+
     /** The middle of a building's depth, where its rooms are divided front from back. */
     private static double midDepth(Building b) {
         return b.front() + Math.floor(0.5 * (b.back() - b.front()));
@@ -1655,8 +1770,9 @@ public final class BuildingLayer {
         } else {
             left = Math.floorMod(k, 2) == 1;
         }
-        double lane = left ? b.upFrom() + 1.5 : b.upTo() - 1.5;
-        if (Math.abs(c.u() - lane) >= 0.5) {
+        // Two blocks wide, so it joins up where the building stands at an angle to the world's grid
+        double lane = left ? b.upFrom() + 2.0 : b.upTo() - 2.0;
+        if (Math.abs(c.u() - lane) >= 1.0) {
             return null;
         }
         int h = k == 1 ? b.ground() : b.upper();
@@ -1740,7 +1856,7 @@ public final class BuildingLayer {
         boolean shopRoom = machiya && storey == 0 && v < b.front() + 4.0;
         // The wall between the front rooms and the back, a doorway in it
         if (!shopFloor && !shopRoom && v >= mid && v < mid + 1.0) {
-            return Math.abs(u - (Math.floor(0.5 * w) + 0.5)) < 0.5 && row <= 2 ? Part.AIR : Part.PARTITION;
+            return Math.abs(u - Math.floor(0.5 * w)) < 1.0 && row <= 2 ? Part.AIR : Part.PARTITION;
         }
         if (t == Building.Type.APARTMENT && Math.floorMod((long) Math.floor(u), 7) == 0) {
             // Between flats
@@ -2451,6 +2567,12 @@ public final class BuildingLayer {
      * cornices, fins and ledges; a shop's sign and awning and an office's canopy over the pavement; outdoor units.
      */
     private static Part ringPart(Building b, Column c, int dy) {
+        if (outsideAccess(b)) {
+            Part access = access(b, c, dy);
+            if (access != null) {
+                return access;
+            }
+        }
         if (arcaded(b)) {
             Part walk = arcade(b, c, dy);
             if (walk != null) {
@@ -3010,6 +3132,19 @@ public final class BuildingLayer {
             // A framed grid: the frame's posts every third block and its beams at the floors, glass between
             long m = (long) Math.floor(face == Face.SIDE ? c.v() - b.front() : c.u());
             return Math.floorMod(m, 3) == 0 ? Part.TRIM : row == 0 ? Part.ACCENT : Part.WINDOW;
+        }
+        if (outsideAccess(b) && face == Face.BACK && !corner && storey < b.step()) {
+            // Each flat's door off the corridor, and a small window by it
+            long bay = Math.floorMod((long) Math.floor(c.u()), 7);
+            if (bay == 3 && (row == 1 || row == 2)) {
+                return row == 1 ? Part.DOOR_LOWER : Part.DOOR_UPPER;
+            }
+            if (bay == 5 && row == 2) {
+                return Part.WINDOW;
+            }
+            if (row >= 1) {
+                return Part.WALL;
+            }
         }
         if (b.type() == Building.Type.APARTMENT && face == Face.BACK && b.composition().is(Slot.ACCESS, "stairwell")) {
             // A danchi's stairwells (階段室型): every tenth bay open, a parapet at each landing
