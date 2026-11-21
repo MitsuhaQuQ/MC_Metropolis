@@ -95,7 +95,8 @@ class PromenadeTest {
     @Test
     void theHillsAtATownsEdgeHaveAWalkAlongTheirFoot() {
         CitySettings settings = CitySettings.DEFAULT;
-        // A city on the plains; then the land rising steeply a little way north of it (the city nearest the foot)
+        // A city on the plains; then the land rising a little way north of it too steeply to build on (past the
+        // grade at which a town's intensity is gone), the city nearest the foot
         CityLogic flat = new CityLogic(3L, settings, SyntheticTerrain.flatPlains());
         Settlement first = flat.settlements(6000, -20000, 42000, 20000).stream()
                 .filter(t -> t.tier() == SettlementTier.METROPOLIS || t.tier() == SettlementTier.CITY).findFirst().orElseThrow();
@@ -103,7 +104,7 @@ class PromenadeTest {
         com.mtm.citybuilder.core.terrain.TerrainView plains = SyntheticTerrain.flatPlains();
         com.mtm.citybuilder.core.terrain.TerrainView slope = new com.mtm.citybuilder.core.terrain.TerrainView() {
             private double rise(double z) {
-                return z < foot ? Math.min(300.0, 0.3 * (foot - z)) : 0.0;
+                return z < foot ? Math.min(300.0, 0.7 * (foot - z)) : 0.0;
             }
 
             @Override
@@ -118,7 +119,7 @@ class PromenadeTest {
 
             @Override
             public double grade(double x, double z) {
-                return z < foot ? 0.3 : 0.0;
+                return z < foot ? 0.7 : 0.0;
             }
 
             @Override

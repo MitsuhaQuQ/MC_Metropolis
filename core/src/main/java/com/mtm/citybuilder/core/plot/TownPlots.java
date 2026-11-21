@@ -790,11 +790,14 @@ public final class TownPlots {
      * edge: the first other lot big enough to build on {chain, side, index}, the block's interior {-1}, or nothing {}
      * (another street first, or only small lots).
      */
-    private int[] behind(Plot lot) {
-        int[] known = behind.get(lot.id());
+    private int[] behind(Plot given) {
+        int[] known = behind.get(given.id());
         if (known != null) {
             return known;
         }
+        // Measured on the lot as cut, however it was reached (its street's width is the one it faces): kept by its
+        // id, it must come out the same whichever position asked first
+        Plot lot = nominal(given, given.index());
         int[] found = {};
         double[] p = pointAt(lot.chain(), 0.5 * (lot.start() + lot.end()));
         double nx = -p[3] * lot.side();
@@ -923,11 +926,14 @@ public final class TownPlots {
      * A lot's actual area and the share of its frontage it holds at the street: its grid points over the land it would
      * have that are its (by {@link #raw}), and of those along the street's edge.
      */
-    private double[] area(Plot lot) {
-        double[] known = areas.get(lot.id());
+    private double[] area(Plot given) {
+        double[] known = areas.get(given.id());
         if (known != null) {
             return known;
         }
+        // Measured on the lot as cut, however it was reached: kept by its id, it must not depend on which position
+        // asked first
+        Plot lot = nominal(given, given.index());
         double nominal = (lot.end() - lot.start()) * lot.maxDepth();
         double step = Math.max(1.0, Math.sqrt(nominal / 100.0));
         int count = 0;

@@ -339,14 +339,20 @@ public final class CitySettings {
         public double reach = 1.5;
         /** Extra cost per block of land of no suitability, falling to none at suitability 1. */
         public double unsuitCost = 3.0;
-        /** Cost per metre climbed or descended between neighbouring nodes, in blocks. */
-        public double climbCost = 8.0;
+        /**
+         * Cost per metre climbed or descended between neighbouring nodes, in blocks: low enough that a hill within
+         * the town is built over, not left an island of woods the flood went round.
+         */
+        public double climbCost = 4.0;
         /** Extra cost per block crossing rivers and lakes, which never count as built-up land. */
         public double bridgeCost = 3.0;
         /** Radius over which the basin floor, the lowest land around, is taken. */
         public double floorRadius = 1000.0;
-        /** Height above the basin floor at which urban intensity has faded out. */
-        public double riseFade = 80.0;
+        /**
+         * Height above the basin floor at which urban intensity has faded out: hills within a town are built over up
+         * their sides (as Nagasaki's, Kobe's and Onomichi's are), the mountains round it not.
+         */
+        public double riseFade = 150.0;
         /**
          * Metropolises and cities do not end at their target area: their intensity tails off into suburbs out to this
          * many times the cost the target area was reached at. Towns and villages end there. Towns and villages keep
@@ -363,9 +369,12 @@ public final class CitySettings {
          * lie, and as much land again as their water within the target is added to it.
          */
         public double smallLakeShare = 0.5;
-        /** Grades from which urban intensity starts fading, and at which it is gone. */
-        public double flatGrade = 0.05;
-        public double steepGrade = 0.35;
+        /**
+         * Grades from which urban intensity starts fading, and at which it is gone: Japanese towns build up slopes of
+         * a third along streets on the contours, terraced; a mountainside stays wooded.
+         */
+        public double flatGrade = 0.12;
+        public double steepGrade = 0.6;
     }
 
     /** L3.5: the use of land outside the built-up areas. */

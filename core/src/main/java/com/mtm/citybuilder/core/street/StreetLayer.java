@@ -6465,7 +6465,10 @@ public final class StreetLayer {
                     double gz = (window.height(x, z + grid) - window.height(x, z - grid)) / (2.0 * grid);
                     double slope = Math.hypot(gx, gz);
                     if (slope > 0.01) {
-                        double w = (0.3 * inside + contourWeight * outside) * Math.min(1.0, slope / config.maxGrade);
+                        // Along the contours where the land slopes, the more the steeper: on a hillside the streets run
+                        // round it in terraces, the lines across them climbing as ramps and stairs
+                        double steep = 1.0 + 2.0 * Math.min(1.0, Math.max(0.0, slope - config.maxGrade) / config.maxGrade);
+                        double w = (0.3 * inside + contourWeight * outside) * Math.min(1.0, slope / config.maxGrade) * steep;
                         double a = Math.atan2(gz, gx) + Math.PI / 2;
                         c += w * Math.cos(2 * a);
                         s += w * Math.sin(2 * a);
