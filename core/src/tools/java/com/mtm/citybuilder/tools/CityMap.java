@@ -241,6 +241,30 @@ public final class CityMap {
         }
         System.out.printf("Estates %d, grand %d, radius %.0f or more %d%n", plan.estates().size(), grand,
                 logic.settings().functions.largeEstate, large);
+        // Streets and lanes inside the estates and on the facilities' land, by class: none but lanes (taken in)
+        java.util.Map<String, Double> inside = new java.util.TreeMap<>();
+        for (double[] e : plan.estates()) {
+            for (StreetSegment g : plan.segments()) {
+                double mx = 0.5 * (g.x1() + g.x2());
+                double mz = 0.5 * (g.z1() + g.z2());
+                if (Math.hypot(mx - e[0], mz - e[1]) < e[2] - 0.5 * g.width() - 1) {
+                    inside.merge("estate " + g.streetClass(), g.length(), Double::sum);
+                }
+            }
+        }
+        for (var f : functions.facilities()) {
+            if (!f.kind().area() || f.landmark()) {
+                continue;
+            }
+            for (StreetSegment g : plan.segments()) {
+                double mx = 0.5 * (g.x1() + g.x2());
+                double mz = 0.5 * (g.z1() + g.z2());
+                if (functions.contains(f, mx, mz)) {
+                    inside.merge("facility land " + g.streetClass(), g.length(), Double::sum);
+                }
+            }
+        }
+        System.out.println("Inside estates and facilities (m): " + inside);
         for (var h : functions.hanamachi()) {
             double branches = 0;
             for (int b : h.branches()) {

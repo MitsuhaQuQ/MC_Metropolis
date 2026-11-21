@@ -290,6 +290,9 @@ public final class CityLogic {
      * This keeps the floods, which read terrain far around, to the places near a border.
      */
     public CultureSample culture(double x, double z) {
+        if (!settings.culture.europe) {
+            return new CultureSample(Style.ASIA, Double.POSITIVE_INFINITY);
+        }
         double distance = cultureLayer.borderDistance(x, z);
         double settled = settings.culture.borderHalfWidth + 2.0 * settings.culture.floodGrid;
         if (distance < -settled) {
@@ -315,6 +318,9 @@ public final class CityLogic {
      * negative on the Asian side. Within {@code culture.borderHalfWidth} of 0 lies the border band.
      */
     public double styleBorderDistance(double x, double z) {
+        if (!settings.culture.europe) {
+            return Double.NEGATIVE_INFINITY;
+        }
         return cultureLayer.borderDistance(x, z);
     }
 

@@ -15,7 +15,8 @@ import java.awt.image.BufferedImage;
 /**
  * A town's functions: each lot coloured by its street's function (shopping red, front streets orange, offices
  * purple, houses pale green, temple streets brown, samurai streets dark green, industry grey, pleasure quarters pink), block interiors pale,
- * streets dark; facilities as outlined circles with a short label, landmarks thicker.
+ * streets dark; a facility's block tinted (parks green, the others lilac) with a short label, lot facilities and
+ * landmarks as outlined circles, landmarks thicker.
  */
 public final class FunctionMap {
     private FunctionMap() {
@@ -90,6 +91,17 @@ public final class FunctionMap {
                         rgb = ((r * 9 / 10) << 16) | ((g * 9 / 10) << 8) | (b * 9 / 10);
                     }
                 }
+                // A facility's land, tinted over whatever lies under it (the lanes it takes in too: not built)
+                if (rgb != 0x2896FF) {
+                    var f = functions.facilityAt(x, z);
+                    if (f != null && f.kind().area()) {
+                        int tint = f.kind() == com.mtm.citybuilder.core.function.Facility.Kind.PARK
+                                || f.kind() == com.mtm.citybuilder.core.function.Facility.Kind.LARGE_PARK
+                                || f.kind() == com.mtm.citybuilder.core.function.Facility.Kind.CENTRAL_PARK
+                                || f.kind() == com.mtm.citybuilder.core.function.Facility.Kind.GREEN ? 0x7CC87C : 0xC8B4E6;
+                        rgb = tint;
+                    }
+                }
                 image.setRGB(px, py, rgb);
             }
         }
@@ -104,7 +116,10 @@ public final class FunctionMap {
             }
             g.setStroke(new BasicStroke(f.landmark() ? 3f : 1.5f));
             g.setColor(f.landmark() ? new Color(200, 0, 120) : f.onLot() ? new Color(0, 90, 200) : new Color(20, 20, 20));
-            g.drawOval(cx - r, cz - r, 2 * r, 2 * r);
+            // A facility on a whole block shows as its tinted land; the others as circles
+            if (functions.facilityAt(f.x(), f.z()) != f) {
+                g.drawOval(cx - r, cz - r, 2 * r, 2 * r);
+            }
             if (f.kind().area() || r >= 4) {
                 g.drawString(label(f.kind()), cx - 6, cz + 4);
             }

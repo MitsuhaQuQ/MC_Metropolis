@@ -9,6 +9,7 @@ import com.mtm.citybuilder.core.settlement.SettlementTier;
 import com.mtm.citybuilder.core.street.Formation;
 import com.mtm.citybuilder.core.street.StreetClass;
 import com.mtm.citybuilder.core.street.StreetPlan;
+import com.mtm.citybuilder.core.street.StreetSegment;
 import com.mtm.citybuilder.core.terrain.Landform;
 import com.mtm.citybuilder.core.terrain.SyntheticTerrain;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,8 @@ class TownFunctionsTest {
         StreetPlan plan = logic.streetPlan(city);
         double cx = logic.extent(city).coreX();
         double cz = logic.extent(city).coreZ();
-        // Shopping streets thick in the middle and few far out; the main roads front streets or offices
+        // Shopping streets thick in the middle and few far out (counted by street, not length: a capital's grid has a
+        // few very long streets); the main roads front streets or offices
         double[] shopping = new double[2];
         double[] streets = new double[2];
         for (int c = 0; c < plots.chainCount(); c++) {
@@ -46,14 +48,14 @@ class TownFunctionsTest {
                 assertTrue(f == StreetFunction.MAIN || f == StreetFunction.OFFICE || f == StreetFunction.INDUSTRIAL, cls + " " + f);
                 continue;
             }
-            if (cls != StreetClass.STREET) {
+            if (cls != StreetClass.STREET && cls != StreetClass.LANE) {
                 continue;
             }
             double[] mid = plots.chainPoint(c, 0.5 * plots.chainLength(c));
             int ring = Math.hypot(mid[0] - cx, mid[1] - cz) < 1000 ? 0 : 1;
-            streets[ring] += plots.chainLength(c);
+            streets[ring]++;
             if (f == StreetFunction.SHOPPING) {
-                shopping[ring] += plots.chainLength(c);
+                shopping[ring]++;
             }
         }
         assertTrue(shopping[0] / streets[0] > 3 * shopping[1] / streets[1],
@@ -69,26 +71,32 @@ class TownFunctionsTest {
                 "elementary schools " + schools + " on " + km2 + " km2");
         assertEquals(1, counts.getOrDefault(Facility.Kind.CITY_HALL, 0));
         assertTrue(counts.getOrDefault(Facility.Kind.CLINIC, 0) > 0 && counts.getOrDefault(Facility.Kind.POLICE_BOX, 0) > 0);
+        // Each area facility on a block of its own: its middle on its land and on no other's
         for (Facility a : functions.facilities()) {
             if (!a.kind().area() || a.landmark()) {
                 continue;
             }
+            assertEquals(a, functions.facilityAt(a.x(), a.z()), a.toString());
             for (Facility b : functions.facilities()) {
                 if (b != a && b.kind().area() && !b.landmark()) {
-                    assertTrue(Math.hypot(a.x() - b.x(), a.z() - b.z()) >= a.radius() + b.radius(), a + " over " + b);
+                    assertFalse(functions.contains(b, a.x(), a.z()), a + " on the block of " + b);
                 }
             }
         }
-        // The large parks, greens, head temples and great shrines take whole estates, the grand grounds all
+        // The large parks, greens, head temples and great shrines take the blocks of the estates
         int grand = 0;
         for (Facility f : functions.facilities()) {
             if (f.kind() == Facility.Kind.LARGE_PARK || f.kind() == Facility.Kind.GREEN
                     || f.kind() == Facility.Kind.GRAND_TEMPLE || f.kind() == Facility.Kind.GRAND_SHRINE) {
                 grand++;
-                assertTrue(plan.estates().stream().anyMatch(e -> e[0] == f.x() && e[1] == f.z() && e[2] == f.radius()), f.toString());
+                assertTrue(plan.estates().stream().anyMatch(e -> functions.contains(f, e[0], e[1])), f.toString());
             }
         }
         assertTrue(grand > 0, "no large park, green or grand temple or shrine");
+        // Every estate's block taken by something
+        for (double[] e : plan.estates()) {
+            assertNotNull(functions.facilityAt(e[0], e[1]), "an estate left empty at " + e[0] + " " + e[1]);
+        }
         // Paths in the grounds: inside them or out to the street at their gate; a temple's or shrine's approach up to
         // its middle
         assertFalse(functions.walks().isEmpty());
@@ -99,12 +107,34 @@ class TownFunctionsTest {
         for (Walk walk : functions.walks()) {
             Facility f = byId.get(walk.facility());
             assertNotNull(f);
-            for (double[] q : walk.points()) {
-                assertTrue(Math.hypot(q[0] - f.x(), q[1] - f.z()) <= f.radius() + 31.0, walk.kind() + " path off its grounds");
+            // On its land, but for a way in's end at its street
+            for (int k = 0; k < walk.points().size(); k++) {
+                double[] q = walk.points().get(k);
+                boolean end = k == 0 || k == walk.points().size() - 1;
+                assertTrue(functions.contains(f, q[0], q[1]) || end, walk.kind() + " path off its grounds");
             }
             if (f.kind() == Facility.Kind.TEMPLE || f.kind() == Facility.Kind.GRAND_TEMPLE) {
                 double[] end = walk.points().get(walk.points().size() - 1);
                 assertEquals(0.0, Math.hypot(end[0] - f.x(), end[1] - f.z()), 1e-6, "the approach ends at the hall");
+            }
+        }
+        // No street crosses an estate or a facility's land (lanes a facility takes in aside)
+        for (StreetSegment g : plan.segments()) {
+            double mx = 0.5 * (g.x1() + g.x2());
+            double mz = 0.5 * (g.z1() + g.z2());
+            if (g.streetClass() == StreetClass.PATH) {
+                continue;
+            }
+            for (double[] e : plan.estates()) {
+                assertTrue(Math.hypot(mx - e[0], mz - e[1]) >= e[2], g.streetClass() + " in an estate");
+            }
+            if (g.streetClass() == StreetClass.LANE) {
+                continue;
+            }
+            for (Facility f : functions.facilities()) {
+                if (f.kind().area() && !f.landmark()) {
+                    assertFalse(functions.contains(f, mx, mz), g.streetClass() + " on the land of " + f);
+                }
             }
         }
         // A lot facility stands on a lot of a street it suits
@@ -163,7 +193,10 @@ class TownFunctionsTest {
                 }
                 for (double along = 0; along <= plots.chainLength(c); along += 8) {
                     double[] p = plots.chainPoint(c, along);
-                    assertTrue(Math.hypot(f.x() - p[0], f.z() - p[1]) > f.radius() + 0.5 * plots.chainWidth(c), f.toString());
+                    for (int side = -1; side <= 1; side += 2) {
+                        double back = 0.5 * plots.chainWidth(c) + 6;
+                        assertFalse(functions.contains(f, p[0] - p[3] * side * back, p[1] + p[2] * side * back), f.toString());
+                    }
                 }
             }
         }

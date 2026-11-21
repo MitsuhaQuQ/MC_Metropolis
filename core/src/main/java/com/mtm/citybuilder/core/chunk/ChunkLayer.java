@@ -634,9 +634,17 @@ public final class ChunkLayer {
     }
 
     private Index build(StreetPlan plan) {
-        // The streets, and the paths inside the facilities' grounds as footpaths
-        List<StreetSegment> segments = new ArrayList<>(plan.segments());
-        for (com.mtm.citybuilder.core.function.Walk walk : logic.functions().town(plan.settlement()).walks()) {
+        // The streets, but not the lanes a facility's grounds take in; the paths inside the grounds as footpaths
+        com.mtm.citybuilder.core.function.TownFunctions functions = logic.functions().town(plan.settlement());
+        List<StreetSegment> segments = new ArrayList<>();
+        for (StreetSegment g : plan.segments()) {
+            if (g.streetClass() == StreetClass.LANE
+                    && functions.facilityAt(0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2())) != null) {
+                continue;
+            }
+            segments.add(g);
+        }
+        for (com.mtm.citybuilder.core.function.Walk walk : functions.walks()) {
             for (int k = 1; k < walk.points().size(); k++) {
                 double[] a = walk.points().get(k - 1);
                 double[] b = walk.points().get(k);

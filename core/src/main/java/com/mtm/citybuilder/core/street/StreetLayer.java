@@ -1368,6 +1368,7 @@ public final class StreetLayer {
                 }
             }
         }
+        clearEstates(window, segments);
         List<Promenade> promenades = formation == Formation.VILLAGE ? List.of()
                 : promenades(settlement, window, canals, segments);
         List<StationSite> sites = formation == Formation.VILLAGE ? List.of()
@@ -1375,7 +1376,8 @@ public final class StreetLayer {
         List<List<double[]>> highSpeed = highSpeedCorridor(settlement, window, districts, anchors);
         return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments, urban,
                 window.capital == null ? null : window.capital.clone(), sites, highSpeed, canals, window.estates,
-                promenades);
+                promenades, new WaterField((double) window.originX * grid, (double) window.originZ * grid, FINE,
+                window.fineSize, window.edge.clone()));
     }
 
     /**
@@ -1470,6 +1472,34 @@ public final class StreetLayer {
         segments.addAll(paths);
         segments.addAll(access);
         return promenades;
+    }
+
+    /**
+     * The large estates as the streets left them: each shrunk to the largest circle round its middle that no street
+     * or lane reaches into (an arterial may have passed through, an older road skirted it), dropped where that is
+     * less than half {@code estateRadius}.
+     */
+    private void clearEstates(Window window, List<StreetSegment> segments) {
+        List<double[]> kept = new ArrayList<>();
+        for (double[] e : window.estates) {
+            double clear = e[2];
+            for (StreetSegment g : segments) {
+                if (g.streetClass() == StreetClass.PATH) {
+                    continue;
+                }
+                double dx = g.x2() - g.x1();
+                double dz = g.z2() - g.z1();
+                double t = Math.max(0, Math.min(1, ((e[0] - g.x1()) * dx + (e[1] - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+                clear = Math.min(clear, Math.hypot(g.x1() + dx * t - e[0], g.z1() + dz * t - e[1]) - 0.5 * g.width() - 1.0);
+            }
+            if (clear >= 0.5 * config.estateRadius) {
+                double[] shrunk = e.clone();
+                shrunk[2] = clear;
+                kept.add(shrunk);
+            }
+        }
+        window.estates.clear();
+        window.estates.addAll(kept);
     }
 
     /** The field a little way to the left of the middle of a line of points. */
@@ -3877,6 +3907,16 @@ public final class StreetLayer {
         }
         // The road split where it is met, the stretch replaced by the curve
         StreetSegment road = net.get(met);
+        // Not where the road's halves would be steeper than it may be: a long piece's ends may hide a rise between them
+        double limit = road.streetClass() == StreetClass.STREET || road.streetClass() == StreetClass.LANE
+                ? config.stairsGrade : config.maxGrade;
+        if (road.structure() == StreetStructure.GROUND
+                && (Math.abs(window.height(meet[0], meet[1]) - window.height(road.x1(), road.z1()))
+                > limit * Math.hypot(meet[0] - road.x1(), meet[1] - road.z1()) + 1e-6
+                || Math.abs(window.height(road.x2(), road.z2()) - window.height(meet[0], meet[1]))
+                > limit * Math.hypot(road.x2() - meet[0], road.z2() - meet[1]) + 1e-6)) {
+            return false;
+        }
         net.remove(met);
         net.add(new StreetSegment(road.x1(), road.z1(), meet[0], meet[1], road.streetClass(), road.era(), road.width(), road.structure()));
         net.add(new StreetSegment(meet[0], meet[1], road.x2(), road.z2(), road.streetClass(), road.era(), road.width(), road.structure()));
@@ -6770,6 +6810,10 @@ public final class StreetLayer {
                         h = window.height(x, z);
                         continue;
                     }
+                }
+                // Streets end at a large estate's edge (arterials may pass, as Kyoto's avenues past the palace)
+                if (streetClass != StreetClass.ARTERIAL && streetClass != StreetClass.BOULEVARD && window.estate(nx, nz)) {
+                    break;
                 }
                 if (!window.built(nx, nz)) {
                     // Arterials bridge rivers where the far bank is near and no bridge stands close by

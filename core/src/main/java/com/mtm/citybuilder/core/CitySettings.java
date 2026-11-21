@@ -45,7 +45,8 @@ public final class CitySettings {
      * A castle town lines {@code templeStreets} streets at its old town's edge with temples; its streets within
      * {@code samuraiReach} of the castle are samurai streets at {@code samuraiChance}.
      * <p>
-     * Area facilities {per km2 of built land, least radius, greatest radius}; temples per km2 of old town. Lot
+     * Area facilities take whole blocks: {per km2 of built land, least area, greatest area} in hectares (a Japanese
+     * primary school's site is 1-2 ha, a junior high's 1.5-3, a high school's 2-4); temples per km2 of old town. Lot
      * facilities per km2 of built land. Landmarks by chance. Tokyo's Taito (PLATEAU's detailed uses, sites of buildings
      * within 30 m of each other) has 17 school sites a km2 (kindergartens and crammers included), 14 clinics and
      * hospitals, 29 temples and shrines (most small), 9 government (police boxes too), 1.8 bathhouses.
@@ -100,17 +101,17 @@ public final class CitySettings {
         public double samuraiReach = 900.0;
         public double samuraiChance = 0.7;
 
-        public double[] elementarySchool = {0.9, 50, 65};
-        public double[] juniorHighSchool = {0.4, 55, 70};
-        public double[] highSchool = {0.15, 65, 85};
-        public double[] hospital = {0.12, 45, 75};
-        public double[] park = {1.2, 25, 55};
-        public double[] temple = {3.0, 22, 45};
-        public double[] shrine = {0.8, 18, 40};
-        public double[] university = {0.0, 180, 250};
-        public double[] centralPark = {0.0, 120, 160};
-        public double[] sportsPark = {0.0, 130, 180};
-        public double[] cityHall = {0.0, 40, 50};
+        public double[] elementarySchool = {0.9, 0.7, 2.5};
+        public double[] juniorHighSchool = {0.4, 1.0, 3.0};
+        public double[] highSchool = {0.15, 1.5, 5.0};
+        public double[] hospital = {0.12, 0.5, 3.0};
+        public double[] park = {1.2, 0.1, 1.2};
+        public double[] temple = {3.0, 0.1, 1.5};
+        public double[] shrine = {0.8, 0.08, 1.2};
+        public double[] university = {0.0, 5.0, 40.0};
+        public double[] centralPark = {0.0, 3.0, 20.0};
+        public double[] sportsPark = {0.0, 3.0, 20.0};
+        public double[] cityHall = {0.0, 0.4, 2.5};
 
         public double clinic = 6.0;
         public double policeBox = 1.5;
@@ -131,12 +132,12 @@ public final class CitySettings {
 
         /**
          * What the grand grounds (street layer {@code grandEstate*}) become, and the larger estates (radius at least
-         * {@code largeEstate}) at the chance {@code largeEstateChance}: weights of {large park, green, grand temple,
+         * {@code largeEstate} hectares) at the chance {@code largeEstateChance}: weights of {large park, green, grand temple,
          * grand shrine}, in the old town and elsewhere; the rest of the estates are left to schools and hospitals.
          */
         public double[] grandOldTown = {0.2, 0.1, 0.4, 0.3};
         public double[] grandElsewhere = {0.45, 0.2, 0.15, 0.2};
-        public double largeEstate = 110.0;
+        public double largeEstate = 3.0;
         public double largeEstateChance = 0.4;
 
         /**
@@ -211,6 +212,11 @@ public final class CitySettings {
          * a smooth field whose values gather around the middle.
          */
         public double asiaShare = 0.5;
+        /**
+         * Whether the European style is laid out at all. Off for the first version (the user, 2026-11-21): every town
+         * is Asian (Japanese), and there are no style borders; the style field and its floods are not read.
+         */
+        public boolean europe = false;
         /**
          * Half width of the border band in blocks, measured from where the field crosses {@link #asiaShare} (the field's
          * difference from the share over its gradient). Outside the band the field alone decides; inside it the
