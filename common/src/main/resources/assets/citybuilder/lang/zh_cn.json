@@ -68,5 +68,22 @@
   "block.citybuilder.bridge_cladding": "\u767b\u673a\u6865\u5916\u677f",
   "block.citybuilder.bridge_bellows": "\u767b\u673a\u6865\u6298\u68da",
   "block.citybuilder.baggage_belt": "\u884c\u674e\u4f20\u9001\u5e26",
-  "block.citybuilder.escalator_step": "\u6276\u68af\u8e0f\u677f"
+  "block.citybuilder.escalator_step": "\u6276\u68af\u8e0f\u677f",
+  "block.citybuilder.concrete_parapet": "桥梁混凝土护墙",
+  "block.citybuilder.bridge_railing": "桥梁栏杆",
+  "block.citybuilder.sound_barrier": "隔音墙",
+  "block.citybuilder.sound_barrier_clear": "透光隔音板",
+  "block.citybuilder.steel_girder_gray": "钢梁（灰）",
+  "block.citybuilder.steel_girder_green": "钢梁（绿）",
+  "block.citybuilder.steel_girder_blue": "钢梁（蓝）",
+  "block.citybuilder.bridge_bearing": "桥梁支座",
+  "block.citybuilder.expansion_joint": "伸缩缝",
+  "block.citybuilder.deck_drain": "桥面排水口",
+  "block.citybuilder.drain_pipe": "排水管",
+  "block.citybuilder.catenary_pole": "接触网支柱",
+  "block.citybuilder.catenary_beam": "接触网门架横梁",
+  "block.citybuilder.catenary_arm": "接触网腕臂",
+  "block.citybuilder.catenary_hanger": "接触网吊柱",
+  "block.citybuilder.curve_marker": "曲线标",
+  "block.citybuilder.curve_marker.describe": "曲线标（股道 %s）：MTR 节点在 %s %s %s，角度 %s°，缓和曲线 %s 格，坡度 %s‰，半径 %s"
 }

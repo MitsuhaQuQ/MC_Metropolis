@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "citybuilder:block/steel_girder_blue",
+    "end": "citybuilder:block/steel_girder_blue_top"
+  }
+}

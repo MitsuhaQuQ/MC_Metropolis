@@ -2,7 +2,9 @@
 codelists, packed as a zip laid out as PLATEAU's own (udx/bldg, udx/tran, codelists) for plateau_buildings.py.
 
 Run from the repository root (standard library only):
-    python tools/assets/plateau_fetch.py <city code> <name> <lat> <lon> <radius km> [out dir]
+    python tools/assets/plateau_fetch.py <city code> <name> <lat> <lon> <radius km> [out dir] [--kinds=bldg,tran]
+
+--kinds picks the feature types (PLATEAU's udx folders), e.g. --kinds=brid,trk for bridges and tracks.
 
 The meshes are listed by the PLATEAU data catalogue (api.plateauview.mlit.go.jp); a radius of 99 takes the whole city.
 Files already downloaded are kept. Source: 3D city models of Project PLATEAU (MLIT; copyright of the local government),
@@ -38,13 +40,17 @@ def km(a, b):
 
 
 def main():
+    kinds = ('bldg', 'tran')
+    for a in [a for a in sys.argv if a.startswith('--kinds=')]:
+        kinds = tuple(a[len('--kinds='):].split(','))
+        sys.argv.remove(a)
     code, name, lat, lon, radius = sys.argv[1], sys.argv[2], float(sys.argv[3]), float(sys.argv[4]), float(sys.argv[5])
     out = sys.argv[6] if len(sys.argv) > 6 else os.path.join('core', 'build', 'plateau')
     city = json.loads(get(CATALOGUE + code))['cities'][0]
     base = city['url'][:-len('.zip')]
     folder = os.path.join(out, name)
     files = []
-    for kind in ('bldg', 'tran'):
+    for kind in kinds:
         for f in city['files'].get(kind, []):
             if len(f['code']) == 8 and km(centre(f['code']), (lat, lon)) <= radius:
                 files.append((kind, f['url']))

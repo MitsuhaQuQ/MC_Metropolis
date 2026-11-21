@@ -1,0 +1,18 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "citybuilder:block/curve_marker"
+    },
+    "facing=east": {
+      "model": "citybuilder:block/curve_marker",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "citybuilder:block/curve_marker"
+    },
+    "facing=west": {
+      "model": "citybuilder:block/curve_marker",
+      "y": 90
+    }
+  }
+}

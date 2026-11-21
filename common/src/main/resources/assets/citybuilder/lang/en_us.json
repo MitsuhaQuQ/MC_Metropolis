@@ -68,5 +68,22 @@
   "block.citybuilder.bridge_cladding": "Boarding Bridge Cladding",
   "block.citybuilder.bridge_bellows": "Boarding Bridge Bellows",
   "block.citybuilder.baggage_belt": "Baggage Belt",
-  "block.citybuilder.escalator_step": "Escalator Step"
+  "block.citybuilder.escalator_step": "Escalator Step",
+  "block.citybuilder.concrete_parapet": "Concrete Bridge Parapet",
+  "block.citybuilder.bridge_railing": "Bridge Railing",
+  "block.citybuilder.sound_barrier": "Sound Barrier",
+  "block.citybuilder.sound_barrier_clear": "Clear Sound Barrier",
+  "block.citybuilder.steel_girder_gray": "Grey Steel Girder",
+  "block.citybuilder.steel_girder_green": "Green Steel Girder",
+  "block.citybuilder.steel_girder_blue": "Blue Steel Girder",
+  "block.citybuilder.bridge_bearing": "Bridge Bearing",
+  "block.citybuilder.expansion_joint": "Expansion Joint",
+  "block.citybuilder.deck_drain": "Deck Drain",
+  "block.citybuilder.drain_pipe": "Drain Pipe",
+  "block.citybuilder.catenary_pole": "Catenary Pole",
+  "block.citybuilder.catenary_beam": "Catenary Portal Beam",
+  "block.citybuilder.catenary_arm": "Catenary Cantilever Arm",
+  "block.citybuilder.catenary_hanger": "Catenary Drop Hanger",
+  "block.citybuilder.curve_marker": "Curve Marker",
+  "block.citybuilder.curve_marker.describe": "Curve marker, track %s: MTR node at %s %s %s, angle %s°, transition %s, grade %s‰, radius %s"
 }

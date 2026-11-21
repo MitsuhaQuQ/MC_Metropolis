@@ -1,8 +1,14 @@
 package com.mtm.citybuilder.platform;
 
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.nio.file.Path;
+import java.util.function.BiFunction;
 import java.util.ServiceLoader;
 import java.util.function.Supplier;
 
@@ -24,6 +30,14 @@ public interface Platform {
      * registered, which on some loaders is only after the mod's construction.
      */
     Supplier<Block> registerBlock(String name, Supplier<Block> factory);
+
+    /**
+     * Registers a block entity type of {@code block} under {@code citybuilder:<name>} (built on the loader's side, where
+     * the type's factory interface is open); the type once it is registered.
+     */
+    <T extends BlockEntity> Supplier<BlockEntityType<T>> registerBlockEntity(String name,
+                                                                             BiFunction<BlockPos, BlockState, T> factory,
+                                                                             Supplier<Block> block);
 
     static Platform get() {
         return Holder.INSTANCE;

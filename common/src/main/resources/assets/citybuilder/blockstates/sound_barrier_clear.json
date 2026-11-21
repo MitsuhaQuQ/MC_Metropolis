@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "citybuilder:block/sound_barrier_clear"
+    },
+    "facing=east": {
+      "model": "citybuilder:block/sound_barrier_clear",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "citybuilder:block/sound_barrier_clear",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "citybuilder:block/sound_barrier_clear",
+      "y": 270
+    }
+  }
+}

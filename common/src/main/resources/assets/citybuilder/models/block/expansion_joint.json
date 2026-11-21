@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "citybuilder:block/expansion_joint",
+    "bottom": "citybuilder:block/deck_side",
+    "side": "citybuilder:block/deck_side"
+  }
+}
