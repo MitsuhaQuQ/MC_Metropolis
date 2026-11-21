@@ -165,6 +165,7 @@ public record Palette(String wall, String accent, String trim, String window, St
             case TACTILE -> c.material("tactile", variant);
             case ARCADE_GLASS -> c.material("arcadeGlass", variant);
             case LOUVRE -> c.material("louvre", variant);
+            case ANDON -> c.material("andon", variant ^ 0x606);
         };
     }
 

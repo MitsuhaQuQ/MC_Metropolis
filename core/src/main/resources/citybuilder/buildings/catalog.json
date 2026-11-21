@@ -2381,6 +2381,12 @@
   "tactile": [
    "minecraft:yellow_concrete"
   ],
+  "andon": [
+   "minecraft:shroomlight",
+   "minecraft:shroomlight",
+   "minecraft:sea_lantern",
+   "minecraft:ochre_froglight"
+  ],
   "arcadeGlass": [
    "minecraft:glass"
   ],

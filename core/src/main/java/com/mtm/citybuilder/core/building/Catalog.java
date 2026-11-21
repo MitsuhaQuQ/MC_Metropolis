@@ -221,7 +221,7 @@ public final class Catalog {
             "shed", "rail", "curtain", "curtainRed", "latticeSpruce", "latticeMangrove", "equipment", "shutter", "hedge",
             "bamboo", "post", "carport", "guard", "downpipe", "lantern", "sudare", "komayose", "engawa", "toro", "toroLight",
             "toroCap", "gravel", "board", "plaster", "spike", "fasciaLit", "display", "stand", "brandKonbini",
-            "brandFastfood", "brandPost", "postbox", "line", "pole", "ad", "baseWall", "upperWall", "step", "tenantSign", "shoki", "bank", "water", "blackBoard", "arcadePost", "arcadeRoof", "arcadePaving", "tactile", "arcadeGlass", "louvre", "rust");
+            "brandFastfood", "brandPost", "postbox", "line", "pole", "ad", "baseWall", "upperWall", "step", "tenantSign", "shoki", "bank", "water", "blackBoard", "arcadePost", "arcadeRoof", "arcadePaving", "tactile", "arcadeGlass", "louvre", "rust", "andon");
 
     /** Gson is used here only. */
     private static final class Json {

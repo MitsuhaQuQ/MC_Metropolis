@@ -68,7 +68,7 @@ final class BuildingPreview {
                 {"bookshelf", 0x6B5839}, {"magenta_concrete", 0xA9309F}, {"pink_concrete", 0xD5658E},
                 {"green_concrete", 0x495B24}, {"cyan_terracotta", 0x565B5B}, {"polished_granite", 0x9A6A59},
                 {"cyan_stained_glass", 0x4C7F99}, {"brown_stained_glass", 0x664C33}, {"blue_stained_glass", 0x334CB2},
-                {"polished_deepslate", 0x484848}, {"brick", 0x976253}, {"cobbled_deepslate", 0x4D4D50}, {"mossy_cobblestone", 0x6E775E}, {"water", 0x3F76E4}, {"cut_copper", 0xBF6B50}, {"exposed_cut_copper", 0xA17E68},
+                {"polished_deepslate", 0x484848}, {"brick", 0x976253}, {"cobbled_deepslate", 0x4D4D50}, {"mossy_cobblestone", 0x6E775E}, {"water", 0x3F76E4}, {"shroomlight", 0xF09A4D}, {"ochre_froglight", 0xF6E9A9}, {"cut_copper", 0xBF6B50}, {"exposed_cut_copper", 0xA17E68},
                 {"weathered_cut_copper", 0x6C9C73}, {"oxidized_cut_copper", 0x50997F}, {"red_nether_brick", 0x45090A},
                 {"cracked_stone_bricks", 0x767676}, {"cracked_deepslate_tiles", 0x343437}, {"gray_terracotta", 0x3A2A24},
                 {"red_terracotta", 0x8E3C2E}, {"yellow_concrete", 0xF0AF15}, {"diorite", 0xBDBCBD}, {"andesite", 0x888889}, {"blackstone", 0x2A2328}, {"cracked_polished_blackstone_bricks", 0x2C262B}, {"granite", 0x956755}, {"red_nether_bricks", 0x45090A}, {"sandstone", 0xD8CB9B}, {"stone", 0x7E7E7E}, {"terracotta", 0x985E43}, {"decorated_pot", 0x8C4F3C}, {"oak_sign", 0xA2834F}, {"composter", 0x7D5A33}, {"stone_brick", 0x7A7A7A}, {"pink_terracotta", 0xA14E4E},

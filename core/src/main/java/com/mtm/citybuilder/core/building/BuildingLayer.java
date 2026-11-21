@@ -173,6 +173,8 @@ public final class BuildingLayer {
         ARCADE_GLASS,
         /** A louvred band under a covered walk's fascia. */
         LOUVRE,
+        /** A lit sign box standing by a shop's door (置き行灯看板). */
+        ANDON,
         /** A light inside, so nothing spawns there. */
         LIGHT
     }
@@ -795,6 +797,7 @@ public final class BuildingLayer {
         Building[] lots = new Building[18 * 18];
         Building[] inside = new Building[18 * 18];
         TownPlots[] towns = new TownPlots[18 * 18];
+        java.util.Map<Long, Plot> probed = new java.util.HashMap<>();
         int minX = chunkX * 16 - 1;
         int minZ = chunkZ * 16 - 1;
         for (int i = 0; i < 18; i++) {
@@ -865,7 +868,7 @@ public final class BuildingLayer {
                     }
                     if (columns[x * 16 + z] == Column.EMPTY && towns[c] != null) {
                         // Out over the street: the half of a roof over the whole street that the nearer side builds
-                        Building o = roofing(towns[c], wx, wz);
+                        Building o = roofing(towns[c], wx, wz, probed);
                         if (o != null) {
                             columns[x * 16 + z] = column(o, wx, wz, false, true, null);
                         }
@@ -1525,13 +1528,22 @@ public final class BuildingLayer {
      * looked for along the four axes, the nearest on each; a building covers what lies before its frontage out to the
      * street's middle.
      */
-    private Building roofing(TownPlots town, double x, double z) {
+    private Building roofing(TownPlots town, double x, double z, java.util.Map<Long, Plot> probed) {
         Building best = null;
         double nearest = Double.MAX_VALUE;
         int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
         for (int[] d : dirs) {
             for (int step = 1; step <= ROOF_REACH; step++) {
-                Plot p = town.at(x + d[0] * step, z + d[1] * step);
+                double px = x + d[0] * step;
+                double pz = z + d[1] * step;
+                long key = (long) Math.floor(px) << 32 ^ ((long) Math.floor(pz) & 0xFFFFFFFFL);
+                Plot p;
+                if (probed.containsKey(key)) {
+                    p = probed.get(key);
+                } else {
+                    p = town.at(px, pz);
+                    probed.put(key, p);
+                }
                 if (p == null) {
                     continue;
                 }
@@ -1570,10 +1582,53 @@ public final class BuildingLayer {
         if (dy == row) {
             return ridge || d < 1.0 || Math.floorMod(lu, 6) == 0 ? Part.ARCADE_ROOF : Part.ARCADE_GLASS;
         }
+        if (ridge && (dy == row - 1 || dy == row - 2) && Math.floorMod(lu, 18) == 9) {
+            // The street's name board, hung from the ridge
+            return Part.SIGN;
+        }
         if (ridge && dy == row - 1 && Math.floorMod(lu, 6) == 3) {
             return Part.LANTERN;
         }
         return Part.NONE;
+    }
+
+    /**
+     * What stands on a covered walk: a lit sign box by the shop's door, goods and stands along its front, a sign hung
+     * under the roof before the door; at the walk's edge, benches and planters between the posts. Null elsewhere.
+     */
+    private static Part walkFurniture(Building b, Column c, int dy, String kind) {
+        double u = c.u();
+        double v = c.v();
+        long lu = (long) Math.floor(u);
+        boolean gangi = kind.equals("gangi");
+        boolean full = kind.equals("full");
+        int roof = full ? fullRoof(b) : b.ground();
+        boolean front = v >= b.front() - 1.0 && u >= 0 && u < b.width();
+        double toDoor = Math.abs(u - b.door());
+        if (front && dy == 1) {
+            if (toDoor >= 1.0 && toDoor < 2.0 && chance(b, 90, 0.4) && (u < b.door()) == chance(b, 93, 0.5)) {
+                return Part.ANDON;
+            }
+            if (toDoor >= 1.0 && detail(b, c, 91) < 0.15) {
+                return Part.STAND;
+            }
+        }
+        if (!gangi && toDoor < 0.5 && dy == (full ? b.ground() : roof - 1) && (full ? front : v >= 2.0 && v < 3.0)) {
+            // The shop's sign hung under the roof (吊り看板), or on its front under a high roof
+            return Part.SIGN;
+        }
+        boolean edge = v < 1.0;
+        int bay = gangi ? 3 : kind.equals("louvre") ? 4 : full ? 6 : 5;
+        if (edge && dy == 1 && Math.floorMod(lu, bay) != 0) {
+            if (!gangi && Math.floorMod(lu, 12) >= 2 && Math.floorMod(lu, 12) <= 3 && chance(b, 92, 0.5)) {
+                // A bench
+                return Part.ENGAWA;
+            }
+            if (detail(b, c, 94) < 0.15) {
+                return Part.PLANT;
+            }
+        }
+        return null;
     }
 
     /** Whether a building stands behind a covered walk. */
@@ -1594,6 +1649,12 @@ public final class BuildingLayer {
             return null;
         }
         String kind = b.composition().get(Slot.ARCADE);
+        if (v >= 0.0 && dy >= 1) {
+            Part furniture = walkFurniture(b, c, dy, kind);
+            if (furniture != null) {
+                return furniture;
+            }
+        }
         if (kind.equals("full")) {
             if (v < 0.0) {
                 return streetRoof(b, c, dy);
