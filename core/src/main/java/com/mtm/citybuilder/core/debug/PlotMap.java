@@ -35,11 +35,31 @@ public final class PlotMap {
                     rgb = 0xB4C3A8;
                     kinds[py * size + px] = 1;
                     ids[py * size + px] = 0L;
+                } else if (plot.pole()) {
+                    // A flag lot's pole: its way in
+                    rgb = 0x9C6B3C;
+                    kinds[py * size + px] = 2;
+                    ids[py * size + px] = plot.id();
+                } else if (plot.use() != null && !plot.use().built()) {
+                    // Open land behind the street: gardens, car parks, fields
+                    rgb = switch (plot.use()) {
+                        case PARKING -> 0xA8A8B0;
+                        case FIELD -> 0xD8D08A;
+                        default -> 0x9CCF8A;
+                    };
+                    kinds[py * size + px] = 2;
+                    ids[py * size + px] = plot.id();
                 } else {
                     long h = Hash.mix(plot.id());
                     int r = 150 + (int) (h & 0x5F);
                     int gr = 150 + (int) ((h >> 8) & 0x5F);
                     int b = 150 + (int) ((h >> 16) & 0x5F);
+                    if (plot.row() > 0) {
+                        // Back lots warmer, parcels bluer
+                        r = Math.min(255, r + 30);
+                    } else if (plot.use() == Plot.Use.PARCEL) {
+                        b = Math.min(255, b + 40);
+                    }
                     rgb = (r << 16) | (gr << 8) | b;
                     kinds[py * size + px] = 2;
                     ids[py * size + px] = plot.id();

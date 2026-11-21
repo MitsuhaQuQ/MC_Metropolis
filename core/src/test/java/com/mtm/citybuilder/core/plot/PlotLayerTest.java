@@ -165,4 +165,58 @@ class PlotLayerTest {
         }
         assertTrue(checked > 100, "checked " + checked);
     }
+
+    /**
+     * The inside of the blocks: nothing left over, back lots behind the front ones, every built back lot reached by a
+     * lane or by its pole, and every pole running out to its street.
+     */
+    @Test
+    void blockInteriorsAreFilledWithBackLotsReachedByPoles() {
+        CityLogic logic = logic();
+        Settlement city = city(logic);
+        CityExtent extent = logic.extent(city);
+        TownPlots plots = logic.plots().town(city);
+        int land = 0;
+        int interior = 0;
+        int back = 0;
+        int built = 0;
+        int poles = 0;
+        for (double x = extent.coreX() - 500; x < extent.coreX() + 500; x += 3) {
+            for (double z = extent.coreZ() - 500; z < extent.coreZ() + 500; z += 3) {
+                Plot plot = plots.at(x, z);
+                if (plot == null) {
+                    continue;
+                }
+                land++;
+                if (plot.interior()) {
+                    interior++;
+                    continue;
+                }
+                if (plot.row() > 0) {
+                    back++;
+                    assertNotNull(plot.use(), "a back lot's use");
+                    built += plot.use().built() ? 1 : 0;
+                    assertTrue(plot.depth() <= plot.maxDepth() + 1e-6, "depth " + plot);
+                }
+                if (plot.pole()) {
+                    poles++;
+                    // The pole runs to the street: straight out towards it, the same lot
+                    assertTrue(plot.use().built() || plot.use() == Plot.Use.PARKING, "a pole to open land " + plot);
+                    double heading = plot.heading();
+                    double nx = Math.sin(heading) * plot.side();
+                    double nz = -Math.cos(heading) * plot.side();
+                    double back2 = Math.max(0.0, plot.depth() - 1.0);
+                    Plot toward = plots.at(x + nx * (plot.depth() - back2), z + nz * (plot.depth() - back2));
+                    // The same pole, or one it shares out to the street (two back lots' first edges close together)
+                    // (a lane doubling back may bring its other side near: only along the pole's own side)
+                    assertTrue(toward == null || toward.chain() != plot.chain() || toward.side() != plot.side()
+                            || toward.id() == plot.id() || toward.pole(), "a pole broken " + plot + " at " + toward);
+                }
+            }
+        }
+        assertTrue(interior < 0.02 * land, "interior left " + interior + " of " + land);
+        assertTrue(back > 0.05 * land, "back lots " + back + " of " + land);
+        assertTrue(built > 0.4 * back, "built back lots " + built + " of " + back);
+        assertTrue(poles > 0, "no poles");
+    }
 }

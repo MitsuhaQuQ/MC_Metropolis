@@ -954,6 +954,35 @@ public final class CitySettings {
         public double priorityOldRoad = 4.0;
         public double priorityStreet = 0.0;
         public double priorityLane = -2.0;
+        /**
+         * The land behind the lots, filled as real blocks' insides are (tools/assets/plateau_interior.py: 23-35% of
+         * Kyoto's, Kanazawa's and Himeji's buildings stand deep in their blocks, neither on a street nor on a lane; the
+         * land 15-25 m back 43-67% covered, beyond 60 m 21-41%). Where no more than {@code backToBack} is left between
+         * a lot's back and the block's middle (looked for up to {@code backReach} from the street), the lot runs on to
+         * the middle (back to back, sewari); else rows of back lots, each {@code backRow} deep (from, to: by street
+         * side), their widths drawn from {@code backFrontage} (5th to 95th percentiles), each reached by a lane within
+         * {@code laneAccess} of its middle or else by a pole {@code poleWidth} wide along its first edge, between the
+         * lots in front of it to the street (a flag lot, hatazaochi). A back lot is open at the chance
+         * {@code backOpen} by how far back it lies {15-25, 25-40, 40-60, over 60 m} (times {@code backOpenDense} in
+         * the old town, downtown and the station front): a car park at {@code backParking}, else a garden, a field
+         * beyond {@code backFieldReach} from the town's middle; built ones are flats at {@code backFlats}, else
+         * houses. Downtown in a metropolis the lots are merged {@code parcelGroup} (least, most) at a time at the
+         * chance {@code parcelChance}, the land behind them taken in: one large parcel (Tokyo's Chuo, a median 254 m2
+         * of nine storeys deep in its blocks).
+         */
+        public double backToBack = 10.0;
+        public double backReach = 90.0;
+        public double[] backRow = {11.0, 15.0};
+        public double[] backFrontage = {6.0, 7.5, 9.0, 11.0, 15.0};
+        public double laneAccess = 10.0;
+        public double poleWidth = 2.5;
+        public double[] backOpen = {0.25, 0.35, 0.45, 0.6};
+        public double backOpenDense = 0.7;
+        public double backParking = 0.4;
+        public double backFieldReach = 2000.0;
+        public double backFlats = 0.18;
+        public double parcelChance = 0.4;
+        public int[] parcelGroup = {2, 4};
     }
 
     /**

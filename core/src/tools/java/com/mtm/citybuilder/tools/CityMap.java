@@ -291,9 +291,21 @@ public final class CityMap {
         int interior = 0;
         int remnant = 0;
         java.util.Map<String, java.util.Map<Long, double[]>> lots = new java.util.TreeMap<>();
+        // The insides of the blocks: each lot once by where it stands (as plateau_interior.py counts buildings), and
+        // the land by what it is
+        java.util.Map<String, java.util.Set<Long>> standing = new java.util.TreeMap<>();
+        java.util.Map<String, Integer> land = new java.util.TreeMap<>();
         for (double x = cx - radius; x < cx + radius; x += 4) {
             for (double z = cz - radius; z < cz + radius; z += 4) {
                 com.mtm.citybuilder.core.plot.Plot plot = plots.at(x, z);
+                if (plot != null && !plot.interior() && !plot.remnant()) {
+                    String where = plot.pole() ? "pole" : plot.row() > 0 ? "back " + plot.use()
+                            : plot.use() == com.mtm.citybuilder.core.plot.Plot.Use.PARCEL ? "parcel"
+                            : plot.street() == StreetClass.LANE ? "lane lot" : plot.depth() > plot.maxDepth() - 1e-9 ? "front, back to back" : "front";
+                    land.merge(where, 1, Integer::sum);
+                    String standsAt = plot.row() > 0 ? (plot.use().built() ? "deep" : "open") : plot.street() == StreetClass.LANE ? "lane" : "front";
+                    standing.computeIfAbsent(standsAt, k -> new java.util.HashSet<>()).add(plot.id());
+                }
                 if (plot == null) {
                     if (plots.onStreet(x, z)) {
                         street++;
@@ -313,6 +325,19 @@ public final class CityMap {
         }
         System.out.printf("L7 plots: %d chains, %d lots; found in %.1f s%n", plots.chainCount(), plots.lotCount(),
                 (System.nanoTime() - start) / 1e9);
+        int landAll = Math.max(1, land.values().stream().mapToInt(Integer::intValue).sum());
+        StringBuilder landLine = new StringBuilder("  the lots' land:");
+        for (var e : land.entrySet()) {
+            landLine.append(String.format(" %s %.1f%%", e.getKey(), 100.0 * e.getValue() / landAll));
+        }
+        System.out.println(landLine);
+        int builtLots = standing.getOrDefault("front", java.util.Set.of()).size() + standing.getOrDefault("lane", java.util.Set.of()).size()
+                + standing.getOrDefault("deep", java.util.Set.of()).size();
+        System.out.printf("  built lots by where they stand (PLATEAU's buildings: Kyoto 54/11/35%%, Kanazawa 64/13/23%%, Himeji 67/5/28%%): front %.0f%%, lane %.0f%%, deep %.0f%%; open back lots %d%n",
+                100.0 * standing.getOrDefault("front", java.util.Set.of()).size() / Math.max(1, builtLots),
+                100.0 * standing.getOrDefault("lane", java.util.Set.of()).size() / Math.max(1, builtLots),
+                100.0 * standing.getOrDefault("deep", java.util.Set.of()).size() / Math.max(1, builtLots),
+                standing.getOrDefault("open", java.util.Set.of()).size());
         int all = Math.max(1, street + lot + interior + remnant);
         System.out.printf("  of the town's street and plotted land: streets %.0f%%, lots %.0f%%, remnants %.1f%%, block interiors %.0f%%%n",
                 100.0 * street / all, 100.0 * lot / all, 100.0 * remnant / all, 100.0 * interior / all);

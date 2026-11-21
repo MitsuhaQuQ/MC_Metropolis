@@ -61,6 +61,12 @@ public final class TownPlots {
      * {chain, side, index} of the lot it joins, {-1} for the block's interior, {} for nothing (a remnant).
      */
     private final Map<Long, int[]> behind = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Each lot whether merged into a downtown parcel, by chain and side. */
+    private final List<boolean[][]> parcels = new ArrayList<>();
+    /** How far back from the street the land behind a lot runs to the block's middle, by the lot's id. */
+    private final Map<Long, Double> backDepths = new java.util.concurrent.ConcurrentHashMap<>();
+    /** The cuts of each row of back lots, by chain, side and row. */
+    private final Map<Long, double[]> backCuts = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** The footpaths' pieces, which front no lots. */
     private final List<StreetSegment> paths = new ArrayList<>();
@@ -88,7 +94,7 @@ public final class TownPlots {
             widest = Math.max(widest, g.width());
         }
         // A position's street lies within this of it, priority and all
-        reach = 0.5 * widest + deepest + config.priorityBoulevard + 1.0;
+        reach = 0.5 * widest + Math.max(deepest, config.backReach) + config.priorityBoulevard + 1.0;
         chain();
         lots();
         for (com.mtm.citybuilder.core.street.Canal canal : plan.canals()) {
@@ -269,6 +275,7 @@ public final class TownPlots {
             double[][] starts = new double[2][];
             double[][] deep = new double[2][];
             District[][] kinds = new District[2][];
+            boolean[][] parcel = new boolean[2][];
             for (int s = 0; s < 2; s++) {
                 int side = s == 0 ? 1 : -1;
                 List<Double> at = new ArrayList<>();
@@ -299,13 +306,51 @@ public final class TownPlots {
                     index++;
                 }
                 at.add(length);
+                // Downtown in a metropolis, runs of lots merged into large parcels
+                List<Boolean> merged = new ArrayList<>();
+                for (int k = 0; k < kind.size(); k++) {
+                    merged.add(false);
+                }
+                if (plan.settlement().tier() == com.mtm.citybuilder.core.settlement.SettlementTier.METROPOLIS
+                        && first.streetClass() != StreetClass.LANE) {
+                    for (int k = 0; k < kind.size(); ) {
+                        long hash = Hash.of(seed ^ 0x9A4CL, c, side, k);
+                        if (kind.get(k) != District.CENTRAL || Hash.unit(hash) >= config.parcelChance) {
+                            k++;
+                            continue;
+                        }
+                        int group = config.parcelGroup[0] + (int) Math.floor(Hash.unit(Hash.mix(hash))
+                                * (config.parcelGroup[1] - config.parcelGroup[0] + 1));
+                        int last = k;
+                        while (last + 1 < kind.size() && last + 1 < k + group && kind.get(last + 1) == District.CENTRAL) {
+                            last++;
+                        }
+                        // The cuts between them taken out: one lot, as deep as the deepest
+                        double deepest = depth.get(k);
+                        for (int q = last; q > k; q--) {
+                            deepest = Math.max(deepest, depth.get(q));
+                            at.remove(q);
+                            depth.remove(q);
+                            kind.remove(q);
+                            merged.remove(q);
+                        }
+                        depth.set(k, deepest);
+                        merged.set(k, true);
+                        k++;
+                    }
+                }
                 starts[s] = at.stream().mapToDouble(Double::doubleValue).toArray();
                 deep[s] = depth.stream().mapToDouble(Double::doubleValue).toArray();
                 kinds[s] = kind.toArray(new District[0]);
+                parcel[s] = new boolean[merged.size()];
+                for (int k = 0; k < merged.size(); k++) {
+                    parcel[s][k] = merged.get(k);
+                }
             }
             cuts.add(starts);
             depths.add(deep);
             districts.add(kinds);
+            parcels.add(parcel);
         }
     }
 
@@ -342,9 +387,28 @@ public final class TownPlots {
             }
         }
         Plot plot = raw(x, z);
-        if (plot == null || plot.interior()) {
-            return plot;
+        if (plot == null) {
+            return null;
         }
+        Plot here = plot.interior() ? inside(plot, x, z) : front(plot, x, z);
+        if (here == null || here.interior() || here.remnant()) {
+            return here;
+        }
+        // A back lot's pole running through here to the street
+        Plot pole = pole(here);
+        return pole != null ? pole : here;
+    }
+
+    /** A position on a lot along the street, as built: joined to a neighbour, a remnant, or part of a parcel. */
+    private Plot front(Plot plot, double x, double z) {
+        Plot lot = frontLot(plot, x, z);
+        if (lot != null && !lot.interior() && !lot.remnant() && parcel(lot.chain(), lot.side(), lot.index())) {
+            return use(lot, Plot.Use.PARCEL);
+        }
+        return lot;
+    }
+
+    private Plot frontLot(Plot plot, double x, double z) {
         int target = absorber(plot);
         if (target < 0) {
             int[] back = behind(plot);
@@ -357,7 +421,10 @@ public final class TownPlots {
             if (back.length == 3) {
                 // The lot behind takes it, as the back of its land: the position measured from that lot's street
                 Plot joined = project(back[0], back[1], x, z);
-                if (joined != null) {
+                // Only where the position lies along that lot's street near its frontage (a street bending round may
+                // bring another stretch of it nearer)
+                double[] starts = cuts.get(back[0])[back[1] > 0 ? 0 : 1];
+                if (joined != null && joined.along() >= starts[back[2]] - 30.0 && joined.along() <= starts[back[2] + 1] + 30.0) {
                     return joined(joined, back[2]);
                 }
             }
@@ -366,6 +433,226 @@ public final class TownPlots {
                     false, true);
         }
         return joined(plot, target);
+    }
+
+    private static Plot use(Plot p, Plot.Use use) {
+        return new Plot(p.id(), p.chain(), p.side(), p.index(), p.start(), p.end(), p.along(), p.depth(), p.maxDepth(),
+                p.district(), p.street(), p.streetWidth(), p.heading(), p.interior(), p.remnant(), p.row(), use, p.pole());
+    }
+
+    private boolean parcel(int chain, int side, int index) {
+        boolean[] merged = parcels.get(chain)[side > 0 ? 0 : 1];
+        return index >= 0 && index < merged.length && merged[index];
+    }
+
+    /**
+     * A position behind the lots along its street: the lot in front of it run on to the block's middle where little is
+     * left between them (back to back) or where it is a parcel or works' land; else the back lot of its row.
+     */
+    private Plot inside(Plot raw, double x, double z) {
+        Plot lot = nominal(raw, raw.index());
+        double back = backDepth(lot);
+        boolean deep = parcel(raw.chain(), raw.side(), raw.index()) || lot.district() == District.INDUSTRIAL
+                || lot.district() == District.PORT;
+        if (deep || rows(lot) == 0) {
+            // Behind a lot too small to build on, joined to no neighbour on its street: left as the block's inside
+            if (absorber(lot) < 0) {
+                return raw;
+            }
+            Plot asFront = new Plot(raw.id(), raw.chain(), raw.side(), raw.index(), raw.start(), raw.end(), raw.along(),
+                    Math.min(raw.depth(), lot.maxDepth() - 0.5), raw.maxDepth(), raw.district(), raw.street(),
+                    raw.streetWidth(), raw.heading(), false, false);
+            Plot f = front(asFront, x, z);
+            // A lot joined to the one behind it, on another street, as it is
+            if (f == null || f.interior() || f.remnant() || f.chain() != raw.chain() || f.side() != raw.side()) {
+                return f;
+            }
+            // To the block's middle: as found behind the lot's middle, or as deep as the position lies
+            return new Plot(f.id(), f.chain(), f.side(), f.index(), f.start(), f.end(), raw.along(), raw.depth(),
+                    Math.max(back, raw.depth()),
+                    f.district(), f.street(), f.streetWidth(), f.heading(), false, false, 0, f.use(), false);
+        }
+        double rowDepth = rowDepth(raw.chain(), raw.side());
+        int row = Math.min(rows(lot), 1 + (int) Math.floor((raw.depth() - lot.maxDepth()) / rowDepth));
+        double[] cuts = backCuts(raw.chain(), raw.side(), row);
+        int index = indexOf(cuts, raw.along());
+        return backLot(raw, row, index, raw.along(), raw.depth(), false);
+    }
+
+    /** A back lot, the position at {@code along} and {@code depth}; on its pole or not. */
+    private Plot backLot(Plot template, int row, int index, double along, double depth, boolean pole) {
+        double[] cuts = backCuts(template.chain(), template.side(), row);
+        Plot front = nominal(template, indexOf(cuts(template), along));
+        double rowDepth = rowDepth(template.chain(), template.side());
+        double far = row >= rows(front) ? Math.max(backDepth(front), depth) : front.maxDepth() + row * rowDepth;
+        long id = Hash.of(seed ^ 0xBAC4L, template.chain(), template.side() * 64L + row, index);
+        return new Plot(id, template.chain(), template.side(), index, cuts[index], cuts[index + 1], along, depth, far,
+                front.district(), template.street(), template.streetWidth(), template.heading(), false, false, row,
+                backUse(template, row, index, id), pole);
+    }
+
+    /** What a back lot is for: open by its depth and district, else houses or flats; open where it has no way in. */
+    private Plot.Use backUse(Plot template, int row, int index, long id) {
+        double[] cuts = backCuts(template.chain(), template.side(), row);
+        double middle = 0.5 * (cuts[index] + cuts[index + 1]);
+        Plot front = nominal(template, indexOf(cuts(template), middle));
+        double rowDepth = rowDepth(template.chain(), template.side());
+        double fromStreet = front.maxDepth() + (row - 0.5) * rowDepth;
+        int band = fromStreet <= 25 ? 0 : fromStreet <= 40 ? 1 : fromStreet <= 60 ? 2 : 3;
+        boolean dense = front.district() == District.OLD_TOWN || front.district() == District.CENTRAL
+                || front.district() == District.STATION_FRONT;
+        double open = config.backOpen[band] * (dense ? config.backOpenDense : 1.0);
+        Plot.Use use;
+        if (Hash.unit(id) < open) {
+            double[] p = pointAt(template.chain(), middle);
+            boolean outskirts = Math.hypot(p[0] - plan.settlement().x(), p[1] - plan.settlement().z()) > config.backFieldReach
+                    && front.district() == District.RESIDENTIAL;
+            use = Hash.unit(Hash.mix(id)) < config.backParking ? Plot.Use.PARKING : outskirts ? Plot.Use.FIELD : Plot.Use.GARDEN;
+        } else {
+            use = Hash.unit(Hash.mix(id + 1)) < config.backFlats ? Plot.Use.FLATS : Plot.Use.HOUSE;
+        }
+        // A built lot or a car park needs a way in: a lane near, or a pole from the lot in front of its first edge
+        if ((use.built() || use == Plot.Use.PARKING) && !laneAccess(template, row, index) && !poleRoom(template, row, index)) {
+            use = Plot.Use.GARDEN;
+        }
+        return use;
+    }
+
+    /** Whether the lot in front of a back lot's first edge has rows back as far as it: a pole can reach it. */
+    private boolean poleRoom(Plot template, int row, int index) {
+        double[] cuts = backCuts(template.chain(), template.side(), row);
+        Plot front = nominal(template, indexOf(cuts(template), cuts[index] + 0.5 * config.poleWidth));
+        return rows(front) >= row && !parcel(front.chain(), front.side(), front.index());
+    }
+
+    /** Whether a lane runs within {@code laneAccess} of a back lot's middle. */
+    private boolean laneAccess(Plot template, int row, int index) {
+        double[] cuts = backCuts(template.chain(), template.side(), row);
+        double middle = 0.5 * (cuts[index] + cuts[index + 1]);
+        Plot front = nominal(template, indexOf(cuts(template), middle));
+        double depth = front.maxDepth() + (row - 0.5) * rowDepth(template.chain(), template.side());
+        double[] p = pointAt(template.chain(), middle);
+        double back = 0.5 * template.streetWidth() + depth;
+        double x = p[0] - p[3] * template.side() * back;
+        double z = p[1] + p[2] * template.side() * back;
+        for (int q : cells.getOrDefault(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL), List.of())) {
+            StreetSegment g = pieces.get(q);
+            if (g.streetClass() != StreetClass.LANE) {
+                continue;
+            }
+            double dx = g.x2() - g.x1();
+            double dz = g.z2() - g.z1();
+            double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+            if (Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z) - 0.5 * g.width() < config.laneAccess) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The back lot whose pole runs through a position, or null: one in a row behind the position's whose first edge
+     * lies within {@code poleWidth} before it, needing a way in (built, or a car park) and having no lane near.
+     */
+    private Plot pole(Plot here) {
+        Plot front = nominal(here, indexOf(cuts(here), here.along()));
+        int rows = rows(front);
+        for (int row = here.row() + 1; row <= rows; row++) {
+            double[] cuts = backCuts(here.chain(), here.side(), row);
+            int index = indexOf(cuts, here.along());
+            if (here.along() - cuts[index] >= config.poleWidth) {
+                continue;
+            }
+            Plot lot = backLot(here, row, index, here.along(), here.depth(), true);
+            if ((lot.use().built() || lot.use() == Plot.Use.PARKING) && !laneAccess(here, row, index)) {
+                return lot;
+            }
+        }
+        return null;
+    }
+
+    /** The rows of back lots behind a lot: none where the land behind it is narrow, else as many as fit. */
+    private int rows(Plot lot) {
+        if (parcel(lot.chain(), lot.side(), lot.index()) || lot.district() == District.INDUSTRIAL
+                || lot.district() == District.PORT) {
+            return 0;
+        }
+        double room = backDepth(lot) - lot.maxDepth();
+        if (room <= config.backToBack) {
+            return 0;
+        }
+        return Math.max(1, (int) Math.floor(room / rowDepth(lot.chain(), lot.side())));
+    }
+
+    private double rowDepth(int chain, int side) {
+        return config.backRow[0] + (config.backRow[1] - config.backRow[0]) * Hash.unit(Hash.of(seed ^ 0x7055L, chain, side));
+    }
+
+    /** The front lots' cuts of a position's street and side. */
+    private double[] cuts(Plot plot) {
+        return cuts.get(plot.chain())[plot.side() > 0 ? 0 : 1];
+    }
+
+    /** The lot in a list of cuts that a position along the street falls in. */
+    private static int indexOf(double[] starts, double along) {
+        int lo = 0;
+        int hi = starts.length - 2;
+        while (lo < hi) {
+            int mid = (lo + hi + 1) >>> 1;
+            if (starts[mid] <= along) {
+                lo = mid;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        return Math.max(0, lo);
+    }
+
+    /** A row of back lots cut along a side of a street, the widths drawn from {@code backFrontage}. */
+    private double[] backCuts(int chain, int side, int row) {
+        long key = Hash.of(chain, side, row);
+        return backCuts.computeIfAbsent(key, k -> {
+            double length = lengths.get(chain);
+            List<Double> at = new ArrayList<>();
+            double position = 0.0;
+            int index = 0;
+            while (position < length - 1e-6) {
+                double width = frontage(config.backFrontage, Hash.unit(Hash.of(seed ^ 0xBAC7L, chain, side * 64L + row, index)));
+                if (length - (position + width) < 0.5 * config.backFrontage[0]) {
+                    width = length - position;
+                }
+                at.add(position);
+                position += width;
+                index++;
+            }
+            at.add(length);
+            return at.stream().mapToDouble(Double::doubleValue).toArray();
+        });
+    }
+
+    /**
+     * How far back from its street's edge the land behind a lot runs before the block's middle: looked for straight
+     * back from the middle of its frontage, to where the land is another street's or none's.
+     */
+    private double backDepth(Plot lot) {
+        Double known = backDepths.get(lot.id());
+        if (known != null) {
+            return known;
+        }
+        double[] p = pointAt(lot.chain(), 0.5 * (lot.start() + lot.end()));
+        double nx = -p[3] * lot.side();
+        double nz = p[2] * lot.side();
+        double found = config.backReach;
+        for (double v = lot.maxDepth(); v < config.backReach; v += 2.0) {
+            double back = 0.5 * lot.streetWidth() + v;
+            Plot at = raw(p[0] + nx * back, p[1] + nz * back);
+            if (at == null || at.chain() != lot.chain() || at.side() != lot.side()) {
+                found = v;
+                break;
+            }
+        }
+        backDepths.put(lot.id(), found);
+        return found;
     }
 
     /**
@@ -468,7 +755,8 @@ public final class TownPlots {
      * enough; else -1, a remnant.
      */
     private int absorber(Plot lot) {
-        if (buildable(lot)) {
+        // A downtown parcel, merged from several lots, is built on whatever the streets round it take
+        if (buildable(lot) || parcel(lot.chain(), lot.side(), lot.index())) {
             return lot.index();
         }
         int s = lot.side() > 0 ? 0 : 1;
