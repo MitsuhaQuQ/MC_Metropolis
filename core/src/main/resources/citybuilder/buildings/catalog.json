@@ -22,7 +22,8 @@
   "UPPER": [
    "normal",
    "low",
-   "tall"
+   "tall",
+   "single"
   ],
   "LAYOUT": [
    "standard",
@@ -52,7 +53,8 @@
    "colonnade",
    "canopy",
    "rooms",
-   "pilotis"
+   "pilotis",
+   "debako"
   ],
   "FRONT_STRIP": [
    "stones",
@@ -62,7 +64,9 @@
   "UPPER_FRONT": [
    "windows",
    "sudare",
-   "glazed"
+   "glazed",
+   "mushiko",
+   "railing"
   ],
   "WAINSCOT": [
    "none",
@@ -235,6 +239,45 @@
    "ribbon",
    "curtain",
    "grid"
+  ],
+  "LATTICE_PATTERN": [
+   "dense",
+   "sparse",
+   "upperPlaster"
+  ],
+  "UDATSU": [
+   "none",
+   "udatsu"
+  ],
+  "DOOR_POS": [
+   "center",
+   "left",
+   "right"
+  ],
+  "SHOKI": [
+   "none",
+   "shoki"
+  ],
+  "RIDGE_HEAVY": [
+   "none",
+   "heavy"
+  ],
+  "HACHIMAKI": [
+   "none",
+   "band"
+  ],
+  "KURA_WINDOW": [
+   "bars",
+   "shutters"
+  ],
+  "NAMAKO": [
+   "diagonal",
+   "grid",
+   "tall"
+  ],
+  "ENTRY_HOOD": [
+   "none",
+   "hood"
   ]
  },
  "palettes": {
@@ -493,6 +536,81 @@
    "parapet": "minecraft:dark_oak_planks",
    "foundation": "minecraft:stone_bricks"
   },
+  "machiya.kyoto.5": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:light_gray_terracotta",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.6": {
+   "wall": "minecraft:mangrove_planks",
+   "accent": "minecraft:calcite",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:mangrove_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.7": {
+   "wall": "minecraft:stripped_dark_oak_log",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:stripped_dark_oak_log",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.8": {
+   "wall": "minecraft:spruce_planks",
+   "accent": "minecraft:yellow_terracotta",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:spruce_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.9": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:smooth_sandstone",
+   "trim": "minecraft:stripped_spruce_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:cobbled_deepslate_slab",
+   "roofBlock": "minecraft:cobbled_deepslate",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
   "machiya.gion.1": {
    "wall": "minecraft:dark_oak_planks",
    "accent": "minecraft:yellow_terracotta",
@@ -534,6 +652,36 @@
    "floor": "minecraft:spruce_planks",
    "roofSlab": "minecraft:deepslate_tile_slab",
    "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.gion.4": {
+   "wall": "minecraft:mangrove_planks",
+   "accent": "minecraft:yellow_terracotta",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:mangrove_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:mangrove_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.gion.5": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:packed_mud",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
    "flat": "minecraft:smooth_stone",
    "parapet": "minecraft:dark_oak_planks",
    "foundation": "minecraft:stone_bricks"
@@ -583,6 +731,36 @@
    "parapet": "minecraft:mangrove_planks",
    "foundation": "minecraft:stone_bricks"
   },
+  "machiya.chaya.4": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:packed_mud",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.chaya.5": {
+   "wall": "minecraft:spruce_planks",
+   "accent": "minecraft:calcite",
+   "trim": "minecraft:spruce_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:spruce_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:spruce_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
   "machiya.jinaimachi.1": {
    "wall": "minecraft:stripped_spruce_log",
    "accent": "minecraft:white_concrete",
@@ -609,6 +787,21 @@
    "floor": "minecraft:spruce_planks",
    "roofSlab": "minecraft:deepslate_tile_slab",
    "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:calcite",
+   "foundation": "minecraft:cobblestone"
+  },
+  "machiya.jinaimachi.3": {
+   "wall": "minecraft:stripped_spruce_log",
+   "accent": "minecraft:calcite",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
    "flat": "minecraft:smooth_stone",
    "parapet": "minecraft:calcite",
    "foundation": "minecraft:cobblestone"
@@ -1226,6 +1419,51 @@
    "roofBlock": "minecraft:polished_blackstone_bricks",
    "flat": "minecraft:smooth_stone",
    "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:cobblestone"
+  },
+  "kura.4": {
+   "wall": "minecraft:black_concrete",
+   "accent": "minecraft:polished_blackstone",
+   "trim": "minecraft:black_concrete",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:black_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "kura.5": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:dark_oak_planks",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:brick_slab",
+   "roofBlock": "minecraft:bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "kura.6": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:deepslate_tiles",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
    "foundation": "minecraft:cobblestone"
   },
   "house.kanto.1": {
@@ -1922,6 +2160,9 @@
   "step": [
    "minecraft:smooth_stone_slab"
   ],
+  "shoki": [
+   "minecraft:decorated_pot"
+  ],
   "tenantSign": [
    "minecraft:white_concrete",
    "minecraft:yellow_concrete",
@@ -2230,24 +2471,31 @@
     "machiya.kyoto.1": 1.0,
     "machiya.kyoto.2": 1.0,
     "machiya.kyoto.3": 1.0,
-    "machiya.kyoto.4": 1.0
+    "machiya.kyoto.4": 1.0,
+    "machiya.kyoto.5": 1.0,
+    "machiya.kyoto.6": 1.0,
+    "machiya.kyoto.7": 1.0,
+    "machiya.kyoto.8": 1.0,
+    "machiya.kyoto.9": 1.0
    },
    "options": {
     "ROOF": {
      "gable": 1.0
     },
     "GROUND": {
-     "lattice": 0.5,
-     "shop": 0.25,
-     "plaster": 0.25
+     "lattice": 0.45,
+     "debako": 0.2,
+     "shop": 0.15,
+     "plaster": 0.2
     },
     "FRONT_STRIP": {
      "bamboo": 0.5,
      "stones": 0.5
     },
     "UPPER": {
-     "normal": 0.5,
-     "low": 0.5
+     "normal": 0.35,
+     "low": 0.5,
+     "single": 0.15
     },
     "WAINSCOT": {
      "band": 1.0
@@ -2268,6 +2516,38 @@
     "TREES": {
      "none": 0.4,
      "one": 0.6
+    },
+    "UPPER_FRONT": {
+     "mushiko": 0.45,
+     "windows": 0.3,
+     "railing": 0.15,
+     "sudare": 0.1
+    },
+    "LATTICE_PATTERN": {
+     "dense": 0.5,
+     "sparse": 0.3,
+     "upperPlaster": 0.2
+    },
+    "UDATSU": {
+     "none": 0.75,
+     "udatsu": 0.25
+    },
+    "DOOR_POS": {
+     "left": 0.45,
+     "right": 0.45,
+     "center": 0.1
+    },
+    "SHOKI": {
+     "none": 0.8,
+     "shoki": 0.2
+    },
+    "RIDGE_DIR": {
+     "along": 0.9,
+     "gable": 0.1
+    },
+    "RIDGE_HEAVY": {
+     "none": 0.8,
+     "heavy": 0.2
     }
    }
   },
@@ -2277,14 +2557,17 @@
    "palettes": {
     "machiya.gion.1": 1.0,
     "machiya.gion.2": 1.0,
-    "machiya.gion.3": 1.0
+    "machiya.gion.3": 1.0,
+    "machiya.gion.4": 1.0,
+    "machiya.gion.5": 1.0
    },
    "options": {
     "ROOF": {
      "gable": 1.0
     },
     "GROUND": {
-     "lattice": 1.0
+     "lattice": 0.8,
+     "debako": 0.2
     },
     "FRONT_STRIP": {
      "bamboo": 0.5,
@@ -2315,8 +2598,34 @@
      "one": 0.6
     },
     "UPPER_FRONT": {
-     "windows": 0.15,
-     "sudare": 0.85
+     "sudare": 0.7,
+     "railing": 0.2,
+     "windows": 0.1
+    },
+    "LATTICE_PATTERN": {
+     "dense": 0.5,
+     "sparse": 0.3,
+     "upperPlaster": 0.2
+    },
+    "UDATSU": {
+     "none": 0.9,
+     "udatsu": 0.1
+    },
+    "DOOR_POS": {
+     "left": 0.45,
+     "right": 0.45,
+     "center": 0.1
+    },
+    "SHOKI": {
+     "none": 0.8,
+     "shoki": 0.2
+    },
+    "RIDGE_DIR": {
+     "along": 1.0
+    },
+    "RIDGE_HEAVY": {
+     "none": 0.8,
+     "heavy": 0.2
     }
    }
   },
@@ -2326,14 +2635,17 @@
    "palettes": {
     "machiya.chaya.1": 1.0,
     "machiya.chaya.2": 1.0,
-    "machiya.chaya.3": 1.0
+    "machiya.chaya.3": 1.0,
+    "machiya.chaya.4": 1.0,
+    "machiya.chaya.5": 1.0
    },
    "options": {
     "ROOF": {
      "gable": 1.0
     },
     "GROUND": {
-     "lattice": 1.0
+     "lattice": 0.85,
+     "debako": 0.15
     },
     "FRONT_STRIP": {
      "stones": 1.0
@@ -2360,7 +2672,32 @@
      "one": 0.6
     },
     "UPPER_FRONT": {
-     "glazed": 1.0
+     "glazed": 0.7,
+     "railing": 0.2,
+     "sudare": 0.1
+    },
+    "LATTICE_PATTERN": {
+     "dense": 0.8,
+     "upperPlaster": 0.2
+    },
+    "UDATSU": {
+     "none": 1.0
+    },
+    "DOOR_POS": {
+     "left": 0.45,
+     "right": 0.45,
+     "center": 0.1
+    },
+    "SHOKI": {
+     "none": 0.9,
+     "shoki": 0.1
+    },
+    "RIDGE_DIR": {
+     "along": 1.0
+    },
+    "RIDGE_HEAVY": {
+     "none": 0.8,
+     "heavy": 0.2
     }
    }
   },
@@ -2369,7 +2706,8 @@
    "storeys": 2,
    "palettes": {
     "machiya.jinaimachi.1": 1.0,
-    "machiya.jinaimachi.2": 1.0
+    "machiya.jinaimachi.2": 1.0,
+    "machiya.jinaimachi.3": 1.0
    },
    "options": {
     "ROOF": {
@@ -2383,7 +2721,8 @@
     },
     "UPPER": {
      "normal": 0.2,
-     "low": 0.8
+     "low": 0.7,
+     "single": 0.1
     },
     "WAINSCOT": {
      "band": 1.0
@@ -2402,6 +2741,36 @@
     "TREES": {
      "none": 0.4,
      "one": 0.6
+    },
+    "UPPER_FRONT": {
+     "mushiko": 0.7,
+     "windows": 0.3
+    },
+    "LATTICE_PATTERN": {
+     "dense": 0.5,
+     "sparse": 0.3,
+     "upperPlaster": 0.2
+    },
+    "UDATSU": {
+     "none": 0.6,
+     "udatsu": 0.4
+    },
+    "DOOR_POS": {
+     "left": 0.45,
+     "right": 0.45,
+     "center": 0.1
+    },
+    "SHOKI": {
+     "none": 0.8,
+     "shoki": 0.2
+    },
+    "RIDGE_DIR": {
+     "along": 0.85,
+     "gable": 0.15
+    },
+    "RIDGE_HEAVY": {
+     "none": 0.8,
+     "heavy": 0.2
     }
    }
   },
@@ -2411,7 +2780,10 @@
    "palettes": {
     "kura.1": 1.0,
     "kura.2": 1.0,
-    "kura.3": 1.0
+    "kura.3": 1.0,
+    "kura.4": 1.0,
+    "kura.5": 1.0,
+    "kura.6": 1.0
    },
    "options": {
     "ROOF": {
@@ -2420,6 +2792,31 @@
     "RIDGE_DIR": {
      "along": 0.4,
      "gable": 0.6
+    },
+    "UPPER": {
+     "normal": 0.85,
+     "single": 0.15
+    },
+    "RIDGE_HEAVY": {
+     "none": 0.6,
+     "heavy": 0.4
+    },
+    "HACHIMAKI": {
+     "none": 0.5,
+     "band": 0.5
+    },
+    "KURA_WINDOW": {
+     "bars": 0.5,
+     "shutters": 0.5
+    },
+    "NAMAKO": {
+     "diagonal": 0.6,
+     "grid": 0.25,
+     "tall": 0.15
+    },
+    "ENTRY_HOOD": {
+     "none": 0.5,
+     "hood": 0.5
     },
     "WAINSCOT": {
      "board": 0.3333333333333333,

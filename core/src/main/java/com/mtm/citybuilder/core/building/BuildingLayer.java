@@ -153,6 +153,8 @@ public final class BuildingLayer {
         TENANT_A,
         TENANT_B,
         TENANT_C,
+        /** A small figure on a machiya's pent roof (鍾馗さん). */
+        SHOKI,
         /** A light inside, so nothing spawns there. */
         LIGHT
     }
@@ -380,6 +382,10 @@ public final class BuildingLayer {
                     composition = composition.with(slot, own.get(slot));
                 }
             }
+        }
+        if ((type == Building.Type.MACHIYA || type == Building.Type.KURA) && composition.is(Slot.UPPER, "single")) {
+            // A single-storey machiya (平屋) or small storehouse
+            storeys = 1;
         }
         // A program the lot was given: standalone where the lot is open (not downtown or in the old town, wide and deep
         // enough for parking in front), else the ground floor of a shop, office or block of flats
@@ -635,7 +641,7 @@ public final class BuildingLayer {
                 : Building.Roof.valueOf(composition.get(storeys >= 4 ? Slot.ROOF_TALL : Slot.ROOF).toUpperCase(java.util.Locale.ROOT));
         // Machiya keep their ridge along the street (平入り); storehouses as their composition says; others along the
         // longer side of their upper volume
-        boolean ridgeAlong = type == Building.Type.MACHIYA
+        boolean ridgeAlong = type == Building.Type.MACHIYA && !composition.is(Slot.RIDGE_DIR, "gable")
                 || (type == Building.Type.KURA ? composition.is(Slot.RIDGE_DIR, "along")
                 : upTo - upFrom >= depth - stepBack - upBack);
         double slope = type == Building.Type.WORKS ? 0.5 : 1.0;
@@ -663,6 +669,10 @@ public final class BuildingLayer {
             door = parkLeft ? width - 1.5 : 1.5;
         } else if (type == Building.Type.HOUSE) {
             door = 1.5 + Math.floor((width - 3.0) * Hash.unit(Hash.of(h, 6)));
+        } else if ((type == Building.Type.MACHIYA || type == Building.Type.KURA) && width >= 5
+                && !composition.is(Slot.DOOR_POS, "center")) {
+            // A machiya's door at one end, its passage (通り庭) running back along that side
+            door = composition.is(Slot.DOOR_POS, "left") ? 1.5 : width - 1.5;
         } else {
             door = Math.floor(0.5 * width) + 0.5;
         }
@@ -961,6 +971,7 @@ public final class BuildingLayer {
             case MACHIYA -> switch (g) {
                 case "shop" -> 2;
                 case "plaster" -> 3;
+                case "debako" -> 4;
                 default -> b.composition().is(Slot.FRONT_STRIP, "bamboo") ? 0 : 1;
             };
             case OFFICE -> switch (g) {
@@ -1170,7 +1181,7 @@ public final class BuildingLayer {
             }
             return wallTop + (c.edge() || detail(b, c, 3) < 0.04 ? 1 : 0);
         }
-        return b.base() + roofRow(b, c);
+        return b.base() + roofRow(b, c) + (c.ridge() && b.composition().is(Slot.RIDGE_HEAVY, "heavy") ? 1 : 0);
     }
 
     /**
@@ -1332,6 +1343,10 @@ public final class BuildingLayer {
                 return Part.RIDGE;
             }
             return Math.floorMod(halves(b, c), 2) == 1 ? Part.ROOF_LOW : Part.ROOF_HIGH;
+        }
+        if (above == roof + 1 && c.ridge() && b.composition().is(Slot.RIDGE_HEAVY, "heavy")) {
+            // A second course of ridge tiles
+            return Part.RIDGE;
         }
         return Part.AIR;
     }
@@ -1604,10 +1619,17 @@ public final class BuildingLayer {
                             ? Part.LATTICE : Part.WALL;
                 }
                 if (front && !corner && !c.door()) {
+                    long lu = (long) Math.floor(u);
+                    // The lattice: dense, sparse (posts between planks), or its top row plastered
+                    String pattern = b.composition().get(Slot.LATTICE_PATTERN);
+                    Part lattice = pattern.equals("sparse") && Math.floorMod(lu, 2) == 1 ? Part.WALL
+                            : pattern.equals("upperPlaster") && row == 2 ? Part.ACCENT : Part.LATTICE;
                     return switch (style) {
                         case 2 -> row <= 2 ? Part.SHOPFRONT : Part.WALL;
-                        case 3 -> row <= 2 && Math.floorMod((long) Math.floor(u), 5) >= 2 ? Part.LATTICE : Part.ACCENT;
-                        default -> row <= 2 ? Part.LATTICE : Part.WALL;
+                        case 3 -> row <= 2 && Math.floorMod(lu, 5) >= 2 ? lattice : Part.ACCENT;
+                        // Plaster behind a projecting lattice (出格子)
+                        case 4 -> row <= 2 ? Part.ACCENT : Part.WALL;
+                        default -> row <= 2 ? lattice : Part.WALL;
                     };
                 }
                 if (behind && !c.door() && row <= 2 && style != 2) {
@@ -1693,6 +1715,28 @@ public final class BuildingLayer {
                     }
                     if (dy == 0) {
                         return Part.PAVING;
+                    }
+                    boolean end = u < 1.0 || u >= w - 1.0;
+                    // Firewalls at the ends of the upper storey, standing out over the pent roof (卯建)
+                    if (b.composition().is(Slot.UDATSU, "udatsu") && end && b.storeys() >= 2) {
+                        if (dy > b.ground() && dy < b.wallHeight()) {
+                            return Part.ACCENT;
+                        }
+                        if (dy == b.wallHeight()) {
+                            return Part.HOOD;
+                        }
+                    }
+                    // A small figure on the pent roof over the door (鍾馗さん)
+                    if (b.composition().is(Slot.SHOKI, "shoki") && Math.abs(u - b.door()) < 0.5 && dy == b.ground() + 1) {
+                        return Part.SHOKI;
+                    }
+                    // A wooden railing before the upper storey, on the pent roof
+                    if (b.composition().is(Slot.UPPER_FRONT, "railing") && b.storeys() >= 2 && !end && dy == b.ground() + 1) {
+                        return Part.KOMAYOSE;
+                    }
+                    // A projecting lattice (出格子) on the strip, the door's bay left open
+                    if (groundStyle(b) == 4 && (dy == 1 || dy == 2) && !toDoor && !end) {
+                        return Part.LATTICE;
                     }
                     // On the strip: the bamboo guard or a low rail, as the composition says (not before a shop front)
                     if (dy == 1 && !toDoor && groundStyle(b) != 2) {
@@ -1983,6 +2027,20 @@ public final class BuildingLayer {
             }
         }
         if (b.type() == Building.Type.KURA) {
+            int rowOf = dy < b.ground() ? dy : (dy - b.ground()) % b.upper();
+            // Thick shutters standing open beside each window (観音開き)
+            if (b.composition().is(Slot.KURA_WINDOW, "shutters") && rowOf == 2 && dy > 0 && dy < b.wallHeight()
+                    && (Math.floorMod(s, 5) == 1 || Math.floorMod(s, 5) == 3)) {
+                return Part.PARAPET;
+            }
+            // A thick plaster band under the eaves (鉢巻)
+            if (b.composition().is(Slot.HACHIMAKI, "band") && dy == b.wallHeight() - 1) {
+                return Part.PARAPET;
+            }
+            // A small tiled hood over the door
+            if (against == Face.FRONT && b.composition().is(Slot.ENTRY_HOOD, "hood") && Math.abs(along - b.door()) < 1.5 && dy == 3) {
+                return Part.HOOD;
+            }
             if (!b.composition().is(Slot.LEDGE, "tiled")) {
                 return null;
             }
@@ -2091,10 +2149,18 @@ public final class BuildingLayer {
         double facadeAt = face == Face.SIDE ? c.v() - b.front() : c.u();
         if (b.type() == Building.Type.KURA) {
             int style = groundStyle(b);
-            if (storey == 0 && row >= 1 && row <= wainscot(b) && style != 2 && !(face == Face.FRONT && c.door())) {
+            boolean tall = style == 1 && b.composition().is(Slot.NAMAKO, "tall");
+            long fs = (long) Math.floor(facadeAt);
+            boolean windowHere = row == 2 && Math.floorMod(fs, 5) == 2;
+            if ((storey == 0 && row >= 1 && row <= wainscot(b) || tall && row >= 1 && !windowHere)
+                    && style != 2 && !(face == Face.FRONT && c.door())) {
                 if (style == 1) {
+                    if (b.composition().is(Slot.NAMAKO, "grid")) {
+                        // Square tiles in a white grid
+                        return Math.floorMod(row, 2) == 0 || Math.floorMod(fs, 3) == 0 ? Part.WALL : Part.ACCENT;
+                    }
                     // The namako wall: dark tiles in a white diagonal grid
-                    return Math.floorMod((long) Math.floor(facadeAt) + row, 2) == 0 ? Part.WALL : Part.ACCENT;
+                    return Math.floorMod(fs + row, 2) == 0 ? Part.WALL : Part.ACCENT;
                 }
                 return Part.ACCENT;
             }
@@ -2164,6 +2230,20 @@ public final class BuildingLayer {
             return wall;
         }
         long s = (long) Math.floor(facade);
+        if (b.type() == Building.Type.MACHIYA && upper && face == Face.FRONT) {
+            switch (b.composition().get(Slot.UPPER_FRONT)) {
+                case "mushiko" -> {
+                    // Plaster pierced by slits (虫籠窓)
+                    return Math.floorMod(s, 3) == 1 ? Part.LATTICE : Part.ACCENT;
+                }
+                case "railing" -> {
+                    // Opened to its railing: glazing between posts
+                    return Math.floorMod(s, 4) == 0 ? Part.TRIM : Part.WINDOW;
+                }
+                default -> {
+                }
+            }
+        }
         if (b.type() == Building.Type.MACHIYA && b.composition().is(Slot.UPPER_FRONT, "glazed") && upper && face == Face.FRONT) {
             // The upper storey glazed across in wooden frames
             return Math.floorMod(s, 3) == 0 ? Part.TRIM : Part.WINDOW;

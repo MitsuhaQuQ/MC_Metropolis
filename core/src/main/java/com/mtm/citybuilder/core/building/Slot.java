@@ -16,7 +16,7 @@ public enum Slot {
     /** A storehouse's ridge: along the street (平入り) or its gable to it (妻入り). */
     RIDGE_DIR("along", "gable"),
     /** The upper storeys' height: as the kind's, the low second storey of older machiya (厨子二階), a chaya's tall one. */
-    UPPER("normal", "low", "tall"),
+    UPPER("normal", "low", "tall", "single"),
     /** How a house and its garden lie on the lot. */
     LAYOUT("standard", "sidePark", "frontPark", "garden"),
     CARPORT("none", "carport"),
@@ -24,11 +24,11 @@ public enum Slot {
     ANNEX("none", "leanTo"),
     /** How the ground floor meets the street, by kind. */
     GROUND("plain", "garage", "lattice", "shop", "plaster", "boards", "glass", "lowWall", "shutter", "recessed",
-            "colonnade", "canopy", "rooms", "pilotis"),
+            "colonnade", "canopy", "rooms", "pilotis", "debako"),
     /** What stands on a machiya's front strip: stones only, the bamboo guard (犬矢来), the low wooden rail (駒寄せ). */
     FRONT_STRIP("stones", "bamboo", "komayose"),
     /** A machiya's upper storey to the street: small windows, bamboo blinds (簾), glazing in wooden frames. */
-    UPPER_FRONT("windows", "sudare", "glazed"),
+    UPPER_FRONT("windows", "sudare", "glazed", "mushiko", "railing"),
     /** The foot of the walls: plain, a band, a storehouse's wooden wainscot, namako wall or stone course. */
     WAINSCOT("none", "band", "board", "namako", "stone"),
     /** A storehouse's tiled ledges (水切り瓦). */
@@ -99,7 +99,25 @@ public enum Slot {
     /** Balconies continuous or split flat by flat by screens. */
     BALCONY_SPLIT("none", "units"),
     /** A block's walls: punched windows, ribbon windows, a curtain wall, a framed grid. */
-    FACADE("punched", "ribbon", "curtain", "grid");
+    FACADE("punched", "ribbon", "curtain", "grid"),
+    /** A machiya's lattice: dense, sparse (posts between planks), its top row plastered. */
+    LATTICE_PATTERN("dense", "sparse", "upperPlaster"),
+    /** Firewalls standing out at the ends of a machiya's upper storey, capped with tiles (卯建). */
+    UDATSU("none", "udatsu"),
+    /** Where the door is: the middle, or one end (a machiya's passage, 通り庭, runs back along that side). */
+    DOOR_POS("center", "left", "right"),
+    /** A small figure on the pent roof over the door (鍾馗さん). */
+    SHOKI("none", "shoki"),
+    /** A heavy ridge, a second course of ridge tiles (as Kawagoe's storehouses). */
+    RIDGE_HEAVY("none", "heavy"),
+    /** A storehouse's thick plaster band under its eaves (鉢巻). */
+    HACHIMAKI("none", "band"),
+    /** A storehouse's windows: bars, or bars with thick shutters standing open beside them (観音開き). */
+    KURA_WINDOW("bars", "shutters"),
+    /** A storehouse's namako wall: diagonal joints, a square grid, or up the whole wall. */
+    NAMAKO("diagonal", "grid", "tall"),
+    /** A small tiled hood over a storehouse's door. */
+    ENTRY_HOOD("none", "hood");
 
     private final List<String> options;
 
