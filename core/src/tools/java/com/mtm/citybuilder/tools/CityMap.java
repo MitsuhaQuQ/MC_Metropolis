@@ -72,6 +72,11 @@ public final class CityMap {
         File out = new File(args[4]);
         int size = args.length > 5 ? Integer.parseInt(args[5]) : 1024;
         String layer = args.length > 6 ? args[6] : "suitability";
+        String quarter = null;
+        if (layer.contains(":")) {
+            quarter = layer.substring(layer.indexOf(':') + 1);
+            layer = layer.substring(0, layer.indexOf(':'));
+        }
 
         WorldgenSettings worldgen = WorldgenSettings.DEFAULT;
         String cache = System.getProperty("worldgenCache");
@@ -210,6 +215,174 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = com.mtm.citybuilder.core.debug.SanctuaryMap.render(logic, found, towns, centerX, centerZ, scale, size);
             }
+            case "buildings" -> {
+                StreetPlan plan = streetStats(logic, centerX, centerZ);
+                com.mtm.citybuilder.core.plot.TownPlots plots = logic.plots().town(plan.settlement());
+                BuildingStats.print(logic, plots, logic.extent(plan.settlement()).coreX(), logic.extent(plan.settlement()).coreZ(),
+                        centerX, centerZ, half);
+                start = System.nanoTime();
+                image = com.mtm.citybuilder.core.debug.BuildingMap.render(logic.buildings(), plots, centerX, centerZ, scale, size);
+            }
+            case "preview", "preview1", "preview2", "preview3" -> {
+                // preview:QUARTER shows the old town's lots as that quarter, to see the library's styles; where the
+                // quarters really lie is for the layers that lay out the town to say
+                // preview:PROGRAMS gives one lot in ten a program (convenience store, fast food, post office), to see
+                // them; where they really are is for the layers before to say
+                // preview:FLATS, WORKS, DANCHI look for the nearest block of flats with open corridors, works, danchi
+                // (built the Kanto way), and centre on it
+                String find = "FLATS".equals(quarter) || "WORKS".equals(quarter) || "DANCHI".equals(quarter)
+                        || "PLANTS".equals(quarter) || "PORTS".equals(quarter) ? quarter : null;
+                boolean flats = find != null;
+                if (flats && !"PLANTS".equals(find) && !"PORTS".equals(find)) {
+                    quarter = "DANCHI".equals(find) ? "KANTO" : null;
+                }
+                if (quarter != null && quarter.endsWith("_CUT")) {
+                    // preview:<QUARTER>_CUT cuts every building away over its ground floor's furniture, to see inside
+                    BuildingPreview.cut = 2;
+                    quarter = quarter.substring(0, quarter.length() - 4);
+                }
+                if (quarter != null && quarter.equals("PROGRAMS")) {
+                    logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
+                        @Override
+                        public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Quarter.ORDINARY;
+                        }
+
+                        @Override
+                        public com.mtm.citybuilder.core.building.Program program(com.mtm.citybuilder.core.plot.Plot plot) {
+                            double r = com.mtm.citybuilder.core.noise.Hash.unit(com.mtm.citybuilder.core.noise.Hash.of(plot.id(), 777));
+                            return r < 0.05 ? com.mtm.citybuilder.core.building.Program.KONBINI
+                                    : r < 0.08 ? com.mtm.citybuilder.core.building.Program.FASTFOOD
+                                    : r < 0.10 ? com.mtm.citybuilder.core.building.Program.POST_OFFICE : null;
+                        }
+                    });
+                } else if (quarter != null && quarter.equals("KANTO")) {
+                    // preview:KANTO shows the whole town built the Tokyo way
+                    logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
+                        @Override
+                        public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Quarter.ORDINARY;
+                        }
+
+                        @Override
+                        public com.mtm.citybuilder.core.building.Region region(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Region.KANTO;
+                        }
+                    });
+                } else if (quarter != null && quarter.equals("WATERSIDE")) {
+                    // preview:WATERSIDE: the old town as a pleasure quarter, the lots on one side of each street
+                    // backing on water (there is none in the picture: where the water runs is for the layers before)
+                    logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
+                        @Override
+                        public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return plot.district() == com.mtm.citybuilder.core.street.District.OLD_TOWN
+                                    ? com.mtm.citybuilder.core.building.Quarter.HANAMACHI
+                                    : com.mtm.citybuilder.core.building.Quarter.ORDINARY;
+                        }
+
+                        @Override
+                        public boolean waterside(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return plot.side() > 0 && !plot.interior();
+                        }
+                    });
+                } else if (quarter != null && quarter.equals("PORTS")) {
+                    // preview:PORTS makes big lots cargo wharves, and centres on one with its quay cranes
+                    logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
+                        @Override
+                        public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Quarter.ORDINARY;
+                        }
+
+                        @Override
+                        public com.mtm.citybuilder.core.building.Program program(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return plot.frontage() < 24.0 || plot.maxDepth() < 26.0 ? null
+                                    : com.mtm.citybuilder.core.building.Program.PORT;
+                        }
+                    });
+                } else if (quarter != null && quarter.equals("PLANTS")) {
+                    // preview:PLANTS gives big lots a plant (refinery, power station, substation in turn), to see them;
+                    // where plants really are is for the layers before to say
+                    logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
+                        @Override
+                        public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Quarter.ORDINARY;
+                        }
+
+                        @Override
+                        public com.mtm.citybuilder.core.building.Program program(com.mtm.citybuilder.core.plot.Plot plot) {
+                            if (plot.frontage() < 24.0 || plot.maxDepth() < 26.0) {
+                                return null;
+                            }
+                            com.mtm.citybuilder.core.building.Program[] plants = {
+                                    com.mtm.citybuilder.core.building.Program.PETROCHEMICAL,
+                                    com.mtm.citybuilder.core.building.Program.POWER_PLANT,
+                                    com.mtm.citybuilder.core.building.Program.SUBSTATION,
+                                    com.mtm.citybuilder.core.building.Program.TANK_FARM,
+                                    com.mtm.citybuilder.core.building.Program.CONTAINER_YARD,
+                                    com.mtm.citybuilder.core.building.Program.PORT,
+                                    com.mtm.citybuilder.core.building.Program.WAREHOUSE};
+                            return plants[(int) Math.floorMod(plot.id(), (long) plants.length)];
+                        }
+                    });
+                } else if (quarter != null && quarter.equals("HOKURIKU")) {
+                    logic.buildings().quarters(new com.mtm.citybuilder.core.building.QuarterMap() {
+                        @Override
+                        public com.mtm.citybuilder.core.building.Quarter at(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Quarter.ORDINARY;
+                        }
+
+                        @Override
+                        public com.mtm.citybuilder.core.building.Region region(com.mtm.citybuilder.core.plot.Plot plot) {
+                            return com.mtm.citybuilder.core.building.Region.HOKURIKU;
+                        }
+                    });
+                } else if (quarter != null) {
+                    com.mtm.citybuilder.core.building.Quarter q = com.mtm.citybuilder.core.building.Quarter.valueOf(quarter);
+                    logic.buildings().quarters(plot -> plot.district() == com.mtm.citybuilder.core.street.District.OLD_TOWN
+                            ? q : com.mtm.citybuilder.core.building.Quarter.ORDINARY);
+                }
+                // Isometric picture of the buildings: size is the area's edge in blocks, scale the pixels per block,
+                // preview1..3 turn it a quarter at a time
+                StreetPlan near = streetStats(logic, centerX, centerZ);
+                double cx = centerX;
+                double cz = centerZ;
+                if (flats) {
+                    // preview:FLATS looks for the nearest block of flats with open corridors and centres on it
+                    com.mtm.citybuilder.core.plot.TownPlots town = logic.plots().town(near.settlement());
+                    double best = Double.MAX_VALUE;
+                    for (double x = centerX - 1500; x <= centerX + 1500; x += 6) {
+                        for (double z = centerZ - 1500; z <= centerZ + 1500; z += 6) {
+                            double d = (x - centerX) * (x - centerX) + (z - centerZ) * (z - centerZ);
+                            if (d >= best) {
+                                continue;
+                            }
+                            com.mtm.citybuilder.core.plot.Plot p = town.at(x, z);
+                            com.mtm.citybuilder.core.building.Building b = p == null ? null : logic.buildings().building(town, p);
+                            boolean wanted = b != null && switch (find) {
+                                case "WORKS" -> b.type() == com.mtm.citybuilder.core.building.Building.Type.WORKS;
+                                case "PORTS" -> b.program() == com.mtm.citybuilder.core.building.Program.PORT
+                                        && com.mtm.citybuilder.core.building.BuildingLayer.plantEquipment(b).stream().anyMatch(e ->
+                                        e.kind() == com.mtm.citybuilder.core.building.BuildingLayer.Equipment.STS);
+                                case "PLANTS" -> b.program() != null && b.program().plant()
+                                        && com.mtm.citybuilder.core.building.BuildingLayer.plantEquipment(b).size() >= 4;
+                                case "DANCHI" -> b.type() == com.mtm.citybuilder.core.building.Building.Type.APARTMENT
+                                        && b.composition().is(com.mtm.citybuilder.core.building.Slot.ACCESS, "stairwell");
+                                default -> b.type() == com.mtm.citybuilder.core.building.Building.Type.APARTMENT
+                                        && b.composition().is(com.mtm.citybuilder.core.building.Slot.ACCESS, "corridor") && b.step() >= 3;
+                            };
+                            if (wanted) {
+                                best = d;
+                                cx = x;
+                                cz = z;
+                            }
+                        }
+                    }
+                    System.out.printf("%s at %.0f %.0f%n", find, cx, cz);
+                }
+                start = System.nanoTime();
+                int view = layer.length() > 7 ? layer.charAt(7) - '0' : 0;
+                image = BuildingPreview.render(logic, cx, cz, size, scale, view);
+            }
             case "highspeed" -> {
                 List<HighSpeedLine> lines = highSpeedStats(logic, centerX, centerZ, half);
                 start = System.nanoTime();
@@ -225,7 +398,9 @@ public final class CityMap {
                 start = System.nanoTime();
                 image = RoadMap.render(logic, edges, centerX, centerZ, scale, size);
             }
-            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, extent, roads, rail, highspeed, streets, districts, plots, functions, airports, sanctuaries or ports");
+            default -> throw new IllegalArgumentException("Unknown layer " + layer + ": suitability, culture, settlements, "
+                    + "extent, roads, rail, highspeed, streets, districts, plots, functions, airports, sanctuaries, ports, plaza, "
+                    + "buildings or preview");
         }
         System.out.printf("Map rendered in %.1f s%n", (System.nanoTime() - start) / 1e9);
         File parent = out.getAbsoluteFile().getParentFile();

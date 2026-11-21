@@ -516,6 +516,18 @@ public final class CityLogic {
 
     private com.mtm.citybuilder.core.port.PortLayer ports;
 
+    /** L8: the buildings on the lots. */
+    public com.mtm.citybuilder.core.building.BuildingLayer buildings() {
+        synchronized (this) {
+            if (buildings == null) {
+                buildings = new com.mtm.citybuilder.core.building.BuildingLayer(this);
+            }
+            return buildings;
+        }
+    }
+
+    private com.mtm.citybuilder.core.building.BuildingLayer buildings;
+
     private record WorldKey(long seed, String settings, Object terrain, PlanStore store) {
     }
 }

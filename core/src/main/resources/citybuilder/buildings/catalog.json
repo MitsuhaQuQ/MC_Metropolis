@@ -1,0 +1,6140 @@
+{
+ "_comment": "The building library's catalogue (L8): palettes, materials, the slots a building's interchangeable parts fill and their options, styles (a kind of building with weighted options for each slot and its palettes), the styles each quarter is built in, and the styles each region builds each kind of building in. Where quarters and regions lie is decided before the buildings. Changing this file changes the buildings of worlds not yet generated.",
+ "version": 1,
+ "slots": {
+  "ROOF": [
+   "gable",
+   "hip",
+   "flat",
+   "irimoya",
+   "shed"
+  ],
+  "ROOF_TALL": [
+   "flat",
+   "gable",
+   "hip",
+   "irimoya"
+  ],
+  "RIDGE_DIR": [
+   "along",
+   "gable"
+  ],
+  "UPPER": [
+   "normal",
+   "low",
+   "tall",
+   "single"
+  ],
+  "LAYOUT": [
+   "standard",
+   "sidePark",
+   "frontPark",
+   "garden"
+  ],
+  "CARPORT": [
+   "none",
+   "carport"
+  ],
+  "ANNEX": [
+   "none",
+   "leanTo"
+  ],
+  "GROUND": [
+   "plain",
+   "garage",
+   "lattice",
+   "shop",
+   "plaster",
+   "boards",
+   "glass",
+   "lowWall",
+   "shutter",
+   "recessed",
+   "colonnade",
+   "canopy",
+   "rooms",
+   "pilotis",
+   "debako"
+  ],
+  "FRONT_STRIP": [
+   "stones",
+   "bamboo",
+   "komayose"
+  ],
+  "UPPER_FRONT": [
+   "windows",
+   "sudare",
+   "glazed",
+   "mushiko",
+   "railing"
+  ],
+  "WAINSCOT": [
+   "none",
+   "band",
+   "board",
+   "namako",
+   "stone"
+  ],
+  "LEDGE": [
+   "none",
+   "tiled"
+  ],
+  "CURTAIN": [
+   "none",
+   "plain",
+   "red"
+  ],
+  "LANTERN": [
+   "none",
+   "lantern"
+  ],
+  "YARD": [
+   "blockLow",
+   "blockHigh",
+   "hedge",
+   "open",
+   "coped",
+   "estate",
+   "kurobei",
+   "dobei",
+   "stoneHedge"
+  ],
+  "WINDOW_HOOD": [
+   "none",
+   "hood"
+  ],
+  "GRILLE": [
+   "none",
+   "grille"
+  ],
+  "BALCONY": [
+   "solid",
+   "rail"
+  ],
+  "ROOF_EDGE": [
+   "parapet",
+   "rail"
+  ],
+  "ARTICULATION": [
+   "plain",
+   "fins",
+   "ledges"
+  ],
+  "RECESS": [
+   "flush",
+   "recessed"
+  ],
+  "SIGN": [
+   "none",
+   "side",
+   "tall",
+   "stacked"
+  ],
+  "AWNING": [
+   "none",
+   "awning"
+  ],
+  "VENDING": [
+   "none",
+   "vending"
+  ],
+  "CORNICE": [
+   "none",
+   "cornice"
+  ],
+  "TREES": [
+   "none",
+   "one",
+   "two"
+  ],
+  "PINE": [
+   "none",
+   "pine"
+  ],
+  "SHED": [
+   "none",
+   "shed"
+  ],
+  "BOUNDARY": [
+   "none",
+   "wall",
+   "hedge"
+  ],
+  "DOWNPIPE": [
+   "front",
+   "back"
+  ],
+  "LATTICE_WOOD": [
+   "palette",
+   "spruce",
+   "mangrove"
+  ],
+  "FASCIA": [
+   "plain",
+   "sign",
+   "lit"
+  ],
+  "ROOF_SIGN": [
+   "none",
+   "billboard"
+  ],
+  "UPPER_STREET": [
+   "windows",
+   "balcony",
+   "bay"
+  ],
+  "WINDOW_AC": [
+   "none",
+   "units"
+  ],
+  "STREET_DISPLAY": [
+   "none",
+   "stand"
+  ],
+  "DISPLAY": [
+   "none",
+   "goods"
+  ],
+  "AD": [
+   "none",
+   "roof",
+   "wall",
+   "both"
+  ],
+  "UPPER_PLAN": [
+   "full",
+   "partial"
+  ],
+  "PODIUM": [
+   "none",
+   "podium"
+  ],
+  "WINDOWS": [
+   "pairs",
+   "wide",
+   "single",
+   "slit"
+  ],
+  "HOUSE_FORM": [
+   "detached",
+   "narrow"
+  ],
+  "TWO_TONE": [
+   "none",
+   "base",
+   "upper"
+  ],
+  "HOUSE_BALCONY": [
+   "none",
+   "front"
+  ],
+  "ACCESS": [
+   "interior",
+   "corridor",
+   "stairwell"
+  ],
+  "BALCONY_SPLIT": [
+   "none",
+   "units"
+  ],
+  "FACADE": [
+   "punched",
+   "ribbon",
+   "curtain",
+   "grid"
+  ],
+  "LATTICE_PATTERN": [
+   "dense",
+   "sparse",
+   "upperPlaster"
+  ],
+  "UDATSU": [
+   "none",
+   "udatsu"
+  ],
+  "DOOR_POS": [
+   "center",
+   "left",
+   "right"
+  ],
+  "SHOKI": [
+   "none",
+   "shoki"
+  ],
+  "RIDGE_HEAVY": [
+   "none",
+   "heavy"
+  ],
+  "HACHIMAKI": [
+   "none",
+   "band"
+  ],
+  "KURA_WINDOW": [
+   "bars",
+   "shutters"
+  ],
+  "NAMAKO": [
+   "diagonal",
+   "grid",
+   "tall"
+  ],
+  "ENTRY_HOOD": [
+   "none",
+   "hood"
+  ],
+  "WATERSIDE": [
+   "plain",
+   "sudare",
+   "balcony"
+  ],
+  "AMADO": [
+   "none",
+   "boxes"
+  ],
+  "SOLAR": [
+   "none",
+   "panels"
+  ],
+  "ANTENNA": [
+   "none",
+   "antenna"
+  ],
+  "HEATER": [
+   "none",
+   "heater"
+  ],
+  "GATEPOST": [
+   "none",
+   "posts"
+  ],
+  "FUTON": [
+   "none",
+   "futon"
+  ],
+  "TATAMI": [
+   "none",
+   "upper",
+   "both"
+  ],
+  "AGEMISE": [
+   "none",
+   "agemise"
+  ],
+  "SAWTOOTH": [
+   "none",
+   "sawtooth"
+  ],
+  "LOADING": [
+   "none",
+   "shutters"
+  ],
+  "CHIMNEY": [
+   "none",
+   "chimney"
+  ],
+  "WORKS_WALL": [
+   "plain",
+   "ribbed",
+   "band"
+  ],
+  "WORKS_WINDOWS": [
+   "high",
+   "band",
+   "none"
+  ],
+  "PIPES": [
+   "none",
+   "pipes"
+  ],
+  "WORKS_SIGN": [
+   "none",
+   "sign"
+  ],
+  "WORKS_FENCE": [
+   "none",
+   "mesh"
+  ],
+  "WATER_TOWER": [
+   "none",
+   "tower"
+  ],
+  "DANCHI_NUMBER": [
+   "none",
+   "number"
+  ],
+  "KURA_FRONT": [
+   "closed",
+   "mise"
+  ],
+  "KURA_FRAME": [
+   "plain",
+   "thick"
+  ],
+  "CREST": [
+   "none",
+   "crest"
+  ],
+  "YAGO": [
+   "none",
+   "board"
+  ],
+  "KEMURIDASHI": [
+   "none",
+   "vent"
+  ],
+  "ARCADE": [
+   "none",
+   "canopy",
+   "gangi",
+   "louvre",
+   "skylight",
+   "full"
+  ],
+  "ARCADE_COLOR": [
+   "white",
+   "ochre",
+   "cream",
+   "brown",
+   "teal"
+  ],
+  "KANBAN": [
+   "none",
+   "kanban"
+  ],
+  "GATE": [
+   "none",
+   "kabuki"
+  ],
+  "DITCH": [
+   "none",
+   "ditch"
+  ]
+ },
+ "palettes": {
+  "house.kinki.1": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kinki.2": {
+   "wall": "minecraft:calcite",
+   "accent": "minecraft:calcite",
+   "trim": "minecraft:spruce_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:calcite",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kinki.3": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:light_gray_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kinki.4": {
+   "wall": "minecraft:birch_planks",
+   "accent": "minecraft:birch_planks",
+   "trim": "minecraft:stripped_spruce_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:birch_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kinki.5": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:smooth_sandstone",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:dark_prismarine_slab",
+   "roofBlock": "minecraft:dark_prismarine",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kinki.6": {
+   "wall": "minecraft:mud_bricks",
+   "accent": "minecraft:mud_bricks",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:mud_bricks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kinki.7": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:birch_door",
+   "floor": "minecraft:birch_planks",
+   "roofSlab": "minecraft:mud_brick_slab",
+   "roofBlock": "minecraft:mud_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kinki.8": {
+   "wall": "minecraft:light_gray_terracotta",
+   "accent": "minecraft:light_gray_terracotta",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_terracotta",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kinki.9": {
+   "wall": "minecraft:brown_terracotta",
+   "accent": "minecraft:brown_terracotta",
+   "trim": "minecraft:spruce_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:brown_terracotta",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kinki.10": {
+   "wall": "minecraft:cut_sandstone",
+   "accent": "minecraft:cut_sandstone",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:brick_slab",
+   "roofBlock": "minecraft:bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:cut_sandstone",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kinki.11": {
+   "wall": "minecraft:gray_concrete",
+   "accent": "minecraft:gray_concrete",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:gray_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kinki.12": {
+   "wall": "minecraft:spruce_planks",
+   "accent": "minecraft:spruce_planks",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:spruce_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kinki.13": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:birch_door",
+   "floor": "minecraft:birch_planks",
+   "roofSlab": "minecraft:dark_prismarine_slab",
+   "roofBlock": "minecraft:dark_prismarine",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.1": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:packed_mud",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.2": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:calcite",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.3": {
+   "wall": "minecraft:spruce_planks",
+   "accent": "minecraft:packed_mud",
+   "trim": "minecraft:stripped_dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:spruce_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.4": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:mud_bricks",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.5": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:light_gray_terracotta",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.6": {
+   "wall": "minecraft:mangrove_planks",
+   "accent": "minecraft:calcite",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:mangrove_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.7": {
+   "wall": "minecraft:stripped_dark_oak_log",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:stripped_dark_oak_log",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.8": {
+   "wall": "minecraft:spruce_planks",
+   "accent": "minecraft:yellow_terracotta",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:spruce_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.kyoto.9": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:smooth_sandstone",
+   "trim": "minecraft:stripped_spruce_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:cobbled_deepslate_slab",
+   "roofBlock": "minecraft:cobbled_deepslate",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.gion.1": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:yellow_terracotta",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.gion.2": {
+   "wall": "minecraft:spruce_planks",
+   "accent": "minecraft:yellow_terracotta",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:spruce_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.gion.3": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:smooth_sandstone",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.gion.4": {
+   "wall": "minecraft:mangrove_planks",
+   "accent": "minecraft:yellow_terracotta",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:mangrove_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:mangrove_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.gion.5": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:packed_mud",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.chaya.1": {
+   "wall": "minecraft:mangrove_planks",
+   "accent": "minecraft:yellow_terracotta",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:mangrove_fence",
+   "door": "minecraft:mangrove_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:mangrove_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.chaya.2": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:yellow_terracotta",
+   "trim": "minecraft:mangrove_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:mangrove_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.chaya.3": {
+   "wall": "minecraft:mangrove_planks",
+   "accent": "minecraft:packed_mud",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:mangrove_fence",
+   "door": "minecraft:mangrove_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:mangrove_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.chaya.4": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:packed_mud",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:dark_oak_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.chaya.5": {
+   "wall": "minecraft:spruce_planks",
+   "accent": "minecraft:calcite",
+   "trim": "minecraft:spruce_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:spruce_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:spruce_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "machiya.jinaimachi.1": {
+   "wall": "minecraft:stripped_spruce_log",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:cobblestone"
+  },
+  "machiya.jinaimachi.2": {
+   "wall": "minecraft:dark_oak_planks",
+   "accent": "minecraft:calcite",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:calcite",
+   "foundation": "minecraft:cobblestone"
+  },
+  "machiya.jinaimachi.3": {
+   "wall": "minecraft:stripped_spruce_log",
+   "accent": "minecraft:calcite",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:calcite",
+   "foundation": "minecraft:cobblestone"
+  },
+  "house.hokuriku.1": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:smooth_sandstone",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.hokuriku.2": {
+   "wall": "minecraft:light_gray_terracotta",
+   "accent": "minecraft:light_gray_terracotta",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_terracotta",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.hokuriku.3": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.hokuriku.4": {
+   "wall": "minecraft:brown_terracotta",
+   "accent": "minecraft:brown_terracotta",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:brown_terracotta",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.hokuriku.5": {
+   "wall": "minecraft:calcite",
+   "accent": "minecraft:calcite",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:calcite",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.estate.1": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.estate.2": {
+   "wall": "minecraft:calcite",
+   "accent": "minecraft:calcite",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:calcite",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.estate.3": {
+   "wall": "minecraft:stripped_spruce_log",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:dark_oak_log",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:stripped_spruce_log",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "shop.1": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:light_gray_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.2": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.3": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:smooth_sandstone",
+   "trim": "minecraft:cut_sandstone",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.4": {
+   "wall": "minecraft:bricks",
+   "accent": "minecraft:bricks",
+   "trim": "minecraft:stone_bricks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:bricks",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.5": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:light_gray_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.6": {
+   "wall": "minecraft:pink_terracotta",
+   "accent": "minecraft:pink_terracotta",
+   "trim": "minecraft:white_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:pink_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.7": {
+   "wall": "minecraft:black_concrete",
+   "accent": "minecraft:black_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:black_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.8": {
+   "wall": "minecraft:orange_terracotta",
+   "accent": "minecraft:orange_terracotta",
+   "trim": "minecraft:white_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:orange_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.9": {
+   "wall": "minecraft:spruce_planks",
+   "accent": "minecraft:spruce_planks",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:spruce_planks",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.10": {
+   "wall": "minecraft:light_blue_terracotta",
+   "accent": "minecraft:light_blue_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_blue_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.1": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:cut_copper_slab",
+   "roofBlock": "minecraft:cut_copper",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.2": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:light_gray_terracotta",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:oxidized_cut_copper_slab",
+   "roofBlock": "minecraft:oxidized_cut_copper",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.3": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:red_nether_brick_slab",
+   "roofBlock": "minecraft:red_nether_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.4": {
+   "wall": "minecraft:bricks",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:bricks",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.5": {
+   "wall": "minecraft:orange_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:exposed_cut_copper_slab",
+   "roofBlock": "minecraft:exposed_cut_copper",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:orange_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.6": {
+   "wall": "minecraft:cyan_terracotta",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:cut_copper_slab",
+   "roofBlock": "minecraft:cut_copper",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:cyan_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.7": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:light_blue_terracotta",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:oxidized_cut_copper_slab",
+   "roofBlock": "minecraft:oxidized_cut_copper",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.8": {
+   "wall": "minecraft:light_gray_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:brick_slab",
+   "roofBlock": "minecraft:bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.9": {
+   "wall": "minecraft:brown_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:brown_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "inaka.shop.10": {
+   "wall": "minecraft:yellow_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:weathered_cut_copper_slab",
+   "roofBlock": "minecraft:weathered_cut_copper",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:yellow_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.1": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.2": {
+   "wall": "minecraft:smooth_quartz",
+   "accent": "minecraft:smooth_quartz",
+   "trim": "minecraft:quartz_pillar",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_quartz",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.3": {
+   "wall": "minecraft:brown_terracotta",
+   "accent": "minecraft:brown_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:brown_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.4": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:light_gray_concrete",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.5": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.6": {
+   "wall": "minecraft:pink_terracotta",
+   "accent": "minecraft:pink_terracotta",
+   "trim": "minecraft:white_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:pink_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.7": {
+   "wall": "minecraft:light_gray_terracotta",
+   "accent": "minecraft:light_gray_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.8": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:smooth_sandstone",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.9": {
+   "wall": "minecraft:gray_concrete",
+   "accent": "minecraft:gray_concrete",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.10": {
+   "wall": "minecraft:bricks",
+   "accent": "minecraft:bricks",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:bricks",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.11": {
+   "wall": "minecraft:cyan_terracotta",
+   "accent": "minecraft:cyan_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:cyan_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "office.1": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:light_gray_concrete",
+   "trim": "minecraft:polished_andesite",
+   "window": "minecraft:light_blue_stained_glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "office.2": {
+   "wall": "minecraft:polished_andesite",
+   "accent": "minecraft:polished_andesite",
+   "trim": "minecraft:smooth_stone",
+   "window": "minecraft:gray_stained_glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:polished_andesite",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "office.3": {
+   "wall": "minecraft:smooth_quartz",
+   "accent": "minecraft:smooth_quartz",
+   "trim": "minecraft:polished_diorite",
+   "window": "minecraft:light_gray_stained_glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_quartz",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "office.4": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:light_gray_terracotta",
+   "window": "minecraft:light_gray_stained_glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "office.5": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:smooth_sandstone",
+   "trim": "minecraft:cut_sandstone",
+   "window": "minecraft:light_blue_stained_glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "office.6": {
+   "wall": "minecraft:gray_concrete",
+   "accent": "minecraft:gray_concrete",
+   "trim": "minecraft:black_concrete",
+   "window": "minecraft:cyan_stained_glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "office.7": {
+   "wall": "minecraft:brown_terracotta",
+   "accent": "minecraft:brown_terracotta",
+   "trim": "minecraft:polished_granite",
+   "window": "minecraft:brown_stained_glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:brown_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "office.8": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:blue_stained_glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "office.9": {
+   "wall": "minecraft:polished_deepslate",
+   "accent": "minecraft:polished_deepslate",
+   "trim": "minecraft:polished_andesite",
+   "window": "minecraft:light_blue_stained_glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:polished_deepslate",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "kura.1": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:dark_oak_planks",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "kura.2": {
+   "wall": "minecraft:calcite",
+   "accent": "minecraft:polished_blackstone",
+   "trim": "minecraft:calcite",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:calcite",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "kura.3": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:deepslate_tiles",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:cobblestone"
+  },
+  "kura.4": {
+   "wall": "minecraft:black_concrete",
+   "accent": "minecraft:polished_blackstone",
+   "trim": "minecraft:black_concrete",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:black_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "kura.5": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:dark_oak_planks",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:brick_slab",
+   "roofBlock": "minecraft:bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "kura.6": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:deepslate_tiles",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:cobblestone"
+  },
+  "kura.7": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:dark_oak_planks",
+   "trim": "minecraft:smooth_sandstone",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "kura.8": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:polished_blackstone",
+   "trim": "minecraft:white_terracotta",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:cobblestone"
+  },
+  "kura.9": {
+   "wall": "minecraft:packed_mud",
+   "accent": "minecraft:dark_oak_planks",
+   "trim": "minecraft:packed_mud",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:packed_mud",
+   "foundation": "minecraft:cobblestone"
+  },
+  "kura.10": {
+   "wall": "minecraft:calcite",
+   "accent": "minecraft:deepslate_tiles",
+   "trim": "minecraft:calcite",
+   "window": "minecraft:iron_bars",
+   "shopfront": "minecraft:iron_bars",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:calcite",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kanto.1": {
+   "wall": "minecraft:gray_concrete",
+   "accent": "minecraft:gray_concrete",
+   "trim": "minecraft:black_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:gray_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kanto.2": {
+   "wall": "minecraft:black_concrete",
+   "accent": "minecraft:black_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:black_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kanto.3": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:birch_door",
+   "floor": "minecraft:birch_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kanto.4": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:light_gray_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kanto.5": {
+   "wall": "minecraft:smooth_quartz",
+   "accent": "minecraft:smooth_quartz",
+   "trim": "minecraft:black_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:oak_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_quartz",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kanto.6": {
+   "wall": "minecraft:brown_terracotta",
+   "accent": "minecraft:brown_terracotta",
+   "trim": "minecraft:black_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:brown_terracotta",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "house.kanto.7": {
+   "wall": "minecraft:spruce_planks",
+   "accent": "minecraft:spruce_planks",
+   "trim": "minecraft:black_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:dark_oak_fence",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:spruce_planks",
+   "roofSlab": "minecraft:polished_blackstone_brick_slab",
+   "roofBlock": "minecraft:polished_blackstone_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:spruce_planks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "apartment.kanto.1": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.kanto.2": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:smooth_sandstone",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.kanto.3": {
+   "wall": "minecraft:light_gray_terracotta",
+   "accent": "minecraft:light_gray_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.kanto.4": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.kanto.5": {
+   "wall": "minecraft:brown_terracotta",
+   "accent": "minecraft:brown_terracotta",
+   "trim": "minecraft:smooth_sandstone",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:brown_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.kanto.6": {
+   "wall": "minecraft:smooth_quartz",
+   "accent": "minecraft:smooth_quartz",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_quartz",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.danchi.1": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.danchi.2": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:smooth_sandstone",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.danchi.3": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:light_gray_concrete",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.danchi.4": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.danchi.5": {
+   "wall": "minecraft:light_blue_terracotta",
+   "accent": "minecraft:light_blue_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_blue_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.danchi.6": {
+   "wall": "minecraft:pink_terracotta",
+   "accent": "minecraft:pink_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:pink_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.danchi.7": {
+   "wall": "minecraft:calcite",
+   "accent": "minecraft:calcite",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:calcite",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "apartment.danchi.8": {
+   "wall": "minecraft:yellow_terracotta",
+   "accent": "minecraft:yellow_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:yellow_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.zakkyo.1": {
+   "wall": "minecraft:light_gray_terracotta",
+   "accent": "minecraft:light_gray_terracotta",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.zakkyo.2": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:white_terracotta",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.zakkyo.3": {
+   "wall": "minecraft:pink_terracotta",
+   "accent": "minecraft:pink_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:pink_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.zakkyo.4": {
+   "wall": "minecraft:brown_terracotta",
+   "accent": "minecraft:brown_terracotta",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:brown_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.zakkyo.5": {
+   "wall": "minecraft:gray_concrete",
+   "accent": "minecraft:gray_concrete",
+   "trim": "minecraft:black_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.zakkyo.6": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:smooth_sandstone",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "shop.zakkyo.7": {
+   "wall": "minecraft:cyan_terracotta",
+   "accent": "minecraft:cyan_terracotta",
+   "trim": "minecraft:white_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:cyan_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "konbini.1": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:gray_concrete"
+  },
+  "konbini.2": {
+   "wall": "minecraft:smooth_quartz",
+   "accent": "minecraft:smooth_quartz",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_quartz",
+   "foundation": "minecraft:gray_concrete"
+  },
+  "fastfood.1": {
+   "wall": "minecraft:bricks",
+   "accent": "minecraft:bricks",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:red_concrete",
+   "foundation": "minecraft:gray_concrete"
+  },
+  "fastfood.2": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:red_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:gray_concrete"
+  },
+  "post.1": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:gray_concrete"
+  },
+  "post.2": {
+   "wall": "minecraft:bricks",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:stone_bricks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:bricks",
+   "foundation": "minecraft:gray_concrete"
+  },
+  "works.old.1": {
+   "wall": "minecraft:bricks",
+   "accent": "minecraft:terracotta",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:spruce_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:bricks",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "works.old.2": {
+   "wall": "minecraft:mud_bricks",
+   "accent": "minecraft:packed_mud",
+   "trim": "minecraft:dark_oak_planks",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:dark_oak_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:mud_bricks",
+   "foundation": "minecraft:cobblestone"
+  },
+  "works.old.3": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:bricks",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:polished_andesite_slab",
+   "roofBlock": "minecraft:polished_andesite",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:stone_bricks"
+  },
+  "works.old.4": {
+   "wall": "minecraft:stone_bricks",
+   "accent": "minecraft:polished_andesite",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:deepslate_tile_slab",
+   "roofBlock": "minecraft:deepslate_tiles",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:stone_bricks",
+   "foundation": "minecraft:cobblestone"
+  },
+  "plant.1": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "plant.2": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:light_blue_terracotta",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "plant.3": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:brown_terracotta",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "plant.4": {
+   "wall": "minecraft:light_blue_terracotta",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_blue_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "works.1": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:light_blue_terracotta",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:cyan_terracotta",
+   "roofBlock": "minecraft:cyan_terracotta",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "works.2": {
+   "wall": "minecraft:smooth_sandstone",
+   "accent": "minecraft:brown_terracotta",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:dark_prismarine_slab",
+   "roofBlock": "minecraft:dark_prismarine",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:smooth_sandstone",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "works.3": {
+   "wall": "minecraft:light_gray_terracotta",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:red_nether_brick_slab",
+   "roofBlock": "minecraft:red_nether_bricks",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "works.4": {
+   "wall": "minecraft:light_blue_terracotta",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:light_gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:polished_andesite_slab",
+   "roofBlock": "minecraft:polished_andesite",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_blue_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "works.5": {
+   "wall": "minecraft:white_terracotta",
+   "accent": "minecraft:green_terracotta",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:dark_prismarine_slab",
+   "roofBlock": "minecraft:dark_prismarine",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_terracotta",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "works.6": {
+   "wall": "minecraft:gray_concrete",
+   "accent": "minecraft:light_gray_concrete",
+   "trim": "minecraft:black_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "works.7": {
+   "wall": "minecraft:light_gray_concrete",
+   "accent": "minecraft:light_gray_concrete",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:polished_andesite_slab",
+   "roofBlock": "minecraft:polished_andesite",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:light_gray_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "works.8": {
+   "wall": "minecraft:white_concrete",
+   "accent": "minecraft:white_concrete",
+   "trim": "minecraft:light_blue_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:dark_prismarine_slab",
+   "roofBlock": "minecraft:dark_prismarine",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:white_concrete",
+   "foundation": "minecraft:polished_andesite"
+  },
+  "works.9": {
+   "wall": "minecraft:iron_block",
+   "accent": "minecraft:iron_block",
+   "trim": "minecraft:gray_concrete",
+   "window": "minecraft:glass",
+   "shopfront": "minecraft:glass",
+   "lattice": "minecraft:iron_bars",
+   "door": "minecraft:iron_door",
+   "floor": "minecraft:smooth_stone",
+   "roofSlab": "minecraft:smooth_stone_slab",
+   "roofBlock": "minecraft:smooth_stone",
+   "flat": "minecraft:smooth_stone",
+   "parapet": "minecraft:iron_block",
+   "foundation": "minecraft:polished_andesite"
+  }
+ },
+ "materials": {
+  "awning": [
+   "minecraft:red_wool",
+   "minecraft:green_wool",
+   "minecraft:blue_wool",
+   "minecraft:white_wool",
+   "minecraft:orange_wool",
+   "minecraft:brown_wool",
+   "minecraft:cyan_wool"
+  ],
+  "sign": [
+   "minecraft:white_concrete",
+   "minecraft:yellow_concrete",
+   "minecraft:red_concrete",
+   "minecraft:light_blue_concrete",
+   "minecraft:orange_concrete",
+   "minecraft:lime_concrete",
+   "minecraft:sea_lantern"
+  ],
+  "vending": [
+   "minecraft:red_concrete",
+   "minecraft:blue_concrete",
+   "minecraft:white_concrete",
+   "minecraft:light_blue_concrete"
+  ],
+  "fence": [
+   "minecraft:stone_bricks",
+   "minecraft:polished_andesite",
+   "minecraft:bricks",
+   "minecraft:smooth_sandstone",
+   "minecraft:light_gray_concrete",
+   "minecraft:mossy_stone_bricks",
+   "minecraft:cobblestone"
+  ],
+  "plant": [
+   "minecraft:potted_azalea_bush",
+   "minecraft:potted_fern",
+   "minecraft:potted_red_tulip",
+   "minecraft:potted_oak_sapling",
+   "minecraft:potted_flowering_azalea_bush",
+   "minecraft:potted_bamboo"
+  ],
+  "log": [
+   "minecraft:spruce_log",
+   "minecraft:dark_oak_log",
+   "minecraft:oak_log",
+   "minecraft:birch_log"
+  ],
+  "leaves": [
+   "minecraft:spruce_leaves",
+   "minecraft:oak_leaves",
+   "minecraft:azalea_leaves",
+   "minecraft:dark_oak_leaves",
+   "minecraft:cherry_leaves"
+  ],
+  "shrub": [
+   "minecraft:azalea",
+   "minecraft:flowering_azalea"
+  ],
+  "shed": [
+   "minecraft:light_gray_concrete",
+   "minecraft:white_concrete",
+   "minecraft:iron_block",
+   "minecraft:green_terracotta"
+  ],
+  "rail": [
+   "minecraft:iron_bars",
+   "minecraft:glass_pane",
+   "minecraft:white_stained_glass_pane",
+   "minecraft:light_gray_stained_glass_pane"
+  ],
+  "curtain": [
+   "minecraft:blue_wall_banner",
+   "minecraft:white_wall_banner",
+   "minecraft:brown_wall_banner",
+   "minecraft:light_blue_wall_banner",
+   "minecraft:red_wall_banner",
+   "minecraft:black_wall_banner"
+  ],
+  "curtainRed": [
+   "minecraft:red_wall_banner",
+   "minecraft:magenta_wall_banner",
+   "minecraft:red_wall_banner",
+   "minecraft:purple_wall_banner"
+  ],
+  "latticeSpruce": [
+   "minecraft:spruce_fence"
+  ],
+  "latticeMangrove": [
+   "minecraft:mangrove_fence"
+  ],
+  "equipment": [
+   "minecraft:smooth_quartz"
+  ],
+  "shutter": [
+   "minecraft:smooth_stone"
+  ],
+  "hedge": [
+   "minecraft:azalea_leaves"
+  ],
+  "bamboo": [
+   "minecraft:bamboo_fence"
+  ],
+  "post": [
+   "minecraft:andesite_wall"
+  ],
+  "carport": [
+   "minecraft:smooth_stone_slab"
+  ],
+  "guard": [
+   "minecraft:iron_trapdoor"
+  ],
+  "downpipe": [
+   "minecraft:andesite_wall"
+  ],
+  "lantern": [
+   "minecraft:lantern"
+  ],
+  "sudare": [
+   "minecraft:bamboo_trapdoor"
+  ],
+  "komayose": [
+   "minecraft:spruce_fence"
+  ],
+  "engawa": [
+   "minecraft:spruce_slab"
+  ],
+  "toro": [
+   "minecraft:stone_brick_wall"
+  ],
+  "toroLight": [
+   "minecraft:lantern"
+  ],
+  "toroCap": [
+   "minecraft:stone_brick_slab"
+  ],
+  "gravel": [
+   "minecraft:gravel"
+  ],
+  "board": [
+   "minecraft:stripped_spruce_log"
+  ],
+  "plaster": [
+   "minecraft:white_concrete"
+  ],
+  "spike": [
+   "minecraft:spruce_fence"
+  ],
+  "fasciaLit": [
+   "minecraft:sea_lantern",
+   "minecraft:ochre_froglight",
+   "minecraft:pearlescent_froglight",
+   "minecraft:verdant_froglight"
+  ],
+  "display": [
+   "minecraft:chiseled_bookshelf",
+   "minecraft:barrel",
+   "minecraft:bookshelf",
+   "minecraft:decorated_pot",
+   "minecraft:potted_azalea_bush"
+  ],
+  "stand": [
+   "minecraft:oak_sign",
+   "minecraft:barrel",
+   "minecraft:decorated_pot",
+   "minecraft:composter",
+   "minecraft:potted_bamboo",
+   "minecraft:potted_fern"
+  ],
+  "brandKonbini": [
+   "minecraft:lime_concrete",
+   "minecraft:blue_concrete",
+   "minecraft:orange_concrete",
+   "minecraft:green_concrete"
+  ],
+  "brandFastfood": [
+   "minecraft:red_concrete",
+   "minecraft:yellow_concrete",
+   "minecraft:orange_concrete"
+  ],
+  "brandPost": [
+   "minecraft:red_concrete"
+  ],
+  "postbox": [
+   "minecraft:red_concrete"
+  ],
+  "line": [
+   "minecraft:white_concrete"
+  ],
+  "pole": [
+   "minecraft:andesite_wall"
+  ],
+  "baseWall": [
+   "minecraft:bricks",
+   "minecraft:stone_bricks",
+   "minecraft:brown_terracotta",
+   "minecraft:light_gray_terracotta",
+   "minecraft:polished_andesite",
+   "minecraft:mud_bricks"
+  ],
+  "upperWall": [
+   "minecraft:white_concrete",
+   "minecraft:light_gray_concrete",
+   "minecraft:smooth_sandstone",
+   "minecraft:birch_planks",
+   "minecraft:white_terracotta",
+   "minecraft:calcite",
+   "minecraft:brown_terracotta",
+   "minecraft:spruce_planks"
+  ],
+  "step": [
+   "minecraft:smooth_stone_slab"
+  ],
+  "shoki": [
+   "minecraft:decorated_pot"
+  ],
+  "water": [
+   "minecraft:water"
+  ],
+  "blackBoard": [
+   "minecraft:stripped_dark_oak_log",
+   "minecraft:dark_oak_planks"
+  ],
+  "arcadePost": [
+   "minecraft:smooth_quartz",
+   "minecraft:yellow_terracotta",
+   "minecraft:white_terracotta",
+   "minecraft:brown_terracotta",
+   "minecraft:light_gray_concrete"
+  ],
+  "arcadeRoof": [
+   "minecraft:smooth_quartz",
+   "minecraft:yellow_terracotta",
+   "minecraft:white_terracotta",
+   "minecraft:brown_terracotta",
+   "minecraft:cyan_terracotta"
+  ],
+  "arcadePaving": [
+   "minecraft:bricks",
+   "minecraft:terracotta",
+   "minecraft:granite",
+   "minecraft:polished_granite",
+   "minecraft:light_gray_terracotta",
+   "minecraft:bricks",
+   "minecraft:red_terracotta"
+  ],
+  "tactile": [
+   "minecraft:yellow_concrete"
+  ],
+  "mesh": [
+   "minecraft:iron_bars"
+  ],
+  "tankShell": [
+   "minecraft:white_concrete",
+   "minecraft:smooth_quartz",
+   "minecraft:light_gray_concrete",
+   "minecraft:white_concrete"
+  ],
+  "pipe": [
+   "minecraft:white_concrete",
+   "minecraft:light_gray_concrete",
+   "minecraft:yellow_terracotta",
+   "minecraft:iron_block",
+   "minecraft:orange_terracotta"
+  ],
+  "deck": [
+   "minecraft:smooth_stone_slab"
+  ],
+  "stack": [
+   "minecraft:light_gray_concrete",
+   "minecraft:white_concrete"
+  ],
+  "coal": [
+   "minecraft:coal_block"
+  ],
+  "steel": [
+   "minecraft:polished_andesite"
+  ],
+  "transformer": [
+   "minecraft:gray_concrete"
+  ],
+  "flareTop": [
+   "minecraft:shroomlight"
+  ],
+  "brandPlant": [
+   "minecraft:light_gray_concrete"
+  ],
+  "container": [
+   "minecraft:red_concrete",
+   "minecraft:blue_concrete",
+   "minecraft:orange_concrete",
+   "minecraft:green_concrete",
+   "minecraft:white_concrete",
+   "minecraft:gray_concrete",
+   "minecraft:cyan_concrete",
+   "minecraft:brown_concrete"
+  ],
+  "crane": [
+   "minecraft:yellow_concrete",
+   "minecraft:white_concrete",
+   "minecraft:orange_concrete",
+   "minecraft:light_blue_concrete"
+  ],
+  "craneHouse": [
+   "minecraft:white_concrete"
+  ],
+  "bund": [
+   "minecraft:smooth_stone",
+   "minecraft:stone_bricks"
+  ],
+  "truckCab": [
+   "minecraft:white_concrete",
+   "minecraft:blue_concrete",
+   "minecraft:red_concrete",
+   "minecraft:green_concrete"
+  ],
+  "flood": [
+   "minecraft:sea_lantern"
+  ],
+  "bollard": [
+   "minecraft:polished_blackstone_wall"
+  ],
+  "chimney": [
+   "minecraft:bricks",
+   "minecraft:light_gray_concrete",
+   "minecraft:stone_bricks"
+  ],
+  "chimneyTop": [
+   "minecraft:red_concrete",
+   "minecraft:red_terracotta"
+  ],
+  "danchiNumber": [
+   "minecraft:blue_concrete",
+   "minecraft:green_concrete",
+   "minecraft:black_concrete",
+   "minecraft:red_concrete",
+   "minecraft:cyan_concrete"
+  ],
+  "crest": [
+   "minecraft:black_concrete",
+   "minecraft:polished_blackstone",
+   "minecraft:deepslate_tiles"
+  ],
+  "tobukuro": [
+   "minecraft:light_gray_concrete",
+   "minecraft:white_concrete",
+   "minecraft:smooth_stone",
+   "minecraft:iron_block"
+  ],
+  "gatepost": [
+   "minecraft:polished_andesite",
+   "minecraft:bricks",
+   "minecraft:stone_bricks",
+   "minecraft:smooth_stone",
+   "minecraft:polished_granite"
+  ],
+  "gateLight": [
+   "minecraft:lantern"
+  ],
+  "futon": [
+   "minecraft:white_carpet",
+   "minecraft:light_blue_carpet",
+   "minecraft:pink_carpet",
+   "minecraft:yellow_carpet",
+   "minecraft:white_carpet"
+  ],
+  "solar": [
+   "minecraft:daylight_detector"
+  ],
+  "antenna": [
+   "minecraft:lightning_rod"
+  ],
+  "heater": [
+   "minecraft:white_concrete",
+   "minecraft:smooth_quartz"
+  ],
+  "oni": [
+   "minecraft:polished_blackstone_brick_wall",
+   "minecraft:deepslate_tile_wall"
+  ],
+  "yago": [
+   "minecraft:dark_oak_planks",
+   "minecraft:stripped_dark_oak_log",
+   "minecraft:spruce_planks"
+  ],
+  "tatami": [
+   "minecraft:stripped_bamboo_block"
+  ],
+  "earth": [
+   "minecraft:packed_mud"
+  ],
+  "partition": [
+   "minecraft:white_concrete",
+   "minecraft:smooth_quartz",
+   "minecraft:white_terracotta",
+   "minecraft:birch_planks"
+  ],
+  "fusuma": [
+   "minecraft:birch_planks",
+   "minecraft:stripped_birch_log"
+  ],
+  "stairs": [
+   "minecraft:spruce_stairs",
+   "minecraft:oak_stairs",
+   "minecraft:dark_oak_stairs"
+  ],
+  "outerStairs": [
+   "minecraft:polished_andesite_stairs",
+   "minecraft:stone_stairs",
+   "minecraft:smooth_quartz_stairs"
+  ],
+  "shelf": [
+   "minecraft:bookshelf",
+   "minecraft:barrel",
+   "minecraft:chest",
+   "minecraft:bookshelf",
+   "minecraft:barrel"
+  ],
+  "table": [
+   "minecraft:spruce_slab",
+   "minecraft:oak_slab",
+   "minecraft:dark_oak_slab"
+  ],
+  "kitchen": [
+   "minecraft:smoker",
+   "minecraft:furnace",
+   "minecraft:cauldron"
+  ],
+  "counter": [
+   "minecraft:spruce_planks",
+   "minecraft:smooth_quartz",
+   "minecraft:polished_andesite"
+  ],
+  "desk": [
+   "minecraft:birch_slab",
+   "minecraft:smooth_quartz_slab",
+   "minecraft:oak_slab"
+  ],
+  "storage": [
+   "minecraft:barrel",
+   "minecraft:chest",
+   "minecraft:barrel",
+   "minecraft:hay_block"
+  ],
+  "andon": [
+   "minecraft:shroomlight",
+   "minecraft:shroomlight",
+   "minecraft:sea_lantern",
+   "minecraft:ochre_froglight"
+  ],
+  "arcadeGlass": [
+   "minecraft:glass"
+  ],
+  "louvre": [
+   "minecraft:iron_bars"
+  ],
+  "rust": [
+   "minecraft:orange_terracotta",
+   "minecraft:brown_terracotta",
+   "minecraft:terracotta"
+  ],
+  "bank": [
+   "minecraft:stone_bricks",
+   "minecraft:mossy_stone_bricks",
+   "minecraft:cobblestone",
+   "minecraft:mossy_cobblestone",
+   "minecraft:stone_bricks"
+  ],
+  "tenantSign": [
+   "minecraft:white_concrete",
+   "minecraft:yellow_concrete",
+   "minecraft:red_concrete",
+   "minecraft:light_blue_concrete",
+   "minecraft:orange_concrete",
+   "minecraft:lime_concrete",
+   "minecraft:magenta_concrete",
+   "minecraft:sea_lantern",
+   "minecraft:pink_concrete",
+   "minecraft:black_concrete",
+   "minecraft:ochre_froglight",
+   "minecraft:blue_concrete"
+  ],
+  "ad": [
+   "minecraft:red_concrete",
+   "minecraft:yellow_concrete",
+   "minecraft:blue_concrete",
+   "minecraft:white_concrete",
+   "minecraft:magenta_concrete",
+   "minecraft:lime_concrete",
+   "minecraft:orange_concrete",
+   "minecraft:light_blue_concrete",
+   "minecraft:pink_concrete",
+   "minecraft:black_concrete"
+  ]
+ },
+ "weathering": {
+  "minecraft:white_concrete": [
+   "minecraft:calcite",
+   "minecraft:light_gray_concrete",
+   "minecraft:polished_diorite"
+  ],
+  "minecraft:light_gray_concrete": [
+   "minecraft:light_gray_terracotta",
+   "minecraft:stone",
+   "minecraft:andesite"
+  ],
+  "minecraft:gray_concrete": [
+   "minecraft:gray_terracotta",
+   "minecraft:polished_andesite"
+  ],
+  "minecraft:smooth_quartz": [
+   "minecraft:calcite",
+   "minecraft:polished_diorite",
+   "minecraft:white_terracotta"
+  ],
+  "minecraft:calcite": [
+   "minecraft:polished_diorite",
+   "minecraft:diorite"
+  ],
+  "minecraft:white_terracotta": [
+   "minecraft:light_gray_terracotta",
+   "minecraft:terracotta"
+  ],
+  "minecraft:smooth_sandstone": [
+   "minecraft:sandstone",
+   "minecraft:cut_sandstone"
+  ],
+  "minecraft:yellow_terracotta": [
+   "minecraft:terracotta",
+   "minecraft:brown_terracotta"
+  ],
+  "minecraft:orange_terracotta": [
+   "minecraft:terracotta",
+   "minecraft:brown_terracotta"
+  ],
+  "minecraft:cyan_terracotta": [
+   "minecraft:gray_terracotta"
+  ],
+  "minecraft:light_blue_terracotta": [
+   "minecraft:light_gray_terracotta"
+  ],
+  "minecraft:pink_terracotta": [
+   "minecraft:white_terracotta"
+  ],
+  "minecraft:brown_terracotta": [
+   "minecraft:terracotta"
+  ],
+  "minecraft:light_gray_terracotta": [
+   "minecraft:stone",
+   "minecraft:andesite"
+  ],
+  "minecraft:bricks": [
+   "minecraft:terracotta"
+  ],
+  "minecraft:stone_bricks": [
+   "minecraft:mossy_stone_bricks",
+   "minecraft:cracked_stone_bricks"
+  ],
+  "minecraft:cobblestone": [
+   "minecraft:mossy_cobblestone"
+  ],
+  "minecraft:polished_andesite": [
+   "minecraft:andesite",
+   "minecraft:stone"
+  ],
+  "minecraft:smooth_stone": [
+   "minecraft:stone",
+   "minecraft:andesite"
+  ],
+  "minecraft:smooth_stone_slab": [
+   "minecraft:stone_slab",
+   "minecraft:andesite_slab"
+  ],
+  "minecraft:deepslate_tiles": [
+   "minecraft:cracked_deepslate_tiles"
+  ],
+  "minecraft:deepslate_tile_slab": [
+   "minecraft:cobbled_deepslate_slab"
+  ],
+  "minecraft:polished_blackstone_bricks": [
+   "minecraft:cracked_polished_blackstone_bricks"
+  ],
+  "minecraft:polished_blackstone_brick_slab": [
+   "minecraft:blackstone_slab"
+  ],
+  "minecraft:cut_copper": [
+   "minecraft:exposed_cut_copper",
+   "minecraft:weathered_cut_copper"
+  ],
+  "minecraft:cut_copper_slab": [
+   "minecraft:exposed_cut_copper_slab",
+   "minecraft:weathered_cut_copper_slab"
+  ],
+  "minecraft:exposed_cut_copper": [
+   "minecraft:weathered_cut_copper"
+  ],
+  "minecraft:exposed_cut_copper_slab": [
+   "minecraft:weathered_cut_copper_slab"
+  ],
+  "minecraft:weathered_cut_copper": [
+   "minecraft:oxidized_cut_copper"
+  ],
+  "minecraft:weathered_cut_copper_slab": [
+   "minecraft:oxidized_cut_copper_slab"
+  ],
+  "minecraft:mud_bricks": [
+   "minecraft:packed_mud"
+  ],
+  "minecraft:packed_mud": [
+   "minecraft:mud_bricks"
+  ]
+ },
+ "styles": {
+  "kinki.house": {
+   "type": "HOUSE",
+   "palettes": {
+    "house.kinki.1": 1.0,
+    "house.kinki.2": 1.0,
+    "house.kinki.3": 1.0,
+    "house.kinki.4": 1.0,
+    "house.kinki.5": 1.0,
+    "house.kinki.6": 1.0,
+    "house.kinki.7": 1.0,
+    "house.kinki.8": 1.0,
+    "house.kinki.9": 1.0,
+    "house.kinki.10": 1.0,
+    "house.kinki.11": 1.0,
+    "house.kinki.12": 1.0,
+    "house.kinki.13": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.6,
+     "hip": 0.1,
+     "flat": 0.12,
+     "shed": 0.18
+    },
+    "UPPER_PLAN": {
+     "full": 0.65,
+     "partial": 0.35
+    },
+    "WINDOWS": {
+     "pairs": 0.5,
+     "wide": 0.3,
+     "single": 0.2
+    },
+    "TWO_TONE": {
+     "none": 0.5,
+     "base": 0.25,
+     "upper": 0.25
+    },
+    "HOUSE_BALCONY": {
+     "none": 0.45,
+     "front": 0.55
+    },
+    "LAYOUT": {
+     "standard": 0.2,
+     "sidePark": 0.3,
+     "frontPark": 0.3,
+     "garden": 0.2
+    },
+    "CARPORT": {
+     "none": 0.55,
+     "carport": 0.45
+    },
+    "ANNEX": {
+     "none": 0.55,
+     "leanTo": 0.45
+    },
+    "GROUND": {
+     "plain": 0.8,
+     "garage": 0.2
+    },
+    "YARD": {
+     "blockLow": 0.2,
+     "blockHigh": 0.2,
+     "hedge": 0.2,
+     "open": 0.2,
+     "coped": 0.2
+    },
+    "WINDOW_HOOD": {
+     "none": 0.5,
+     "hood": 0.5
+    },
+    "GRILLE": {
+     "none": 0.6,
+     "grille": 0.4
+    },
+    "WAINSCOT": {
+     "none": 0.6,
+     "band": 0.4
+    },
+    "TREES": {
+     "none": 0.4,
+     "one": 0.6
+    },
+    "AMADO": {
+     "none": 0.35,
+     "boxes": 0.65
+    },
+    "SOLAR": {
+     "none": 0.85,
+     "panels": 0.15
+    },
+    "ANTENNA": {
+     "none": 0.5,
+     "antenna": 0.5
+    },
+    "HEATER": {
+     "none": 0.4,
+     "heater": 0.6
+    },
+    "GATEPOST": {
+     "none": 0.5,
+     "posts": 0.5
+    },
+    "FUTON": {
+     "none": 0.6,
+     "futon": 0.4
+    },
+    "TATAMI": {
+     "none": 0.3,
+     "upper": 0.5,
+     "both": 0.2
+    },
+    "PINE": {
+     "none": 0.65,
+     "pine": 0.35
+    },
+    "SHED": {
+     "none": 0.6,
+     "shed": 0.4
+    },
+    "BOUNDARY": {
+     "wall": 0.5,
+     "hedge": 0.25,
+     "none": 0.25
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    }
+   }
+  },
+  "hokuriku.house": {
+   "type": "HOUSE",
+   "palettes": {
+    "house.hokuriku.1": 1.0,
+    "house.hokuriku.2": 1.0,
+    "house.hokuriku.3": 1.0,
+    "house.hokuriku.4": 1.0,
+    "house.hokuriku.5": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.45,
+     "hip": 0.1,
+     "flat": 0.05,
+     "irimoya": 0.4
+    },
+    "UPPER_PLAN": {
+     "full": 0.65,
+     "partial": 0.35
+    },
+    "WINDOWS": {
+     "pairs": 0.5,
+     "wide": 0.3,
+     "single": 0.2
+    },
+    "TWO_TONE": {
+     "none": 0.5,
+     "base": 0.25,
+     "upper": 0.25
+    },
+    "HOUSE_BALCONY": {
+     "none": 0.45,
+     "front": 0.55
+    },
+    "LAYOUT": {
+     "standard": 0.2,
+     "sidePark": 0.3,
+     "frontPark": 0.3,
+     "garden": 0.2
+    },
+    "CARPORT": {
+     "none": 0.55,
+     "carport": 0.45
+    },
+    "ANNEX": {
+     "none": 0.55,
+     "leanTo": 0.45
+    },
+    "GROUND": {
+     "plain": 0.8,
+     "garage": 0.2
+    },
+    "YARD": {
+     "blockLow": 0.2,
+     "blockHigh": 0.2,
+     "hedge": 0.2,
+     "open": 0.2,
+     "coped": 0.2
+    },
+    "WINDOW_HOOD": {
+     "none": 0.5,
+     "hood": 0.5
+    },
+    "GRILLE": {
+     "none": 0.6,
+     "grille": 0.4
+    },
+    "WAINSCOT": {
+     "none": 0.6,
+     "band": 0.4
+    },
+    "TREES": {
+     "none": 0.4,
+     "one": 0.6
+    },
+    "AMADO": {
+     "none": 0.35,
+     "boxes": 0.65
+    },
+    "SOLAR": {
+     "none": 0.85,
+     "panels": 0.15
+    },
+    "ANTENNA": {
+     "none": 0.5,
+     "antenna": 0.5
+    },
+    "HEATER": {
+     "none": 0.4,
+     "heater": 0.6
+    },
+    "GATEPOST": {
+     "none": 0.5,
+     "posts": 0.5
+    },
+    "FUTON": {
+     "none": 0.6,
+     "futon": 0.4
+    },
+    "TATAMI": {
+     "none": 0.3,
+     "upper": 0.5,
+     "both": 0.2
+    },
+    "PINE": {
+     "none": 0.65,
+     "pine": 0.35
+    },
+    "SHED": {
+     "none": 0.6,
+     "shed": 0.4
+    },
+    "BOUNDARY": {
+     "wall": 0.5,
+     "hedge": 0.25,
+     "none": 0.25
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    }
+   }
+  },
+  "jinaimachi.estate": {
+   "type": "HOUSE",
+   "storeys": 2,
+   "palettes": {
+    "house.estate.1": 1.0,
+    "house.estate.2": 1.0,
+    "house.estate.3": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.1,
+     "irimoya": 0.5
+    },
+    "UPPER_PLAN": {
+     "full": 0.5,
+     "partial": 0.5
+    },
+    "WINDOWS": {
+     "pairs": 0.5,
+     "wide": 0.3,
+     "single": 0.2
+    },
+    "TWO_TONE": {
+     "none": 1.0
+    },
+    "HOUSE_BALCONY": {
+     "none": 1.0
+    },
+    "LAYOUT": {
+     "garden": 1.0
+    },
+    "CARPORT": {
+     "none": 1.0
+    },
+    "ANNEX": {
+     "none": 1.0
+    },
+    "GROUND": {
+     "plain": 1.0
+    },
+    "YARD": {
+     "estate": 1.0
+    },
+    "WINDOW_HOOD": {
+     "none": 0.5,
+     "hood": 0.5
+    },
+    "GRILLE": {
+     "none": 0.6,
+     "grille": 0.4
+    },
+    "WAINSCOT": {
+     "none": 0.6,
+     "band": 0.4
+    },
+    "TREES": {
+     "two": 1.0
+    },
+    "AMADO": {
+     "none": 0.35,
+     "boxes": 0.65
+    },
+    "SOLAR": {
+     "none": 0.85,
+     "panels": 0.15
+    },
+    "ANTENNA": {
+     "none": 0.5,
+     "antenna": 0.5
+    },
+    "HEATER": {
+     "none": 0.4,
+     "heater": 0.6
+    },
+    "GATEPOST": {
+     "none": 0.5,
+     "posts": 0.5
+    },
+    "FUTON": {
+     "none": 0.6,
+     "futon": 0.4
+    },
+    "TATAMI": {
+     "none": 0.3,
+     "upper": 0.5,
+     "both": 0.2
+    },
+    "PINE": {
+     "none": 0.65,
+     "pine": 0.35
+    },
+    "SHED": {
+     "none": 0.6,
+     "shed": 0.4
+    },
+    "BOUNDARY": {
+     "wall": 0.5,
+     "hedge": 0.25,
+     "none": 0.25
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    }
+   }
+  },
+  "buke.yashiki": {
+   "type": "HOUSE",
+   "storeys": 1,
+   "palettes": {
+    "house.estate.1": 1.0,
+    "house.estate.2": 1.0,
+    "house.estate.3": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "irimoya": 0.5,
+     "hip": 0.3,
+     "gable": 0.2
+    },
+    "UPPER_PLAN": {
+     "full": 1.0
+    },
+    "WINDOWS": {
+     "wide": 1.0
+    },
+    "TWO_TONE": {
+     "none": 1.0
+    },
+    "HOUSE_BALCONY": {
+     "none": 1.0
+    },
+    "LAYOUT": {
+     "garden": 1.0
+    },
+    "CARPORT": {
+     "none": 1.0
+    },
+    "ANNEX": {
+     "none": 0.6,
+     "leanTo": 0.4
+    },
+    "GROUND": {
+     "plain": 1.0
+    },
+    "YARD": {
+     "kurobei": 0.5,
+     "dobei": 0.3,
+     "stoneHedge": 0.2
+    },
+    "WINDOW_HOOD": {
+     "none": 0.5,
+     "hood": 0.5
+    },
+    "GRILLE": {
+     "none": 0.6,
+     "grille": 0.4
+    },
+    "WAINSCOT": {
+     "none": 0.6,
+     "band": 0.4
+    },
+    "TREES": {
+     "two": 1.0
+    },
+    "AMADO": {
+     "none": 0.35,
+     "boxes": 0.65
+    },
+    "SOLAR": {
+     "none": 1.0
+    },
+    "ANTENNA": {
+     "none": 0.5,
+     "antenna": 0.5
+    },
+    "HEATER": {
+     "none": 0.7,
+     "heater": 0.3
+    },
+    "GATEPOST": {
+     "none": 1.0
+    },
+    "FUTON": {
+     "none": 1.0
+    },
+    "TATAMI": {
+     "both": 1.0
+    },
+    "PINE": {
+     "pine": 0.6,
+     "none": 0.4
+    },
+    "SHED": {
+     "none": 0.6,
+     "shed": 0.4
+    },
+    "BOUNDARY": {
+     "hedge": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "GATE": {
+     "kabuki": 0.7,
+     "none": 0.3
+    },
+    "DITCH": {
+     "ditch": 0.8,
+     "none": 0.2
+    }
+   }
+  },
+  "kyoto.machiya": {
+   "type": "MACHIYA",
+   "palettes": {
+    "machiya.kyoto.1": 1.0,
+    "machiya.kyoto.2": 1.0,
+    "machiya.kyoto.3": 1.0,
+    "machiya.kyoto.4": 1.0,
+    "machiya.kyoto.5": 1.0,
+    "machiya.kyoto.6": 1.0,
+    "machiya.kyoto.7": 1.0,
+    "machiya.kyoto.8": 1.0,
+    "machiya.kyoto.9": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 1.0
+    },
+    "GROUND": {
+     "lattice": 0.45,
+     "debako": 0.2,
+     "shop": 0.15,
+     "plaster": 0.2
+    },
+    "FRONT_STRIP": {
+     "bamboo": 0.5,
+     "stones": 0.5
+    },
+    "UPPER": {
+     "normal": 0.35,
+     "low": 0.5,
+     "single": 0.15
+    },
+    "WAINSCOT": {
+     "band": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "LANTERN": {
+     "none": 0.7,
+     "lantern": 0.3
+    },
+    "LATTICE_WOOD": {
+     "palette": 0.5,
+     "spruce": 0.25,
+     "mangrove": 0.25
+    },
+    "TREES": {
+     "none": 0.4,
+     "one": 0.6
+    },
+    "AGEMISE": {
+     "none": 0.7,
+     "agemise": 0.3
+    },
+    "YAGO": {
+     "none": 0.55,
+     "board": 0.45
+    },
+    "KEMURIDASHI": {
+     "none": 0.5,
+     "vent": 0.5
+    },
+    "UPPER_FRONT": {
+     "mushiko": 0.45,
+     "windows": 0.3,
+     "railing": 0.15,
+     "sudare": 0.1
+    },
+    "LATTICE_PATTERN": {
+     "dense": 0.5,
+     "sparse": 0.3,
+     "upperPlaster": 0.2
+    },
+    "UDATSU": {
+     "none": 0.75,
+     "udatsu": 0.25
+    },
+    "DOOR_POS": {
+     "left": 0.45,
+     "right": 0.45,
+     "center": 0.1
+    },
+    "SHOKI": {
+     "none": 0.8,
+     "shoki": 0.2
+    },
+    "RIDGE_DIR": {
+     "along": 0.9,
+     "gable": 0.1
+    },
+    "RIDGE_HEAVY": {
+     "none": 0.8,
+     "heavy": 0.2
+    },
+    "WATERSIDE": {
+     "plain": 0.3,
+     "sudare": 0.45,
+     "balcony": 0.25
+    }
+   }
+  },
+  "gion.machiya": {
+   "type": "MACHIYA",
+   "storeys": 2,
+   "palettes": {
+    "machiya.gion.1": 1.0,
+    "machiya.gion.2": 1.0,
+    "machiya.gion.3": 1.0,
+    "machiya.gion.4": 1.0,
+    "machiya.gion.5": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 1.0
+    },
+    "GROUND": {
+     "lattice": 0.8,
+     "debako": 0.2
+    },
+    "FRONT_STRIP": {
+     "bamboo": 0.5,
+     "komayose": 0.5
+    },
+    "UPPER": {
+     "normal": 0.5,
+     "low": 0.5
+    },
+    "WAINSCOT": {
+     "band": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.1,
+     "red": 0.9
+    },
+    "LANTERN": {
+     "none": 0.4,
+     "lantern": 0.6
+    },
+    "LATTICE_WOOD": {
+     "palette": 0.5,
+     "spruce": 0.25,
+     "mangrove": 0.25
+    },
+    "TREES": {
+     "none": 0.4,
+     "one": 0.6
+    },
+    "AGEMISE": {
+     "none": 0.7,
+     "agemise": 0.3
+    },
+    "YAGO": {
+     "none": 0.55,
+     "board": 0.45
+    },
+    "KEMURIDASHI": {
+     "none": 0.5,
+     "vent": 0.5
+    },
+    "UPPER_FRONT": {
+     "sudare": 0.7,
+     "railing": 0.2,
+     "windows": 0.1
+    },
+    "LATTICE_PATTERN": {
+     "dense": 0.5,
+     "sparse": 0.3,
+     "upperPlaster": 0.2
+    },
+    "UDATSU": {
+     "none": 0.9,
+     "udatsu": 0.1
+    },
+    "DOOR_POS": {
+     "left": 0.45,
+     "right": 0.45,
+     "center": 0.1
+    },
+    "SHOKI": {
+     "none": 0.8,
+     "shoki": 0.2
+    },
+    "RIDGE_DIR": {
+     "along": 1.0
+    },
+    "RIDGE_HEAVY": {
+     "none": 0.8,
+     "heavy": 0.2
+    },
+    "WATERSIDE": {
+     "sudare": 0.55,
+     "balcony": 0.4,
+     "plain": 0.05
+    }
+   }
+  },
+  "kanazawa.chaya": {
+   "type": "MACHIYA",
+   "storeys": 2,
+   "palettes": {
+    "machiya.chaya.1": 1.0,
+    "machiya.chaya.2": 1.0,
+    "machiya.chaya.3": 1.0,
+    "machiya.chaya.4": 1.0,
+    "machiya.chaya.5": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 1.0
+    },
+    "GROUND": {
+     "lattice": 0.85,
+     "debako": 0.15
+    },
+    "FRONT_STRIP": {
+     "stones": 1.0
+    },
+    "UPPER": {
+     "tall": 1.0
+    },
+    "WAINSCOT": {
+     "band": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "LANTERN": {
+     "none": 0.4,
+     "lantern": 0.6
+    },
+    "LATTICE_WOOD": {
+     "palette": 1.0
+    },
+    "TREES": {
+     "none": 0.4,
+     "one": 0.6
+    },
+    "AGEMISE": {
+     "none": 0.7,
+     "agemise": 0.3
+    },
+    "YAGO": {
+     "none": 0.55,
+     "board": 0.45
+    },
+    "KEMURIDASHI": {
+     "none": 0.5,
+     "vent": 0.5
+    },
+    "UPPER_FRONT": {
+     "glazed": 0.7,
+     "railing": 0.2,
+     "sudare": 0.1
+    },
+    "LATTICE_PATTERN": {
+     "dense": 0.8,
+     "upperPlaster": 0.2
+    },
+    "UDATSU": {
+     "none": 1.0
+    },
+    "DOOR_POS": {
+     "left": 0.45,
+     "right": 0.45,
+     "center": 0.1
+    },
+    "SHOKI": {
+     "none": 0.9,
+     "shoki": 0.1
+    },
+    "RIDGE_DIR": {
+     "along": 1.0
+    },
+    "RIDGE_HEAVY": {
+     "none": 0.8,
+     "heavy": 0.2
+    },
+    "WATERSIDE": {
+     "balcony": 0.4,
+     "sudare": 0.3,
+     "plain": 0.3
+    }
+   }
+  },
+  "jinaimachi.machiya": {
+   "type": "MACHIYA",
+   "storeys": 2,
+   "palettes": {
+    "machiya.jinaimachi.1": 1.0,
+    "machiya.jinaimachi.2": 1.0,
+    "machiya.jinaimachi.3": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 1.0
+    },
+    "GROUND": {
+     "boards": 1.0
+    },
+    "FRONT_STRIP": {
+     "stones": 1.0
+    },
+    "UPPER": {
+     "normal": 0.2,
+     "low": 0.7,
+     "single": 0.1
+    },
+    "WAINSCOT": {
+     "band": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "LANTERN": {
+     "none": 0.7,
+     "lantern": 0.3
+    },
+    "LATTICE_WOOD": {
+     "palette": 1.0
+    },
+    "TREES": {
+     "none": 0.4,
+     "one": 0.6
+    },
+    "AGEMISE": {
+     "none": 0.7,
+     "agemise": 0.3
+    },
+    "YAGO": {
+     "none": 0.55,
+     "board": 0.45
+    },
+    "KEMURIDASHI": {
+     "none": 0.5,
+     "vent": 0.5
+    },
+    "UPPER_FRONT": {
+     "mushiko": 0.7,
+     "windows": 0.3
+    },
+    "LATTICE_PATTERN": {
+     "dense": 0.5,
+     "sparse": 0.3,
+     "upperPlaster": 0.2
+    },
+    "UDATSU": {
+     "none": 0.6,
+     "udatsu": 0.4
+    },
+    "DOOR_POS": {
+     "left": 0.45,
+     "right": 0.45,
+     "center": 0.1
+    },
+    "SHOKI": {
+     "none": 0.8,
+     "shoki": 0.2
+    },
+    "RIDGE_DIR": {
+     "along": 0.85,
+     "gable": 0.15
+    },
+    "RIDGE_HEAVY": {
+     "none": 0.8,
+     "heavy": 0.2
+    },
+    "WATERSIDE": {
+     "plain": 0.3,
+     "sudare": 0.45,
+     "balcony": 0.25
+    }
+   }
+  },
+  "kura": {
+   "type": "KURA",
+   "storeys": 2,
+   "palettes": {
+    "kura.1": 1.0,
+    "kura.2": 1.0,
+    "kura.3": 1.0,
+    "kura.4": 1.0,
+    "kura.5": 1.0,
+    "kura.6": 1.0,
+    "kura.7": 1.0,
+    "kura.8": 1.0,
+    "kura.9": 1.0,
+    "kura.10": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 1.0
+    },
+    "RIDGE_DIR": {
+     "along": 0.4,
+     "gable": 0.6
+    },
+    "UPPER": {
+     "normal": 0.85,
+     "single": 0.15
+    },
+    "RIDGE_HEAVY": {
+     "none": 0.6,
+     "heavy": 0.4
+    },
+    "HACHIMAKI": {
+     "none": 0.5,
+     "band": 0.5
+    },
+    "KURA_WINDOW": {
+     "bars": 0.5,
+     "shutters": 0.5
+    },
+    "NAMAKO": {
+     "diagonal": 0.6,
+     "grid": 0.25,
+     "tall": 0.15
+    },
+    "ENTRY_HOOD": {
+     "none": 0.5,
+     "hood": 0.5
+    },
+    "KURA_FRONT": {
+     "closed": 0.75,
+     "mise": 0.25
+    },
+    "KURA_FRAME": {
+     "plain": 0.5,
+     "thick": 0.5
+    },
+    "CREST": {
+     "none": 0.6,
+     "crest": 0.4
+    },
+    "WAINSCOT": {
+     "board": 0.3333333333333333,
+     "namako": 0.3333333333333333,
+     "stone": 0.3333333333333333
+    },
+    "LEDGE": {
+     "tiled": 1.0
+    },
+    "RECESS": {
+     "recessed": 1.0
+    }
+   }
+  },
+  "modern.shop": {
+   "type": "SHOP",
+   "palettes": {
+    "shop.1": 1.0,
+    "shop.2": 1.0,
+    "shop.3": 1.0,
+    "shop.4": 1.0,
+    "shop.5": 1.0,
+    "shop.6": 1.0,
+    "shop.7": 1.0,
+    "shop.8": 1.0,
+    "shop.9": 1.0,
+    "shop.10": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.25,
+     "lowWall": 0.25,
+     "shutter": 0.25,
+     "recessed": 0.25
+    },
+    "RECESS": {
+     "flush": 0.5,
+     "recessed": 0.5
+    },
+    "SIGN": {
+     "none": 0.4,
+     "side": 0.6
+    },
+    "AWNING": {
+     "none": 0.5,
+     "awning": 0.5
+    },
+    "VENDING": {
+     "none": 0.7,
+     "vending": 0.3
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "FASCIA": {
+     "plain": 0.3,
+     "sign": 0.45,
+     "lit": 0.25
+    },
+    "ROOF_SIGN": {
+     "none": 0.75,
+     "billboard": 0.25
+    },
+    "UPPER_STREET": {
+     "windows": 0.5,
+     "balcony": 0.3,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.5,
+     "stand": 0.5
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
+    },
+    "LANTERN": {
+     "none": 0.8,
+     "lantern": 0.2
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    }
+   }
+  },
+  "modern.apartment": {
+   "type": "APARTMENT",
+   "palettes": {
+    "apartment.1": 1.0,
+    "apartment.2": 1.0,
+    "apartment.3": 1.0,
+    "apartment.4": 1.0,
+    "apartment.5": 1.0,
+    "apartment.6": 1.0,
+    "apartment.7": 1.0,
+    "apartment.8": 1.0,
+    "apartment.9": 1.0,
+    "apartment.10": 1.0,
+    "apartment.11": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "rooms": 0.65,
+     "pilotis": 0.35
+    },
+    "RECESS": {
+     "flush": 0.3,
+     "recessed": 0.7
+    },
+    "ARTICULATION": {
+     "plain": 0.3333333333333333,
+     "fins": 0.3333333333333333,
+     "ledges": 0.3333333333333333
+    },
+    "BALCONY": {
+     "solid": 0.5,
+     "rail": 0.5
+    },
+    "ROOF_EDGE": {
+     "parapet": 0.7,
+     "rail": 0.3
+    },
+    "CORNICE": {
+     "none": 0.5,
+     "cornice": 0.5
+    },
+    "YARD": {
+     "hedge": 1.0
+    },
+    "ACCESS": {
+     "interior": 0.5,
+     "corridor": 0.5
+    },
+    "BALCONY_SPLIT": {
+     "none": 0.5,
+     "units": 0.5
+    },
+    "FACADE": {
+     "punched": 0.6,
+     "ribbon": 0.4
+    },
+    "TWO_TONE": {
+     "none": 0.6,
+     "base": 0.4
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "FUTON": {
+     "none": 0.6,
+     "futon": 0.4
+    }
+   }
+  },
+  "modern.office": {
+   "type": "OFFICE",
+   "palettes": {
+    "office.1": 1.0,
+    "office.2": 1.0,
+    "office.3": 1.0,
+    "office.4": 1.0,
+    "office.5": 1.0,
+    "office.6": 1.0,
+    "office.7": 1.0,
+    "office.8": 1.0,
+    "office.9": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.3333333333333333,
+     "colonnade": 0.3333333333333333,
+     "canopy": 0.3333333333333333
+    },
+    "RECESS": {
+     "flush": 0.3,
+     "recessed": 0.7
+    },
+    "ARTICULATION": {
+     "plain": 0.3333333333333333,
+     "fins": 0.3333333333333333,
+     "ledges": 0.3333333333333333
+    },
+    "SIGN": {
+     "none": 0.6,
+     "tall": 0.4
+    },
+    "FACADE": {
+     "punched": 0.4,
+     "ribbon": 0.25,
+     "curtain": 0.2,
+     "grid": 0.15
+    },
+    "PODIUM": {
+     "none": 0.6,
+     "podium": 0.4
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    }
+   }
+  },
+  "works": {
+   "type": "WORKS",
+   "palettes": {
+    "works.1": 1.0,
+    "works.2": 1.0,
+    "works.3": 1.0,
+    "works.4": 1.0,
+    "works.5": 1.0,
+    "works.6": 1.0,
+    "works.7": 1.0,
+    "works.8": 1.0,
+    "works.9": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.55,
+     "flat": 0.45
+    },
+    "LOADING": {
+     "none": 0.4,
+     "shutters": 0.6
+    },
+    "CHIMNEY": {
+     "none": 0.9,
+     "chimney": 0.1
+    },
+    "WORKS_WALL": {
+     "plain": 0.4,
+     "ribbed": 0.35,
+     "band": 0.25
+    },
+    "WORKS_WINDOWS": {
+     "high": 0.5,
+     "band": 0.35,
+     "none": 0.15
+    },
+    "PIPES": {
+     "none": 0.6,
+     "pipes": 0.4
+    },
+    "WORKS_SIGN": {
+     "none": 0.5,
+     "sign": 0.5
+    },
+    "WORKS_FENCE": {
+     "none": 0.4,
+     "mesh": 0.6
+    }
+   }
+  },
+  "plant.petrochemical": {
+   "type": "WORKS",
+   "storeys": 2,
+   "palettes": {
+    "plant.1": 1.0,
+    "plant.2": 1.0,
+    "plant.3": 1.0,
+    "plant.4": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "WORKS_WALL": {
+     "plain": 0.5,
+     "ribbed": 0.5
+    },
+    "WORKS_WINDOWS": {
+     "band": 0.6,
+     "high": 0.4
+    },
+    "PIPES": {
+     "pipes": 1.0
+    },
+    "WORKS_SIGN": {
+     "sign": 0.7,
+     "none": 0.3
+    },
+    "WORKS_FENCE": {
+     "mesh": 1.0
+    }
+   }
+  },
+  "plant.power": {
+   "type": "WORKS",
+   "storeys": 2,
+   "palettes": {
+    "plant.1": 1.0,
+    "plant.2": 1.0,
+    "plant.3": 1.0,
+    "plant.4": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 0.6,
+     "gable": 0.4
+    },
+    "WORKS_WALL": {
+     "plain": 0.4,
+     "ribbed": 0.6
+    },
+    "WORKS_WINDOWS": {
+     "high": 0.6,
+     "band": 0.4
+    },
+    "PIPES": {
+     "pipes": 0.6,
+     "none": 0.4
+    },
+    "WORKS_SIGN": {
+     "sign": 0.8,
+     "none": 0.2
+    },
+    "WORKS_FENCE": {
+     "mesh": 1.0
+    }
+   }
+  },
+  "plant.substation": {
+   "type": "WORKS",
+   "storeys": 1,
+   "palettes": {
+    "plant.1": 1.0,
+    "plant.2": 1.0,
+    "plant.3": 1.0,
+    "plant.4": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "WORKS_WALL": {
+     "plain": 1.0
+    },
+    "WORKS_WINDOWS": {
+     "high": 0.5,
+     "none": 0.5
+    },
+    "WORKS_SIGN": {
+     "none": 1.0
+    },
+    "WORKS_FENCE": {
+     "mesh": 1.0
+    }
+   }
+  },
+  "plant.tankfarm": {
+   "type": "WORKS",
+   "storeys": 1,
+   "palettes": {
+    "plant.1": 1.0,
+    "plant.2": 1.0,
+    "plant.3": 1.0,
+    "plant.4": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "WORKS_WALL": {
+     "plain": 1.0
+    },
+    "WORKS_WINDOWS": {
+     "band": 1.0
+    },
+    "WORKS_FENCE": {
+     "mesh": 1.0
+    }
+   }
+  },
+  "plant.containers": {
+   "type": "WORKS",
+   "storeys": 1,
+   "palettes": {
+    "plant.1": 1.0,
+    "plant.2": 1.0,
+    "plant.3": 1.0,
+    "plant.4": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "WORKS_WALL": {
+     "plain": 1.0
+    },
+    "WORKS_WINDOWS": {
+     "band": 1.0
+    },
+    "WORKS_SIGN": {
+     "sign": 0.6,
+     "none": 0.4
+    },
+    "WORKS_FENCE": {
+     "mesh": 1.0
+    }
+   }
+  },
+  "plant.port": {
+   "type": "WORKS",
+   "storeys": 1,
+   "palettes": {
+    "works.1": 1.0,
+    "works.2": 1.0,
+    "works.3": 1.0,
+    "works.4": 1.0,
+    "works.5": 1.0,
+    "works.6": 1.0,
+    "works.7": 1.0,
+    "works.8": 1.0,
+    "works.9": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.6,
+     "flat": 0.4
+    },
+    "LOADING": {
+     "shutters": 1.0
+    },
+    "WORKS_WALL": {
+     "ribbed": 0.7,
+     "plain": 0.3
+    },
+    "WORKS_WINDOWS": {
+     "high": 1.0
+    },
+    "WORKS_SIGN": {
+     "sign": 0.7,
+     "none": 0.3
+    },
+    "WORKS_FENCE": {
+     "mesh": 1.0
+    }
+   }
+  },
+  "plant.warehouse": {
+   "type": "WORKS",
+   "storeys": 2,
+   "palettes": {
+    "works.1": 1.0,
+    "works.2": 1.0,
+    "works.3": 1.0,
+    "works.4": 1.0,
+    "works.5": 1.0,
+    "works.6": 1.0,
+    "works.7": 1.0,
+    "works.8": 1.0,
+    "works.9": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 0.7,
+     "gable": 0.3
+    },
+    "LOADING": {
+     "shutters": 1.0
+    },
+    "WORKS_WALL": {
+     "ribbed": 0.6,
+     "band": 0.4
+    },
+    "WORKS_WINDOWS": {
+     "high": 0.6,
+     "none": 0.4
+    },
+    "WORKS_SIGN": {
+     "sign": 0.8,
+     "none": 0.2
+    },
+    "WORKS_FENCE": {
+     "mesh": 0.7,
+     "none": 0.3
+    }
+   }
+  },
+  "works.warehouse": {
+   "type": "WORKS",
+   "palettes": {
+    "works.1": 1.0,
+    "works.2": 1.0,
+    "works.3": 1.0,
+    "works.4": 1.0,
+    "works.5": 1.0,
+    "works.6": 1.0,
+    "works.7": 1.0,
+    "works.8": 1.0,
+    "works.9": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.7,
+     "flat": 0.3
+    },
+    "LOADING": {
+     "shutters": 1.0
+    },
+    "CHIMNEY": {
+     "none": 1.0
+    },
+    "WORKS_WALL": {
+     "plain": 0.3,
+     "ribbed": 0.7
+    },
+    "WORKS_WINDOWS": {
+     "high": 0.7,
+     "none": 0.3
+    },
+    "PIPES": {
+     "none": 1.0
+    },
+    "WORKS_SIGN": {
+     "none": 0.4,
+     "sign": 0.6
+    },
+    "WORKS_FENCE": {
+     "none": 0.3,
+     "mesh": 0.7
+    }
+   }
+  },
+  "works.old": {
+   "type": "WORKS",
+   "palettes": {
+    "works.old.1": 1.0,
+    "works.old.2": 1.0,
+    "works.old.3": 1.0,
+    "works.old.4": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "SAWTOOTH": {
+     "sawtooth": 1.0
+    },
+    "LOADING": {
+     "none": 0.6,
+     "shutters": 0.4
+    },
+    "CHIMNEY": {
+     "none": 0.4,
+     "chimney": 0.6
+    },
+    "WORKS_WALL": {
+     "plain": 0.5,
+     "band": 0.5
+    },
+    "WORKS_WINDOWS": {
+     "high": 0.6,
+     "band": 0.4
+    },
+    "PIPES": {
+     "none": 0.7,
+     "pipes": 0.3
+    },
+    "WORKS_SIGN": {
+     "none": 0.6,
+     "sign": 0.4
+    },
+    "WORKS_FENCE": {
+     "none": 0.6,
+     "mesh": 0.4
+    }
+   }
+  },
+  "downtown.shop": {
+   "type": "SHOP",
+   "palettes": {
+    "shop.1": 1.0,
+    "shop.2": 1.0,
+    "shop.3": 1.0,
+    "shop.4": 1.0,
+    "shop.5": 1.0,
+    "shop.6": 1.0,
+    "shop.7": 1.0,
+    "shop.8": 1.0,
+    "shop.9": 1.0,
+    "shop.10": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.25,
+     "lowWall": 0.25,
+     "shutter": 0.25,
+     "recessed": 0.25
+    },
+    "RECESS": {
+     "flush": 0.5,
+     "recessed": 0.5
+    },
+    "SIGN": {
+     "none": 0.2,
+     "side": 0.8
+    },
+    "AWNING": {
+     "none": 0.5,
+     "awning": 0.5
+    },
+    "VENDING": {
+     "none": 0.7,
+     "vending": 0.3
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "FASCIA": {
+     "plain": 0.15,
+     "sign": 0.4,
+     "lit": 0.45
+    },
+    "ROOF_SIGN": {
+     "none": 0.55,
+     "billboard": 0.45
+    },
+    "UPPER_STREET": {
+     "windows": 0.5,
+     "balcony": 0.3,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.5,
+     "stand": 0.5
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
+    },
+    "LANTERN": {
+     "none": 0.8,
+     "lantern": 0.2
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    }
+   }
+  },
+  "downtown.office": {
+   "type": "OFFICE",
+   "palettes": {
+    "office.1": 1.0,
+    "office.2": 1.0,
+    "office.3": 1.0,
+    "office.4": 1.0,
+    "office.5": 1.0,
+    "office.6": 1.0,
+    "office.7": 1.0,
+    "office.8": 1.0,
+    "office.9": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.3333333333333333,
+     "colonnade": 0.3333333333333333,
+     "canopy": 0.3333333333333333
+    },
+    "RECESS": {
+     "flush": 0.3,
+     "recessed": 0.7
+    },
+    "ARTICULATION": {
+     "plain": 0.3333333333333333,
+     "fins": 0.3333333333333333,
+     "ledges": 0.3333333333333333
+    },
+    "SIGN": {
+     "none": 0.45,
+     "tall": 0.55
+    },
+    "FACADE": {
+     "punched": 0.25,
+     "ribbon": 0.25,
+     "curtain": 0.3,
+     "grid": 0.2
+    },
+    "PODIUM": {
+     "none": 0.5,
+     "podium": 0.5
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "AD": {
+     "none": 0.4,
+     "roof": 0.3,
+     "wall": 0.15,
+     "both": 0.15
+    }
+   }
+  },
+  "kanto.house": {
+   "type": "HOUSE",
+   "palettes": {
+    "house.kanto.1": 1.0,
+    "house.kanto.2": 1.0,
+    "house.kanto.3": 1.0,
+    "house.kanto.4": 1.0,
+    "house.kanto.5": 1.0,
+    "house.kanto.6": 1.0,
+    "house.kanto.7": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.3,
+     "hip": 0.05,
+     "flat": 0.3,
+     "shed": 0.35
+    },
+    "UPPER_PLAN": {
+     "full": 0.8,
+     "partial": 0.2
+    },
+    "WINDOWS": {
+     "pairs": 0.25,
+     "wide": 0.2,
+     "single": 0.2,
+     "slit": 0.35
+    },
+    "TWO_TONE": {
+     "none": 0.5,
+     "base": 0.25,
+     "upper": 0.25
+    },
+    "HOUSE_BALCONY": {
+     "none": 0.45,
+     "front": 0.55
+    },
+    "LAYOUT": {
+     "standard": 0.5,
+     "sidePark": 0.2,
+     "frontPark": 0.3
+    },
+    "CARPORT": {
+     "none": 0.55,
+     "carport": 0.45
+    },
+    "ANNEX": {
+     "none": 0.55,
+     "leanTo": 0.45
+    },
+    "GROUND": {
+     "plain": 0.55,
+     "garage": 0.45
+    },
+    "YARD": {
+     "blockLow": 0.3,
+     "hedge": 0.2,
+     "open": 0.5
+    },
+    "WINDOW_HOOD": {
+     "none": 0.5,
+     "hood": 0.5
+    },
+    "GRILLE": {
+     "none": 0.6,
+     "grille": 0.4
+    },
+    "WAINSCOT": {
+     "none": 0.6,
+     "band": 0.4
+    },
+    "TREES": {
+     "none": 0.6,
+     "one": 0.4
+    },
+    "AMADO": {
+     "none": 0.35,
+     "boxes": 0.65
+    },
+    "SOLAR": {
+     "none": 0.85,
+     "panels": 0.15
+    },
+    "ANTENNA": {
+     "none": 0.5,
+     "antenna": 0.5
+    },
+    "HEATER": {
+     "none": 0.4,
+     "heater": 0.6
+    },
+    "GATEPOST": {
+     "none": 0.5,
+     "posts": 0.5
+    },
+    "FUTON": {
+     "none": 0.6,
+     "futon": 0.4
+    },
+    "TATAMI": {
+     "none": 0.3,
+     "upper": 0.5,
+     "both": 0.2
+    },
+    "PINE": {
+     "none": 0.65,
+     "pine": 0.35
+    },
+    "SHED": {
+     "none": 0.6,
+     "shed": 0.4
+    },
+    "BOUNDARY": {
+     "wall": 0.5,
+     "hedge": 0.25,
+     "none": 0.25
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "HOUSE_FORM": {
+     "detached": 0.4,
+     "narrow": 0.6
+    }
+   }
+  },
+  "kanto.mansion": {
+   "type": "APARTMENT",
+   "palettes": {
+    "apartment.kanto.1": 1.0,
+    "apartment.kanto.2": 1.0,
+    "apartment.kanto.3": 1.0,
+    "apartment.kanto.4": 1.0,
+    "apartment.kanto.5": 1.0,
+    "apartment.kanto.6": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "rooms": 0.65,
+     "pilotis": 0.35
+    },
+    "RECESS": {
+     "flush": 0.3,
+     "recessed": 0.7
+    },
+    "ARTICULATION": {
+     "plain": 0.3333333333333333,
+     "fins": 0.3333333333333333,
+     "ledges": 0.3333333333333333
+    },
+    "BALCONY": {
+     "solid": 0.3,
+     "rail": 0.7
+    },
+    "ROOF_EDGE": {
+     "parapet": 0.7,
+     "rail": 0.3
+    },
+    "CORNICE": {
+     "none": 0.5,
+     "cornice": 0.5
+    },
+    "YARD": {
+     "hedge": 1.0
+    },
+    "ACCESS": {
+     "interior": 0.4,
+     "corridor": 0.6
+    },
+    "BALCONY_SPLIT": {
+     "none": 0.3,
+     "units": 0.7
+    },
+    "FACADE": {
+     "punched": 0.6,
+     "ribbon": 0.4
+    },
+    "TWO_TONE": {
+     "none": 0.6,
+     "base": 0.4
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "FUTON": {
+     "none": 0.6,
+     "futon": 0.4
+    }
+   }
+  },
+  "kanto.danchi": {
+   "type": "APARTMENT",
+   "storeys": 5,
+   "palettes": {
+    "apartment.danchi.1": 1.0,
+    "apartment.danchi.2": 1.0,
+    "apartment.danchi.3": 1.0,
+    "apartment.danchi.4": 1.0,
+    "apartment.danchi.5": 1.0,
+    "apartment.danchi.6": 1.0,
+    "apartment.danchi.7": 1.0,
+    "apartment.danchi.8": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "ROOF_TALL": {
+     "flat": 1.0
+    },
+    "GROUND": {
+     "rooms": 1.0
+    },
+    "RECESS": {
+     "flush": 1.0
+    },
+    "ARTICULATION": {
+     "plain": 1.0
+    },
+    "BALCONY": {
+     "solid": 0.6,
+     "rail": 0.4
+    },
+    "ROOF_EDGE": {
+     "parapet": 1.0
+    },
+    "CORNICE": {
+     "none": 1.0
+    },
+    "YARD": {
+     "hedge": 1.0
+    },
+    "ACCESS": {
+     "stairwell": 1.0
+    },
+    "BALCONY_SPLIT": {
+     "units": 1.0
+    },
+    "FACADE": {
+     "punched": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "FUTON": {
+     "none": 0.5,
+     "futon": 0.5
+    },
+    "WATER_TOWER": {
+     "none": 0.6,
+     "tower": 0.4
+    },
+    "DANCHI_NUMBER": {
+     "none": 0.3,
+     "number": 0.7
+    }
+   }
+  },
+  "kanto.danchi4": {
+   "type": "APARTMENT",
+   "storeys": 4,
+   "palettes": {
+    "apartment.danchi.1": 1.0,
+    "apartment.danchi.2": 1.0,
+    "apartment.danchi.3": 1.0,
+    "apartment.danchi.4": 1.0,
+    "apartment.danchi.5": 1.0,
+    "apartment.danchi.6": 1.0,
+    "apartment.danchi.7": 1.0,
+    "apartment.danchi.8": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "ROOF_TALL": {
+     "flat": 0.7,
+     "hip": 0.3
+    },
+    "GROUND": {
+     "rooms": 1.0
+    },
+    "RECESS": {
+     "flush": 1.0
+    },
+    "ARTICULATION": {
+     "plain": 1.0
+    },
+    "BALCONY": {
+     "solid": 0.6,
+     "rail": 0.4
+    },
+    "ROOF_EDGE": {
+     "parapet": 1.0
+    },
+    "CORNICE": {
+     "none": 1.0
+    },
+    "YARD": {
+     "hedge": 1.0
+    },
+    "ACCESS": {
+     "stairwell": 1.0
+    },
+    "BALCONY_SPLIT": {
+     "units": 1.0
+    },
+    "FACADE": {
+     "punched": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "FUTON": {
+     "none": 0.5,
+     "futon": 0.5
+    },
+    "WATER_TOWER": {
+     "none": 0.6,
+     "tower": 0.4
+    },
+    "DANCHI_NUMBER": {
+     "none": 0.3,
+     "number": 0.7
+    }
+   }
+  },
+  "kanto.zakkyo": {
+   "type": "SHOP",
+   "minStoreys": 5,
+   "palettes": {
+    "shop.zakkyo.1": 1.0,
+    "shop.zakkyo.2": 1.0,
+    "shop.zakkyo.3": 1.0,
+    "shop.zakkyo.4": 1.0,
+    "shop.zakkyo.5": 1.0,
+    "shop.zakkyo.6": 1.0,
+    "shop.zakkyo.7": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.25,
+     "lowWall": 0.25,
+     "shutter": 0.25,
+     "recessed": 0.25
+    },
+    "RECESS": {
+     "flush": 0.5,
+     "recessed": 0.5
+    },
+    "SIGN": {
+     "side": 0.3,
+     "stacked": 0.7
+    },
+    "AWNING": {
+     "none": 0.7,
+     "awning": 0.3
+    },
+    "VENDING": {
+     "none": 0.7,
+     "vending": 0.3
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "FASCIA": {
+     "sign": 0.4,
+     "lit": 0.6
+    },
+    "ROOF_SIGN": {
+     "none": 0.6,
+     "billboard": 0.4
+    },
+    "UPPER_STREET": {
+     "windows": 0.8,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.5,
+     "stand": 0.5
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
+    },
+    "LANTERN": {
+     "none": 0.8,
+     "lantern": 0.2
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    }
+   }
+  },
+  "kanto.office": {
+   "type": "OFFICE",
+   "palettes": {
+    "office.1": 1.0,
+    "office.2": 1.0,
+    "office.3": 1.0,
+    "office.4": 1.0,
+    "office.5": 1.0,
+    "office.6": 1.0,
+    "office.7": 1.0,
+    "office.8": 1.0,
+    "office.9": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.3333333333333333,
+     "colonnade": 0.3333333333333333,
+     "canopy": 0.3333333333333333
+    },
+    "RECESS": {
+     "flush": 0.3,
+     "recessed": 0.7
+    },
+    "ARTICULATION": {
+     "plain": 0.3333333333333333,
+     "fins": 0.3333333333333333,
+     "ledges": 0.3333333333333333
+    },
+    "SIGN": {
+     "none": 0.6,
+     "tall": 0.2,
+     "stacked": 0.2
+    },
+    "FACADE": {
+     "punched": 0.2,
+     "ribbon": 0.2,
+     "curtain": 0.35,
+     "grid": 0.25
+    },
+    "PODIUM": {
+     "none": 0.5,
+     "podium": 0.5
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    }
+   }
+  },
+  "konbini.standalone": {
+   "type": "SHOP",
+   "storeys": 1,
+   "palettes": {
+    "konbini.1": 1.0,
+    "konbini.2": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "DISPLAY": {
+     "goods": 1.0
+    },
+    "CORNICE": {
+     "none": 1.0
+    }
+   }
+  },
+  "fastfood.standalone": {
+   "type": "SHOP",
+   "storeys": 1,
+   "palettes": {
+    "fastfood.1": 1.0,
+    "fastfood.2": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 1.0
+    },
+    "DISPLAY": {
+     "none": 1.0
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    }
+   }
+  },
+  "postoffice.standalone": {
+   "type": "SHOP",
+   "storeys": 1,
+   "palettes": {
+    "post.1": 1.0,
+    "post.2": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "flat": 0.6,
+     "hip": 0.4
+    },
+    "DISPLAY": {
+     "none": 1.0
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    }
+   }
+  },
+  "shotengai.shop": {
+   "type": "SHOP",
+   "palettes": {
+    "shop.1": 1.0,
+    "shop.2": 1.0,
+    "shop.3": 1.0,
+    "shop.4": 1.0,
+    "shop.5": 1.0,
+    "shop.6": 1.0,
+    "shop.7": 1.0,
+    "shop.8": 1.0,
+    "shop.9": 1.0,
+    "shop.10": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.25,
+     "lowWall": 0.25,
+     "shutter": 0.25,
+     "recessed": 0.25
+    },
+    "RECESS": {
+     "flush": 0.5,
+     "recessed": 0.5
+    },
+    "SIGN": {
+     "none": 0.2,
+     "side": 0.8
+    },
+    "AWNING": {
+     "none": 0.5,
+     "awning": 0.5
+    },
+    "VENDING": {
+     "none": 0.7,
+     "vending": 0.3
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "FASCIA": {
+     "plain": 0.15,
+     "sign": 0.4,
+     "lit": 0.45
+    },
+    "ROOF_SIGN": {
+     "none": 0.55,
+     "billboard": 0.45
+    },
+    "UPPER_STREET": {
+     "windows": 0.5,
+     "balcony": 0.3,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.5,
+     "stand": 0.5
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
+    },
+    "LANTERN": {
+     "none": 0.8,
+     "lantern": 0.2
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "ARCADE": {
+     "canopy": 0.4,
+     "louvre": 0.15,
+     "gangi": 0.15,
+     "full": 0.3
+    },
+    "ARCADE_COLOR": {
+     "white": 0.7,
+     "cream": 0.2,
+     "brown": 0.1
+    }
+   }
+  },
+  "shotengai.zakkyo": {
+   "type": "SHOP",
+   "minStoreys": 5,
+   "palettes": {
+    "shop.zakkyo.1": 1.0,
+    "shop.zakkyo.2": 1.0,
+    "shop.zakkyo.3": 1.0,
+    "shop.zakkyo.4": 1.0,
+    "shop.zakkyo.5": 1.0,
+    "shop.zakkyo.6": 1.0,
+    "shop.zakkyo.7": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.25,
+     "lowWall": 0.25,
+     "shutter": 0.25,
+     "recessed": 0.25
+    },
+    "RECESS": {
+     "flush": 0.5,
+     "recessed": 0.5
+    },
+    "SIGN": {
+     "side": 0.3,
+     "stacked": 0.7
+    },
+    "AWNING": {
+     "none": 0.7,
+     "awning": 0.3
+    },
+    "VENDING": {
+     "none": 0.7,
+     "vending": 0.3
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "FASCIA": {
+     "sign": 0.4,
+     "lit": 0.6
+    },
+    "ROOF_SIGN": {
+     "none": 0.6,
+     "billboard": 0.4
+    },
+    "UPPER_STREET": {
+     "windows": 0.8,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.5,
+     "stand": 0.5
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
+    },
+    "LANTERN": {
+     "none": 0.8,
+     "lantern": 0.2
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "ARCADE": {
+     "canopy": 0.4,
+     "louvre": 0.15,
+     "gangi": 0.15,
+     "full": 0.3
+    },
+    "ARCADE_COLOR": {
+     "white": 0.7,
+     "cream": 0.2,
+     "brown": 0.1
+    }
+   }
+  },
+  "shotengai.office": {
+   "type": "OFFICE",
+   "palettes": {
+    "office.1": 1.0,
+    "office.2": 1.0,
+    "office.3": 1.0,
+    "office.4": 1.0,
+    "office.5": 1.0,
+    "office.6": 1.0,
+    "office.7": 1.0,
+    "office.8": 1.0,
+    "office.9": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.3333333333333333,
+     "colonnade": 0.3333333333333333,
+     "canopy": 0.3333333333333333
+    },
+    "RECESS": {
+     "flush": 0.3,
+     "recessed": 0.7
+    },
+    "ARTICULATION": {
+     "plain": 0.3333333333333333,
+     "fins": 0.3333333333333333,
+     "ledges": 0.3333333333333333
+    },
+    "SIGN": {
+     "none": 0.45,
+     "tall": 0.55
+    },
+    "FACADE": {
+     "punched": 0.25,
+     "ribbon": 0.25,
+     "curtain": 0.3,
+     "grid": 0.2
+    },
+    "PODIUM": {
+     "none": 0.5,
+     "podium": 0.5
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "AD": {
+     "none": 0.4,
+     "roof": 0.3,
+     "wall": 0.15,
+     "both": 0.15
+    },
+    "ARCADE": {
+     "canopy": 0.4,
+     "louvre": 0.15,
+     "gangi": 0.15,
+     "full": 0.3
+    },
+    "ARCADE_COLOR": {
+     "white": 0.7,
+     "cream": 0.2,
+     "brown": 0.1
+    }
+   }
+  },
+  "inaka.shop": {
+   "type": "SHOP",
+   "storeys": 2,
+   "palettes": {
+    "inaka.shop.1": 1.0,
+    "inaka.shop.2": 1.0,
+    "inaka.shop.3": 1.0,
+    "inaka.shop.4": 1.0,
+    "inaka.shop.5": 1.0,
+    "inaka.shop.6": 1.0,
+    "inaka.shop.7": 1.0,
+    "inaka.shop.8": 1.0,
+    "inaka.shop.9": 1.0,
+    "inaka.shop.10": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.7,
+     "flat": 0.3
+    },
+    "ROOF_TALL": {
+     "gable": 0.3,
+     "flat": 0.7
+    },
+    "GROUND": {
+     "shutter": 0.4,
+     "glass": 0.25,
+     "lowWall": 0.15,
+     "recessed": 0.2
+    },
+    "RECESS": {
+     "flush": 0.5,
+     "recessed": 0.5
+    },
+    "SIGN": {
+     "side": 0.7,
+     "none": 0.3
+    },
+    "AWNING": {
+     "none": 0.7,
+     "awning": 0.3
+    },
+    "VENDING": {
+     "none": 0.65,
+     "vending": 0.35
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "FASCIA": {
+     "plain": 0.4,
+     "sign": 0.5,
+     "lit": 0.1
+    },
+    "ROOF_SIGN": {
+     "none": 1.0
+    },
+    "UPPER_STREET": {
+     "windows": 0.8,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.6,
+     "stand": 0.4
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
+    },
+    "LANTERN": {
+     "none": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "KANBAN": {
+     "kanban": 0.6,
+     "none": 0.4
+    },
+    "ARCADE": {
+     "canopy": 0.25,
+     "louvre": 0.15,
+     "skylight": 0.1,
+     "gangi": 0.1,
+     "full": 0.2,
+     "none": 0.2
+    },
+    "ARCADE_COLOR": {
+     "white": 0.25,
+     "ochre": 0.25,
+     "cream": 0.25,
+     "brown": 0.1,
+     "teal": 0.15
+    }
+   }
+  },
+  "inaka.shop3": {
+   "type": "SHOP",
+   "storeys": 3,
+   "palettes": {
+    "inaka.shop.1": 1.0,
+    "inaka.shop.2": 1.0,
+    "inaka.shop.3": 1.0,
+    "inaka.shop.4": 1.0,
+    "inaka.shop.5": 1.0,
+    "inaka.shop.6": 1.0,
+    "inaka.shop.7": 1.0,
+    "inaka.shop.8": 1.0,
+    "inaka.shop.9": 1.0,
+    "inaka.shop.10": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.7,
+     "flat": 0.3
+    },
+    "ROOF_TALL": {
+     "gable": 0.3,
+     "flat": 0.7
+    },
+    "GROUND": {
+     "shutter": 0.4,
+     "glass": 0.25,
+     "lowWall": 0.15,
+     "recessed": 0.2
+    },
+    "RECESS": {
+     "flush": 0.5,
+     "recessed": 0.5
+    },
+    "SIGN": {
+     "side": 0.7,
+     "none": 0.3
+    },
+    "AWNING": {
+     "none": 0.7,
+     "awning": 0.3
+    },
+    "VENDING": {
+     "none": 0.65,
+     "vending": 0.35
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "FASCIA": {
+     "plain": 0.4,
+     "sign": 0.5,
+     "lit": 0.1
+    },
+    "ROOF_SIGN": {
+     "none": 1.0
+    },
+    "UPPER_STREET": {
+     "windows": 0.8,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.6,
+     "stand": 0.4
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
+    },
+    "LANTERN": {
+     "none": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "KANBAN": {
+     "kanban": 0.6,
+     "none": 0.4
+    },
+    "ARCADE": {
+     "canopy": 0.25,
+     "louvre": 0.15,
+     "skylight": 0.1,
+     "gangi": 0.1,
+     "full": 0.2,
+     "none": 0.2
+    },
+    "ARCADE_COLOR": {
+     "white": 0.25,
+     "ochre": 0.25,
+     "cream": 0.25,
+     "brown": 0.1,
+     "teal": 0.15
+    }
+   }
+  },
+  "inaka.block": {
+   "type": "OFFICE",
+   "minStoreys": 3,
+   "palettes": {
+    "inaka.shop.1": 1.0,
+    "inaka.shop.2": 1.0,
+    "inaka.shop.3": 1.0,
+    "inaka.shop.4": 1.0,
+    "inaka.shop.5": 1.0,
+    "inaka.shop.6": 1.0,
+    "inaka.shop.7": 1.0,
+    "inaka.shop.8": 1.0,
+    "inaka.shop.9": 1.0,
+    "inaka.shop.10": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.3333333333333333,
+     "colonnade": 0.3333333333333333,
+     "canopy": 0.3333333333333333
+    },
+    "RECESS": {
+     "flush": 0.3,
+     "recessed": 0.7
+    },
+    "ARTICULATION": {
+     "plain": 0.3333333333333333,
+     "fins": 0.3333333333333333,
+     "ledges": 0.3333333333333333
+    },
+    "SIGN": {
+     "none": 0.6,
+     "tall": 0.4
+    },
+    "FACADE": {
+     "punched": 0.4,
+     "ribbon": 0.25,
+     "curtain": 0.2,
+     "grid": 0.15
+    },
+    "PODIUM": {
+     "none": 0.6,
+     "podium": 0.4
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "ARCADE": {
+     "canopy": 0.25,
+     "louvre": 0.15,
+     "skylight": 0.1,
+     "gangi": 0.1,
+     "full": 0.2,
+     "none": 0.2
+    },
+    "ARCADE_COLOR": {
+     "white": 0.25,
+     "ochre": 0.25,
+     "cream": 0.25,
+     "brown": 0.1,
+     "teal": 0.15
+    }
+   }
+  }
+ },
+ "quarters": {
+  "HANAMACHI": {
+   "gion.machiya": 1.0
+  },
+  "CHAYA": {
+   "kanazawa.chaya": 1.0
+  },
+  "STOREHOUSE": {
+   "kura": 0.6,
+   "kyoto.machiya": 0.4
+  },
+  "JINAIMACHI": {
+   "jinaimachi.estate": 0.25,
+   "kura": 0.25,
+   "jinaimachi.machiya": 0.5
+  },
+  "BUKE": {
+   "buke.yashiki": 1.0
+  },
+  "SHOTENGAI": {
+   "shotengai.shop": 0.6,
+   "shotengai.zakkyo": 0.25,
+   "shotengai.office": 0.15
+  },
+  "LOCAL_SHOTENGAI": {
+   "inaka.shop": 0.6,
+   "inaka.shop3": 0.25,
+   "inaka.block": 0.15
+  }
+ },
+ "districts": {
+  "CENTRAL": {
+   "SHOP": {
+    "downtown.shop": 1.0
+   },
+   "OFFICE": {
+    "downtown.office": 1.0
+   }
+  },
+  "STATION_FRONT": {
+   "SHOP": {
+    "downtown.shop": 1.0
+   },
+   "OFFICE": {
+    "downtown.office": 1.0
+   }
+  }
+ },
+ "programs": {
+  "KONBINI": {
+   "standalone": "konbini.standalone",
+   "brand": "brandKonbini"
+  },
+  "FASTFOOD": {
+   "standalone": "fastfood.standalone",
+   "brand": "brandFastfood"
+  },
+  "POST_OFFICE": {
+   "standalone": "postoffice.standalone",
+   "brand": "brandPost"
+  },
+  "PETROCHEMICAL": {
+   "standalone": "plant.petrochemical",
+   "brand": "brandPlant"
+  },
+  "POWER_PLANT": {
+   "standalone": "plant.power",
+   "brand": "brandPlant"
+  },
+  "SUBSTATION": {
+   "standalone": "plant.substation",
+   "brand": "brandPlant"
+  },
+  "TANK_FARM": {
+   "standalone": "plant.tankfarm",
+   "brand": "brandPlant"
+  },
+  "CONTAINER_YARD": {
+   "standalone": "plant.containers",
+   "brand": "brandPlant"
+  },
+  "PORT": {
+   "standalone": "plant.port",
+   "brand": "brandPlant"
+  },
+  "WAREHOUSE": {
+   "standalone": "plant.warehouse",
+   "brand": "brandPlant"
+  }
+ },
+ "regions": {
+  "KINKI": {
+   "HOUSE": {
+    "kinki.house": 1.0
+   },
+   "MACHIYA": {
+    "kyoto.machiya": 1.0
+   },
+   "KURA": {
+    "kura": 1.0
+   },
+   "SHOP": {
+    "modern.shop": 1.0
+   },
+   "APARTMENT": {
+    "modern.apartment": 1.0
+   },
+   "OFFICE": {
+    "modern.office": 1.0
+   },
+   "WORKS": {
+    "works": 0.45,
+    "works.warehouse": 0.35,
+    "works.old": 0.2
+   }
+  },
+  "HOKURIKU": {
+   "HOUSE": {
+    "hokuriku.house": 1.0
+   }
+  },
+  "KANTO": {
+   "HOUSE": {
+    "kanto.house": 1.0
+   },
+   "APARTMENT": {
+    "kanto.mansion": 0.7,
+    "kanto.danchi": 0.18,
+    "kanto.danchi4": 0.12
+   },
+   "SHOP": {
+    "kanto.zakkyo": 0.35,
+    "modern.shop": 0.65
+   },
+   "OFFICE": {
+    "kanto.office": 1.0
+   }
+  }
+ },
+ "regionDistricts": {
+  "KANTO": {
+   "CENTRAL": {
+    "SHOP": {
+     "kanto.zakkyo": 0.6,
+     "downtown.shop": 0.4
+    },
+    "OFFICE": {
+     "kanto.office": 1.0
+    },
+    "APARTMENT": {
+     "kanto.mansion": 1.0
+    }
+   },
+   "STATION_FRONT": {
+    "SHOP": {
+     "kanto.zakkyo": 0.6,
+     "downtown.shop": 0.4
+    },
+    "OFFICE": {
+     "kanto.office": 1.0
+    },
+    "APARTMENT": {
+     "kanto.mansion": 1.0
+    }
+   }
+  }
+ }
+}

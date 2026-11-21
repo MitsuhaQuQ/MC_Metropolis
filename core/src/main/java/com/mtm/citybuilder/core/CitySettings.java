@@ -35,6 +35,7 @@ public final class CitySettings {
     public Sanctuaries sanctuaries = new Sanctuaries();
     public Ports ports = new Ports();
     public Plazas plazas = new Plazas();
+    public com.mtm.citybuilder.core.building.BuildingSettings buildings = new com.mtm.citybuilder.core.building.BuildingSettings();
 
     /**
      * The ports' terminals, built out over the sea (see {@code port.PortLayer}). Each kind {width along the shore,

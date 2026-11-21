@@ -246,7 +246,7 @@ public final class TownPlots {
     }
 
     /** The point at a distance along a chain, and the chain's direction there: {x, z, ux, uz}. */
-    private double[] pointAt(int chain, double along) {
+    public double[] pointAt(int chain, double along) {
         int[] order = chains.get(chain);
         int lo = 0;
         int hi = order.length - 1;
