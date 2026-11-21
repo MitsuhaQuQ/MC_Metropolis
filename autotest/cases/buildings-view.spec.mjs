@@ -66,5 +66,12 @@ test('the buildings seen from the test client', async ({}, testInfo) => {
     await server.generate(x - 48, z - 48, x + 47, z + 47);
     const ground = s.ground ?? 70;
     await view(name, x, Math.round(ground) + 3, z, yaw, 5, testInfo);
+    if (cls === 'ARTERIAL') {
+      for (const side of [1, -1]) {
+        // From the road's middle, looking across at one side's fronts
+        await view(`bld-front-${side > 0 ? 'left' : 'right'}`, Math.round(s.x), Math.round(ground) + 4, Math.round(s.z),
+          yawOf(s.heading + 55 * side), 8, testInfo);
+      }
+    }
   }
 });

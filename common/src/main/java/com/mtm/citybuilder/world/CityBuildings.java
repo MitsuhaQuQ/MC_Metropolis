@@ -123,6 +123,7 @@ public final class CityBuildings {
                 }
             }
         }
+        bridge(chunk, columns, panes);
         join(level, panes);
         tidy(level, chunk, columns);
     }
@@ -171,6 +172,60 @@ public final class CityBuildings {
                 }
             }
         }
+    }
+
+    /**
+     * A wall at an angle to the blocks steps across them, its panes meeting corner to corner, where no pane can join
+     * the next: the cell between them filled with a pane of the same, the one inside the building, so a band of
+     * windows runs on unbroken. Within the chunk only.
+     */
+    private static void bridge(ChunkAccess chunk, BuildingLayer.Column[] columns, java.util.List<BlockPos> panes) {
+        int baseX = chunk.getPos().getMinBlockX();
+        int baseZ = chunk.getPos().getMinBlockZ();
+        java.util.List<BlockPos> added = new java.util.ArrayList<>();
+        for (BlockPos at : panes) {
+            BlockState state = chunk.getBlockState(at);
+            if (!(state.getBlock() instanceof IronBarsBlock)) {
+                continue;
+            }
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                for (Direction e : new Direction[]{d.getClockWise(), d.getCounterClockWise()}) {
+                    BlockPos diagonal = at.relative(d).relative(e);
+                    if (!inside(diagonal, baseX, baseZ) || chunk.getBlockState(diagonal).getBlock() != state.getBlock()) {
+                        continue;
+                    }
+                    BlockPos one = at.relative(d);
+                    BlockPos two = at.relative(e);
+                    if (!inside(one, baseX, baseZ) || !inside(two, baseX, baseZ)) {
+                        continue;
+                    }
+                    BlockState a = chunk.getBlockState(one);
+                    BlockState b = chunk.getBlockState(two);
+                    // Already joined round the step: through a pane, or along a solid wall
+                    if (a.getBlock() instanceof IronBarsBlock || b.getBlock() instanceof IronBarsBlock
+                            || a.blocksMotion() && b.blocksMotion()) {
+                        continue;
+                    }
+                    BlockPos fill = indoor(columns, one, baseX, baseZ) && !a.blocksMotion() ? one
+                            : indoor(columns, two, baseX, baseZ) && !b.blocksMotion() ? two : null;
+                    if (fill != null) {
+                        chunk.setBlockState(fill, state.getBlock().defaultBlockState(), false);
+                        added.add(fill);
+                    }
+                }
+            }
+        }
+        panes.addAll(added);
+    }
+
+    private static boolean inside(BlockPos p, int baseX, int baseZ) {
+        return p.getX() >= baseX && p.getX() < baseX + 16 && p.getZ() >= baseZ && p.getZ() < baseZ + 16;
+    }
+
+    /** Whether a cell of the chunk lies in a building's footprint, not its ring of land outside. */
+    private static boolean indoor(BuildingLayer.Column[] columns, BlockPos p, int baseX, int baseZ) {
+        BuildingLayer.Column c = columns[(p.getX() - baseX) * 16 + (p.getZ() - baseZ)];
+        return c.building() != null && !c.ring();
     }
 
     /**
