@@ -24,9 +24,13 @@ Usage:
     python -I tools/assets/plateau_voxel.py build <buildings.csv> <out> [--id GMLID ...] [--no-textures]
                                                   [--mc-jar <1.20.1 client jar>]
 
-Without --id the built-in list LANDMARKS is used. Source: 3D city models of Project PLATEAU
-(MLIT; copyright Kyoto City), PLATEAU site policy (compatible with CC BY 4.0): ATTRIBUTION is
-written next to the templates and must ship with them.
+Without --id the built-in lists LANDMARKS (Kyoto) and MORE_LANDMARKS (other cities) are used. `extract` runs once
+per city, with that city's zip and CSV, and takes the buildings of the lists found in that CSV; `build` takes the CSVs
+of all the cities, comma separated, e.g.
+    python -I tools/assets/plateau_voxel.py build <dir>/kyoto-buildings.csv,<dir>/himeji-buildings.csv,
+        <dir>/kanazawa-buildings.csv,<dir>/taito-buildings.csv,<dir>/chuo-buildings.csv <out>
+Source: 3D city models of Project PLATEAU (MLIT; copyright of each city or ward, CITIES), PLATEAU site policy
+(compatible with CC BY 4.0): ATTRIBUTION, written next to the templates with every city used, must ship with them.
 """
 import base64
 import csv
@@ -88,6 +92,64 @@ LANDMARKS = [
     ("bldg_a42ada8b-afff-438c-ab50-b0d6bc9d047a", "inari_gaihaiden", "伏見稲荷大社 外拝殿", "temple"),
     ("bldg_143a1271-fbe6-4704-aae8-e78634da2291", "inari_honden", "伏見稲荷大社 本殿", "temple"),
 ]
+
+# The cities the templates come from: the dataset on G空間情報センター and who made the data (the city, or for the
+# Tokyo wards sometimes the metropolis). Kyoto's ids are in LANDMARKS; the others are in MORE_LANDMARKS.
+CITIES = {
+    "kyoto": ("京都市", "Kyoto City", 2025, "plateau-26100-kyoto-shi-2025"),
+    "himeji": ("姫路市", "Himeji City", 2023, "plateau-28201-himeji-shi-2023"),
+    "kanazawa": ("金沢市", "Kanazawa City", 2024, "plateau-17201-kanazawa-shi-2024"),
+    "taito": ("台東区", "Taito City (Tokyo)", 2025, "plateau-13106-taito-ku-2025"),
+    "chuo": ("中央区", "Chuo City (Tokyo)", 2025, "plateau-13102-chuo-ku-2025"),
+    "yokohama": ("横浜市", "Yokohama City", 2024, "plateau-14100-yokohama-shi-2024"),
+    "saitama": ("さいたま市", "Saitama City", 2025, "plateau-11100-saitama-shi-2025"),
+}
+
+# (gml id, slug, name, palette, city) from the partial city zips fetched by plateau_fetch.py (no textures there, so
+# the palette is all there is). Names are what stands at these coordinates (OpenStreetMap); where nothing is named
+# there the name says what and where.
+MORE_LANDMARKS = [
+    # Himeji Castle: the main keep on its stone base (LOD2 joins some of the smaller keeps to it), and the turrets
+    # (yagura) and corridor turrets round it, named by where they stand from the keep; the stone walls they stand on
+    # are part of each model.
+    ("bldg_7b639b68-9776-4747-b144-19cf05cc27b2", "himeji_keep", "姫路城 大天守（連立する小天守の一部を含む）", "castle", "himeji"),
+    ("bldg_02977f63-4916-4ff8-8b3f-a679f13232cf", "himeji_watari_yagura", "姫路城 渡櫓（天守の北東、折れ曲がり）", "castle", "himeji"),
+    ("bldg_b6404c13-90e0-4a38-843a-465570e42ee6", "himeji_yagura_east", "姫路城 櫓（天守の東）", "castle", "himeji"),
+    ("bldg_ea5dd0a8-7150-41dd-8687-f31710e11ffe", "himeji_yagura_southeast", "姫路城 櫓（天守の南東）", "castle", "himeji"),
+    ("bldg_f38b8b93-41a1-486b-921a-b99aa13ea530", "himeji_yagura_southwest", "姫路城 櫓（天守の南西、L 字）", "castle", "himeji"),
+    ("bldg_237aeeca-24f3-439d-b3c0-18276c8d6ca3", "himeji_yagura_small", "姫路城 小櫓（天守の南東）", "castle", "himeji"),
+    ("bldg_7f52078b-2172-4231-9bd2-0775ea03a675", "himeji_nishinomaru", "姫路城 西の丸の渡櫓（百間廊下）", "castle", "himeji"),
+    # Department stores, old to new.
+    ("bldg_6c22d3d1-7bbf-40c8-a814-b0f2a77855c7", "mitsukoshi_nihonbashi", "三越 日本橋本店", "stone", "chuo"),
+    ("bldg_c720caed-f9af-4ec8-9dda-c4ce6287d259", "takashimaya_nihonbashi", "髙島屋 日本橋店", "stone", "chuo"),
+    ("bldg_0831aa2a-3a2d-4fae-a537-4a3d585396f4", "matsuya_ginza", "松屋 銀座", "modern", "chuo"),
+    ("bldg_7de66f35-b725-44e5-bbf5-0925ba25142e", "mitsukoshi_ginza", "銀座三越", "glass", "chuo"),
+    ("bldg_0c7a5b4d-b552-4e5c-b207-dc9b019df49a", "atrio_korinbo", "香林坊アトリオ（香林坊大和）", "modern", "kanazawa"),
+    ("bldg_225af865-6a62-4e74-ad92-e60a7fecb48f", "sanyo_himeji", "山陽百貨店（姫路駅前）", "modern", "himeji"),
+    # Schools: classroom blocks and gyms of municipal schools, suburban (Kanazawa) and inner-city (Taito).
+    ("bldg_58f823a3-9ee0-43e9-aebf-5faeade2862c", "school_shikindai_classrooms", "紫錦台中学校 校舎", "school", "kanazawa"),
+    ("bldg_0502618b-6b69-4ba9-8f70-9f90ffc6c5b9", "school_shikindai_annex", "紫錦台中学校 別棟（鉄骨 2 階）", "school", "kanazawa"),
+    ("bldg_520c721f-0b93-40ed-8b6b-1f0bb87ff587", "school_shikindai_gym", "紫錦台中学校 体育館（寄棟）", "school", "kanazawa"),
+    ("bldg_889b19aa-91b0-4d24-b44c-6d0897ec56fb", "school_chuo_classrooms", "中央小学校 校舎", "school", "kanazawa"),
+    ("bldg_e9937263-eba7-499b-8e39-a939c5f3d3fa", "school_chuo_wing", "中央小学校 校舎（鉄骨 2 階、コの字）", "school", "kanazawa"),
+    ("bldg_32daae02-3590-4d19-b1d4-1ede56d62318", "school_kenroku_classrooms", "兼六小学校 校舎", "school", "kanazawa"),
+    ("bldg_be11df60-0458-42f1-bd85-9f94caf4e55d", "school_kenroku_gym", "兼六小学校 体育館（切妻）", "school", "kanazawa"),
+    ("bldg_b8489c38-cc17-4eb2-9782-8ce3db739495", "school_kinryu", "金竜小学校（都心の一体型校舎）", "school", "taito"),
+    ("bldg_5650eb42-a950-4c02-98e3-1ce16d604d2a", "school_negishi", "根岸小学校（都心の一体型校舎）", "school", "taito"),
+    # Industry: sheds, works and warehouses.
+    ("bldg_64e31921-4e86-441a-a173-e7942e6ab7cb", "factory_shed", "町工場（切妻、鉄骨造、金沢）", "industrial", "kanazawa"),
+    ("bldg_f5b9c918-22e9-40e3-9692-c08312624387", "factory_works_1953", "工場（1953 年、鉄筋コンクリート造、金沢 石引）", "industrial", "kanazawa"),
+    ("bldg_76714911-79e7-475a-ba10-70b14b66fef7", "factory_small_tsukuda", "町工場（切妻、佃）", "industrial", "chuo"),
+    ("bldg_1ee0acc8-b7ca-45b6-8572-80ceedece25d", "factory_building", "工場ビル（墨田区横網、台東区のデータ）", "modern", "taito"),
+    ("bldg_34f0a69b-920f-4f8f-b834-678329ca789f", "warehouse_kachidoki", "倉庫（切妻、勝どき）", "industrial", "chuo"),
+    ("bldg_1aaa241b-98f1-447f-9379-0ccf819bf795", "warehouse_harumi", "大型倉庫（晴海）", "industrial", "chuo"),
+    ("bldg_ce9c458f-e370-4f49-80d5-a5863aac02a5", "warehouse_multistorey", "多層倉庫（中央区）", "industrial", "chuo"),
+    # Arenas (the Yokohama Arena's mesh is LOD1 only, so not here).
+    ("bldg_5fc20e0c-e93b-4032-b60d-5f3e29205eb1", "saitama_super_arena", "さいたまスーパーアリーナ", "glass", "saitama"),
+    ("bldg_c2a8fdb7-36bb-4c35-86e6-7afd672dbd66", "yokohama_buntai", "横浜BUNTAI（関内）", "modern", "yokohama"),
+    ("bldg_be0df25a-55be-467a-b406-35fbc0ef631c", "yokohama_budokan", "横浜武道館", "industrial", "yokohama"),
+]
+ALL_LANDMARKS = [(g, s, n, p, "kyoto") for g, s, n, p in LANDMARKS] + MORE_LANDMARKS
 
 # Buildings whose LOD2 shape is too coarse to voxelize (a pagoda is a box with a hip roof, halls lose their eaves
 # and pent roofs): they are built by the temple generators in core (core.building.temple) from these specs, sizes
@@ -235,6 +297,24 @@ LABELS = {
     "demo_toro_kasuga": ("sacred", BOTH, "TORO"), "demo_toro_small": ("sacred", BOTH, "TORO"),
     "demo_komainu": ("sacred", SHRINE, "KOMAINU"), "demo_kitsune": ("sacred", SHRINE, "KOMAINU"),
     "demo_temizuya": ("sacred", BOTH, "TEMIZUYA"),
+    "himeji_keep": ("castle", None, "CASTLE_KEEP"), "himeji_watari_yagura": ("castle", None, "WATARI_YAGURA"),
+    "himeji_yagura_east": ("castle", None, "YAGURA"), "himeji_yagura_southeast": ("castle", None, "YAGURA"),
+    "himeji_yagura_southwest": ("castle", None, "YAGURA"), "himeji_yagura_small": ("castle", None, "YAGURA"),
+    "himeji_nishinomaru": ("castle", None, "WATARI_YAGURA"),
+    "mitsukoshi_nihonbashi": ("store", None, "DEPARTMENT_STORE"), "takashimaya_nihonbashi": ("store", None, "DEPARTMENT_STORE"),
+    "matsuya_ginza": ("store", None, "DEPARTMENT_STORE"), "mitsukoshi_ginza": ("store", None, "DEPARTMENT_STORE"),
+    "atrio_korinbo": ("store", None, "DEPARTMENT_STORE"), "sanyo_himeji": ("store", None, "DEPARTMENT_STORE"),
+    "school_shikindai_classrooms": ("school", None, "CLASSROOMS"), "school_shikindai_gym": ("school", None, "GYM"),
+    "school_shikindai_annex": ("school", None, "CLASSROOMS"), "school_chuo_classrooms": ("school", None, "CLASSROOMS"),
+    "school_chuo_wing": ("school", None, "CLASSROOMS"), "school_kenroku_classrooms": ("school", None, "CLASSROOMS"),
+    "school_kenroku_gym": ("school", None, "GYM"), "school_kinryu": ("school", None, "SCHOOL_COMPACT"),
+    "school_negishi": ("school", None, "SCHOOL_COMPACT"),
+    "factory_shed": ("industry", None, "FACTORY"), "factory_works_1953": ("industry", None, "FACTORY"),
+    "factory_small_tsukuda": ("industry", None, "FACTORY"), "factory_building": ("industry", None, "FACTORY"),
+    "warehouse_kachidoki": ("industry", None, "WAREHOUSE"), "warehouse_harumi": ("industry", None, "WAREHOUSE"),
+    "warehouse_multistorey": ("industry", None, "WAREHOUSE"),
+    "saitama_super_arena": ("sports", None, "ARENA"), "yokohama_buntai": ("sports", None, "ARENA"),
+    "yokohama_budokan": ("sports", None, "ARENA"),
     "demo_precinct_shrine": ("sacred", SHRINE, "KEIDAI"), "demo_precinct_temple": ("sacred", TEMPLE, "GARAN"), "demo_hall_copper": ("sacred", SHRINE, "HAIDEN"),
     # Landmarks: no religion, the role is a core.building.landmark.Landmark.
     "lighthouse_cape": ("lighthouse", None, "LIGHTHOUSE"), "lighthouse_cape_small": ("lighthouse", None, "LIGHTHOUSE"),
@@ -259,13 +339,20 @@ def label(slug):
             "role": lab[2] if len(lab) > 2 else None}
 
 
-ATTRIBUTION = """出典：3D都市モデル（Project PLATEAU）京都市（2025年度）
-Source: 3D city model (Project PLATEAU), Kyoto City (FY2025), https://www.geospatial.jp/ckan/dataset/plateau-26100-kyoto-shi-2025
+def attribution(cities):
+    """The credit for the cities the templates were made from (Kyoto always: the generated ones take its sizes)."""
+    keys = [k for k in CITIES if k == "kyoto" or k in cities]
+    ja = "、".join(f"{CITIES[k][0]}（{CITIES[k][2]}年度）" for k in keys)
+    lines = [f"出典：3D都市モデル（Project PLATEAU）{ja}"]
+    lines += [f"Source: 3D city model (Project PLATEAU), {CITIES[k][1]} (FY{CITIES[k][2]}), "
+              f"https://www.geospatial.jp/ckan/dataset/{CITIES[k][3]}" for k in keys]
+    return "\n".join(lines) + """
+PLATEAU Site Policy「３．著作権について」に基づき利用。
 
 これらの構造物テンプレートは上記データを加工して作成したものです（ボクセル化、方向の補正、
-ブロックの割り当て）。国土交通省および京都市が作成したものではありません。
+ブロックの割り当て）。国土交通省および各地方公共団体が作成したものではありません。
 These structure templates were made by processing the data above (voxelized at 1 m, turned to the
-grid, blocks assigned). They were not made by MLIT or Kyoto City.
+grid, blocks assigned). They were not made by MLIT or the local governments.
 
 palette "generated" の項目（寺社、灯台、競技場）は core.building の生成器が作ったもので、外部の素材を使っていません
 （寸法は PLATEAU の計測値や実在の施設の公表値を参考にした自作の形状）。本 mod のライセンスに従います。
@@ -273,6 +360,8 @@ Entries with palette "generated" (temples, shrines, lighthouses, sports grounds)
 core.building from parameters, with no outside material (sizes taken from PLATEAU measurements or published
 dimensions of real facilities); self-made shapes under the mod's own licence.
 """
+
+
 
 GML_ID = "{http://www.opengis.net/gml}id"
 SURFACES = {"RoofSurface": "roof", "OuterFloorSurface": "roof", "WallSurface": "wall",
@@ -386,13 +475,18 @@ def extract(zpath, rows, out, ids):
                 images |= {im for im, _ in b["tex"].values()}
             print(f"{name}: {len(found)} buildings, "
                   f"{sum(len(b['tex']) for b in found.values())} textured polygons", flush=True)
+    missing = 0
     with zipfile.ZipFile(zpath) as z:  # the atlases (aerial photographs) those polygons use
+        have = set(z.namelist())
         for im in sorted(images):
+            if "udx/bldg/" + im not in have:  # partial zips from plateau_fetch.py have no appearance folders
+                missing += 1
+                continue
             dst = os.path.join(out, "tex", im)
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             with open(dst, "wb") as fh:
                 fh.write(z.read("udx/bldg/" + im))
-    print(f"{len(images)} texture atlases", flush=True)
+    print(f"{len(images) - missing} texture atlases" + (f", {missing} not in the zip" if missing else ""), flush=True)
 
 
 # ---------------------------------------------------------------- voxelize
@@ -560,6 +654,8 @@ def voxelize(rings, tex=None, texdir=None):
         if cls == "ground":
             columns |= fill_columns([(p[0], p[2]) for p in ring], [[(p[0], p[2]) for p in h] for h in holes])
         tm = texture_map(ring, tex[pid]) if tex and pid in tex and cls != "ground" else None
+        if tm and not os.path.exists(os.path.join(texdir, tm[0])):  # an atlas not extracted (not in the zip)
+            tm = None
         if tm:
             pix, W, H = atlas(os.path.join(texdir, tm[0]))
             _, ta, tb, cu, cv = tm
@@ -640,6 +736,25 @@ PALETTES = {
                   wall="white_terracotta", lower="white_terracotta", pillar="stripped_dark_oak_log",
                   band="white_terracotta", window="light_gray_stained_glass", floor="spruce_planks",
                   flat="smooth_stone"),
+    # White plaster over a stone base, grey tiles, dark windows. LOD2 models a keep or turret with its stone wall
+    # (the walls start at the foot of the wall), so the base is everything one storey below the eaves (the 10th
+    # percentile of the roof heights: a few low roofs of gates and corridors do not count).
+    "castle": dict(roof="deepslate_tiles", stairs="deepslate_tile_stairs", slab="deepslate_tile_slab",
+                   wall="white_concrete", lower="stone_bricks", pillar="white_concrete", band="smooth_quartz",
+                   window="dark_oak_planks", floor="spruce_planks", flat="deepslate_tiles", base="eave", bay=5, panes=(2,)),
+    # Stone-faced pre-war department stores (Mitsukoshi, Takashimaya Nihonbashi).
+    "stone": dict(roof="smooth_stone", stairs="smooth_sandstone_stairs", slab="smooth_sandstone_slab",
+                  wall="smooth_sandstone", lower="polished_granite", pillar="cut_sandstone", band="cut_sandstone",
+                  window="gray_stained_glass", floor="smooth_stone", flat="smooth_stone", bay=3, panes=(1,)),
+    # Schools: off-white concrete, a band of windows along each classroom floor.
+    "school": dict(roof="light_gray_concrete", stairs="polished_andesite_stairs", slab="polished_andesite_slab",
+                   wall="white_concrete", lower="light_gray_concrete", pillar="white_concrete", band="white_concrete",
+                   window="glass", floor="smooth_stone", flat="light_gray_concrete", bay=4, panes=(1, 2, 3)),
+    # Sheds and warehouses: metal-clad walls with few windows, low-pitched metal roofs.
+    "industrial": dict(roof="light_gray_concrete", stairs="andesite_stairs", slab="andesite_slab",
+                       wall="light_gray_concrete", lower="gray_concrete", pillar="gray_concrete",
+                       band="gray_concrete", window="gray_stained_glass", floor="smooth_stone", flat="gray_concrete",
+                       bay=8, panes=(3, 4)),
 }
 
 
@@ -664,7 +779,11 @@ def storey_height(row):
 def assign_blocks(solid, surf, height, pal, sh):
     """Block state per kept voxel: (name, properties)."""
     P = PALETTES[pal]
-    pitched_roofs = pal in ("temple", "brick", "house")
+    pitched_roofs = pal in ("temple", "brick", "house", "castle", "school", "industrial")
+    bay, panes, base = P.get("bay", 4), P.get("panes", (1, 2)), P.get("base", 0)
+    if base == "eave":
+        eaves = sorted(v[1] for v, c in surf.items() if c == "roof" and v[1] > 2)
+        base = max(0, eaves[len(eaves) // 10] - sh) if eaves else 0
     blocks = {}
     dirs = [(1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1), (0, 1, 0), (0, -1, 0)]
     for v in solid:
@@ -686,7 +805,9 @@ def assign_blocks(solid, surf, height, pal, sh):
         along = z if side[0][0] else x  # coordinate along the wall
         level = y % sh
         roof_above = (x, y + 1, z) in solid and blocks_is_roof(x, y + 1, z, solid, height)
-        if corner or (pal in ("temple",) and along % 4 == 0):
+        if y < base:
+            blocks[v] = (P["lower"], None)
+        elif corner or (pal in ("temple",) and along % 4 == 0):
             blocks[v] = (P["pillar"], {"axis": "y"} if P["pillar"].endswith("_log") else None)
         elif roof_above:
             blocks[v] = (P["band"], None)
@@ -696,7 +817,7 @@ def assign_blocks(solid, surf, height, pal, sh):
             blocks[v] = (P["lower"], None)
         elif P.get("glassy") and level != 0:
             blocks[v] = (P["window"] if along % 6 else P["pillar"], None)
-        elif P["window"] and 0 < level < sh - 1 and along % 4 in (1, 2):
+        elif P["window"] and 0 < level < sh - 1 and along % bay in panes:
             blocks[v] = (P["window"], None)
         else:
             blocks[v] = (P["wall"], None)
@@ -778,7 +899,9 @@ def block_colours(jar, cache):
     """Average colour (alpha-weighted, first animation frame) of each candidate block's texture in
     the vanilla client jar. Read locally to pick blocks; nothing from the jar is written out
     except these averages, cached in `cache`."""
-    names = sorted(set(WALL_BLOCKS + GLASS_BLOCKS + FLAT_EXTRA + [f[0] for f in ROOF_FAMILIES] + ["gold_block"]))
+    names = sorted(set(WALL_BLOCKS + GLASS_BLOCKS + FLAT_EXTRA + [f[0] for f in ROOF_FAMILIES] + ["gold_block"]
+                       + [n for P in PALETTES.values() for k, n in P.items()  # the palettes' full blocks too
+                          if k not in ("stairs", "slab") and isinstance(n, str) and n != "eave"]))
     if os.path.exists(cache):
         with open(cache, encoding="utf-8") as fh:
             got = json.load(fh)
@@ -1210,7 +1333,14 @@ def build_temple(out, gid, slug, name, row, bc):
 
 
 def build_one(args):
-    out, gid, slug, name, pal, row, bc, textured = args
+    out, gid, slug, name, pal, row, bc, textured, city = args
+    e = _build_one(out, gid, slug, name, pal, row, bc, textured)
+    if e:
+        e["city"] = city
+    return e
+
+
+def _build_one(out, gid, slug, name, pal, row, bc, textured):
     if slug in TEMPLES and os.path.exists(os.path.join(out, "models", slug + ".json")):
         return build_temple(out, gid, slug, name, row, bc)
     with open(os.path.join(out, "geom", gid + ".json"), encoding="utf-8") as fh:
@@ -1242,12 +1372,12 @@ def build_one(args):
 
 def build(rows, out, chosen, jar=MC_JAR, textured=True):
     bc = block_colours(jar, os.path.join(out, "block_colours.json"))
-    jobs = [(out, gid, slug, name, pal, rows.get(gid, {}), bc, textured) for gid, slug, name, pal in chosen
+    jobs = [(out, gid, slug, name, pal, rows.get(gid, {}), bc, textured, city) for gid, slug, name, pal, city in chosen
             if os.path.exists(os.path.join(out, "geom", gid + ".json"))
             or slug in TEMPLES and os.path.exists(os.path.join(out, "models", slug + ".json"))]  # LOD1-only ones too
-    if len(chosen) == len(LANDMARKS) or any(c[1].startswith("demo_") for c in chosen):
-        jobs += [(out, None, slug, DEMO_NAMES.get(slug, slug), None, {}, bc, textured) for slug in TEMPLES
-                 if slug not in {c[1] for c in LANDMARKS} and os.path.exists(os.path.join(out, "models", slug + ".json"))]
+    if len(chosen) == len(ALL_LANDMARKS) or any(c[1].startswith("demo_") for c in chosen):
+        jobs += [(out, None, slug, DEMO_NAMES.get(slug, slug), None, {}, bc, textured, None) for slug in TEMPLES
+                 if slug not in {c[1] for c in ALL_LANDMARKS} and os.path.exists(os.path.join(out, "models", slug + ".json"))]
     entries = []
     with multiprocessing.Pool(max(1, min(len(jobs), (os.cpu_count() or 2) - 1))) as pool:
         for e in pool.imap(build_one, jobs):
@@ -1256,21 +1386,23 @@ def build(rows, out, chosen, jar=MC_JAR, textured=True):
                 print(f"{e['slug']:24s} {e['name']:16s} {e['size'][0]:4d}x{e['size'][1]:3d}x{e['size'][2]:4d} "
                       f"{e['blocks']:7d} blocks  {e['palette']:6s} turned {e['rotation_deg']:+.1f}  "
                       f"{e['recoloured_blocks']} from textures", flush=True)
+    cities = {e["city"] for e in entries if e.get("city")}
+    credit = attribution(cities)
     with open(os.path.join(out, "library.json"), "w", encoding="utf-8") as fh:
-        json.dump({"source": "PLATEAU Kyoto City FY2025 LOD2", "attribution": "ATTRIBUTION",
-                   "buildings": entries}, fh, ensure_ascii=False, indent=1)
+        json.dump({"source": "PLATEAU LOD2: " + ", ".join(f"{CITIES[k][1]} FY{CITIES[k][2]}" for k in CITIES
+                                                       if k == "kyoto" or k in cities),
+                   "attribution": "ATTRIBUTION", "buildings": entries}, fh, ensure_ascii=False, indent=1)
     with open(os.path.join(out, "ATTRIBUTION"), "w", encoding="utf-8") as fh:
-        fh.write(ATTRIBUTION)
+        fh.write(credit)
     html = ["<!doctype html><meta charset=utf-8><title>PLATEAU building library</title>",
             "<style>body{font:14px sans-serif;background:#eee;margin:16px}figure{display:inline-block;"
             "vertical-align:top;margin:8px;background:#fff;padding:8px;max-width:100%}img{max-width:100%}"
             "figcaption{margin-top:4px}</style><h1>PLATEAU building library</h1><p>"
-            + ATTRIBUTION.replace("\n", "<br>") + "</p>"]
+            + credit.replace("\n", "<br>") + "</p>"]
     for e in entries:
         with open(os.path.join(out, e["slug"] + ".png"), "rb") as fh:
             data = base64.b64encode(fh.read()).decode()
-        kind = e["category"] + (f" / {e['religion']} {e['role'] or ''}" if e.get("religion")
-                                else f" / {e['role']}" if e.get("role") else "")
+        kind = e["category"] + (f" / {e['religion']}" if e.get("religion") else "") + (f" {e['role']}" if e.get("role") else "")
         html.append(f"<figure><img src='data:image/png;base64,{data}'><figcaption><b>{e['name']}</b> [{kind}] "
                     f"{e['slug']} — {e['size'][0]}×{e['size'][1]}×{e['size'][2]}, {e['blocks']} blocks, "
                     f"{e['usage']}, {e['structure']}, {e['year']}, roof {e['roof_shape']} {e['roof_pitch']}°, "
@@ -1298,18 +1430,19 @@ def main(argv):
     ids = [rest[i + 1] for i, a in enumerate(rest) if a == "--id"]
     jar = next((rest[i + 1] for i, a in enumerate(rest) if a == "--mc-jar"), MC_JAR)
     textured = "--no-textures" not in rest
-    chosen = [(g, s, n, p) for g, s, n, p in LANDMARKS if not ids or g in ids]
+    chosen = [c for c in ALL_LANDMARKS if not ids or c[0] in ids]
     known = {c[0] for c in chosen}
-    chosen += [(g, g.split("_")[1][:8], g, None) for g in ids if g not in known]
+    chosen += [(g, g.split("_")[1][:8], g, None, None) for g in ids if g not in known]
     want = {c[0] for c in chosen}
     rows = {}
-    with open(csvpath, encoding="utf-8") as fh:
-        for r in csv.DictReader(fh):
-            if r["id"] in want:
-                rows[r["id"]] = r
+    for path in csvpath.split(","):  # build takes the CSVs of all the cities, comma separated
+        with open(path, encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                if r["id"] in want:
+                    rows.setdefault(r["id"], r)
     missing = want - set(rows)
-    if missing:
-        print("not in the CSV:", ", ".join(sorted(missing)))
+    if missing and (ids or cmd == "build"):
+        print("not in the CSVs:", ", ".join(sorted(missing)))
     os.makedirs(out, exist_ok=True)
     if cmd == "extract":
         extract(zpath, rows, out, [g for g in want if g in rows])
