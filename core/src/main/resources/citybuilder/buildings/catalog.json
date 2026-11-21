@@ -94,7 +94,10 @@
    "hedge",
    "open",
    "coped",
-   "estate"
+   "estate",
+   "kurobei",
+   "dobei",
+   "stoneHedge"
   ],
   "WINDOW_HOOD": [
    "none",
@@ -283,6 +286,19 @@
    "plain",
    "sudare",
    "balcony"
+  ],
+  "ARCADE": [
+   "none",
+   "canopy",
+   "gangi"
+  ],
+  "GATE": [
+   "none",
+   "kabuki"
+  ],
+  "DITCH": [
+   "none",
+   "ditch"
   ]
  },
  "palettes": {
@@ -2168,6 +2184,24 @@
   "shoki": [
    "minecraft:decorated_pot"
   ],
+  "water": [
+   "minecraft:water"
+  ],
+  "blackBoard": [
+   "minecraft:stripped_dark_oak_log",
+   "minecraft:dark_oak_planks"
+  ],
+  "arcadePost": [
+   "minecraft:smooth_quartz",
+   "minecraft:white_concrete",
+   "minecraft:light_gray_concrete",
+   "minecraft:quartz_pillar"
+  ],
+  "arcadeRoof": [
+   "minecraft:smooth_quartz",
+   "minecraft:white_concrete",
+   "minecraft:light_gray_concrete"
+  ],
   "bank": [
    "minecraft:stone_bricks",
    "minecraft:mossy_stone_bricks",
@@ -2474,6 +2508,90 @@
     "DOWNPIPE": {
      "front": 0.5,
      "back": 0.5
+    }
+   }
+  },
+  "buke.yashiki": {
+   "type": "HOUSE",
+   "storeys": 1,
+   "palettes": {
+    "house.estate.1": 1.0,
+    "house.estate.2": 1.0,
+    "house.estate.3": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "irimoya": 0.5,
+     "hip": 0.3,
+     "gable": 0.2
+    },
+    "UPPER_PLAN": {
+     "full": 1.0
+    },
+    "WINDOWS": {
+     "wide": 1.0
+    },
+    "TWO_TONE": {
+     "none": 1.0
+    },
+    "HOUSE_BALCONY": {
+     "none": 1.0
+    },
+    "LAYOUT": {
+     "garden": 1.0
+    },
+    "CARPORT": {
+     "none": 1.0
+    },
+    "ANNEX": {
+     "none": 0.6,
+     "leanTo": 0.4
+    },
+    "GROUND": {
+     "plain": 1.0
+    },
+    "YARD": {
+     "kurobei": 0.5,
+     "dobei": 0.3,
+     "stoneHedge": 0.2
+    },
+    "WINDOW_HOOD": {
+     "none": 0.5,
+     "hood": 0.5
+    },
+    "GRILLE": {
+     "none": 0.6,
+     "grille": 0.4
+    },
+    "WAINSCOT": {
+     "none": 0.6,
+     "band": 0.4
+    },
+    "TREES": {
+     "two": 1.0
+    },
+    "PINE": {
+     "pine": 0.6,
+     "none": 0.4
+    },
+    "SHED": {
+     "none": 0.6,
+     "shed": 0.4
+    },
+    "BOUNDARY": {
+     "hedge": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "GATE": {
+     "kabuki": 0.7,
+     "none": 0.3
+    },
+    "DITCH": {
+     "ditch": 0.8,
+     "none": 0.2
     }
    }
   },
@@ -3687,6 +3805,261 @@
      "cornice": 1.0
     }
    }
+  },
+  "shotengai.shop": {
+   "type": "SHOP",
+   "palettes": {
+    "shop.1": 1.0,
+    "shop.2": 1.0,
+    "shop.3": 1.0,
+    "shop.4": 1.0,
+    "shop.5": 1.0,
+    "shop.6": 1.0,
+    "shop.7": 1.0,
+    "shop.8": 1.0,
+    "shop.9": 1.0,
+    "shop.10": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.25,
+     "lowWall": 0.25,
+     "shutter": 0.25,
+     "recessed": 0.25
+    },
+    "RECESS": {
+     "flush": 0.5,
+     "recessed": 0.5
+    },
+    "SIGN": {
+     "none": 0.2,
+     "side": 0.8
+    },
+    "AWNING": {
+     "none": 0.5,
+     "awning": 0.5
+    },
+    "VENDING": {
+     "none": 0.7,
+     "vending": 0.3
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "FASCIA": {
+     "plain": 0.15,
+     "sign": 0.4,
+     "lit": 0.45
+    },
+    "ROOF_SIGN": {
+     "none": 0.55,
+     "billboard": 0.45
+    },
+    "UPPER_STREET": {
+     "windows": 0.5,
+     "balcony": 0.3,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.5,
+     "stand": 0.5
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
+    },
+    "LANTERN": {
+     "none": 0.8,
+     "lantern": 0.2
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "ARCADE": {
+     "canopy": 0.75,
+     "gangi": 0.25
+    }
+   }
+  },
+  "shotengai.zakkyo": {
+   "type": "SHOP",
+   "minStoreys": 5,
+   "palettes": {
+    "shop.zakkyo.1": 1.0,
+    "shop.zakkyo.2": 1.0,
+    "shop.zakkyo.3": 1.0,
+    "shop.zakkyo.4": 1.0,
+    "shop.zakkyo.5": 1.0,
+    "shop.zakkyo.6": 1.0,
+    "shop.zakkyo.7": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.25,
+     "lowWall": 0.25,
+     "shutter": 0.25,
+     "recessed": 0.25
+    },
+    "RECESS": {
+     "flush": 0.5,
+     "recessed": 0.5
+    },
+    "SIGN": {
+     "side": 0.3,
+     "stacked": 0.7
+    },
+    "AWNING": {
+     "none": 0.7,
+     "awning": 0.3
+    },
+    "VENDING": {
+     "none": 0.7,
+     "vending": 0.3
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "CURTAIN": {
+     "none": 0.3,
+     "plain": 0.7
+    },
+    "FASCIA": {
+     "sign": 0.4,
+     "lit": 0.6
+    },
+    "ROOF_SIGN": {
+     "none": 0.6,
+     "billboard": 0.4
+    },
+    "UPPER_STREET": {
+     "windows": 0.8,
+     "bay": 0.2
+    },
+    "WINDOW_AC": {
+     "none": 0.4,
+     "units": 0.6
+    },
+    "STREET_DISPLAY": {
+     "none": 0.5,
+     "stand": 0.5
+    },
+    "DISPLAY": {
+     "none": 0.3,
+     "goods": 0.7
+    },
+    "LANTERN": {
+     "none": 0.8,
+     "lantern": 0.2
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "ARCADE": {
+     "canopy": 0.75,
+     "gangi": 0.25
+    }
+   }
+  },
+  "shotengai.office": {
+   "type": "OFFICE",
+   "palettes": {
+    "office.1": 1.0,
+    "office.2": 1.0,
+    "office.3": 1.0,
+    "office.4": 1.0,
+    "office.5": 1.0,
+    "office.6": 1.0,
+    "office.7": 1.0,
+    "office.8": 1.0,
+    "office.9": 1.0
+   },
+   "options": {
+    "ROOF": {
+     "gable": 0.4,
+     "hip": 0.08,
+     "flat": 0.52
+    },
+    "ROOF_TALL": {
+     "gable": 0.1,
+     "hip": 0.05,
+     "flat": 0.85
+    },
+    "GROUND": {
+     "glass": 0.3333333333333333,
+     "colonnade": 0.3333333333333333,
+     "canopy": 0.3333333333333333
+    },
+    "RECESS": {
+     "flush": 0.3,
+     "recessed": 0.7
+    },
+    "ARTICULATION": {
+     "plain": 0.3333333333333333,
+     "fins": 0.3333333333333333,
+     "ledges": 0.3333333333333333
+    },
+    "SIGN": {
+     "none": 0.45,
+     "tall": 0.55
+    },
+    "FACADE": {
+     "punched": 0.25,
+     "ribbon": 0.25,
+     "curtain": 0.3,
+     "grid": 0.2
+    },
+    "PODIUM": {
+     "none": 0.5,
+     "podium": 0.5
+    },
+    "CORNICE": {
+     "cornice": 1.0
+    },
+    "DOWNPIPE": {
+     "front": 0.5,
+     "back": 0.5
+    },
+    "AD": {
+     "none": 0.4,
+     "roof": 0.3,
+     "wall": 0.15,
+     "both": 0.15
+    },
+    "ARCADE": {
+     "canopy": 0.75,
+     "gangi": 0.25
+    }
+   }
   }
  },
  "quarters": {
@@ -3704,6 +4077,14 @@
    "jinaimachi.estate": 0.25,
    "kura": 0.25,
    "jinaimachi.machiya": 0.5
+  },
+  "BUKE": {
+   "buke.yashiki": 1.0
+  },
+  "SHOTENGAI": {
+   "shotengai.shop": 0.6,
+   "shotengai.zakkyo": 0.25,
+   "shotengai.office": 0.15
   }
  },
  "districts": {

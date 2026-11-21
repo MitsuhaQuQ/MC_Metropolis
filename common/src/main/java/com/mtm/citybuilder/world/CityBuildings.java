@@ -97,7 +97,7 @@ public final class CityBuildings {
                 long position = Hash.of(b.variant(), baseX + x, baseZ + z);
                 double[] out = BuildingLayer.outward(column);
                 Direction outward = Direction.getNearest(out[0], 0.0, out[1]);
-                for (int y = Math.max(min, Math.min(floor + 1, b.base())); y <= top; y++) {
+                for (int y = Math.max(min, Math.min(floor + 1, BuildingLayer.bottom(column))); y <= top; y++) {
                     BuildingLayer.Part part = BuildingLayer.part(column, y);
                     if (part == BuildingLayer.Part.FOUNDATION && y <= floor) {
                         continue;

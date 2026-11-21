@@ -155,8 +155,16 @@ public final class BuildingLayer {
         TENANT_C,
         /** A small figure on a machiya's pent roof (鍾馗さん). */
         SHOKI,
-        /** The stones of a bank along water, its top along a lot's back. */
+        /** The stones of a bank along water, its top along a lot's back; a wall's stone base. */
         BANK,
+        /** Water, in a ditch. */
+        WATER,
+        /** Black boards of a samurai house's fence (黒板塀). */
+        BLACK_BOARD,
+        /** A post of a covered walk. */
+        ARCADE_POST,
+        /** The roof and fascia of a covered walk. */
+        ARCADE_ROOF,
         /** A light inside, so nothing spawns there. */
         LIGHT
     }
@@ -481,6 +489,11 @@ public final class BuildingLayer {
             backGap = 1.0;
             depth = 9.0 + 4.0 * Hash.unit(Hash.of(h, 4));
         }
+        if (quarter == Quarter.SHOTENGAI && !standalone && (type == Building.Type.SHOP || type == Building.Type.OFFICE)) {
+            // Back behind the covered walk on its own lot, wall to wall with its neighbours
+            front = 3.0;
+            sideGap = 0.0;
+        }
         double width = Math.floor(plot.frontage() - 2.0 * sideGap);
         if (width < 5.0) {
             sideGap = Math.max(0.0, 0.5 * (plot.frontage() - 5.0));
@@ -509,6 +522,17 @@ public final class BuildingLayer {
                 front = 3.0 + Math.floor(2.0 * Hash.unit(Hash.of(seed, 42)));
             }
             composition = composition.with(Slot.LAYOUT, Slot.LAYOUT.options().get(layout));
+        }
+        if (quarter == Quarter.BUKE && type == Building.Type.HOUSE) {
+            // A samurai house stands well back in its garden, behind its wall
+            front = Math.max(3.0, Math.min(5.0 + Math.floor(4.0 * Hash.unit(Hash.of(h, 85))), plot.maxDepth() - backGap - 7.0));
+            sideGap = Math.max(sideGap, 2.0);
+            width = Math.floor(plot.frontage() - 2.0 * sideGap);
+        }
+        if (quarter == Quarter.SHOTENGAI && composition.options().containsKey(Slot.ARCADE)) {
+            // A street's lots on one side share the walk's kind
+            long street = Hash.of(logic.seed() ^ 0x5A0EL, plot.chain(), plot.side());
+            composition = composition.with(Slot.ARCADE, Hash.unit(street) < 0.75 ? "canopy" : "gangi");
         }
         depth = Math.floor(Math.min(depth, plot.maxDepth() - front - backGap));
         if (width < 4.0 || depth < 4.0) {
@@ -717,7 +741,8 @@ public final class BuildingLayer {
 
     /** How far out in front a building's ring reaches: its whole front yard for houses and flats, else a block. */
     private static double yard(Building b) {
-        return b.type() == Building.Type.HOUSE || b.type() == Building.Type.APARTMENT || b.standalone() ? b.front() : 1.0;
+        return b.type() == Building.Type.HOUSE || b.type() == Building.Type.APARTMENT || b.standalone() || arcaded(b)
+                ? b.front() : 1.0;
     }
 
     /**
@@ -1413,6 +1438,116 @@ public final class BuildingLayer {
         return null;
     }
 
+    /** Whether a building stands behind a covered walk. */
+    private static boolean arcaded(Building b) {
+        return b.quarter() == Quarter.SHOTENGAI && !b.composition().is(Slot.ARCADE, "none")
+                && b.composition().options().containsKey(Slot.ARCADE) && b.front() >= 2.0;
+    }
+
+    /**
+     * The covered walk in front of a shop on a shopping street: paving, posts along the street's edge, a flat roof at
+     * the first floor with a deep fascia along its edge, lights hung under it; or the old wooden kind (雁木), posts and
+     * a beam of timber under a tiled pent roof. Null off the walk.
+     */
+    private static Part arcade(Building b, Column c, int dy) {
+        double u = c.u();
+        double v = c.v();
+        if (v >= b.front() || u < -1.0 || u >= b.width() + 1.0) {
+            return null;
+        }
+        boolean gangi = b.composition().is(Slot.ARCADE, "gangi");
+        int roof = b.ground();
+        boolean edge = v < 1.0;
+        boolean post = edge && Math.floorMod((long) Math.floor(u), gangi ? 3 : 5) == 0;
+        if (dy == 0) {
+            return Part.PAVING;
+        }
+        if (dy < roof - 1) {
+            if (post) {
+                return gangi ? Part.LOG : Part.ARCADE_POST;
+            }
+            if (!gangi && !edge && v < 2.0 && dy == roof - 2 && Math.floorMod((long) Math.floor(u), 4) == 2) {
+                return Part.LANTERN;
+            }
+            return Part.AIR;
+        }
+        if (dy == roof - 1) {
+            if (post || edge) {
+                // The beam, or the fascia, along the edge
+                return gangi ? Part.LOG : Part.ARCADE_ROOF;
+            }
+            return Part.AIR;
+        }
+        if (dy == roof) {
+            return gangi ? (v < 1.0 ? Part.ROOF_LOW : Part.ROOF_HIGH) : Part.ARCADE_ROOF;
+        }
+        if (gangi && dy == roof + 1 && v >= b.front() - 1.0) {
+            return Part.ROOF_LOW;
+        }
+        return Part.NONE;
+    }
+
+    /**
+     * A samurai house's street side: a ditch along the street, bridged at the gate; the wall (black boards or an earthen
+     * wall on a stone base, under a coping; or a hedge on stones); the gate. Null off it.
+     */
+    private static Part bukeFront(Building b, Column c, int dy) {
+        double u = c.u();
+        double v = c.v();
+        boolean ditch = b.composition().is(Slot.DITCH, "ditch");
+        double wallAt = ditch ? 1.0 : 0.0;
+        double gate = u - b.door();
+        boolean kabuki = b.composition().is(Slot.GATE, "kabuki");
+        if (ditch && v < 1.0) {
+            if (Math.abs(gate) < 1.0) {
+                // The bridge to the gate
+                return dy == 0 ? Part.STEP : dy == -1 ? Part.WATER : dy == -2 ? Part.BANK : Part.NONE;
+            }
+            return dy == 0 ? Part.AIR : dy == -1 ? Part.WATER : dy == -2 ? Part.BANK : Part.NONE;
+        }
+        if (v < wallAt || v >= wallAt + 1.0) {
+            return null;
+        }
+        if (dy < 0) {
+            return Part.NONE;
+        }
+        if (Math.abs(gate) < 1.0) {
+            // Through the gate: paving, the beam and the roof over it
+            if (dy == 0) {
+                return Part.PAVING;
+            }
+            if (!kabuki) {
+                return Part.NONE;
+            }
+            return dy == 4 ? Part.LOG : dy == 5 ? Part.HOOD : Part.AIR;
+        }
+        if (kabuki && Math.abs(gate) < 2.0) {
+            // The gate's posts, under its roof
+            return dy <= 4 ? (dy == 0 ? Part.BANK : Part.LOG) : dy == 5 ? Part.HOOD : Part.NONE;
+        }
+        if (kabuki && Math.abs(gate) < 2.5 && dy == 5) {
+            return Part.HOOD;
+        }
+        return switch (b.composition().get(Slot.YARD)) {
+            case "kurobei" -> dy == 0 ? Part.BANK : dy <= 2 ? Part.BLACK_BOARD : dy == 3 ? Part.HOOD : Part.NONE;
+            case "dobei" -> dy <= 1 ? Part.BANK : dy == 2 ? Part.PLASTER : dy == 3 ? Part.HOOD : Part.NONE;
+            default -> dy == 0 ? Part.BANK : dy <= 2 ? Part.HEDGE : Part.NONE;
+        };
+    }
+
+    /** The lowest block a column's building reaches below its base: a ditch's bed, two below. */
+    public static int bottom(Column c) {
+        Building b = c.building();
+        if (b == null) {
+            return 0;
+        }
+        if (c.ring() && b.quarter() == Quarter.BUKE && b.type() == Building.Type.HOUSE && c.v() < 1.0
+                && b.composition().is(Slot.DITCH, "ditch")) {
+            return b.base() - 2;
+        }
+        return b.base();
+    }
+
     /** A garden tree: {u, v of its trunk, trunk height, crown radius}. */
     private record Tree(double u, double v, int trunk, int radius) {
     }
@@ -1424,9 +1559,11 @@ public final class BuildingLayer {
     private static java.util.List<Tree> trees(Building b) {
         java.util.List<double[]> spots = new java.util.ArrayList<>();
         double w = b.width();
+        boolean buke = b.quarter() == Quarter.BUKE;
         if (b.front() >= 3.0) {
-            spots.add(new double[]{1.5, 1.5});
-            spots.add(new double[]{w - 1.5, 1.5});
+            double tv = buke ? b.front() - 1.5 : 1.5;
+            spots.add(new double[]{1.5, tv});
+            spots.add(new double[]{w - 1.5, tv});
         }
         double behind = Math.max(b.back(), b.wingBack());
         if (b.lotDepth() - behind >= 3.0) {
@@ -1446,7 +1583,11 @@ public final class BuildingLayer {
             // A tall pine over a garden wall, as old houses keep (in a garden-fronted house, one in three)
             boolean pine = b.layout() == 3 && b.composition().is(Slot.PINE, "pine");
             int trunk = pine ? 6 + choice(b, 72 + k, 2) : 3 + choice(b, 54 + k, 2);
-            trees.add(new Tree(Math.floor(s[0]) + 0.5, Math.floor(s[1]) + 0.5, trunk, big || pine ? 2 : 1));
+            if (buke) {
+                // Tall old trees over the walls
+                trunk += 2 + choice(b, 86 + k, 3);
+            }
+            trees.add(new Tree(Math.floor(s[0]) + 0.5, Math.floor(s[1]) + 0.5, trunk, big || pine || buke ? 2 : 1));
         }
         return trees;
     }
@@ -1753,6 +1894,18 @@ public final class BuildingLayer {
      * cornices, fins and ledges; a shop's sign and awning and an office's canopy over the pavement; outdoor units.
      */
     private static Part ringPart(Building b, Column c, int dy) {
+        if (arcaded(b)) {
+            Part walk = arcade(b, c, dy);
+            if (walk != null) {
+                return walk;
+            }
+        }
+        if (b.quarter() == Quarter.BUKE && b.type() == Building.Type.HOUSE) {
+            Part wall = bukeFront(b, c, dy);
+            if (wall != null) {
+                return wall;
+            }
+        }
         if (b.waterside()) {
             Part water = waterside(b, c, dy);
             if (water != null) {

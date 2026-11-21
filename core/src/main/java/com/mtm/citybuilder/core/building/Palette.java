@@ -104,6 +104,10 @@ public record Palette(String wall, String accent, String trim, String window, St
             case TENANT_C -> c.material("tenantSign", variant ^ 0x303);
             case SHOKI -> c.material("shoki", variant);
             case BANK -> c.material("bank", position);
+            case WATER -> c.material("water", variant);
+            case BLACK_BOARD -> c.material("blackBoard", variant);
+            case ARCADE_POST -> c.material("arcadePost", variant ^ 0x404);
+            case ARCADE_ROOF -> c.material("arcadeRoof", variant ^ 0x505);
         };
     }
 

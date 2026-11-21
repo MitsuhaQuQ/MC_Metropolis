@@ -27,5 +27,16 @@ public enum Quarter {
      * cedar boards below a low white upper storey, a strip of river stones at their foot; storehouses; big houses behind
      * board walls under tiled copings, spiked rails (忍び返し) on top.
      */
-    JINAIMACHI
+    JINAIMACHI,
+    /**
+     * A shopping street (商店街, as Niigata's Furumachi): shops and mixed blocks of two to nine storeys, set back behind
+     * a covered walk along the whole street (a canopy on posts, or the old wooden 雁木), lights under it.
+     */
+    SHOTENGAI,
+    /**
+     * A samurai quarter (武家屋敷, as Kakunodate or Kanazawa's Nagamachi): single-storey houses set well back in gardens
+     * of tall pines and cherries, behind black board fences or earthen walls on stone bases, a gate in each, a ditch
+     * along the street.
+     */
+    BUKE
 }

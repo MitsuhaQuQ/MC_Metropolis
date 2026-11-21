@@ -3,7 +3,8 @@ package com.mtm.citybuilder.core.building;
 import com.mtm.citybuilder.core.plot.Plot;
 
 /**
- * Which quarter a lot lies in, and in which region: supplied by the layers that lay out the town; the library's
+ * Which quarter a lot lies in (a street's lots on one side, at least, should share it: a shopping street's covered walk
+ * or a samurai street's walls run along it), and in which region: supplied by the layers that lay out the town; the library's
  * default knows none.
  */
 @FunctionalInterface

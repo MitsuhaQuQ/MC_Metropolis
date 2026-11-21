@@ -37,7 +37,7 @@ public enum Slot {
     CURTAIN("none", "plain", "red"),
     LANTERN("none", "lantern"),
     /** A front yard's boundary along the street. */
-    YARD("blockLow", "blockHigh", "hedge", "open", "coped", "estate"),
+    YARD("blockLow", "blockHigh", "hedge", "open", "coped", "estate", "kurobei", "dobei", "stoneHedge"),
     /** Hoods over a house's windows (霧除け). */
     WINDOW_HOOD("none", "hood"),
     /** Grilles over a house's ground-floor windows to the street (面格子). */
@@ -122,7 +122,16 @@ public enum Slot {
      * A back on the water (a canal, a stream, as Gion's Shirakawa): plain over its bank, bamboo blinds hung down both
      * storeys under a pent roof, or a wooden balcony over the water with blinds above it.
      */
-    WATERSIDE("plain", "sudare", "balcony");
+    WATERSIDE("plain", "sudare", "balcony"),
+    /**
+     * A covered walk along a shopping street's front, on the lot (as Niigata's 雁木 and Furumachi's arcades): none, a
+     * flat canopy on white posts, or the old wooden kind under a tiled pent roof. A street's lots on one side share it.
+     */
+    ARCADE("none", "canopy", "gangi"),
+    /** A samurai house's gate in its street wall: none (a gap), or two posts under a beam and a small roof (冠木門). */
+    GATE("none", "kabuki"),
+    /** A stone-lined ditch along the street in front of the wall (側溝), bridged at the gate. */
+    DITCH("none", "ditch");
 
     private final List<String> options;
 
