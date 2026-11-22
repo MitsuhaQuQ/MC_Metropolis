@@ -1,0 +1,49 @@
+{
+  "variants": {
+    "facing=north,shape=straight": {
+      "model": "citybuilder:block/ground/snow_slope"
+    },
+    "facing=east,shape=straight": {
+      "model": "citybuilder:block/ground/snow_slope",
+      "y": 90
+    },
+    "facing=south,shape=straight": {
+      "model": "citybuilder:block/ground/snow_slope",
+      "y": 180
+    },
+    "facing=west,shape=straight": {
+      "model": "citybuilder:block/ground/snow_slope",
+      "y": 270
+    },
+    "facing=north,shape=outer": {
+      "model": "citybuilder:block/ground/snow_slope_outer"
+    },
+    "facing=east,shape=outer": {
+      "model": "citybuilder:block/ground/snow_slope_outer",
+      "y": 90
+    },
+    "facing=south,shape=outer": {
+      "model": "citybuilder:block/ground/snow_slope_outer",
+      "y": 180
+    },
+    "facing=west,shape=outer": {
+      "model": "citybuilder:block/ground/snow_slope_outer",
+      "y": 270
+    },
+    "facing=north,shape=inner": {
+      "model": "citybuilder:block/ground/snow_slope_inner"
+    },
+    "facing=east,shape=inner": {
+      "model": "citybuilder:block/ground/snow_slope_inner",
+      "y": 90
+    },
+    "facing=south,shape=inner": {
+      "model": "citybuilder:block/ground/snow_slope_inner",
+      "y": 180
+    },
+    "facing=west,shape=inner": {
+      "model": "citybuilder:block/ground/snow_slope_inner",
+      "y": 270
+    }
+  }
+}

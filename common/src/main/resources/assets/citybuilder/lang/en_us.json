@@ -443,5 +443,12 @@
   "block.citybuilder.konbini_band_green": "Convenience Store Band (Green)",
   "block.citybuilder.konbini_band_blue": "Convenience Store Band (Blue)",
   "block.citybuilder.konbini_band_orange": "Convenience Store Band (Orange)",
-  "block.citybuilder.konbini_band_red": "Convenience Store Band (Red)"
+  "block.citybuilder.konbini_band_red": "Convenience Store Band (Red)",
+  "block.citybuilder.grass_layer": "Grass Layer",
+  "block.citybuilder.dirt_layer": "Earth Layer",
+  "block.citybuilder.grass_slope": "Grass Slope",
+  "block.citybuilder.dirt_slope": "Earth Slope",
+  "block.citybuilder.snow_slope": "Snow Slope",
+  "block.citybuilder.stone_ashlar_slope": "Ashlar Slope",
+  "block.citybuilder.snow_layer": "Snow Layer"
 }

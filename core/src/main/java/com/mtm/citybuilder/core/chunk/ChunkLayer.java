@@ -1075,11 +1075,11 @@ public final class ChunkLayer {
      * The heights a chunk's streets are laid at, and the land beside them graded to (see {@link #grades}): each
      * column's street level (NaN off the streets, on a bridge or a footpath, which follow their own levels), and for
      * the land within {@link #VERGE} of a street's edge the level of that street there and how far out it lies (NaN
-     * elsewhere), and whether that street's edge is a retaining wall (see {@link #retained}), x-major as
-     * {@link #columns}.
+     * elsewhere), whether that street's edge is a retaining wall (see {@link #retained}) and the way to that street (a
+     * unit vector towards its centre line, for the slopes laid on the verge), x-major as {@link #columns}.
      */
     public record Grades(double[] level, double[] verge, double[] outside, double[] bank, int[] bankKind,
-                         boolean[] wall) {
+                         boolean[] wall, double[] towardX, double[] towardZ) {
     }
 
     /**
@@ -1149,6 +1149,8 @@ public final class ChunkLayer {
         double[] weight = new double[256];
         double[] weighted = new double[256];
         boolean[] wall = new boolean[256];
+        double[] towardX = new double[256];
+        double[] towardZ = new double[256];
         java.util.Arrays.fill(level, Double.NaN);
         java.util.Arrays.fill(verge, Double.NaN);
         java.util.Arrays.fill(outside, Double.POSITIVE_INFINITY);
@@ -1198,6 +1200,8 @@ public final class ChunkLayer {
                             outside[c] = d - half;
                             verge[c] = at;
                             wall[c] = retained(index, p);
+                            towardX[c] = (g.x1() + dx * t - cx) / Math.max(1e-9, d);
+                            towardZ[c] = (g.z1() + dz * t - cz) / Math.max(1e-9, d);
                         }
                     }
                 }
@@ -1259,7 +1263,7 @@ public final class ChunkLayer {
                 outside[c] = Double.NaN;
             }
         }
-        return new Grades(level, verge, outside, bank, bankKind, wall);
+        return new Grades(level, verge, outside, bank, bankKind, wall, towardX, towardZ);
     }
 
     /**

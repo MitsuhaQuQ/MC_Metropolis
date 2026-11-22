@@ -26,6 +26,14 @@ public final class CityBuilderFabricClient implements ClientModInitializer {
         BlockRenderLayerMap.INSTANCE.putBlocks(RenderType.cutout(), CityBlocks.BRIDGE_RAILING.get(),
                 CityBlocks.CATENARY_BEAM.get(), CityBlocks.CATENARY_HANGER.get());
         BlockRenderLayerMap.INSTANCE.putBlock(CityBlocks.SOUND_BARRIER_CLEAR.get(), RenderType.translucent());
+        // The grass of graded ground, coloured by the biome as the grass block is
+        for (var block : com.mtm.citybuilder.block.GroundBlocks.TINTED) {
+            net.fabricmc.fabric.api.client.rendering.v1.ColorProviderRegistry.BLOCK.register((state, level, pos, index) ->
+                    level != null && pos != null ? net.minecraft.client.renderer.BiomeColors.getAverageGrassColor(level, pos)
+                            : net.minecraft.world.level.GrassColor.getDefaultColor(), block.get());
+            net.fabricmc.fabric.api.client.rendering.v1.ColorProviderRegistry.ITEM.register((stack, index) ->
+                    net.minecraft.world.level.GrassColor.getDefaultColor(), block.get());
+        }
         BlockEntityRenderers.register(CityBlocks.CURVE_MARKER_ENTITY.get(), CurveMarkerRenderer::new);
         // The city map: its key, its tiles from the server
         KeyBindingHelper.registerKeyBinding(CityMapClient.KEY);

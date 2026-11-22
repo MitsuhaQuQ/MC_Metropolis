@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "citybuilder:grass_layer",
+    "citybuilder:dirt_layer",
+    "citybuilder:grass_slope",
+    "citybuilder:dirt_slope",
+    "citybuilder:snow_slope",
+    "citybuilder:snow_layer"
+  ]
+}

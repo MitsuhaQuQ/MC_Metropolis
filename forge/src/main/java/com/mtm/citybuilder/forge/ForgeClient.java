@@ -18,6 +18,19 @@ final class ForgeClient {
     static void init(IEventBus bus) {
         bus.addListener((EntityRenderersEvent.RegisterRenderers event) ->
                 event.registerBlockEntityRenderer(CityBlocks.CURVE_MARKER_ENTITY.get(), CurveMarkerRenderer::new));
+        // The grass of graded ground, coloured by the biome as the grass block is
+        bus.addListener((net.minecraftforge.client.event.RegisterColorHandlersEvent.Block event) -> {
+            for (var block : com.mtm.citybuilder.block.GroundBlocks.TINTED) {
+                event.register((state, level, pos, index) -> level != null && pos != null
+                        ? net.minecraft.client.renderer.BiomeColors.getAverageGrassColor(level, pos)
+                        : net.minecraft.world.level.GrassColor.getDefaultColor(), block.get());
+            }
+        });
+        bus.addListener((net.minecraftforge.client.event.RegisterColorHandlersEvent.Item event) -> {
+            for (var block : com.mtm.citybuilder.block.GroundBlocks.TINTED) {
+                event.register((stack, index) -> net.minecraft.world.level.GrassColor.getDefaultColor(), block.get());
+            }
+        });
         // The city map: its key, checked every tick
         bus.addListener((RegisterKeyMappingsEvent event) -> event.register(CityMapClient.KEY));
         MinecraftForge.EVENT_BUS.addListener((TickEvent.ClientTickEvent event) -> {

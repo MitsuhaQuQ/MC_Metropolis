@@ -443,5 +443,12 @@
   "block.citybuilder.konbini_band_green": "便利店色带灯箱（绿）",
   "block.citybuilder.konbini_band_blue": "便利店色带灯箱（蓝）",
   "block.citybuilder.konbini_band_orange": "便利店色带灯箱（橙）",
-  "block.citybuilder.konbini_band_red": "便利店色带灯箱（红）"
+  "block.citybuilder.konbini_band_red": "便利店色带灯箱（红）",
+  "block.citybuilder.grass_layer": "草层",
+  "block.citybuilder.dirt_layer": "土层",
+  "block.citybuilder.grass_slope": "草斜面",
+  "block.citybuilder.dirt_slope": "土斜面",
+  "block.citybuilder.snow_slope": "雪斜面",
+  "block.citybuilder.stone_ashlar_slope": "間知石斜面",
+  "block.citybuilder.snow_layer": "雪层"
 }

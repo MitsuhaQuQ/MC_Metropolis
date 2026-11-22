@@ -8,6 +8,9 @@ import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.chunk.ChunkLayer;
 import com.mtm.citybuilder.core.chunk.RoadChunks;
 import com.mtm.citybuilder.block.EdgeBlock;
+import com.mtm.citybuilder.block.GroundBlocks;
+import com.mtm.citybuilder.block.LayerBlock;
+import com.mtm.citybuilder.block.SlopeBlock;
 import com.mtm.citybuilder.block.KerbEdgeBlock;
 import net.minecraft.core.Direction;
 import net.minecraft.core.BlockPos;
@@ -245,8 +248,8 @@ public final class CityChunks {
         return slopeFacing;
     }
 
-    private static void verge(ChunkAccess chunk, double street, double outside, boolean wall, int wx, int wz, int x, int z,
-                              BlockPos.MutableBlockPos pos, int top) {
+    private static void verge(ChunkAccess chunk, double street, double outside, boolean wall, double tx, double tz,
+                              int wx, int wz, int x, int z, BlockPos.MutableBlockPos pos, int top) {
         int surface = Math.min(top, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
         int ground = surface;
         BlockState state = chunk.getBlockState(pos.set(wx, ground, wz));
@@ -287,6 +290,14 @@ public final class CityChunks {
                 chunk.setBlockState(pos.set(wx, y, wz), Blocks.AIR.defaultBlockState(), false);
             }
             chunk.setBlockState(pos.set(wx, high, wz), topBlock, false);
+            // The cutting's side rises away from the street: a slope up to the columns beyond a block higher
+            BlockState slope = slopeOf(chunk, topBlock, wx, high, wz);
+            if (slope != null) {
+                slope = SlopeBlock.shaped(slope, higher(street, outside, tx, tz, high, true));
+                if (slope != null) {
+                    chunk.setBlockState(pos.set(wx, high + 1, wz), slope, false);
+                }
+            }
         } else if (ground < low) {
             // A street raised two blocks and more over the land (a bridge's approach, a ramp onto a levee) stands on
             // a slope faced in masonry (間知ブロック積み); a block's fill is earth under the land's own top
@@ -297,7 +308,56 @@ public final class CityChunks {
                 chunk.setBlockState(pos.set(wx, y, wz), fill, false);
             }
             chunk.setBlockState(pos.set(wx, low, wz), topBlock, false);
+            // The fill's face rises towards the street: a slope up to the columns nearer it a block higher (the
+            // street's own paving, or the verge nearer it); straight, or a corner where the bank turns or runs
+            // diagonally
+            BlockState slope = faced ? GroundBlocks.ASHLAR_SLOPE.get().defaultBlockState() : slopeOf(chunk, state, wx, low, wz);
+            if (slope != null) {
+                slope = SlopeBlock.shaped(slope, higher(street, outside, tx, tz, low, false));
+                if (slope != null) {
+                    chunk.setBlockState(pos.set(wx, low + 1, wz), slope, false);
+                }
+            }
         }
+    }
+
+    /** The neighbours' offsets: north, east, south, west, then north-east, south-east, south-west, north-west. */
+    private static final int[][] AROUND = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}, {1, -1}, {1, 1}, {-1, 1}, {-1, -1}};
+
+    /**
+     * Which of a verge column's neighbours (see {@link #AROUND}) stand a block above its top ({@code top}): their
+     * graded heights from the same street, nearer it ({@code tx, tz} the way to it) by how far they lie that way; in a
+     * cutting ({@code cut}), the land rising away from the street, else the fill rising towards it, the street's
+     * paving itself once a neighbour lies on it.
+     */
+    private static boolean[] higher(double street, double outside, double tx, double tz, int top, boolean cut) {
+        boolean[] up = new boolean[8];
+        for (int i = 0; i < 8; i++) {
+            double out = Math.max(0.0, outside - (AROUND[i][0] * tx + AROUND[i][1] * tz));
+            int h = (int) Math.floor(cut ? street + out : street - out);
+            up[i] = h == top + 1;
+        }
+        return up;
+    }
+
+    /** Whether snow lies on the ground at a column in its biome (the slopes and layers are then of snow). */
+    private static boolean snowy(ChunkAccess chunk, int wx, int y, int wz) {
+        return chunk.getNoiseBiome(net.minecraft.core.QuartPos.fromBlock(wx), net.minecraft.core.QuartPos.fromBlock(y),
+                net.minecraft.core.QuartPos.fromBlock(wz)).value().coldEnoughToSnow(new BlockPos(wx, y, wz));
+    }
+
+    /** The 45 degree slope matching the top of the land it is laid on (grass, earth, snow in a cold biome), or null. */
+    private static BlockState slopeOf(ChunkAccess chunk, BlockState ground, int wx, int y, int wz) {
+        boolean grass = ground.is(Blocks.GRASS_BLOCK);
+        boolean earth = ground.is(Blocks.DIRT) || ground.is(Blocks.COARSE_DIRT) || ground.is(Blocks.PODZOL)
+                || ground.is(Blocks.ROOTED_DIRT) || ground.is(Blocks.MYCELIUM);
+        if (!grass && !earth) {
+            return null;
+        }
+        if (snowy(chunk, wx, y + 1, wz)) {
+            return GroundBlocks.SNOW_SLOPE.get().defaultBlockState();
+        }
+        return (grass ? GroundBlocks.GRASS_SLOPE : GroundBlocks.DIRT_SLOPE).get().defaultBlockState();
     }
 
     /**
@@ -345,6 +405,17 @@ public final class CityChunks {
             chunk.setBlockState(pos.set(wx, down, wz), fill, false);
         }
         chunk.setBlockState(pos.set(wx, y, wz), face, false);
+        if (kind == ChunkLayer.BANK_SLOPE || kind == ChunkLayer.BANK_TERRACE) {
+            // The grass laid to the slope's own height in eighths over the whole block (1 in 2: half a block a
+            // column), so the back slope reads as a slope, not a staircase; snow in a cold biome
+            int eighths = (int) Math.round((level - y) * 8.0);
+            if (eighths > 0 && y + 1 <= top) {
+                BlockState layer = snowy(chunk, wx, y + 1, wz)
+                        ? GroundBlocks.SNOW_LAYER.get().defaultBlockState().setValue(LayerBlock.LAYERS, Math.min(8, eighths))
+                        : GroundBlocks.GRASS_LAYER.get().defaultBlockState().setValue(LayerBlock.LAYERS, Math.min(8, eighths));
+                chunk.setBlockState(pos.set(wx, y + 1, wz), layer, false);
+            }
+        }
         if (kind == ChunkLayer.BANK_REVETMENT || kind == ChunkLayer.BANK_ROAD) {
             // A block of the same under it, as under the streets' paving: a step's face is the revetment or the road
             BlockState under = kind == ChunkLayer.BANK_ROAD ? face : fill;
@@ -466,7 +537,7 @@ public final class CityChunks {
                         bank(chunk, grades.bank()[x * 16 + z], grades.bankKind()[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
                     } else if (grades != null && !Double.isNaN(grades.verge()[x * 16 + z])) {
                         verge(chunk, grades.verge()[x * 16 + z], grades.outside()[x * 16 + z], grades.wall()[x * 16 + z],
-                                baseX + x, baseZ + z, x, z, pos, top);
+                                grades.towardX()[x * 16 + z], grades.towardZ()[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
                     }
                     continue;
                 }
