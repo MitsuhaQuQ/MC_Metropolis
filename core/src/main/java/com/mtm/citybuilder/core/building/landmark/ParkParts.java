@@ -394,4 +394,114 @@ public final class ParkParts {
         m.set(0, 3, 0, "minecraft:stone_brick_slab[type=bottom,waterlogged=false]");
         return m;
     }
+
+    /**
+     * A pocket park (街区公園) over {@code width} by {@code depth}, its front to the south (z at its largest, the street):
+     * as OSM's are laid out, its path hugging its edge (along its sides and back, two blocks wide, a block in from a
+     * hedge round it), two ways in at the front's corners with car stops; trees in its corners and along its back; a
+     * bare-earth square in the middle with the playground's swings, slide, sandpit and climbing frame where it is big
+     * enough, benches and lamps by the path, a toilet in a back corner of a larger one.
+     */
+    public static Model pocketPark(int width, int depth, long seed) {
+        Model m = new Model();
+        String path = "citybuilder:sidewalk_interlocking";
+        for (int x = 0; x < width; x++) {
+            for (int z = 0; z < depth; z++) {
+                boolean rim = x == 0 || x == width - 1 || z == 0 || z == depth - 1;
+                boolean ring = !rim && (x <= 2 || x >= width - 3 || z <= 2);
+                boolean gate = z >= depth - 3 && (x >= 1 && x <= 2 || x >= width - 3 && x <= width - 2);
+                m.set(x, 0, z, ring || gate ? path : "minecraft:grass_block[snowy=false]");
+                if (rim && !(z == depth - 1 && (x >= 1 && x <= 2 || x >= width - 3 && x <= width - 2))) {
+                    m.set(x, 1, z, hedge(Hash.of(seed, x, z)).get(0, 1, 0));
+                }
+            }
+        }
+        // The square in the middle, its playground where there is room
+        boolean big = width * depth >= 1500;
+        int sx0 = 4;
+        int sz0 = big ? 9 : 4;
+        int sx1 = width - 5;
+        int sz1 = depth - 3;
+        for (int x = sx0; x <= sx1; x++) {
+            for (int z = sz0; z <= sz1; z++) {
+                m.set(x, 0, z, "minecraft:coarse_dirt");
+            }
+        }
+        int pw = sx1 - sx0 + 1;
+        int pd = sz1 - sz0 + 1;
+        if (pw >= 12 && pd >= 9) {
+            int w = Math.min(pw, 16);
+            int d = Math.min(pd, 12);
+            m.place(playground(w, d, seed), sx0 + (pw - w) / 2, 0, sz0, true);
+        } else {
+            m.place(fountain(), sx0, 1, sz0, true);
+        }
+        // Car stops in the ways in
+        for (int x : new int[]{1, 2, width - 3, width - 2}) {
+            m.set(x, 1, depth - 1, bollard().get(0, 1, 0));
+        }
+        // Trees in the back corners and along the back behind the path, the front corners too on a deep one
+        long t = Hash.of(seed, 0x7EEL);
+        int[][] spots = depth >= 20 ? new int[][]{{1, 1}, {width - 2, 1}, {1, depth - 6}, {width - 2, depth - 6}}
+                : new int[][]{{1, 1}, {width - 2, 1}};
+        for (int[] spot : spots) {
+            Model tree = tree(Hash.unit(Hash.of(t, spot[0], spot[1])) < 0.5 ? Tree.CHERRY : Tree.ZELKOVA, Hash.of(t, spot[0]));
+            tree.forEach((x, y, z, s) -> {
+                if (y >= 1) {
+                    m.setIfAbsent(x + spot[0], y, z + spot[1], s);
+                }
+            });
+            m.set(spot[0], 0, spot[1], "minecraft:grass_block[snowy=false]");
+        }
+        // Benches and lamps by the path along the sides
+        for (int z = 6; z < depth - 5; z += 8) {
+            m.place(bench("west"), 3, 1, z, false);
+            m.place(lamp(), width - 4, 1, z, false);
+        }
+        // A toilet at the back of a larger park, behind its square
+        if (big) {
+            m.place(toilet(), sx0, 0, 3, true);
+        }
+        return m;
+    }
+
+    /**
+     * A castle's honmaru (本丸) over {@code width} by {@code depth}, its front to the south: a platform three blocks
+     * high on stone walls (野面積み, rough stones, their foot a little wider), gravel over its top, stone steps up the
+     * middle of its front, pines at its corners; its middle left open for the keep.
+     */
+    public static Model honmaru(int width, int depth, long seed) {
+        Model m = new Model();
+        int high = 3;
+        for (int x = 0; x < width; x++) {
+            for (int z = 0; z < depth; z++) {
+                boolean rim = x == 0 || z == 0 || x == width - 1 || z == depth - 1;
+                for (int y = 0; y < high; y++) {
+                    m.set(x, y, z, rim ? (Hash.unit(Hash.of(seed, x * 31 + y, z)) < 0.6 ? "citybuilder:stone_rubble"
+                            : "minecraft:cobblestone") : "minecraft:dirt");
+                }
+                m.set(x, high, z, rim ? "citybuilder:stone_rubble" : "minecraft:gravel");
+            }
+        }
+        // The steps up the front's middle, out from it
+        int mid = width / 2;
+        for (int k = 0; k < high; k++) {
+            for (int x = mid - 2; x <= mid + 2; x++) {
+                m.set(x, high - k, depth + k, "minecraft:stone_brick_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]");
+                for (int y = 0; y < high - k; y++) {
+                    m.set(x, y, depth + k, "minecraft:stone_bricks");
+                }
+            }
+        }
+        // Pines at its corners
+        for (int[] c : new int[][]{{2, 2}, {width - 3, 2}, {2, depth - 3}, {width - 3, depth - 3}}) {
+            Model pine = tree(Tree.PINE, Hash.of(seed, c[0], c[1]));
+            pine.forEach((x, y, z, st) -> {
+                if (y >= 1) {
+                    m.setIfAbsent(x + c[0], y + high, z + c[1], st);
+                }
+            });
+        }
+        return m;
+    }
 }

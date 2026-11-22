@@ -45,14 +45,23 @@ test('public buildings stand on their sites', async ({}, testInfo) => {
     await server.command('gamerule doDaylightCycle false');
     await server.command('weather clear');
   }
-  const PARKS = ['PARK', 'CENTRAL_PARK', 'LARGE_PARK', 'SPORTS_PARK', 'GREEN'];
-  const seen = new Set();
+  const PARKS = ['PARK', 'CENTRAL_PARK', 'LARGE_PARK', 'SPORTS_PARK', 'GREEN', 'POCKET_PARK', 'CASTLE_PARK'];
+  // The nearest of each kind; of a park, its largest graded piece (a green's trees)
+  const chosen = new Map();
+  const size = (p) => (p.maxX - p.minX + 1) * (p.maxZ - p.minZ + 1);
   for (const p of f.placed) {
-    // The nearest of each kind; of a park, its graded piece (a green's trees)
     const park = PARKS.includes(p.kind);
-    if (seen.has(p.kind) || park && !p.grade && p.kind !== 'GREEN') {
+    if (park && !p.grade && p.kind !== 'GREEN') {
       continue;
     }
+    const known = chosen.get(p.kind);
+    if (!known || park && p.kind !== 'GREEN' && size(p) > size(known)) {
+      chosen.set(p.kind, p);
+    }
+  }
+  const seen = new Set();
+  for (const p of chosen.values()) {
+    const park = PARKS.includes(p.kind);
     seen.add(p.kind);
     await server.generate(p.minX - 24, p.minZ - 24, p.maxX + 24, p.maxZ + 24);
     const blocks = await server.blocks(p.minX, p.minZ, p.maxX, p.maxZ);

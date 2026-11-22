@@ -50,6 +50,7 @@ public final class FunctionMap {
             case TEMPLE -> "T";
             case SHRINE -> "S";
             case LARGE_PARK -> "BigPark";
+            case CASTLE_PARK -> "Castle";
             case GREEN -> "Green";
             case GRAND_TEMPLE -> "GrandT";
             case GRAND_SHRINE -> "GrandS";
@@ -60,6 +61,7 @@ public final class FunctionMap {
             case BATHHOUSE -> "b";
             case SMALL_SHRINE -> "s";
             case SMALL_TEMPLE -> "t";
+            case POCKET_PARK -> "p";
             case GAS_STATION -> "g";
             case CASTLE_KEEP -> "Keep";
             case PAGODA -> "Pagoda";

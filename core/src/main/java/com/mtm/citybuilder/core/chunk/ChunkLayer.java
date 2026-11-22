@@ -1077,7 +1077,9 @@ public final class ChunkLayer {
             com.mtm.citybuilder.core.street.District district = logic.streetPlan(sample.owner()).districts().at(x, z);
             if (district == com.mtm.citybuilder.core.street.District.GROUNDS
                     || district == com.mtm.citybuilder.core.street.District.HIGH_SPEED) {
-                return true;
+                // A castle's grounds made a park keep to the trees the park plants
+                com.mtm.citybuilder.core.function.Facility f = logic.functions().town(sample.owner()).facilityAt(x + 0.5, z + 0.5);
+                return f == null || f.kind() != com.mtm.citybuilder.core.function.Facility.Kind.CASTLE_PARK;
             }
         }
         double keep = 1.0 - (sample.intensity() - built) / (TREELESS - built);

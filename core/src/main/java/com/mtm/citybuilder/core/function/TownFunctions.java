@@ -343,6 +343,19 @@ public final class TownFunctions {
         double townRadius = Math.sqrt(builtKm2 * 1e6 / Math.PI);
         java.util.function.ToDoubleFunction<Blocks.Block> houses = b ->
                 b.district() == District.RESIDENTIAL || b.district() == District.OLD_TOWN ? 1.0 : 0.0;
+        // The castle's grounds: its block and every block inside its inner moat, one castle-site park, the town's
+        // central park as well (as Osaka Castle Park, Nagoya's Meijo Park: the park and the castle site one)
+        boolean castlePark = false;
+        for (Anchor anchor : plan.anchors()) {
+            if (anchor.kind() != Anchor.Kind.CASTLE) {
+                continue;
+            }
+            Blocks.Block grounds = castleGrounds(anchor.x(), anchor.z());
+            if (grounds != null) {
+                take(Facility.Kind.CASTLE_PARK, grounds);
+                castlePark = true;
+            }
+        }
         // The town hall near the middle, by a main road
         placeAreas(Facility.Kind.CITY_HALL, 1, config.cityHall, 1, b -> {
             boolean fits = b.district() == District.CENTRAL || b.district() == District.OLD_TOWN
@@ -352,7 +365,9 @@ public final class TownFunctions {
         });
         if (city) {
             // A central park near the middle, a sports park and (a metropolis) a university towards the edge
-            placeAreas(Facility.Kind.CENTRAL_PARK, 1, config.centralPark, 1, b -> 2.0 - fromCentre(b.x(), b.z()) / 2000.0);
+            if (!castlePark) {
+                placeAreas(Facility.Kind.CENTRAL_PARK, 1, config.centralPark, 1, b -> 2.0 - fromCentre(b.x(), b.z()) / 2000.0);
+            }
             placeAreas(Facility.Kind.SPORTS_PARK, 1, config.sportsPark, 1, b -> 0.5 + fromCentre(b.x(), b.z()) / townRadius);
             if (plan.settlement().tier() == SettlementTier.METROPOLIS) {
                 placeAreas(Facility.Kind.UNIVERSITY, 1 + (int) (builtKm2 / 80), config.university, townRadius,
@@ -411,6 +426,60 @@ public final class TownFunctions {
                 take(Facility.Kind.GREEN, b);
             }
         }
+    }
+
+    /**
+     * A castle's grounds as a block of land: the castle district's ground (the street layer's {@code GROUNDS}) reached
+     * from the castle without crossing water (its moat) or a street, on the blocks' grid; null where there is none
+     * (the castle on a hill the town keeps wooded beyond its reach).
+     */
+    private Blocks.Block castleGrounds(double ax, double az) {
+        double cell = Blocks.CELL;
+        int reach = (int) Math.ceil(600 / cell);
+        int n = 2 * reach + 1;
+        double x0 = ax - reach * cell;
+        double z0 = az - reach * cell;
+        java.util.BitSet seen = new java.util.BitSet(n * n);
+        java.util.ArrayDeque<int[]> open = new java.util.ArrayDeque<>();
+        open.add(new int[]{reach, reach});
+        seen.set(reach * n + reach);
+        int count = 0;
+        int i0 = n, j0 = n, i1 = -1, j1 = -1;
+        java.util.List<int[]> cells = new ArrayList<>();
+        while (!open.isEmpty()) {
+            int[] c = open.poll();
+            double x = x0 + (c[0] + 0.5) * cell;
+            double z = z0 + (c[1] + 0.5) * cell;
+            if (plan.districts().at(x, z) != District.GROUNDS || plan.water().water(x, z) || plots.onStreet(x, z)) {
+                continue;
+            }
+            cells.add(c);
+            count++;
+            i0 = Math.min(i0, c[0]);
+            j0 = Math.min(j0, c[1]);
+            i1 = Math.max(i1, c[0]);
+            j1 = Math.max(j1, c[1]);
+            for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                int i = c[0] + d[0];
+                int j = c[1] + d[1];
+                if (i >= 0 && j >= 0 && i < n && j < n && !seen.get(i * n + j)) {
+                    seen.set(i * n + j);
+                    open.add(new int[]{i, j});
+                }
+            }
+        }
+        if (count < 40) {
+            return null;
+        }
+        int width = i1 - i0 + 1;
+        int height = j1 - j0 + 1;
+        java.util.BitSet bits = new java.util.BitSet(width * height);
+        for (int[] c : cells) {
+            bits.set((c[0] - i0) * height + (c[1] - j0));
+        }
+        Blocks.Land land = new Blocks.Land(x0 + i0 * cell, z0 + j0 * cell, width, height, bits);
+        double area = count * cell * cell;
+        return new Blocks.Block(-1, area, ax, az, 0.5 * Math.sqrt(area / Math.PI), District.GROUNDS, false, true, land);
     }
 
     /** The block holding a position, or null. */
@@ -665,6 +734,8 @@ public final class TownFunctions {
                 f -> f == StreetFunction.RESIDENTIAL || f == StreetFunction.SAMURAI || f == StreetFunction.SHOPPING);
         placeLots(Facility.Kind.SMALL_TEMPLE, config.smallTemple * oldTownKm2() / Math.max(1e-6, builtKm2),
                 f -> f == StreetFunction.RESIDENTIAL || f == StreetFunction.TEMPLE);
+        // Pocket parks among the houses
+        placeLots(Facility.Kind.POCKET_PARK, config.pocketPark, f -> f == StreetFunction.RESIDENTIAL);
         // Filling stations on main streets' larger lots, out of the town's middle
         placeLots(Facility.Kind.GAS_STATION, config.gasStation, f -> f == StreetFunction.MAIN,
                 (c, side, index) -> plots.lotFrontage(c, side, index) >= config.gasStationFrontage
@@ -752,28 +823,32 @@ public final class TownFunctions {
             double[] reach = reach(f);
             double[] gate = nearestStreetPoint(f.x(), f.z(), f.radius() * 2 + 40.0);
             switch (f.kind()) {
+                // As OSM's parks in Kyoto, Osaka and Tokyo have them (tools/assets/osm_parks.py): a neighbourhood park
+                // (0.5-2 ha) a loop near its edge, four or five ways in, a way across (460-880 m of path a ha, an eighth
+                // of its land); a central or large park a loop further in, six to eight ways in and two across (250-380
+                // m a ha); a sports park a loop round its edge
                 case PARK -> {
                     if (minimum(reach) >= 12) {
-                        clip(f, new Walk(f.id(), f.kind(), ring(f, reach, 0.6), 2.0));
+                        clip(f, new Walk(f.id(), f.kind(), ring(f, reach, 0.82), 2.5));
                     }
-                    ways(f, gate, reach, 0.6, 2.0);
+                    entrances(f, reach, 0.82, 2.5, 5);
+                    across(f, gate, reach, 0.82, 2.5, 1);
                 }
                 case LARGE_PARK, CENTRAL_PARK -> {
-                    clip(f, new Walk(f.id(), f.kind(), ring(f, reach, 0.7), 3.0));
-                    ways(f, gate, reach, 0.7, 3.0);
-                    if (gate != null) {
-                        // Across the middle from the way in, and in from the far side's street
-                        double a = Math.atan2(gate[1] - f.z(), gate[0] - f.x());
-                        double[] near = along(f, reach, a, 0.7);
-                        double[] far = along(f, reach, a + Math.PI, 0.7);
-                        clip(f, new Walk(f.id(), f.kind(), List.of(near, far), 3.0));
-                        double[] edge = along(f, reach, a + Math.PI, 1.0);
-                        ways(f, nearestStreetPoint(edge[0], edge[1], 30.0), reach, 0.7, 3.0);
-                    }
+                    clip(f, new Walk(f.id(), f.kind(), ring(f, reach, 0.72), 3.0));
+                    entrances(f, reach, 0.72, 3.0, 8);
+                    across(f, gate, reach, 0.72, 3.0, 2);
+                }
+                case CASTLE_PARK -> {
+                    // A loop round the castle's grounds inside its edge, ways in from the streets round the moat, the
+                    // main one on to the honmaru in the middle
+                    clip(f, new Walk(f.id(), f.kind(), ring(f, reach, 0.78), 3.0));
+                    entrances(f, reach, 0.78, 3.0, 6);
+                    across(f, gate, reach, 0.78, 3.0, 1);
                 }
                 case SPORTS_PARK -> {
-                    clip(f, new Walk(f.id(), f.kind(), ring(f, reach, 0.85), 3.0));
-                    ways(f, gate, reach, 0.85, 3.0);
+                    clip(f, new Walk(f.id(), f.kind(), ring(f, reach, 0.88), 3.0));
+                    entrances(f, reach, 0.88, 3.0, 4);
                 }
                 case GREEN -> {
                     if (gate != null) {
@@ -845,6 +920,43 @@ public final class TownFunctions {
         double[] on = along(f, reach, Math.atan2(gate[1] - f.z(), gate[0] - f.x()), share);
         if (Math.hypot(gate[0] - on[0], gate[1] - on[1]) > 1.0) {
             clip(f, new Walk(f.id(), f.kind(), List.of(on, gate), width));
+        }
+    }
+
+    /**
+     * The ways in to a park's loop from the streets round it: up to {@code most}, from the street nearest each of as
+     * many directions round it, none within 25 of another.
+     */
+    private void entrances(Facility f, double[] reach, double share, double width, int most) {
+        List<double[]> gates = new ArrayList<>();
+        double turn = 2 * Math.PI * Hash.unit(Hash.of(seed ^ 0xE7A1L, f.id()));
+        for (int k = 0; k < most; k++) {
+            double a = turn + 2 * Math.PI * k / most;
+            double[] edge = along(f, reach, a, 1.0);
+            double[] gate = nearestStreetPoint(edge[0], edge[1], 20.0);
+            if (gate == null) {
+                continue;
+            }
+            boolean apart = true;
+            for (double[] g : gates) {
+                apart &= Math.hypot(g[0] - gate[0], g[1] - gate[1]) >= 25.0;
+            }
+            if (apart) {
+                gates.add(gate);
+                ways(f, gate, reach, share, width);
+            }
+        }
+    }
+
+    /** Ways straight across a park's loop through its middle: one from its main way in, a second square to it. */
+    private void across(Facility f, double[] gate, double[] reach, double share, double width, int count) {
+        if (gate == null) {
+            return;
+        }
+        double a = Math.atan2(gate[1] - f.z(), gate[0] - f.x());
+        for (int k = 0; k < count; k++) {
+            double b = a + k * 0.5 * Math.PI;
+            clip(f, new Walk(f.id(), f.kind(), List.of(along(f, reach, b, share), along(f, reach, b + Math.PI, share)), width));
         }
     }
 

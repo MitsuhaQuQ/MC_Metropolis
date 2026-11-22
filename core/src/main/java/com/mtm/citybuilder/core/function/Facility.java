@@ -36,6 +36,11 @@ public record Facility(Kind kind, long id, double x, double z, double radius, in
         SPORTS_PARK(true),
         TEMPLE(true),
         SHRINE(true),
+        /**
+         * A castle-site park (城址公園, as Osaka Castle Park, Nijo, Kanazawa Castle Park): the castle's block inside its
+         * moat, its honmaru's stone-walled platform kept for the keep, cherries and pines round it.
+         */
+        CASTLE_PARK(true),
         /** A large park on grand grounds (Okazaki, Maruyama, Kenrokuen). */
         LARGE_PARK(true),
         /** A green tract left wooded or open (a river's green, a hill's grove, Tadasu no Mori). */
@@ -51,6 +56,8 @@ public record Facility(Kind kind, long id, double x, double z, double radius, in
         BATHHOUSE(false),
         SMALL_SHRINE(false),
         SMALL_TEMPLE(false),
+        /** A pocket park (街区公園) on a residential street's lots: its playground, paths round its edge. */
+        POCKET_PARK(false),
         /** A filling station (ガソリンスタンド) on a main street's lot. */
         GAS_STATION(false),
         // Landmarks

@@ -59,6 +59,45 @@ class FacilityModelsTest {
             }
         }
         System.out.println("sites " + sites + "\nbuilt " + built);
+        // The parks' paths, measured as tools/assets/osm_parks.py measures OSM's: their land in hectares, metres of
+        // path a hectare
+        for (Facility.Kind kind : new Facility.Kind[]{Facility.Kind.PARK, Facility.Kind.CENTRAL_PARK, Facility.Kind.LARGE_PARK}) {
+            List<Double> densities = new java.util.ArrayList<>();
+            List<Double> areas = new java.util.ArrayList<>();
+            for (Facility f : functions.facilities()) {
+                if (f.kind() != kind) {
+                    continue;
+                }
+                double cells = 0;
+                double half = f.radius() * 2 + 40;
+                for (double x = f.x() - half; x <= f.x() + half; x += 2) {
+                    for (double z = f.z() - half; z <= f.z() + half; z += 2) {
+                        if (functions.contains(f, x, z)) {
+                            cells++;
+                        }
+                    }
+                }
+                double ha = cells * 4 / 10000.0;
+                double length = 0;
+                for (com.mtm.citybuilder.core.function.Walk w : functions.walks()) {
+                    if (w.facility() == f.id()) {
+                        for (int k = 1; k < w.points().size(); k++) {
+                            length += Math.hypot(w.points().get(k)[0] - w.points().get(k - 1)[0],
+                                    w.points().get(k)[1] - w.points().get(k - 1)[1]);
+                        }
+                    }
+                }
+                areas.add(ha);
+                densities.add(length / Math.max(1e-6, ha));
+            }
+            java.util.Collections.sort(areas);
+            java.util.Collections.sort(densities);
+            if (!areas.isEmpty()) {
+                System.out.printf("%s: %d, ha median %.2f (%.2f-%.2f), path m/ha median %.0f (%.0f-%.0f)%n", kind,
+                        areas.size(), areas.get(areas.size() / 2), areas.get(0), areas.get(areas.size() - 1),
+                        densities.get(densities.size() / 2), densities.get(0), densities.get(densities.size() - 1));
+            }
+        }
         assertTrue(built.getOrDefault(Facility.Kind.CITY_HALL, 0) == 1, () -> "no city hall built: " + built);
         assertTrue(built.getOrDefault(Facility.Kind.LIBRARY, 0) >= 1, () -> "no library built: " + built);
         // The lots: no building's lot within a placed model, the quarters and uses given

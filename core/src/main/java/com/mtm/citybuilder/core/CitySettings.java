@@ -138,7 +138,11 @@ public final class CitySettings {
         public double[] juniorHighSchool = {0.4, 1.0, 3.0};
         public double[] highSchool = {0.15, 1.5, 5.0};
         public double[] hospital = {0.12, 0.5, 3.0};
-        public double[] park = {1.2, 0.1, 1.2};
+        /**
+         * Neighbourhood parks (近隣公園) on whole blocks: OSM's in Kyoto, Osaka and Tokyo (tools/assets/osm_parks.py,
+         * 2026-11-22) run 0.4-1 a km2, 0.5-2 ha (median 0.8-1 ha).
+         */
+        public double[] park = {0.7, 0.5, 2.0};
         public double[] temple = {3.0, 0.1, 1.5};
         public double[] shrine = {0.8, 0.08, 1.2};
         public double[] university = {0.0, 5.0, 40.0};
@@ -161,6 +165,11 @@ public final class CitySettings {
         public double fireStation = 0.4;
         public double postOffice = 1.0;
         public double bathhouse = 0.8;
+        /**
+         * Pocket parks (街区公園, 児童遊園) a km2 of built land, on a residential street's lots and their neighbours:
+         * OSM's run 2.5-6 a km2, median 0.08-0.15 ha, nine in ten under 0.4 ha.
+         */
+        public double pocketPark = 3.0;
         /**
          * Filling stations (ガソリンスタンド) a km2 of built land, on a lot of a main street at least
          * {@code gasStationFrontage} wide and {@code gasStationDepth} deep, outside the middle of the town.

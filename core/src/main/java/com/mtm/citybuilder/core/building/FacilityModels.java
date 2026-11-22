@@ -100,7 +100,7 @@ public final class FacilityModels {
     }
 
     /** The facilities laid out as parks. */
-    private static final java.util.Set<Facility.Kind> PARKS = java.util.EnumSet.of(Facility.Kind.PARK,
+    private static final java.util.Set<Facility.Kind> PARKS = java.util.EnumSet.of(Facility.Kind.PARK, Facility.Kind.CASTLE_PARK,
             Facility.Kind.CENTRAL_PARK, Facility.Kind.LARGE_PARK, Facility.Kind.SPORTS_PARK, Facility.Kind.GREEN);
 
     private List<Placed> place(Settlement town) {
@@ -119,7 +119,7 @@ public final class FacilityModels {
             if (candidates.isEmpty()) {
                 continue;
             }
-            double[] site = f.kind().area() ? areaSite(functions, plots, f) : lotSite(plots, f);
+            double[] site = f.kind().area() ? areaSite(functions, plots, f) : lotSite(functions, plots, f);
             if (site == null) {
                 continue;
             }
@@ -166,6 +166,17 @@ public final class FacilityModels {
                     }
                 }
             }
+            case POCKET_PARK -> {
+                // Its size drawn as OSM's run (median 0.12 ha), squarish; the largest that fits its land first
+                double[] ha = {0.05, 0.07, 0.09, 0.12, 0.15, 0.2, 0.25, 0.35};
+                double target = ha[(int) Math.floorMod(Hash.of(f.id(), 0x9A1CL), (long) ha.length)] * 10000.0;
+                double aspect = 1.0 + 0.8 * Hash.unit(Hash.of(f.id(), 0x9A1DL));
+                int w = (int) Math.round(Math.sqrt(target * aspect));
+                int d = (int) Math.round(target / w);
+                for (double k = 1.0; w * k >= 14 && d * k >= 12; k -= 0.1) {
+                    out.add(ParkParts.pocketPark((int) Math.round(w * k), (int) Math.round(d * k), f.id()));
+                }
+            }
             case GAS_STATION -> {
                 for (int islands : new int[]{3, 2, 1}) {
                     out.add(new GasStation(islands, true, seed).build());
@@ -200,10 +211,13 @@ public final class FacilityModels {
      * A lot facility's site: the largest rectangle off the streets about its lot, taking in its neighbours' land as a
      * filling station does (their buildings give way, see {@link #excludes}).
      */
-    private static double[] lotSite(TownPlots plots, Facility f) {
+    private static double[] lotSite(TownFunctions functions, TownPlots plots, Facility f) {
         double[] c = plots.lotCentre(f.chain(), f.side(), f.index());
-        return site((x, z) -> !plots.onStreet(x, z) && !plots.inCanal(x, z) && Math.hypot(x - c[0], z - c[1]) <= 30.0,
-                plots, c[0], c[1], 32.0);
+        // A pocket park takes in more of its neighbours than a filling station
+        double reach = f.kind() == Facility.Kind.POCKET_PARK ? 44.0 : 30.0;
+        // Off the streets and canals, and off the blocks an area facility took (a park, a school's ground)
+        return site((x, z) -> !plots.onStreet(x, z) && !plots.inCanal(x, z) && Math.hypot(x - c[0], z - c[1]) <= reach
+                && functions.facilityAt(x, z) == null, plots, c[0], c[1], reach + 2.0);
     }
 
     /**
@@ -336,17 +350,20 @@ public final class FacilityModels {
         Ground open = (x, z) -> land.test(x, z) && walkDistance(walk, x, z) > 2.0 && !in(reserved, x, z, 2.0)
                 && land.test(x + 3, z) && land.test(x - 3, z) && land.test(x, z + 3) && land.test(x, z - 3);
         Facility.Kind kind = f.kind();
-        // The graded pieces, the largest first
+        // The graded pieces, the largest first: a castle's honmaru on its stone walls in the middle
+        if (kind == Facility.Kind.CASTLE_PARK && holdsCastle(town, functions, f)) {
+            graded(f, open, plots, half, 24, 24, 48, 40, reserved, out, (w, d) -> ParkParts.honmaru(w, d, seed));
+        }
         if (kind == Facility.Kind.SPORTS_PARK) {
             graded(f, open, plots, half, 30, 20, 70, 48, reserved, out, (w, d) -> ParkParts.field(w, d));
         }
         if (kind == Facility.Kind.CENTRAL_PARK || kind == Facility.Kind.LARGE_PARK) {
             graded(f, open, plots, half, 12, 10, 30, 22, reserved, out, (w, d) -> ParkParts.pond(w, d, seed));
         }
-        if (kind == Facility.Kind.PARK || kind == Facility.Kind.CENTRAL_PARK) {
+        if (kind == Facility.Kind.PARK || kind == Facility.Kind.CENTRAL_PARK || kind == Facility.Kind.CASTLE_PARK) {
             graded(f, open, plots, half, 12, 9, 16, 12, reserved, out, (w, d) -> ParkParts.playground(w, d, seed));
         }
-        if (kind == Facility.Kind.CENTRAL_PARK || kind == Facility.Kind.LARGE_PARK) {
+        if (kind == Facility.Kind.CENTRAL_PARK || kind == Facility.Kind.LARGE_PARK || kind == Facility.Kind.CASTLE_PARK) {
             graded(f, open, plots, half, 5, 5, 5, 5, reserved, out, (w, d) -> ParkParts.gazebo(seed));
         }
         if (kind == Facility.Kind.PARK || kind == Facility.Kind.CENTRAL_PARK) {
@@ -356,7 +373,8 @@ public final class FacilityModels {
             graded(f, open, plots, half, 6, 5, 6, 5, reserved, out, (w, d) -> ParkParts.toilet());
         }
         // Flower beds: one in a neighbourhood park, two in the larger
-        int beds = kind == Facility.Kind.PARK ? 1 : kind == Facility.Kind.CENTRAL_PARK || kind == Facility.Kind.LARGE_PARK ? 2 : 0;
+        int beds = kind == Facility.Kind.PARK ? 1
+                : kind == Facility.Kind.CENTRAL_PARK || kind == Facility.Kind.LARGE_PARK || kind == Facility.Kind.CASTLE_PARK ? 2 : 0;
         for (int k = 0; k < beds; k++) {
             long bed = Hash.of(seed, 0xBEDL + k);
             graded(f, open, plots, half, 5, 3, 10, 4, reserved, out, (w, d) -> ParkParts.flowerBed(w, d, bed));
@@ -366,6 +384,7 @@ public final class FacilityModels {
         double spacing = switch (kind) {
             case GREEN -> 5.0;
             case CENTRAL_PARK, LARGE_PARK -> 8.0;
+            case CASTLE_PARK -> 7.0;
             default -> 6.0;
         };
         double cx0 = f.x() - half;
@@ -389,6 +408,7 @@ public final class FacilityModels {
                 double chance = switch (kind) {
                     case GREEN -> 0.85;
                     case CENTRAL_PARK, LARGE_PARK -> edge ? 0.9 : 0.5;
+                    case CASTLE_PARK -> edge ? 0.95 : 0.35;
                     default -> edge ? 0.9 : 0.12;
                 };
                 if (Hash.unit(Hash.of(h, 3)) >= chance) {
@@ -498,6 +518,16 @@ public final class FacilityModels {
         }
     }
 
+    /** Whether a castle park's block holds the castle itself (its honmaru there; the rest of its grounds park). */
+    private boolean holdsCastle(Settlement town, TownFunctions functions, Facility f) {
+        for (com.mtm.citybuilder.core.street.Anchor a : logic.streetPlan(town).anchors()) {
+            if (a.kind() == com.mtm.citybuilder.core.street.Anchor.Kind.CASTLE && functions.contains(f, a.x(), a.z())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** A part of a size made for a width and depth. */
     @FunctionalInterface
     private interface Part {
@@ -558,6 +588,10 @@ public final class FacilityModels {
 
     /** The tree a park plants at a spot: its kind's mix, the edge's own. */
     private static ParkParts.Tree species(Facility.Kind kind, boolean edge, double u) {
+        if (kind == Facility.Kind.CASTLE_PARK) {
+            // A castle park's cherries (its famous viewing) and its pines
+            return u < 0.6 ? ParkParts.Tree.CHERRY : u < 0.9 ? ParkParts.Tree.PINE : ParkParts.Tree.ZELKOVA;
+        }
         if (kind == Facility.Kind.GREEN) {
             return u < 0.45 ? ParkParts.Tree.CAMPHOR : u < 0.8 ? ParkParts.Tree.ZELKOVA : ParkParts.Tree.PINE;
         }

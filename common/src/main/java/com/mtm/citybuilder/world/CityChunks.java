@@ -564,8 +564,8 @@ public final class CityChunks {
 
     /**
      * A footpath's paving inside a facility's grounds (the function layer's walks): a neighbourhood or sports park's
-     * paths in red interlocking pavers, a central or large park's in granite setts, a temple's in gravel, a shrine's
-     * approach in gravel too; a green's and the promenades' packed earth as they were.
+     * paths in red interlocking pavers, a central or large park's in granite setts, a temple's, a shrine's approach and
+     * a castle park's in gravel; a green's and the promenades' packed earth as they were.
      */
     private static BlockState walkPaving(WorldGenLevel level, int x, int z, BlockState earth) {
         CityLogic logic = CityWorlds.of(level.getLevel());
@@ -580,7 +580,7 @@ public final class CityChunks {
         return switch (f.kind()) {
             case PARK, SPORTS_PARK -> ours("sidewalk_interlocking").defaultBlockState();
             case CENTRAL_PARK, LARGE_PARK -> ours("sidewalk_granite").defaultBlockState();
-            case TEMPLE, SHRINE, GRAND_TEMPLE, GRAND_SHRINE, SMALL_TEMPLE, SMALL_SHRINE -> Blocks.GRAVEL.defaultBlockState();
+            case TEMPLE, SHRINE, GRAND_TEMPLE, GRAND_SHRINE, SMALL_TEMPLE, SMALL_SHRINE, CASTLE_PARK -> Blocks.GRAVEL.defaultBlockState();
             default -> earth;
         };
     }
