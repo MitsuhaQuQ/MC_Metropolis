@@ -7,8 +7,9 @@ import static com.mtm.citybuilder.core.building.landmark.Civic.*;
 /**
  * A Japanese general hospital (総合病院), 1 block = 1 m, its front to the south (laid out facing north, then turned): the outpatient block (外来棟), three
  * storeys over a glazed ground floor, its name lit along its parapet; behind it the ward block (病棟), a white slab of
- * {@code wards} storeys with balconies all along its back (for getting the patients out in a fire), a helipad on its
- * roof (a grey square, a white H in a yellow ring, a railing round); a porte-cochère (車寄せ) over the entrance with a
+ * {@code wards} storeys, centred behind it or to one side, with balconies all along its back (for getting the patients
+ * out in a fire) or plain windows, white, beige or cream by the seed, a helipad on its roof if it has seven storeys or
+ * more (a grey square, a white H in a yellow ring, a railing round); a porte-cochère (車寄せ) over the entrance with a
  * drive looping round a planted island; the emergency entrance (救急入口) on the east side under its own canopy, its
  * sign lit red; a car park down the west side. Sizes as 200-400 bed hospitals'.
  *
@@ -20,6 +21,13 @@ public record Hospital(int width, int wards, int seed) {
     private static final int FORECOURT = 18;
     private static final int CLINIC = 22;
     private static final int WARD = 18;
+
+    private static final String[] WALLS = {"citybuilder:tile_white", "citybuilder:tile_beige", "citybuilder:concrete_cream"};
+
+    /** Whether the wards have balconies along their back and ends: one seed in two. */
+    public boolean balconies() {
+        return Math.floorMod(seed / 9, 2) == 0;
+    }
 
     public Hospital {
         if (width < 30 || wards < 4) {
@@ -43,23 +51,27 @@ public record Hospital(int width, int wards, int seed) {
         Facade ground = new Facade("citybuilder:concrete_white", "citybuilder:curtain_clear", "citybuilder:concrete_white",
                 "citybuilder:concrete_white", 5, 0, 1);
         block(m, 0, z0, x1, z1, 0, 1, 5, ground, "citybuilder:floor_pvc");
-        Facade clinic = new Facade("citybuilder:tile_white", "citybuilder:window_white_clear", "citybuilder:concrete_light",
-                "citybuilder:tile_white", 5, 0, 1);
+        String wall = WALLS[Math.floorMod(seed, WALLS.length)];
+        Facade clinic = new Facade(wall, "citybuilder:window_white_clear", "citybuilder:concrete_light", wall, 5, 0, 1);
         int roof = block(m, 0, z0, x1, z1, 5, 2, 4, clinic, "citybuilder:floor_pvc");
         parapet(m, 0, z0, x1, z1, roof + 1, "citybuilder:concrete_light");
         plant(m, 2, z0 + 2, x1 - 2, z0 + 6, roof + 1);
         // The name, lit, along the top of the front
         sign(m, "citybuilder:fascia_lit_green", cx - 6, roof + 1, z0, 12, seed, "north");
         // The ward block behind, its storeys a little lower than the clinic's
-        int w0 = 4;
-        int w1 = x1 - 4;
+        // Centred behind the clinic, or to one side of it
+        int w0 = switch (Math.floorMod(seed / 3, 3)) {
+            case 1 -> 0;
+            case 2 -> x1 - (Math.max(20, width * 2 / 3) - 1);
+            default -> 4;
+        };
+        int w1 = Math.floorMod(seed / 3, 3) == 0 ? x1 - 4 : w0 + Math.max(20, width * 2 / 3) - 1;
         int b0 = z1 + 1;
         int b1 = b0 + WARD - 1;
-        Facade ward = new Facade("citybuilder:tile_white", "citybuilder:window_white_clear", "citybuilder:tile_white",
-                "citybuilder:concrete_light", 3, 0, 1);
+        Facade ward = new Facade(wall, "citybuilder:window_white_clear", wall, "citybuilder:concrete_light", 3, 0, 1);
         int top = block(m, w0, b0, w1, b1, 0, wards, 4, ward, "citybuilder:floor_pvc");
-        // Balconies all along its back and ends, every floor above the ground
-        for (int s = 1; s < wards; s++) {
+        // Balconies all along its back and ends, every floor above the ground (or, one seed in two, none)
+        for (int s = 1; s < wards && balconies(); s++) {
             int y = s * 4;
             for (int x = w0 - 1; x <= w1 + 1; x++) {
                 m.set(x, y, b1 + 1, "minecraft:smooth_quartz_slab[type=top,waterlogged=false]");
@@ -75,7 +87,11 @@ public record Hospital(int width, int wards, int seed) {
             }
         }
         parapet(m, w0, b0, w1, b1, top + 1, "citybuilder:concrete_light");
-        helipad(m, (w0 + w1) / 2, (b0 + b1) / 2, top, Math.min(w1 - w0 - 1, WARD - 3));
+        if (wards >= 7) {
+            helipad(m, (w0 + w1) / 2, (b0 + b1) / 2, top, Math.min(w1 - w0 - 1, WARD - 3));
+        } else {
+            plant(m, w0 + 2, b0 + 2, w1 - 2, b1 - 2, top + 1);
+        }
         // The porte-cochère: a canopy on four columns over the drive at the door, the name over its front
         doors(m, cx - 1, 1, z0);
         doors(m, cx + 1, 1, z0);

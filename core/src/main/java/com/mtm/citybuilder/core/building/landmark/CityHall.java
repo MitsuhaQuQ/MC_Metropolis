@@ -7,7 +7,9 @@ import static com.mtm.citybuilder.core.building.landmark.Civic.*;
 /**
  * A Japanese city hall (市役所), 1 block = 1 m, its front to the south (laid out facing north, then turned): the office block (行政棟) of {@code storeys} over
  * a glazed lobby five high, the upper floors four high with ribbon windows between bands of tile, a plant house and a
- * mast on its roof; the council wing (議会棟) beside it, two tall storeys in stone with tall windows; a paved forecourt
+ * mast on its roof (by the seed, the offices' facade is one of three ages: ribbon windows, punched windows, glass;
+ * a tall hall may rise as a tower set back over a podium); the council wing (議会棟) beside it, two tall storeys in
+ * stone with tall windows; a paved forecourt
  * with three flagpoles and planting, the entrance under a canopy carrying the hall's name; a car park down the west
  * side. Sizes as mid-sized cities' (the office block 40-70 by 18-25, 6-9 storeys).
  *
@@ -22,15 +24,27 @@ public record CityHall(int width, int depth, int storeys, int council, int seed)
     private static final String[] TILES = {"citybuilder:tile_beige", "citybuilder:tile_white", "citybuilder:tile_gray",
             "citybuilder:tile_ochre"};
 
+    private static final String[] OLD = {"citybuilder:tile_brown", "citybuilder:concrete_cream", "citybuilder:tile_dark"};
+
     public CityHall {
         if (width < 16 || depth < 10 || storeys < 2) {
             throw new IllegalArgumentException("a city hall needs width >= 16, depth >= 10, storeys >= 2");
         }
     }
 
+    /** The offices' facade, by the seed: 0 ribbon windows, 1 punched windows (older), 2 glass. */
+    public int style() {
+        return Math.floorMod(seed, 3);
+    }
+
+    /** Whether the offices rise as a tower set back over a three-storey podium: a tall hall, one seed in two. */
+    public boolean tower() {
+        return storeys >= 7 && Math.floorMod(seed / 3, 2) == 0 && depth >= 16;
+    }
+
     public Model build() {
         Model m = new Model();
-        String tile = TILES[Math.floorMod(seed, TILES.length)];
+        String tile = TILES[Math.floorMod(seed / 6, TILES.length)];
         int z0 = FORECOURT;
         int z1 = FORECOURT + depth - 1;
         int x1 = width - 1;
@@ -43,18 +57,40 @@ public record CityHall(int width, int depth, int storeys, int council, int seed)
         Facade lobby = new Facade("citybuilder:granite_gray", "citybuilder:curtain_clear", "citybuilder:granite_gray",
                 "citybuilder:granite_gray", 4, 0, 1);
         block(m, 0, z0, x1, z1, 0, 1, 5, lobby, "citybuilder:terminal_tile");
-        // The offices: ribbon windows, tile over and under, a pier every six
-        Facade offices = new Facade(tile, "citybuilder:window_aluminum_clear", "citybuilder:concrete_light", tile, 6, 0, 1);
-        int top = block(m, 0, z0, x1, z1, 5, storeys - 1, 4, offices, "citybuilder:floor_pvc");
-        parapet(m, 0, z0, x1, z1, top + 1, "citybuilder:concrete_light");
+        // The offices, by the hall's age: ribbon windows between bands of tile (the 1980s-90s), punched windows in an
+        // older tiled or painted block (the 1960s-70s), or glass between granite mullions (since the 2000s)
+        Facade offices = switch (style()) {
+            case 1 -> new Facade(OLD[Math.floorMod(seed / 3, OLD.length)], "citybuilder:window_aluminum_clear",
+                    "citybuilder:concrete_light", OLD[Math.floorMod(seed / 3, OLD.length)], 3, 1, 1);
+            case 2 -> new Facade("citybuilder:granite_gray", "citybuilder:curtain_blue", "citybuilder:curtain_gray",
+                    "citybuilder:granite_gray", 4, 0, 0);
+            default -> new Facade(tile, "citybuilder:window_aluminum_clear", "citybuilder:concrete_light", tile, 6, 0, 1);
+        };
+        int top;
+        int tx0 = 0;
+        int tx1 = x1;
+        int tz0 = z0;
+        int tz1 = z1;
+        if (tower()) {
+            // A podium of three storeys, the tower over it set back from its front and ends
+            int podium = block(m, 0, z0, x1, z1, 5, 2, 4, offices, "citybuilder:floor_pvc");
+            parapet(m, 0, z0, x1, z1, podium + 1, "citybuilder:concrete_light");
+            tx0 = Math.min(6, width / 5);
+            tx1 = x1 - tx0;
+            tz0 = z0 + 4;
+            top = block(m, tx0, tz0, tx1, tz1, podium, storeys - 3, 4, offices, "citybuilder:floor_pvc");
+        } else {
+            top = block(m, 0, z0, x1, z1, 5, storeys - 1, 4, offices, "citybuilder:floor_pvc");
+        }
+        parapet(m, tx0, tz0, tx1, tz1, top + 1, "citybuilder:concrete_light");
         // The plant house in the middle of the roof, outdoor units round it, a mast on it
         int cx = width / 2;
-        int cz = z0 + depth / 2;
+        int cz = (tz0 + tz1) / 2;
         Facade plain = new Facade("citybuilder:steel_siding_gray", "citybuilder:steel_siding_gray",
                 "citybuilder:concrete_light", "citybuilder:concrete_light", 0, 0, 0);
         int house = block(m, cx - 4, cz - 3, cx + 4, cz + 3, top, 1, 4, plain, ROOF);
-        plant(m, 2, z0 + 2, cx - 7, z1 - 2, top + 1);
-        plant(m, cx + 7, z0 + 2, x1 - 2, z1 - 2, top + 1);
+        plant(m, tx0 + 2, tz0 + 2, cx - 7, tz1 - 2, top + 1);
+        plant(m, cx + 7, tz0 + 2, tx1 - 2, tz1 - 2, top + 1);
         for (int y = house + 1; y <= house + 8; y++) {
             m.set(cx, y, cz, "minecraft:iron_bars");
         }

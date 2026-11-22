@@ -5,9 +5,10 @@ import com.mtm.citybuilder.core.building.temple.Model;
 import static com.mtm.citybuilder.core.building.landmark.Civic.*;
 
 /**
- * A Japanese municipal library (市立図書館), 1 block = 1 m, its front to the south (laid out facing north, then turned): two storeys five high in fair-faced
- * concrete, the front all glass from the ground to the roof with cedar fins standing before it, a thin roof running out
- * over it as deep eaves; inside, the front third a reading room two storeys high (tables along the glass, lights hung
+ * A Japanese municipal library (市立図書館), 1 block = 1 m, its front to the south (laid out facing north, then turned): two storeys five high,
+ * by the seed in fair-faced concrete with cedar fins before its glass front, in red brick with brick piers between
+ * tall panes, or in white render with white louvres; a thin flat roof running out as deep eaves, or a metal roof
+ * pitched to a ridge along the front; inside, the front third a reading room two storeys high (tables along the glass, lights hung
  * in it), the stacks behind on both floors in rows of bookshelves; narrow windows down the sides and back; a forecourt
  * of granite with cherry trees, the library's name on a low stone by the door; a car park beside it. Sizes as town and
  * city libraries' (40-60 by 25-40).
@@ -33,26 +34,29 @@ public record Library(int width, int depth, int seed) {
         int z1 = z0 + depth - 1;
         int cx = width / 2;
         fill(m, -2, 0, 0, x1 + 2, 0, z0 - 1, PAVING);
-        Facade sides = new Facade("citybuilder:concrete_exposed", "citybuilder:window_wood_clear",
-                "citybuilder:concrete_exposed", "citybuilder:concrete_exposed", 4, 0, 1);
+        String[] look = LOOKS[material()];
+        String wall = look[0];
+        Facade sides = new Facade(wall, look[1], wall, wall, 4, 0, 1);
         int top = block(m, 0, z0, x1, z1, 0, 2, STOREY, sides, "citybuilder:flooring_light");
         // Narrower windows: two in each bay of four, the rest concrete
         for (int y = 1; y < top; y++) {
             for (int z = z0 + 1; z < z1; z++) {
                 if (Math.floorMod(z - z0, 4) == 1) {
-                    m.set(0, y, z, set(m.get(0, y, z)));
-                    m.set(x1, y, z, set(m.get(x1, y, z)));
+                    m.set(0, y, z, set(m.get(0, y, z), wall));
+                    m.set(x1, y, z, set(m.get(x1, y, z), wall));
                 }
             }
         }
-        // The front all glass, both storeys and the floor between, cedar fins a block before it
+        // The front all glass, both storeys and the floor between: before it fins (cedar, or white louvres), or the
+        // brick carried down as piers between tall panes
         for (int x = 1; x < x1; x++) {
+            boolean pier = material() == 1 && Math.floorMod(x, 4) == 0;
             for (int y = 1; y < top; y++) {
-                m.set(x, y, z0, "citybuilder:curtain_clear");
+                m.set(x, y, z0, pier ? wall : "citybuilder:curtain_clear");
             }
-            if (x % 2 == 0) {
+            if (look[2] != null && x % 2 == 0) {
                 for (int y = 1; y < top; y++) {
-                    m.set(x, y, z0 - 1, "citybuilder:timber_light");
+                    m.set(x, y, z0 - 1, look[2]);
                 }
             }
         }
@@ -84,10 +88,32 @@ public record Library(int width, int depth, int seed) {
                 }
             }
         }
-        // The roof out over the front and sides as eaves, thin
-        for (int x = -2; x <= x1 + 2; x++) {
-            for (int z = z0 - 3; z <= z1; z++) {
-                m.set(x, top, z, "citybuilder:metal_roof_white_slab[axis=z,type=bottom]");
+        if (pitched()) {
+            // A metal roof pitched from both long sides to a ridge along the front, half a block up a block in,
+            // overhanging the front and back by two; the gables filled in the wall's material
+            int e0 = z0 - 2;
+            int e1 = z1 + 2;
+            int mid = (e0 + e1) / 2;
+            for (int z = e0; z <= e1; z++) {
+                int in = Math.min(z - e0, e1 - z);
+                int y = top + in / 2;
+                String slab = "citybuilder:metal_roof_slab[axis=x,type=" + (in % 2 == 0 ? "bottom" : "top") + "]";
+                for (int x = -1; x <= x1 + 1; x++) {
+                    m.set(x, y, z, z == mid || z == mid + 1 && (e1 - e0) % 2 == 1 ? "citybuilder:metal_roof[axis=x]" : slab);
+                }
+                if (z >= z0 && z <= z1) {
+                    for (int g = top; g < y; g++) {
+                        m.set(0, g, z, wall);
+                        m.set(x1, g, z, wall);
+                    }
+                }
+            }
+        } else {
+            // The roof out over the front and sides as eaves, thin
+            for (int x = -2; x <= x1 + 2; x++) {
+                for (int z = z0 - 3; z <= z1; z++) {
+                    m.set(x, top, z, "citybuilder:metal_roof_white_slab[axis=z,type=bottom]");
+                }
             }
         }
         // The door in the middle of the glass
@@ -116,8 +142,24 @@ public record Library(int width, int depth, int seed) {
         return m.rotated(2);
     }
 
-    /** A wall's window kept a wall: concrete in its place, where the bay keeps only two of three. */
-    private static String set(String s) {
-        return s != null && s.startsWith("citybuilder:window_") ? "citybuilder:concrete_exposed" : s;
+    /** A wall's window kept a wall: the wall in its place, where the bay keeps only two of three. */
+    private static String set(String s, String wall) {
+        return s != null && s.startsWith("citybuilder:window_") ? wall : s;
+    }
+
+    /** {wall, window, fins before the glass or null}: fair-faced concrete and cedar, red brick, white render. */
+    private static final String[][] LOOKS = {
+            {"citybuilder:concrete_exposed", "citybuilder:window_wood_clear", "citybuilder:timber_light"},
+            {"citybuilder:brick_red", "citybuilder:window_dark_clear", null},
+            {"citybuilder:plaster_white", "citybuilder:window_aluminum_clear", "citybuilder:concrete_white"}};
+
+    /** Its materials, by the seed: 0 concrete and cedar fins, 1 red brick, 2 white render and louvres. */
+    public int material() {
+        return Math.floorMod(seed, LOOKS.length);
+    }
+
+    /** Whether its roof is pitched metal (one seed in two) rather than flat with deep eaves. */
+    public boolean pitched() {
+        return Math.floorMod(seed / 3, 2) == 1;
     }
 }

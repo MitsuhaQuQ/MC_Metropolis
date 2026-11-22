@@ -278,15 +278,24 @@ TEMPLES = {
     # Civic and roadside buildings (core.building.landmark), self-made at Japanese sizes: a mid-sized city's hall
     # (office block 48 x 22, 8 storeys, a council wing), a smaller town's (30 x 16, 5 storeys), a general hospital
     # (outpatient block 50 wide, 8-storey wards, helipad), a municipal library (44 x 30, two storeys) and a branch
-    # library, filling stations with three and two islands.
+    # library, filling stations with three and two islands. The seed picks each one's look (see the generators):
+    # the city halls' facades (ribbon, punched, glass) and set-back towers, the hospitals' colours, ward placing and
+    # balconies, the libraries' materials (concrete and cedar, brick, white) and roofs, the stations' brands, fascias,
+    # sales rooms and columns.
     "city_hall_office": dict(kind="cityhall", role="CITY_HALL", width=48, depth=22, storeys=8, council=22, seed=3),
-    "town_hall": dict(kind="cityhall", role="CITY_HALL", width=30, depth=16, storeys=5, council=0, seed=5),
+    "city_hall_tower": dict(kind="cityhall", role="CITY_HALL", width=52, depth=24, storeys=11, council=24, seed=2),
+    "city_hall_old": dict(kind="cityhall", role="CITY_HALL", width=40, depth=18, storeys=6, council=18, seed=4),
+    "town_hall": dict(kind="cityhall", role="CITY_HALL", width=30, depth=16, storeys=4, council=0, seed=7),
     "hospital_general": dict(kind="hospital", role="HOSPITAL", width=50, wards=8, seed=2),
+    "hospital_west": dict(kind="hospital", role="HOSPITAL", width=46, wards=7, seed=13),
     "hospital_small": dict(kind="hospital", role="HOSPITAL", width=34, wards=5, seed=6),
-    "library_city": dict(kind="library", role="LIBRARY", width=44, depth=30, seed=4),
+    "library_city": dict(kind="library", role="LIBRARY", width=44, depth=30, seed=0),
+    "library_brick": dict(kind="library", role="LIBRARY", width=40, depth=26, seed=4),
+    "library_white": dict(kind="library", role="LIBRARY", width=36, depth=24, seed=2),
     "library_branch": dict(kind="library", role="LIBRARY", width=24, depth=18, seed=9),
     "gas_station": dict(kind="gas_station", role="GAS_STATION", islands=3, carWash=True, seed=1),
-    "gas_station_small": dict(kind="gas_station", role="GAS_STATION", islands=2, carWash=False, seed=2),
+    "gas_station_red": dict(kind="gas_station", role="GAS_STATION", islands=4, carWash=True, seed=12),
+    "gas_station_small": dict(kind="gas_station", role="GAS_STATION", islands=2, carWash=False, seed=22),
     # The hillside demos stand on MTM_worldgen's real terrain (seed 12345, round the castle town): each finds the
     # mountainside site nearest the town whose ground climbs as much as asked from the street to the back.
     # A shrine high on a mountainside: the approach climbs 30-60 m from the street.
@@ -362,9 +371,13 @@ LABELS = {
     "stadium_football": ("sports", None, "STADIUM"), "stadium_baseball": ("sports", None, "BALLPARK"),
     "athletics_ground": ("sports", None, "ATHLETICS_GROUND"),
     "city_hall_office": ("civic", None, "CITY_HALL"), "town_hall": ("civic", None, "CITY_HALL"),
+    "city_hall_tower": ("civic", None, "CITY_HALL"), "city_hall_old": ("civic", None, "CITY_HALL"),
     "hospital_general": ("civic", None, "HOSPITAL"), "hospital_small": ("civic", None, "HOSPITAL"),
+    "hospital_west": ("civic", None, "HOSPITAL"),
     "library_city": ("civic", None, "LIBRARY"), "library_branch": ("civic", None, "LIBRARY"),
+    "library_brick": ("civic", None, "LIBRARY"), "library_white": ("civic", None, "LIBRARY"),
     "gas_station": ("roadside", None, "GAS_STATION"), "gas_station_small": ("roadside", None, "GAS_STATION"),
+    "gas_station_red": ("roadside", None, "GAS_STATION"),
     "demo_precinct_shrine_small_hill": ("sacred", SHRINE, "KEIDAI"),
     "demo_precinct_shrine_medium_hill": ("sacred", SHRINE, "KEIDAI"),
     "demo_precinct_shrine_large": ("sacred", SHRINE, "KEIDAI"),
@@ -381,6 +394,9 @@ DEMO_NAMES = {"lighthouse_cape": "灯台（岬、犬吠埼風、退息所付き�
               "city_hall_office": "市役所（行政棟・議会棟）", "town_hall": "町役場", "hospital_general": "総合病院（ヘリポート付き）",
               "hospital_small": "病院（中規模）", "library_city": "市立図書館", "library_branch": "図書館（分館）",
               "gas_station": "ガソリンスタンド（洗車機付き）", "gas_station_small": "ガソリンスタンド（小）",
+              "city_hall_tower": "市役所（高層棟・ガラス）", "city_hall_old": "市役所（昭和の庁舎）",
+              "hospital_west": "病院（病棟が片側）", "library_brick": "図書館（レンガ・切妻屋根）",
+              "library_white": "図書館（白・ルーバー）", "gas_station_red": "ガソリンスタンド（4 アイランド）",
               "demo_precinct_shrine": "神社の境内（稲荷風）", "demo_precinct_temple": "寺院の伽藍", "demo_kasuga": "本殿（春日造）", "demo_hachiman": "本殿（八幡造）", "demo_shinmei": "本殿（神明造）",
               "demo_precinct_shrine_small_hill": "小さな神社（山の斜面）", "demo_precinct_shrine_medium_hill": "中規模の神社（山麓）",
               "demo_precinct_shrine_large": "大きな神社（稲荷風、緩い斜面）", "demo_precinct_temple_medium_hill": "中規模の寺院（山麓）",
