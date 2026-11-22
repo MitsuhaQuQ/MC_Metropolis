@@ -1,6 +1,27 @@
 {
   "variants": {
-    "": {
+    "height=1": {
+      "model": "citybuilder:block/sidewalk_t2"
+    },
+    "height=2": {
+      "model": "citybuilder:block/sidewalk_t4"
+    },
+    "height=3": {
+      "model": "citybuilder:block/sidewalk_t6"
+    },
+    "height=4": {
+      "model": "citybuilder:block/sidewalk_t8"
+    },
+    "height=5": {
+      "model": "citybuilder:block/sidewalk_t10"
+    },
+    "height=6": {
+      "model": "citybuilder:block/sidewalk_t12"
+    },
+    "height=7": {
+      "model": "citybuilder:block/sidewalk_t14"
+    },
+    "height=8": {
       "model": "citybuilder:block/sidewalk"
     }
   }

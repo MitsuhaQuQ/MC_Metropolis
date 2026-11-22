@@ -111,7 +111,7 @@ public final class CityBlocks {
         ASPHALT_LINE_WHITE = platform.registerBlock("asphalt_line_white", () -> new MarkingBlock(properties()));
         ASPHALT_LINE_YELLOW = platform.registerBlock("asphalt_line_yellow", () -> new MarkingBlock(properties()));
         ASPHALT_WHITE = platform.registerBlock("asphalt_white", () -> new PavingBlock(properties()));
-        SIDEWALK = platform.registerBlock("sidewalk", () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE_BRICKS)));
+        SIDEWALK = platform.registerBlock("sidewalk", () -> new SidewalkBlock(BlockBehaviour.Properties.copy(Blocks.STONE_BRICKS)));
         ASPHALT_HATCH = platform.registerBlock("asphalt_hatch", () -> new DirectedPavingBlock(properties()));
         ROAD_ARROW_SHAFT = platform.registerBlock("road_arrow_shaft", () -> new DirectedPavingBlock(properties()));
         ROAD_ARROW_HEAD = platform.registerBlock("road_arrow_head", () -> new DirectedPavingBlock(properties()));

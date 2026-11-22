@@ -17,7 +17,7 @@ public final class DirectedPavingBlock extends PavingBlock {
 
     public DirectedPavingBlock(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(LOW, false));
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(LOW, false).setValue(HEIGHT, 8));
     }
 
     @Override

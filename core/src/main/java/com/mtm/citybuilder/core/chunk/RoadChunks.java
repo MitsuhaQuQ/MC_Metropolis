@@ -38,12 +38,14 @@ public final class RoadChunks {
      * @param outside how far the column lies beyond the road's edge, 0 on the road: the slopes' columns
      * @param mark    the paving on the road, null on the slopes
      * @param kind    how the road meets the ground there
-     * @param parapet whether a bridge's parapet stands on the column: its outermost block
+     * @param parapet whether a bridge's parapet stands on the column: a block of the deck reaching its edge (see
+     *                {@link ChunkLayer#atEdge})
+     * @param edge    how far the column's middle lies in from the deck's edge (for the parapet's shape)
      * @param pier    whether a bridge's pier stands under the column
      * @param outward the direction out from the road's centre line across the column, radians from +x towards +z
      */
     public record Cell(int level, double outside, ChunkLayer.Mark mark, RoadKind kind, boolean parapet, boolean pier,
-                       double outward) {
+                       double outward, double edge) {
         public boolean onRoad() {
             return outside <= 0.0;
         }
@@ -224,15 +226,16 @@ public final class RoadChunks {
             if (kind == RoadKind.TUNNEL || kind == RoadKind.BRIDGE) {
                 return null;
             }
-            return new Cell(level, bestScore, null, kind, false, false, outward);
+            return new Cell(level, bestScore, null, kind, false, false, outward, 0.0);
         }
         double half = 0.5 * route.width();
         double along = best.along[i - 1] + bestT * (best.along[i] - best.along[i - 1]);
         ChunkLayer.Mark mark = ChunkLayer.drawRoad(route.width(), bestAcross, heading, along);
         boolean bridge = kind == RoadKind.BRIDGE;
-        boolean parapet = bridge && Math.abs(bestAcross) > half - 1.0;
+        double edge = half - Math.abs(bestAcross);
+        boolean parapet = bridge && ChunkLayer.atEdge(edge, outward);
         boolean pier = bridge && !parapet && Math.floorMod((long) Math.floor(along), (long) PIER_SPACING) < 2;
-        return new Cell(level, 0.0, mark, kind, parapet, pier, outward);
+        return new Cell(level, 0.0, mark, kind, parapet, pier, outward, edge);
     }
 
     /** The roads whose routing window touches the chunk's region. */

@@ -1,0 +1,7 @@
+{
+  "parent": "citybuilder:block/paved_3",
+  "textures": {
+    "top": "citybuilder:block/line/yellow_5_1",
+    "side": "citybuilder:block/asphalt"
+  }
+}

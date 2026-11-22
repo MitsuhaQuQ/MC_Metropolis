@@ -18,7 +18,7 @@ public final class MarkingBlock extends PavingBlock {
     public MarkingBlock(Properties properties) {
         super(properties);
         registerDefaultState(stateDefinition.any().setValue(ANGLE, 0).setValue(OFFSET, ChunkLayer.OFFSETS / 2)
-                .setValue(LOW, false));
+                .setValue(LOW, false).setValue(HEIGHT, 8));
     }
 
     @Override

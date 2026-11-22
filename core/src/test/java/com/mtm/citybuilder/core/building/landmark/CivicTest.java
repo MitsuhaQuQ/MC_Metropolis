@@ -24,6 +24,21 @@ class CivicTest {
                 new Library(24, 18, 9).build(), new GasStation(3, true, 1).build(), new GasStation(1, false, 2).build());
     }
 
+    /**
+     * Whether a block-state file's variant key is a state written without the properties it leaves at their defaults:
+     * the paving's height, whole (height=8).
+     */
+    private static boolean sameWithDefaults(String key, String props) {
+        java.util.Set<String> given = new java.util.HashSet<>(java.util.Arrays.asList(props.split(",")));
+        given.remove("");
+        java.util.Set<String> listed = new java.util.HashSet<>(java.util.Arrays.asList(key.split(",")));
+        if (!listed.containsAll(given)) {
+            return false;
+        }
+        listed.removeAll(given);
+        return listed.stream().allMatch(p -> p.equals("height=8"));
+    }
+
     private static String base(String state) {
         int i = state.indexOf('[');
         return i < 0 ? state : state.substring(0, i);
@@ -61,7 +76,8 @@ class CivicTest {
                     return;
                 }
                 String props = s.indexOf('[') < 0 ? "" : s.substring(s.indexOf('[') + 1, s.length() - 1);
-                if (!file.getAsJsonObject("variants").has(props)) {
+                JsonObject variants = file.getAsJsonObject("variants");
+                if (!variants.has(props) && variants.keySet().stream().noneMatch(k -> sameWithDefaults(k, props))) {
                     bad.add(s);
                 }
             });

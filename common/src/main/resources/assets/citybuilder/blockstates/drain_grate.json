@@ -1,32 +1,242 @@
 {
   "variants": {
-    "facing=north,low=false": {
+    "facing=north,height=1,low=false": {
+      "model": "citybuilder:block/drain_grate_t2"
+    },
+    "facing=east,height=1,low=false": {
+      "model": "citybuilder:block/drain_grate_t2",
+      "y": 90
+    },
+    "facing=south,height=1,low=false": {
+      "model": "citybuilder:block/drain_grate_t2",
+      "y": 180
+    },
+    "facing=west,height=1,low=false": {
+      "model": "citybuilder:block/drain_grate_t2",
+      "y": 270
+    },
+    "facing=north,height=2,low=false": {
+      "model": "citybuilder:block/drain_grate_t4"
+    },
+    "facing=east,height=2,low=false": {
+      "model": "citybuilder:block/drain_grate_t4",
+      "y": 90
+    },
+    "facing=south,height=2,low=false": {
+      "model": "citybuilder:block/drain_grate_t4",
+      "y": 180
+    },
+    "facing=west,height=2,low=false": {
+      "model": "citybuilder:block/drain_grate_t4",
+      "y": 270
+    },
+    "facing=north,height=3,low=false": {
+      "model": "citybuilder:block/drain_grate_t6"
+    },
+    "facing=east,height=3,low=false": {
+      "model": "citybuilder:block/drain_grate_t6",
+      "y": 90
+    },
+    "facing=south,height=3,low=false": {
+      "model": "citybuilder:block/drain_grate_t6",
+      "y": 180
+    },
+    "facing=west,height=3,low=false": {
+      "model": "citybuilder:block/drain_grate_t6",
+      "y": 270
+    },
+    "facing=north,height=4,low=false": {
+      "model": "citybuilder:block/drain_grate_t8"
+    },
+    "facing=east,height=4,low=false": {
+      "model": "citybuilder:block/drain_grate_t8",
+      "y": 90
+    },
+    "facing=south,height=4,low=false": {
+      "model": "citybuilder:block/drain_grate_t8",
+      "y": 180
+    },
+    "facing=west,height=4,low=false": {
+      "model": "citybuilder:block/drain_grate_t8",
+      "y": 270
+    },
+    "facing=north,height=5,low=false": {
+      "model": "citybuilder:block/drain_grate_t10"
+    },
+    "facing=east,height=5,low=false": {
+      "model": "citybuilder:block/drain_grate_t10",
+      "y": 90
+    },
+    "facing=south,height=5,low=false": {
+      "model": "citybuilder:block/drain_grate_t10",
+      "y": 180
+    },
+    "facing=west,height=5,low=false": {
+      "model": "citybuilder:block/drain_grate_t10",
+      "y": 270
+    },
+    "facing=north,height=6,low=false": {
+      "model": "citybuilder:block/drain_grate_t12"
+    },
+    "facing=east,height=6,low=false": {
+      "model": "citybuilder:block/drain_grate_t12",
+      "y": 90
+    },
+    "facing=south,height=6,low=false": {
+      "model": "citybuilder:block/drain_grate_t12",
+      "y": 180
+    },
+    "facing=west,height=6,low=false": {
+      "model": "citybuilder:block/drain_grate_t12",
+      "y": 270
+    },
+    "facing=north,height=7,low=false": {
+      "model": "citybuilder:block/drain_grate_t14"
+    },
+    "facing=east,height=7,low=false": {
+      "model": "citybuilder:block/drain_grate_t14",
+      "y": 90
+    },
+    "facing=south,height=7,low=false": {
+      "model": "citybuilder:block/drain_grate_t14",
+      "y": 180
+    },
+    "facing=west,height=7,low=false": {
+      "model": "citybuilder:block/drain_grate_t14",
+      "y": 270
+    },
+    "facing=north,height=8,low=false": {
       "model": "citybuilder:block/drain_grate"
     },
-    "facing=east,low=false": {
+    "facing=east,height=8,low=false": {
       "model": "citybuilder:block/drain_grate",
       "y": 90
     },
-    "facing=south,low=false": {
+    "facing=south,height=8,low=false": {
       "model": "citybuilder:block/drain_grate",
       "y": 180
     },
-    "facing=west,low=false": {
+    "facing=west,height=8,low=false": {
       "model": "citybuilder:block/drain_grate",
       "y": 270
     },
-    "facing=north,low=true": {
+    "facing=north,height=1,low=true": {
+      "model": "citybuilder:block/drain_grate_t1"
+    },
+    "facing=east,height=1,low=true": {
+      "model": "citybuilder:block/drain_grate_t1",
+      "y": 90
+    },
+    "facing=south,height=1,low=true": {
+      "model": "citybuilder:block/drain_grate_t1",
+      "y": 180
+    },
+    "facing=west,height=1,low=true": {
+      "model": "citybuilder:block/drain_grate_t1",
+      "y": 270
+    },
+    "facing=north,height=2,low=true": {
+      "model": "citybuilder:block/drain_grate_t1"
+    },
+    "facing=east,height=2,low=true": {
+      "model": "citybuilder:block/drain_grate_t1",
+      "y": 90
+    },
+    "facing=south,height=2,low=true": {
+      "model": "citybuilder:block/drain_grate_t1",
+      "y": 180
+    },
+    "facing=west,height=2,low=true": {
+      "model": "citybuilder:block/drain_grate_t1",
+      "y": 270
+    },
+    "facing=north,height=3,low=true": {
+      "model": "citybuilder:block/drain_grate_t3"
+    },
+    "facing=east,height=3,low=true": {
+      "model": "citybuilder:block/drain_grate_t3",
+      "y": 90
+    },
+    "facing=south,height=3,low=true": {
+      "model": "citybuilder:block/drain_grate_t3",
+      "y": 180
+    },
+    "facing=west,height=3,low=true": {
+      "model": "citybuilder:block/drain_grate_t3",
+      "y": 270
+    },
+    "facing=north,height=4,low=true": {
+      "model": "citybuilder:block/drain_grate_t5"
+    },
+    "facing=east,height=4,low=true": {
+      "model": "citybuilder:block/drain_grate_t5",
+      "y": 90
+    },
+    "facing=south,height=4,low=true": {
+      "model": "citybuilder:block/drain_grate_t5",
+      "y": 180
+    },
+    "facing=west,height=4,low=true": {
+      "model": "citybuilder:block/drain_grate_t5",
+      "y": 270
+    },
+    "facing=north,height=5,low=true": {
+      "model": "citybuilder:block/drain_grate_t7"
+    },
+    "facing=east,height=5,low=true": {
+      "model": "citybuilder:block/drain_grate_t7",
+      "y": 90
+    },
+    "facing=south,height=5,low=true": {
+      "model": "citybuilder:block/drain_grate_t7",
+      "y": 180
+    },
+    "facing=west,height=5,low=true": {
+      "model": "citybuilder:block/drain_grate_t7",
+      "y": 270
+    },
+    "facing=north,height=6,low=true": {
+      "model": "citybuilder:block/drain_grate_t9"
+    },
+    "facing=east,height=6,low=true": {
+      "model": "citybuilder:block/drain_grate_t9",
+      "y": 90
+    },
+    "facing=south,height=6,low=true": {
+      "model": "citybuilder:block/drain_grate_t9",
+      "y": 180
+    },
+    "facing=west,height=6,low=true": {
+      "model": "citybuilder:block/drain_grate_t9",
+      "y": 270
+    },
+    "facing=north,height=7,low=true": {
+      "model": "citybuilder:block/drain_grate_t11"
+    },
+    "facing=east,height=7,low=true": {
+      "model": "citybuilder:block/drain_grate_t11",
+      "y": 90
+    },
+    "facing=south,height=7,low=true": {
+      "model": "citybuilder:block/drain_grate_t11",
+      "y": 180
+    },
+    "facing=west,height=7,low=true": {
+      "model": "citybuilder:block/drain_grate_t11",
+      "y": 270
+    },
+    "facing=north,height=8,low=true": {
       "model": "citybuilder:block/drain_grate_low"
     },
-    "facing=east,low=true": {
+    "facing=east,height=8,low=true": {
       "model": "citybuilder:block/drain_grate_low",
       "y": 90
     },
-    "facing=south,low=true": {
+    "facing=south,height=8,low=true": {
       "model": "citybuilder:block/drain_grate_low",
       "y": 180
     },
-    "facing=west,low=true": {
+    "facing=west,height=8,low=true": {
       "model": "citybuilder:block/drain_grate_low",
       "y": 270
     }

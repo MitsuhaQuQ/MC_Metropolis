@@ -68,12 +68,25 @@ public final class TestKitClient implements ClientModInitializer {
                 }
                 return state;
             }));
-            route(http, "/join", q -> onThread(() -> {
+            route(http, "/join", q -> {
+                // Not while resources are (re)loading: a reload finishing after the join (MTR's fails, and the game
+                // reloads again without the resource packs) drops the connection a moment later
+                long until = System.currentTimeMillis() + 180_000;
+                while (System.currentTimeMillis() < until && Boolean.TRUE.equals(onThread(() -> minecraft.getOverlay() != null))) {
+                    try {
+                        Thread.sleep(500);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
                 String address = q.getOrDefault("address", "127.0.0.1:25566");
-                ConnectScreen.startConnecting(new TitleScreen(), minecraft, ServerAddress.parseString(address),
-                        new ServerData("autotest", address, false), false);
-                return Map.of("joining", address);
-            }));
+                return onThread(() -> {
+                    ConnectScreen.startConnecting(new TitleScreen(), minecraft, ServerAddress.parseString(address),
+                            new ServerData("autotest", address, false), false);
+                    return Map.of("joining", address);
+                });
+            });
             route(http, "/look", q -> onThread(() -> {
                 if (minecraft.player != null) {
                     minecraft.player.setYRot(Float.parseFloat(q.getOrDefault("yaw", "0")));

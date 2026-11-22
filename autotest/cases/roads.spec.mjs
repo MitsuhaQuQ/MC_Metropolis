@@ -47,5 +47,5 @@ test('a bridge has its deck and parapets', async () => {
   const blocks = await around(p);
   const top = blocks.top;
   console.log('blocks', JSON.stringify(top));
-  expect(top['citybuilder:concrete_parapet'] ?? 0).toBeGreaterThan(20);
+  expect(top['citybuilder:thin_concrete_light'] ?? 0).toBeGreaterThan(20);
 });

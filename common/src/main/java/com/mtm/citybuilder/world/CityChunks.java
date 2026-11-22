@@ -124,6 +124,23 @@ public final class CityChunks {
         chunk.setBlockState(pos.set(wx, y + pole + 1, wz), lamp, false);
     }
 
+    /**
+     * A paving block cut to {@code eighths} (asphalt, its markings and fittings, the pavement; a planted median's
+     * grass as grass in layers), or null for one that comes only whole.
+     */
+    private static BlockState cut(BlockState block, int eighths) {
+        if (block == null) {
+            return null;
+        }
+        if (block.hasProperty(PavingBlock.HEIGHT)) {
+            return block.setValue(PavingBlock.HEIGHT, eighths);
+        }
+        if (block.is(Blocks.GRASS_BLOCK)) {
+            return GroundBlocks.GRASS_LAYER.get().defaultBlockState().setValue(LayerBlock.LAYERS, eighths);
+        }
+        return null;
+    }
+
     private static BlockState line(Block block, ChunkLayer.Mark mark) {
         return block.defaultBlockState().setValue(MarkingBlock.ANGLE, mark.angle()).setValue(MarkingBlock.OFFSET, mark.offset())
                 .setValue(PavingBlock.LOW, mark.low());
@@ -378,8 +395,17 @@ public final class CityChunks {
         if (wet && (kind == ChunkLayer.BANK_TERRACE || kind == ChunkLayer.BANK_REVETMENT && ground < level - 2)) {
             return;
         }
+        // Off the revetment the bank's top is laid as the streets' paving is ({@link #surface}): whole blocks to just
+        // under it, the rest in eighths over them (grass or snow layers, the foot road's asphalt cut to height), so
+        // the back slope reads as a slope, not a staircase, and the crest meets its road
+        int eighths = 8;
         int y = (int) Math.floor(level);
-        if (y < chunk.getMinBuildHeight() + 3 || y + 1 > top) {
+        if (kind != ChunkLayer.BANK_REVETMENT) {
+            int[] at = surface(level);
+            eighths = at[1];
+            y = eighths == 8 ? at[0] : at[0] - 1;
+        }
+        if (y < chunk.getMinBuildHeight() + 3 || y + 2 > top) {
             return;
         }
         for (int up = y + 1; up <= surface; up++) {
@@ -405,16 +431,16 @@ public final class CityChunks {
             chunk.setBlockState(pos.set(wx, down, wz), fill, false);
         }
         chunk.setBlockState(pos.set(wx, y, wz), face, false);
-        if (kind == ChunkLayer.BANK_SLOPE || kind == ChunkLayer.BANK_TERRACE) {
-            // The grass laid to the slope's own height in eighths over the whole block (1 in 2: half a block a
-            // column), so the back slope reads as a slope, not a staircase; snow in a cold biome
-            int eighths = (int) Math.round((level - y) * 8.0);
-            if (eighths > 0 && y + 1 <= top) {
-                BlockState layer = snowy(chunk, wx, y + 1, wz)
-                        ? GroundBlocks.SNOW_LAYER.get().defaultBlockState().setValue(LayerBlock.LAYERS, Math.min(8, eighths))
-                        : GroundBlocks.GRASS_LAYER.get().defaultBlockState().setValue(LayerBlock.LAYERS, Math.min(8, eighths));
-                chunk.setBlockState(pos.set(wx, y + 1, wz), layer, false);
+        if (eighths < 8) {
+            BlockState layer;
+            if (kind == ChunkLayer.BANK_ROAD) {
+                layer = CityBlocks.ASPHALT.get().defaultBlockState().setValue(PavingBlock.HEIGHT, eighths);
+            } else if (snowy(chunk, wx, y + 1, wz)) {
+                layer = GroundBlocks.SNOW_LAYER.get().defaultBlockState().setValue(LayerBlock.LAYERS, eighths);
+            } else {
+                layer = GroundBlocks.GRASS_LAYER.get().defaultBlockState().setValue(LayerBlock.LAYERS, eighths);
             }
+            chunk.setBlockState(pos.set(wx, y + 1, wz), layer, false);
         }
         if (kind == ChunkLayer.BANK_REVETMENT || kind == ChunkLayer.BANK_ROAD) {
             // A block of the same under it, as under the streets' paving: a step's face is the revetment or the road
@@ -423,6 +449,38 @@ public final class CityChunks {
                 chunk.setBlockState(pos.set(wx, y - k, wz), under, false);
             }
         }
+    }
+
+    /** The mean of the levels within two columns of one in its chunk (x-major, NaN where none), or NaN. */
+    private static double around(double[] levels, int x, int z) {
+        double sum = 0;
+        int count = 0;
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                int nx = x + dx;
+                int nz = z + dz;
+                if (nx >= 0 && nx < 16 && nz >= 0 && nz < 16 && !Double.isNaN(levels[nx * 16 + nz])) {
+                    sum += levels[nx * 16 + nz];
+                    count++;
+                }
+            }
+        }
+        return count == 0 ? Double.NaN : sum / count;
+    }
+
+    /**
+     * Where a surface laid to a continuous level tops out: half a block over the level (the ground's own top lies,
+     * on the whole, half a block over its height, a block's top face being over the block the height falls in), as
+     * {block, eighths}: the block holding the top, and how many eighths of it are filled (1 to 8).
+     */
+    static int[] surface(double level) {
+        double top = level + 0.5;
+        int block = (int) Math.ceil(top - 1e-9) - 1;
+        int eighths = (int) Math.round((top - block) * 8.0);
+        if (eighths < 1) {
+            return new int[]{block - 1, 8};
+        }
+        return new int[]{block, Math.min(8, eighths)};
     }
 
     private static ChunkLayer.Column[] columns(WorldGenLevel level, ChunkAccess chunk) {
@@ -543,11 +601,20 @@ public final class CityChunks {
                 }
                 double planned = grades == null || column.plaza() != null || column.surface() == ChunkLayer.Surface.PATH
                         ? Double.NaN : grades.level()[x * 16 + z];
+                if (Double.isNaN(planned) && grades != null && !column.bridge() && column.plaza() == null
+                        && column.surface() != ChunkLayer.Surface.PATH) {
+                    // A street's column with no level of its own (past a bridge piece's end, off its deck): the
+                    // level of the street round it, so it does not sink to the ground among its neighbours
+                    planned = around(grades.level(), x, z);
+                }
                 // A footpath on an embankment (the riverside promenade on its terrace) at the embankment's level
                 if (grades != null && column.surface() == ChunkLayer.Surface.PATH && !Double.isNaN(grades.bank()[x * 16 + z])) {
                     planned = grades.bank()[x * 16 + z];
                 }
                 int y;
+                // How much of the paving block is filled, in eighths: a street rising on a ramp tops out a little
+                // higher each column, not a block at a time (see surface)
+                int eighths = 8;
                 if (column.bridge()) {
                     y = (int) column.deck();
                 } else {
@@ -567,8 +634,24 @@ public final class CityChunks {
                     if (!Double.isNaN(planned)) {
                         // Laid at the street's level, the ground cut down or filled up to it; over water no lower than
                         // its surface
-                        int at = (int) Math.floor(planned);
-                        y = waterTop == Integer.MIN_VALUE ? at : Math.max(at, waterTop);
+                        int[] laid = surface(planned);
+                        int at = laid[0];
+                        eighths = laid[1];
+                        if (eighths == 1 && block != null && block.hasProperty(PavingBlock.LOW) && block.getValue(PavingBlock.LOW)) {
+                            // A lowered carriageway an eighth into its block tops out just under it: the block below
+                            at -= 1;
+                            eighths = 8;
+                        }
+                        if (eighths < 8 && (column.canal() != 0 || cut(block, eighths) == null)) {
+                            // A block that comes only whole: the whole block nearer the street's top
+                            at = eighths >= 4 ? at : at - 1;
+                            eighths = 8;
+                        }
+                        if (waterTop != Integer.MIN_VALUE && waterTop > at) {
+                            at = waterTop;
+                            eighths = 8;
+                        }
+                        y = at;
                         for (int cut = y + 1; cut <= Math.min(top, surface); cut++) {
                             chunk.setBlockState(pos.set(baseX + x, cut, baseZ + z), Blocks.AIR.defaultBlockState(), false);
                         }
@@ -591,6 +674,9 @@ public final class CityChunks {
                     if (ChunkLayer.slabDeck(column)) {
                         block = Blocks.SMOOTH_STONE.defaultBlockState();
                     }
+                }
+                if (eighths < 8) {
+                    block = cut(block, eighths);
                 }
                 chunk.setBlockState(pos.set(baseX + x, y, baseZ + z), block, false);
                 if (!column.bridge() && column.canal() == 0) {
@@ -623,12 +709,14 @@ public final class CityChunks {
                 if (ChunkLayer.parapet(column)) {
                     chunk.setBlockState(pos.set(baseX + x, y + 1, baseZ + z), Blocks.STONE_BRICK_WALL.defaultBlockState(), false);
                 } else if (ChunkLayer.railing(column)) {
-                    // A street bridge's parapet along its edge, its face outward (the street's left is its normal)
-                    double outward = column.heading() + (column.across() >= 0 ? 0.5 * Math.PI : -0.5 * Math.PI);
-                    chunk.setBlockState(pos.set(baseX + x, y + 1, baseZ + z), CityBlocks.CONCRETE_PARAPET.get().defaultBlockState()
-                            .setValue(EdgeBlock.FACING, direction(outward)), false);
+                    // A street bridge's parapet along its edge, joined round its corners
+                    BlockState parapet = parapet(ChunkLayer.edge(column), ChunkLayer.outward(column));
+                    if (parapet != null) {
+                        chunk.setBlockState(pos.set(baseX + x, y + 1, baseZ + z), parapet, false);
+                    }
                 }
-                fixture(chunk, ChunkLayer.furniture(column), baseX + x, y, baseZ + z, pos, top);
+                // A pole stands on the paving, or, on a block cut low, down in it
+                fixture(chunk, ChunkLayer.furniture(column), baseX + x, eighths >= 6 ? y : y - 1, baseZ + z, pos, top);
             }
         }
     }
@@ -716,8 +804,10 @@ public final class CityChunks {
                     chunk.setBlockState(pos.set(wx, y, wz), air, false);
                 }
                 if (cell.parapet()) {
-                    chunk.setBlockState(pos.set(wx, level + 1, wz), CityBlocks.CONCRETE_PARAPET.get().defaultBlockState()
-                            .setValue(EdgeBlock.FACING, direction(cell.outward())), false);
+                    BlockState parapet = parapet(cell.edge(), cell.outward());
+                    if (parapet != null) {
+                        chunk.setBlockState(pos.set(wx, level + 1, wz), parapet, false);
+                    }
                 }
                 if (cell.pier()) {
                     // Down to the ground, through water to its bed
@@ -747,6 +837,44 @@ public final class CityChunks {
     }
 
     /** The horizontal direction nearest an angle from +x towards +z. */
+    /**
+     * A bridge's parapet on a block of its deck's edge ({@code edge} its middle's distance in from the edge, the way
+     * out {@code outward}): a thin concrete wall against the sides and corners whose neighbours lie beyond the edge
+     * (core's {@link com.mtm.citybuilder.core.building.ThinWall#fromOutside}), straight along a square edge, outer
+     * corners and inner posts where the edge steps across the blocks at an angle, so the parapet is one closed line
+     * with no gap between its pieces. Null where none fits (a deck too narrow for one).
+     */
+    private static BlockState parapet(double edge, double outward) {
+        double ox = Math.cos(outward);
+        double oz = Math.sin(outward);
+        int sides = 0;
+        int corners = 0;
+        for (int d = 0; d < 4; d++) {
+            int e = com.mtm.citybuilder.core.building.ThinWall.clockwise(d);
+            int dx = com.mtm.citybuilder.core.building.ThinWall.dx(d);
+            int dz = com.mtm.citybuilder.core.building.ThinWall.dz(d);
+            if (dx * ox + dz * oz > edge) {
+                sides |= 1 << d;
+            }
+            int cx = dx + com.mtm.citybuilder.core.building.ThinWall.dx(e);
+            int cz = dz + com.mtm.citybuilder.core.building.ThinWall.dz(e);
+            if (cx * ox + cz * oz > edge) {
+                corners |= 1 << d;
+            }
+        }
+        com.mtm.citybuilder.core.building.ThinWall.Shape shape = com.mtm.citybuilder.core.building.ThinWall.fromOutside(sides, corners);
+        if (shape == null) {
+            return null;
+        }
+        if (parapetWall == null) {
+            parapetWall = (com.mtm.citybuilder.block.ThinWallBlock) net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                    new net.minecraft.resources.ResourceLocation(CityBuilder.MOD_ID, "thin_concrete_light"));
+        }
+        return parapetWall.state(shape);
+    }
+
+    private static com.mtm.citybuilder.block.ThinWallBlock parapetWall;
+
     private static Direction direction(double angle) {
         double dx = Math.cos(angle);
         double dz = Math.sin(angle);

@@ -66,13 +66,32 @@ public final class ChunkLayer {
     }
 
     /**
-     * Whether a street bridge's parapet stands on a column: the outermost block of its deck, not where streets meet
-     * on it nor on a footbridge's path.
+     * Whether a street bridge's parapet stands on a column: a block of its deck reaching the edge ({@link #atEdge}),
+     * not where streets meet on it nor on a footbridge's path.
      */
     public static boolean railing(Column column) {
         return column.bridge && column.surface != Surface.NONE && column.surface != Surface.PATH
                 && column.surface != Surface.PLAZA && column.plaza == null && !column.junction && column.width >= 4.0
-                && Math.abs(column.across) > 0.5 * column.width - 1.0;
+                && atEdge(edge(column), outward(column));
+    }
+
+    /** How far a column's middle lies in from its street's edge. */
+    public static double edge(Column column) {
+        return 0.5 * column.width - Math.abs(column.across);
+    }
+
+    /** The way out of a column's street across its nearer edge, in radians (the street's left is its normal). */
+    public static double outward(Column column) {
+        return column.heading + (column.across >= 0 ? 0.5 * Math.PI : -0.5 * Math.PI);
+    }
+
+    /**
+     * Whether a block whose middle lies {@code edge} in from a deck's edge, the way out being {@code outward}, has a
+     * neighbour, square or diagonal, whose middle lies beyond the edge: the deck's edge blocks, a closed line round
+     * a deck at any angle (each touching the next by a face), so a parapet along them leaves no gap to walk through.
+     */
+    public static boolean atEdge(double edge, double outward) {
+        return edge < Math.abs(Math.cos(outward)) + Math.abs(Math.sin(outward));
     }
 
     /** Whether a surface is marked with lines: arterials, collectors and boulevards. */
@@ -1823,8 +1842,11 @@ public final class ChunkLayer {
         for (int p = 0; p < segments.size(); p++) {
             StreetSegment g = segments.get(p);
             if (g.structure() == StreetStructure.BRIDGE && !Double.isNaN(deck[p])) {
-                heights.merge(point(g.x1(), g.z1()), deck[p], Math::max);
-                heights.merge(point(g.x2(), g.z2()), deck[p], Math::max);
+                // At the deck's top: a street's paving tops out half a block over its level (the chunk layer lays
+                // it so), the deck's at the top of its block
+                double end = Math.floor(deck[p]) + 0.5;
+                heights.merge(point(g.x1(), g.z1()), end, Math::max);
+                heights.merge(point(g.x2(), g.z2()), end, Math::max);
             }
         }
         ramps(index);

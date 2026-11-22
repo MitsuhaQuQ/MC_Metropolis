@@ -3,7 +3,9 @@ python tools/textures/road_models.py (after road_textures.py, which draws the te
 
 Asphalt and the marked asphalt come full height or lowered (low=true, 13/16 high: a carriageway beside pavements, see
 PavingBlock); the marked asphalt has a line at one of ANGLES directions and OFFSETS positions (see MarkingBlock).
-The pavement's sides are kerb stones.
+The pavement's sides are kerb stones. Asphalt, its markings and the pavement also come cut to eighths (height 1-8,
+for a street rising on a ramp a little at a time): their tops at 2 * height sixteenths, less the kerb's 3 where
+lowered (PavingBlock.top), on a parent per height (paved_<sixteenths>).
 """
 import json
 import math
@@ -24,6 +26,42 @@ def write(path, data):
     with open(path, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(data, f, indent=2)
         f.write('\n')
+
+
+def top(height, low):
+    """A paving block's top in sixteenths (PavingBlock.top)."""
+    return max(1, 2 * height - (16 - LOW if low else 0))
+
+
+TOPS = sorted({top(h, low) for h in range(1, 9) for low in (False, True)})
+HEIGHTS = range(1, 9)
+
+
+def paved_parent(t):
+    """A block t sixteenths high: the top face textured #top, the sides #side cut to that height, #side under."""
+    side = {'uv': [0, 16 - t, 16, 16], 'texture': '#side'}
+    faces = {'down': {'uv': [0, 0, 16, 16], 'texture': '#side', 'cullface': 'down'},
+             'up': {'uv': [0, 0, 16, 16], 'texture': '#top'}}
+    for face in ('north', 'south', 'west', 'east'):
+        faces[face] = dict(side, cullface=face)
+    return {'parent': 'minecraft:block/block',
+            'textures': {'particle': '#side'},
+            'elements': [{'from': [0, 0, 0], 'to': [16, t, 16], 'faces': faces}]}
+
+
+def cut(base, textures):
+    """Writes a paving block's models cut to each height other than whole (base) and lowered (base_low); returns
+    the model name for a height and lowering."""
+    folder, name = os.path.split(base)
+    for t in TOPS:
+        if t not in (16, LOW):
+            write(os.path.join(MODELS, folder, f'{name}_t{t}.json'),
+                  {'parent': f'citybuilder:block/paved_{t}', 'textures': textures})
+
+    def model(height, low):
+        t = top(height, low)
+        return f'citybuilder:block/{base}' + ('' if t == 16 else '_low' if t == LOW else f'_t{t}')
+    return model
 
 
 def lowered_parent():
@@ -89,6 +127,8 @@ def kerb_edge(angle, offset):
 
 def main():
     write(os.path.join(MODELS, 'lowered.json'), lowered_parent())
+    for t in TOPS:
+        write(os.path.join(MODELS, f'paved_{t}.json'), paved_parent(t))
     # Kerbs crossing their blocks at an angle
     variants = {}
     for angle in range(KERB_ANGLES):
@@ -104,9 +144,9 @@ def main():
     write(os.path.join(MODELS, 'asphalt_low.json'), {'parent': 'citybuilder:block/lowered',
                                                      'textures': {'top': 'citybuilder:block/asphalt',
                                                                   'side': 'citybuilder:block/asphalt'}})
+    model = cut('asphalt', {'top': 'citybuilder:block/asphalt', 'side': 'citybuilder:block/asphalt'})
     write(os.path.join(BLOCKSTATES, 'asphalt.json'), {'variants': {
-        'low=false': {'model': 'citybuilder:block/asphalt'},
-        'low=true': {'model': 'citybuilder:block/asphalt_low'}}})
+        f'height={h},low={low}': {'model': model(h, low == 'true')} for h in HEIGHTS for low in ('false', 'true')}})
     # Asphalt painted white all over (a zebra crossing's stripe)
     write(os.path.join(MODELS, 'asphalt_white.json'), {'parent': 'minecraft:block/cube_bottom_top',
                                                        'textures': {'top': 'citybuilder:block/asphalt_white',
@@ -115,9 +155,9 @@ def main():
     write(os.path.join(MODELS, 'asphalt_white_low.json'), {'parent': 'citybuilder:block/lowered',
                                                            'textures': {'top': 'citybuilder:block/asphalt_white',
                                                                         'side': 'citybuilder:block/asphalt'}})
+    model = cut('asphalt_white', {'top': 'citybuilder:block/asphalt_white', 'side': 'citybuilder:block/asphalt'})
     write(os.path.join(BLOCKSTATES, 'asphalt_white.json'), {'variants': {
-        'low=false': {'model': 'citybuilder:block/asphalt_white'},
-        'low=true': {'model': 'citybuilder:block/asphalt_white_low'}}})
+        f'height={h},low={low}': {'model': model(h, low == 'true')} for h in HEIGHTS for low in ('false', 'true')}})
     # The streets' details: painted or fitted asphalt, full height or lowered, some turned by facing
     for name, facing in (('asphalt_hatch', True), ('road_arrow_shaft', True), ('road_arrow_head', True),
                          ('manhole', False), ('drain_grate', True)):
@@ -128,13 +168,15 @@ def main():
         write(os.path.join(MODELS, f'{name}_low.json'), {'parent': 'citybuilder:block/lowered',
                                                          'textures': {'top': top, 'side': 'citybuilder:block/asphalt'}})
         variants = {}
+        model = cut(name, {'top': top, 'side': 'citybuilder:block/asphalt'})
         for low in ('false', 'true'):
-            model = f'citybuilder:block/{name}' + ('_low' if low == 'true' else '')
-            if facing:
-                for direction, y in FACINGS:
-                    variants[f'facing={direction},low={low}'] = dict({'model': model}, **({'y': y} if y else {}))
-            else:
-                variants[f'low={low}'] = {'model': model}
+            for h in HEIGHTS:
+                m = model(h, low == 'true')
+                if facing:
+                    for direction, y in FACINGS:
+                        variants[f'facing={direction},height={h},low={low}'] = dict({'model': m}, **({'y': y} if y else {}))
+                else:
+                    variants[f'height={h},low={low}'] = {'model': m}
         write(os.path.join(BLOCKSTATES, f'{name}.json'), {'variants': variants})
     # Paving: their own tops, kerb stones on the sides; tactile guide bars turned by facing
     for name, facing in (('tactile_line', True), ('tactile_dot', False), ('sidewalk_interlocking', False),
@@ -162,14 +204,19 @@ def main():
                 write(os.path.join(MODELS, 'line', f'{name}_low.json'), {
                     'parent': 'citybuilder:block/lowered',
                     'textures': {'top': top, 'side': 'citybuilder:block/asphalt'}})
-                variants[f'angle={angle},low=false,offset={offset}'] = {'model': f'citybuilder:block/line/{name}'}
-                variants[f'angle={angle},low=true,offset={offset}'] = {'model': f'citybuilder:block/line/{name}_low'}
+                model = cut(f'line/{name}', {'top': top, 'side': 'citybuilder:block/asphalt'})
+                for h in HEIGHTS:
+                    for low in ('false', 'true'):
+                        variants[f'angle={angle},height={h},low={low},offset={offset}'] = {'model': model(h, low == 'true')}
         write(os.path.join(BLOCKSTATES, f'asphalt_line_{colour}.json'), {'variants': variants})
     # Pavement: paving slabs on top, kerb stones on the sides
     write(os.path.join(MODELS, 'sidewalk.json'), {'parent': 'minecraft:block/cube_bottom_top',
                                                   'textures': {'top': 'citybuilder:block/sidewalk',
                                                                'side': 'citybuilder:block/sidewalk_side',
                                                                'bottom': 'citybuilder:block/sidewalk_side'}})
+    model = cut('sidewalk', {'top': 'citybuilder:block/sidewalk', 'side': 'citybuilder:block/sidewalk_side'})
+    write(os.path.join(BLOCKSTATES, 'sidewalk.json'), {'variants': {
+        f'height={h}': {'model': model(h, False)} for h in HEIGHTS}})
 
 
 if __name__ == '__main__':

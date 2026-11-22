@@ -1,9 +1,51 @@
 {
   "variants": {
-    "low=false": {
+    "height=1,low=false": {
+      "model": "citybuilder:block/asphalt_white_t2"
+    },
+    "height=1,low=true": {
+      "model": "citybuilder:block/asphalt_white_t1"
+    },
+    "height=2,low=false": {
+      "model": "citybuilder:block/asphalt_white_t4"
+    },
+    "height=2,low=true": {
+      "model": "citybuilder:block/asphalt_white_t1"
+    },
+    "height=3,low=false": {
+      "model": "citybuilder:block/asphalt_white_t6"
+    },
+    "height=3,low=true": {
+      "model": "citybuilder:block/asphalt_white_t3"
+    },
+    "height=4,low=false": {
+      "model": "citybuilder:block/asphalt_white_t8"
+    },
+    "height=4,low=true": {
+      "model": "citybuilder:block/asphalt_white_t5"
+    },
+    "height=5,low=false": {
+      "model": "citybuilder:block/asphalt_white_t10"
+    },
+    "height=5,low=true": {
+      "model": "citybuilder:block/asphalt_white_t7"
+    },
+    "height=6,low=false": {
+      "model": "citybuilder:block/asphalt_white_t12"
+    },
+    "height=6,low=true": {
+      "model": "citybuilder:block/asphalt_white_t9"
+    },
+    "height=7,low=false": {
+      "model": "citybuilder:block/asphalt_white_t14"
+    },
+    "height=7,low=true": {
+      "model": "citybuilder:block/asphalt_white_t11"
+    },
+    "height=8,low=false": {
       "model": "citybuilder:block/asphalt_white"
     },
-    "low=true": {
+    "height=8,low=true": {
       "model": "citybuilder:block/asphalt_white_low"
     }
   }
