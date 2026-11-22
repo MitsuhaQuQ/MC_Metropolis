@@ -62,9 +62,14 @@ public final class CityRails {
         BlockState platformEdge = own("tactile_line", Blocks.YELLOW_CONCRETE);
         BlockState canopy = Blocks.WHITE_CONCRETE.defaultBlockState();
         BlockState post = own("street_light_pole", Blocks.IRON_BARS);
+        // First a subway's box under another line (see Cell.below), then the lines themselves
+        for (int pass = 0; pass < 2; pass++)
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 RailChunks.Cell cell = cells[x * 16 + z];
+                if (cell != null && pass == 0) {
+                    cell = cell.below();
+                }
                 if (cell == null) {
                     continue;
                 }

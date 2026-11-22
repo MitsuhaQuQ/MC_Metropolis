@@ -1911,7 +1911,7 @@ public final class ChunkLayer {
         }
         // The station squares by chunk
         Map<Long, List<StationPlaza>> plazas = new HashMap<>();
-        for (StationPlaza plaza : plan.plazas()) {
+        for (StationPlaza plaza : logic.settings().streets.plazaPaving ? plan.plazas() : List.<StationPlaza>of()) {
             double[] b = plaza.bounds();
             for (int cx = Math.floorDiv((int) Math.floor(b[0]), 16); cx <= Math.floorDiv((int) Math.floor(b[2]), 16); cx++) {
                 for (int cz = Math.floorDiv((int) Math.floor(b[1]), 16); cz <= Math.floorDiv((int) Math.floor(b[3]), 16); cz++) {

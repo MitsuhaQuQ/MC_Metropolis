@@ -787,6 +787,11 @@ public final class CitySettings {
         public double patchSize = 1200.0;
         /** Built land, where streets run: the town's own urban intensity above this. */
         public double builtIntensity = 0.12;
+        /**
+         * Whether the chunks pave the main stations' squares (their loops, bays, taxi pools). Off for now (the user,
+         * 2026-11-23): the square stood well over the ground round it; the plan keeps the land, the streets stay.
+         */
+        public boolean plazaPaving = false;
         /** Steepest grade a street climbs; steeper ground ends it. */
         public double maxGrade = 0.10;
         /** Tracing step along a streamline. */
