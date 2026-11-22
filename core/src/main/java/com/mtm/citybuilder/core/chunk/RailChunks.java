@@ -312,6 +312,17 @@ public final class RailChunks {
                     return true;
                 }
             }
+            // An underground station's entrance stair
+            for (int p : index.entrancesByChunk.getOrDefault(key(cx, cz), List.of())) {
+                double[] e = index.entrances.get(p);
+                double dx = x - e[0];
+                double dz = z - e[1];
+                double s = dx * e[2] + dz * e[3];
+                double lateral = dx * e[4] + dz * e[5];
+                if (s >= -margin && s <= ENTRANCE + margin && lateral >= -2.0 - margin && lateral <= 1.5 + margin) {
+                    return true;
+                }
+            }
         }
         return false;
     }
@@ -357,15 +368,42 @@ public final class RailChunks {
         }
         double[] best = null;
         double bestD = Double.POSITIVE_INFINITY;
-        List<double[]> from = kind.equals("station") ? index.platforms : index.pieces;
+        if (kind.equals("entrance")) {
+            double[] found = null;
+            double foundD = Double.POSITIVE_INFINITY;
+            for (double[] e : index.entrances) {
+                double d = Math.hypot(e[0] - x, e[1] - z);
+                if (d < foundD && !Double.isNaN(e[6])) {
+                    foundD = d;
+                    found = new double[]{e[0], e[1], e[6], logic.terrain().surfaceHeight((int) Math.floor(e[0]), (int) Math.floor(e[1])),
+                            Math.atan2(e[3], e[2])};
+                }
+            }
+            return found;
+        }
+        boolean station = kind.equals("station") || kind.equals("substation");
+        List<double[]> from = station ? index.platforms : index.pieces;
         for (double[] g : from) {
             double mx = 0.5 * (g[0] + g[2]);
             double mz = 0.5 * (g[1] + g[3]);
             double level;
             double ground;
-            if (kind.equals("station")) {
+            if (station) {
+                if (kind.equals("substation") != g[5] > 0.5) {
+                    continue;
+                }
+                // Its level and ground: the line's under it
+                double nearest = Double.POSITIVE_INFINITY;
                 level = Double.NaN;
                 ground = Double.NaN;
+                for (double[] q : index.pieces) {
+                    double[] at = foot(q, mx, mz);
+                    if (at[1] < nearest) {
+                        nearest = at[1];
+                        level = q[4] + (q[5] - q[4]) * at[0];
+                        ground = q[8] + (q[9] - q[8]) * at[0];
+                    }
+                }
             } else {
                 level = 0.5 * (g[4] + g[5]);
                 ground = 0.5 * (g[8] + g[9]);
@@ -388,7 +426,7 @@ public final class RailChunks {
     /**
      * The underground stations' entrance stairs over a chunk (x-major): each column's step, the block its stair's step
      * stands at (rising a block a block from the platform's level along the line), or NaN; and the stair's heading in
-     * {@code headings}.
+     * {@code headings} (NaN on the passage from the box out to the stair's foot, the column's value its floor's top).
      */
     public double[] entrances(int chunkX, int chunkZ, double[] headings) {
         double[] out = new double[256];
@@ -408,9 +446,16 @@ public final class RailChunks {
                         double dz = minZ + z + 0.5 - e[1];
                         double s = dx * e[2] + dz * e[3];
                         double lateral = dx * e[4] + dz * e[5];
-                        if (s >= 0 && s <= ENTRANCE && lateral >= -2.0 && lateral <= 1.5 && !Double.isNaN(e[6])) {
+                        if (Double.isNaN(e[6])) {
+                            continue;
+                        }
+                        if (s >= 0 && s <= ENTRANCE && lateral >= -2.0 && lateral <= 1.5) {
                             out[x * 16 + z] = Math.floor(e[6]) + 1 + Math.floor(s);
                             headings[x * 16 + z] = Math.atan2(e[3], e[2]);
+                        } else if (s >= 0 && s < 2.0 && lateral < -2.0 && lateral >= -(e[7] - STATION + 1.0)) {
+                            // The passage out from the box to the stair's foot (its heading NaN: no step, a way)
+                            out[x * 16 + z] = Math.floor(e[6]) + 2;
+                            headings[x * 16 + z] = Double.NaN;
                         }
                     }
                 }
@@ -507,12 +552,13 @@ public final class RailChunks {
                             under ? 1 : 0});
                 }
                 if (under) {
-                    // A stair up to the street beside the box, from the platform's middle along the line
+                    // A stair up beside the box, from the platform's middle along the line, out past the street the
+                    // line runs under (a subway under an arterial comes up on its pavement's far side), not through it
                     double h = st[3];
                     double nx = -Math.sin(h);
                     double nz = Math.cos(h);
-                    double off = STATION + 1.0;
-                    entrances.add(new double[]{st[0] + nx * off, st[1] + nz * off, Math.cos(h), Math.sin(h), nx, nz});
+                    double off = Math.max(STATION + 1.0, streetHalf(plan, st[0], st[1]) + 2.5);
+                    entrances.add(new double[]{st[0] + nx * off, st[1] + nz * off, Math.cos(h), Math.sin(h), nx, nz, off});
                 }
             }
         }
@@ -550,7 +596,7 @@ public final class RailChunks {
                     level = g[4] + (g[5] - g[4]) * at[0];
                 }
             }
-            entrances.set(k, new double[]{e[0], e[1], e[2], e[3], e[4], e[5], level});
+            entrances.set(k, new double[]{e[0], e[1], e[2], e[3], e[4], e[5], level, e[6]});
         }
         Map<Long, List<Integer>> entrancesByChunk = new HashMap<>();
         for (int p = 0; p < entrances.size(); p++) {
@@ -558,6 +604,21 @@ public final class RailChunks {
             bucket(entrancesByChunk, p, e[0], e[1], e[0] + e[2] * ENTRANCE, e[1] + e[3] * ENTRANCE, 4.0);
         }
         return new Index(pieces, platforms, byChunk, platformsByChunk, entrances, entrancesByChunk);
+    }
+
+    /** Half the width of the widest street (lanes and paths aside) whose line passes within 6 of a point, or 0. */
+    private static double streetHalf(StreetPlan plan, double x, double z) {
+        double half = 0;
+        for (com.mtm.citybuilder.core.street.StreetSegment g : plan.segments()) {
+            if (g.streetClass() == com.mtm.citybuilder.core.street.StreetClass.LANE
+                    || g.streetClass() == com.mtm.citybuilder.core.street.StreetClass.PATH) {
+                continue;
+            }
+            if (foot(new double[]{g.x1(), g.z1(), g.x2(), g.z2()}, x, z)[1] < 6.0) {
+                half = Math.max(half, 0.5 * g.width());
+            }
+        }
+        return half;
     }
 
     private static boolean aboveGround(List<double[]> pieces, double x, double z) {

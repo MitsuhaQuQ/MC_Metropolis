@@ -92,7 +92,9 @@ public final class CityRails {
                     for (int y = bed + 1; y <= bed + 5; y++) {
                         chunk.setBlockState(pos.set(wx, y, wz), wall ? deck : air, false);
                     }
-                    boolean lamp = Math.abs(cell.across()) < 0.6 && Math.floorMod((long) Math.floor(cell.along()), 8L) == 0;
+                    // Lights down the middle every 8, and over a station's platforms every 4
+                    boolean lamp = Math.abs(cell.across()) < 0.6 && Math.floorMod((long) Math.floor(cell.along()), 8L) == 0
+                            || cell.platform() && edge > 1.0 && edge < 2.0 && Math.floorMod((long) Math.floor(cell.along()), 4L) == 0;
                     chunk.setBlockState(pos.set(wx, bed + 6, wz), lamp ? own("ceiling_light", Blocks.SEA_LANTERN) : deck, false);
                     if (cell.platform() && !wall) {
                         chunk.setBlockState(pos.set(wx, bed + 1, wz), edge > 3.0 ? platformEdge : platform, false);
@@ -217,6 +219,15 @@ public final class CityRails {
                 }
                 int y = (int) step;
                 if (y > floor || y < min + 2) {
+                    continue;
+                }
+                if (Double.isNaN(headings[x * 16 + z])) {
+                    // The passage from the platform out to the stair's foot: floored, roofed, three high
+                    chunk.setBlockState(pos.set(wx, y - 1, wz), own("sidewalk", Blocks.SMOOTH_STONE), false);
+                    for (int k = y; k <= y + 2; k++) {
+                        chunk.setBlockState(pos.set(wx, k, wz), Blocks.AIR.defaultBlockState(), false);
+                    }
+                    chunk.setBlockState(pos.set(wx, y + 3, wz), Blocks.LIGHT_GRAY_CONCRETE.defaultBlockState(), false);
                     continue;
                 }
                 double h = headings[x * 16 + z];

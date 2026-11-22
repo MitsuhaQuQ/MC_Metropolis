@@ -699,6 +699,12 @@ public final class TestKit implements DedicatedServerModInitializer {
         if (logic == null) {
             return Map.of("found", false);
         }
+        // Planned now if not yet (the planner thread may not have reached it)
+        com.mtm.citybuilder.core.settlement.Settlement owner = logic.urban(Double.parseDouble(query.get("x")),
+                Double.parseDouble(query.get("z"))).owner();
+        if (owner != null) {
+            logic.streetPlan(owner);
+        }
         double[] p = logic.chunks().rails().nearest(Double.parseDouble(query.get("x")), Double.parseDouble(query.get("z")),
                 query.getOrDefault("kind", "elevated"));
         if (p == null) {
