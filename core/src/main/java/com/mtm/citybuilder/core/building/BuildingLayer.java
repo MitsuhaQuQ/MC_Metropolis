@@ -284,7 +284,9 @@ public final class BuildingLayer {
         /** A storehouse's goods. */
         STORAGE,
         /** A light inside, so nothing spawns there. */
-        LIGHT
+        LIGHT,
+        /** A shop's projecting sign (袖看板), a lit blade standing out from the wall; a tenant's is TENANT_A-C. */
+        BLADE
     }
 
     /** Which wall of the building a column's wall is. */
@@ -4031,7 +4033,7 @@ public final class BuildingLayer {
                 boolean signColumn = signed && (chance(b, 15, 0.5) ? along >= 1 && along < 2
                         : w - along >= 1 && w - along < 2);
                 if (signColumn && dy >= b.ground() && dy < b.wallHeight()) {
-                    return b.composition().is(Slot.SIGN, "stacked") ? tenant(b, dy) : Part.SIGN;
+                    return b.composition().is(Slot.SIGN, "stacked") ? tenant(b, dy) : Part.BLADE;
                 }
                 // An awning over the shop front; a shutter's box where the shutter is down
                 boolean awning = b.composition().is(Slot.AWNING, "awning");
@@ -4080,7 +4082,7 @@ public final class BuildingLayer {
                     && (b.composition().is(Slot.SIGN, "tall") || b.composition().is(Slot.SIGN, "stacked"))
                     && along >= 1 && along < 2 && dy >= b.ground() && dy < b.wallHeight()) {
                 // The tall sign of a downtown block, down one end of its front; or its tenants' signs stacked
-                return b.composition().is(Slot.SIGN, "stacked") ? tenant(b, dy) : Part.SIGN;
+                return b.composition().is(Slot.SIGN, "stacked") ? tenant(b, dy) : Part.BLADE;
             }
             if (against == Face.FRONT && b.type() == Building.Type.OFFICE && groundStyle(b) == 2
                     && Math.abs(along - b.door()) < 2.5 && dy == b.ground() - 1) {

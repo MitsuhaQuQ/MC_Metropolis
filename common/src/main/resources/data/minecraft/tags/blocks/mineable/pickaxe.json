@@ -268,6 +268,21 @@
     "citybuilder:thin_steel_siding",
     "citybuilder:thin_steel_siding_aged",
     "citybuilder:thin_steel_siding_gray",
-    "citybuilder:thin_steel_siding_gray_aged"
+    "citybuilder:thin_steel_siding_gray_aged",
+    "citybuilder:sign_blade_white",
+    "citybuilder:sign_blade_red",
+    "citybuilder:sign_blade_navy",
+    "citybuilder:sign_blade_green",
+    "citybuilder:sign_blade_yellow",
+    "citybuilder:sign_blade_black",
+    "citybuilder:fascia_sign_wood",
+    "citybuilder:fascia_sign_white",
+    "citybuilder:fascia_sign_navy",
+    "citybuilder:fascia_sign_green",
+    "citybuilder:fascia_sign_black",
+    "citybuilder:fascia_lit_red",
+    "citybuilder:fascia_lit_blue",
+    "citybuilder:fascia_lit_green",
+    "citybuilder:fascia_lit_black"
   ]
 }

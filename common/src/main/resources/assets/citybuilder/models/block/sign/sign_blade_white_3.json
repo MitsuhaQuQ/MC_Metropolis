@@ -1,0 +1,170 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "citybuilder:block/sign/blade_white_3",
+    "face": "citybuilder:block/sign/blade_white_3",
+    "edge": "citybuilder:block/sign/blade_edge"
+  },
+  "elements": [
+    {
+      "from": [
+        6.5,
+        0,
+        1
+      ],
+      "to": [
+        9.5,
+        16,
+        16
+      ],
+      "faces": {
+        "west": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#face"
+        },
+        "east": {
+          "uv": [
+            16,
+            0,
+            0,
+            16
+          ],
+          "texture": "#face"
+        },
+        "north": {
+          "uv": [
+            6.5,
+            0,
+            9.5,
+            16
+          ],
+          "texture": "#edge"
+        },
+        "up": {
+          "uv": [
+            6.5,
+            1,
+            9.5,
+            16
+          ],
+          "texture": "#edge"
+        },
+        "down": {
+          "uv": [
+            6.5,
+            1,
+            9.5,
+            16
+          ],
+          "texture": "#edge"
+        }
+      }
+    },
+    {
+      "from": [
+        7,
+        0.5,
+        15
+      ],
+      "to": [
+        9,
+        1.5,
+        16
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            7,
+            15,
+            9,
+            16
+          ],
+          "texture": "#edge"
+        },
+        "down": {
+          "uv": [
+            7,
+            0,
+            9,
+            1
+          ],
+          "texture": "#edge"
+        },
+        "west": {
+          "uv": [
+            15,
+            14.5,
+            16,
+            15.5
+          ],
+          "texture": "#edge"
+        },
+        "east": {
+          "uv": [
+            0,
+            14.5,
+            1,
+            15.5
+          ],
+          "texture": "#edge"
+        }
+      }
+    },
+    {
+      "from": [
+        7,
+        14.5,
+        15
+      ],
+      "to": [
+        9,
+        15.5,
+        16
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            7,
+            15,
+            9,
+            16
+          ],
+          "texture": "#edge"
+        },
+        "down": {
+          "uv": [
+            7,
+            0,
+            9,
+            1
+          ],
+          "texture": "#edge"
+        },
+        "west": {
+          "uv": [
+            15,
+            0.5,
+            16,
+            1.5
+          ],
+          "texture": "#edge"
+        },
+        "east": {
+          "uv": [
+            0,
+            0.5,
+            1,
+            1.5
+          ],
+          "texture": "#edge"
+        }
+      }
+    }
+  ]
+}

@@ -204,6 +204,21 @@ public final class BuildingBlocks {
             TRANSLUCENT.add(p.registerBlock(name, () -> new CityDoorBlock(BlockBehaviour.Properties.copy(Blocks.IRON_DOOR)
                     .strength(3.0f), ALUMINIUM)));
         }
+        // Shops' signs (models drawn by tools/textures/sign_textures.py): projecting light boxes standing out from the
+        // wall, painted fascia boards, lit fascias
+        for (String colour : new String[]{"white", "red", "navy", "green", "yellow", "black"}) {
+            p.registerBlock("sign_blade_" + colour, () -> new ShopSignBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+                    .strength(1.5f).lightLevel(s -> 11).noOcclusion(), new double[]{6.5, 0, 1, 9.5, 16, 16}));
+        }
+        for (String colour : new String[]{"wood", "white", "navy", "green", "black"}) {
+            p.registerBlock("fascia_sign_" + colour, () -> new ShopSignBlock(BlockBehaviour.Properties.copy(
+                    colour.equals("wood") ? Blocks.SPRUCE_PLANKS : Blocks.WHITE_CONCRETE).strength(1.5f),
+                    new double[]{0, 0, 0, 16, 16, 16}));
+        }
+        for (String colour : new String[]{"red", "blue", "green", "black"}) {
+            p.registerBlock("fascia_lit_" + colour, () -> new ShopSignBlock(BlockBehaviour.Properties.copy(Blocks.WHITE_CONCRETE)
+                    .strength(1.5f).lightLevel(s -> 14), new double[]{0, 0, 0, 16, 16, 16}));
+        }
         // Fixtures (models and boxes drawn by tools/textures/fixture_textures.py, facing north, the wall to the south)
         for (String colour : new String[]{"white", "beige"}) {
             p.registerBlock("ac_unit_" + colour, () -> new AcUnitBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)

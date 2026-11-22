@@ -119,6 +119,9 @@ public final class CityBuildings {
                                     alongX ? Direction.Axis.X : Direction.Axis.Z);
                         }
                         placed = fixture(chunk, pos.set(baseX + x, y, baseZ + z), placed, column, y, part);
+                        if (placed.getBlock() instanceof com.mtm.citybuilder.block.ShopSignBlock) {
+                            placed = placed.setValue(com.mtm.citybuilder.block.ShopSignBlock.GLYPH, glyph(baseX + x, y, baseZ + z));
+                        }
                         if (thin != null && THIN_PARTS.contains(part) && thinOf(id) instanceof ThinWallBlock wall
                                 && closed(columns, column, x, z, y)) {
                             placed = wall.state(thin);
@@ -403,6 +406,14 @@ public final class CityBuildings {
      * (across {@code outward}), fences left as posts; trapdoors standing open against the wall; banners hung facing
      * out; lanterns hanging, this mod's lamps facing out; leaves kept from decaying.
      */
+    /** A sign's character at a block: one of the drawn ones, a plain panel now and then between them. */
+    private static int glyph(int x, int y, int z) {
+        long h = Hash.of(0x516EL, x, y, z);
+        int glyphs = com.mtm.citybuilder.block.ShopSignBlock.GLYPHS;
+        int pick = (int) Math.floorMod(h, (long) glyphs + 1);
+        return pick == glyphs ? 0 : pick + 1;
+    }
+
     private static BlockState state(Block block, BuildingLayer.Part part, Direction facing, Direction outward) {
         BlockState state = block.defaultBlockState();
         if (block instanceof CrossCollisionBlock && (!(block instanceof FenceBlock) || part == BuildingLayer.Part.KOMAYOSE)) {

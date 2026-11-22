@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "particle": "citybuilder:block/sign/fascia_lit_side",
+    "front": "citybuilder:block/sign/fascia_lit_black_5",
+    "side": "citybuilder:block/sign/fascia_lit_side",
+    "top": "citybuilder:block/sign/fascia_lit_side"
+  }
+}

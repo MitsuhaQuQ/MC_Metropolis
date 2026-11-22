@@ -151,6 +151,7 @@ public record Palette(String wall, String accent, String trim, String window, St
             case EQUIPMENT -> c.material("equipment", variant);
             case AWNING -> c.material("awning", variant ^ 0x11);
             case SIGN -> c.material("sign", variant ^ 0x22);
+            case BLADE -> c.material("blade", variant ^ 0x23);
             case SHUTTER -> c.material("shutter", variant);
             case VENDING -> c.material("vending", variant ^ 0x33);
             case FENCE -> c.material("fence", variant ^ 0x44);

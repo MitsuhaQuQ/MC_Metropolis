@@ -37,6 +37,10 @@ Textures (textures/block/), each drawn by a script in tools/textures/:
   catenary_textures.py
     catenary_*.png, curve_marker_*.png
 
+  sign_textures.py
+    sign/blade_*.png, sign/fascia_*.png (shops' projecting signs, fascia boards and lit fascias). Their lettering is
+    strokes put together by the script, no script's characters and no brand's.
+
 Block states, block and item models (blockstates/, models/), loot tables (data/citybuilder/loot_tables/) and the
 translations (lang/): written for this mod, by the *_models.py scripts in tools/textures/ or by hand.
 

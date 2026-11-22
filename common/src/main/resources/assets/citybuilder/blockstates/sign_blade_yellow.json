@@ -1,0 +1,139 @@
+{
+  "variants": {
+    "facing=north,glyph=0": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_0"
+    },
+    "facing=east,glyph=0": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_0",
+      "y": 90
+    },
+    "facing=south,glyph=0": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_0",
+      "y": 180
+    },
+    "facing=west,glyph=0": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_0",
+      "y": 270
+    },
+    "facing=north,glyph=1": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_1"
+    },
+    "facing=east,glyph=1": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_1",
+      "y": 90
+    },
+    "facing=south,glyph=1": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_1",
+      "y": 180
+    },
+    "facing=west,glyph=1": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_1",
+      "y": 270
+    },
+    "facing=north,glyph=2": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_2"
+    },
+    "facing=east,glyph=2": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_2",
+      "y": 90
+    },
+    "facing=south,glyph=2": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_2",
+      "y": 180
+    },
+    "facing=west,glyph=2": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_2",
+      "y": 270
+    },
+    "facing=north,glyph=3": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_3"
+    },
+    "facing=east,glyph=3": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_3",
+      "y": 90
+    },
+    "facing=south,glyph=3": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_3",
+      "y": 180
+    },
+    "facing=west,glyph=3": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_3",
+      "y": 270
+    },
+    "facing=north,glyph=4": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_4"
+    },
+    "facing=east,glyph=4": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_4",
+      "y": 90
+    },
+    "facing=south,glyph=4": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_4",
+      "y": 180
+    },
+    "facing=west,glyph=4": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_4",
+      "y": 270
+    },
+    "facing=north,glyph=5": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_5"
+    },
+    "facing=east,glyph=5": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_5",
+      "y": 90
+    },
+    "facing=south,glyph=5": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_5",
+      "y": 180
+    },
+    "facing=west,glyph=5": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_5",
+      "y": 270
+    },
+    "facing=north,glyph=6": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_6"
+    },
+    "facing=east,glyph=6": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_6",
+      "y": 90
+    },
+    "facing=south,glyph=6": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_6",
+      "y": 180
+    },
+    "facing=west,glyph=6": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_6",
+      "y": 270
+    },
+    "facing=north,glyph=7": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_7"
+    },
+    "facing=east,glyph=7": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_7",
+      "y": 90
+    },
+    "facing=south,glyph=7": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_7",
+      "y": 180
+    },
+    "facing=west,glyph=7": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_7",
+      "y": 270
+    },
+    "facing=north,glyph=8": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_8"
+    },
+    "facing=east,glyph=8": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_8",
+      "y": 90
+    },
+    "facing=south,glyph=8": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_8",
+      "y": 180
+    },
+    "facing=west,glyph=8": {
+      "model": "citybuilder:block/sign/sign_blade_yellow_8",
+      "y": 270
+    }
+  }
+}

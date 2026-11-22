@@ -2628,8 +2628,21 @@
    "minecraft:cyan_wool"
   ],
   "sign": [
-   "minecraft:white_concrete",
-   "minecraft:sea_lantern"
+   "citybuilder:fascia_sign_white",
+   "citybuilder:fascia_sign_white",
+   "citybuilder:fascia_sign_navy",
+   "citybuilder:fascia_sign_green",
+   "citybuilder:fascia_sign_black",
+   "citybuilder:fascia_sign_wood"
+  ],
+  "blade": [
+   "citybuilder:sign_blade_white",
+   "citybuilder:sign_blade_white",
+   "citybuilder:sign_blade_red",
+   "citybuilder:sign_blade_navy",
+   "citybuilder:sign_blade_green",
+   "citybuilder:sign_blade_yellow",
+   "citybuilder:sign_blade_black"
   ],
   "vending": [
    "citybuilder:vending_red",
@@ -2768,10 +2781,10 @@
    "minecraft:spruce_fence"
   ],
   "fasciaLit": [
-   "minecraft:sea_lantern",
-   "minecraft:ochre_froglight",
-   "minecraft:pearlescent_froglight",
-   "minecraft:verdant_froglight"
+   "citybuilder:fascia_lit_red",
+   "citybuilder:fascia_lit_blue",
+   "citybuilder:fascia_lit_green",
+   "citybuilder:fascia_lit_black"
   ],
   "display": [
    "minecraft:chiseled_bookshelf",
@@ -3113,8 +3126,13 @@
    "minecraft:stone_bricks"
   ],
   "tenantSign": [
-   "minecraft:white_concrete",
-   "minecraft:sea_lantern"
+   "citybuilder:sign_blade_white",
+   "citybuilder:sign_blade_white",
+   "citybuilder:sign_blade_red",
+   "citybuilder:sign_blade_navy",
+   "citybuilder:sign_blade_green",
+   "citybuilder:sign_blade_yellow",
+   "citybuilder:sign_blade_black"
   ],
   "ad": [
    "minecraft:white_concrete",

@@ -220,7 +220,7 @@ public final class Catalog {
     static final List<String> MATERIALS = List.of("awning", "sign", "vending", "fence", "plant", "log", "leaves", "shrub",
             "shed", "rail", "curtain", "curtainRed", "latticeSpruce", "latticeMangrove", "equipment", "shutter", "hedge",
             "bamboo", "post", "carport", "guard", "downpipe", "lantern", "sudare", "komayose", "engawa", "toro", "toroLight",
-            "toroCap", "gravel", "board", "plaster", "spike", "fasciaLit", "display", "stand", "brandKonbini",
+            "toroCap", "gravel", "board", "plaster", "spike", "fasciaLit", "blade", "display", "stand", "brandKonbini",
             "brandFastfood", "brandPost", "postbox", "line", "pole", "ad", "baseWall", "upperWall", "step", "tenantSign", "shoki", "bank", "water", "blackBoard", "arcadePost", "arcadeRoof", "arcadePaving", "tactile", "arcadeGlass", "louvre", "rust", "andon", "tobukuro", "gatepost", "gateLight", "porchLight", "futon",
             "solar", "antenna", "heater", "oni", "yago", "tatami", "earth", "partition", "fusuma", "stairs", "shelf", "table",
             "kitchen", "counter", "desk", "storage", "outerStairs", "mesh", "chimney", "chimneyTop",

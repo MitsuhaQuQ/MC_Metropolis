@@ -424,5 +424,20 @@
   "block.citybuilder.thin_steel_siding": "薄墙（角波钢板）",
   "block.citybuilder.thin_steel_siding_aged": "薄墙（角波钢板（旧））",
   "block.citybuilder.thin_steel_siding_gray": "薄墙（灰色角波钢板）",
-  "block.citybuilder.thin_steel_siding_gray_aged": "薄墙（灰色角波钢板（旧））"
+  "block.citybuilder.thin_steel_siding_gray_aged": "薄墙（灰色角波钢板（旧））",
+  "block.citybuilder.sign_blade_white": "袖看板（白）",
+  "block.citybuilder.sign_blade_red": "袖看板（红）",
+  "block.citybuilder.sign_blade_navy": "袖看板（藏青）",
+  "block.citybuilder.sign_blade_green": "袖看板（绿）",
+  "block.citybuilder.sign_blade_yellow": "袖看板（黄）",
+  "block.citybuilder.sign_blade_black": "袖看板（黑）",
+  "block.citybuilder.fascia_sign_wood": "招牌板（木）",
+  "block.citybuilder.fascia_sign_white": "招牌板（白）",
+  "block.citybuilder.fascia_sign_navy": "招牌板（藏青）",
+  "block.citybuilder.fascia_sign_green": "招牌板（绿）",
+  "block.citybuilder.fascia_sign_black": "招牌板（黑）",
+  "block.citybuilder.fascia_lit_red": "内照式招牌（红字）",
+  "block.citybuilder.fascia_lit_blue": "内照式招牌（蓝字）",
+  "block.citybuilder.fascia_lit_green": "内照式招牌（绿字）",
+  "block.citybuilder.fascia_lit_black": "内照式招牌（黑字）"
 }

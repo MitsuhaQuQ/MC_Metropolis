@@ -424,5 +424,20 @@
   "block.citybuilder.thin_steel_siding": "Thin Corrugated Steel Siding Wall",
   "block.citybuilder.thin_steel_siding_aged": "Thin Weathered Corrugated Steel Siding Wall",
   "block.citybuilder.thin_steel_siding_gray": "Thin Grey Corrugated Steel Siding Wall",
-  "block.citybuilder.thin_steel_siding_gray_aged": "Thin Weathered Grey Corrugated Steel Siding Wall"
+  "block.citybuilder.thin_steel_siding_gray_aged": "Thin Weathered Grey Corrugated Steel Siding Wall",
+  "block.citybuilder.sign_blade_white": "Projecting Sign (White)",
+  "block.citybuilder.sign_blade_red": "Projecting Sign (Red)",
+  "block.citybuilder.sign_blade_navy": "Projecting Sign (Navy)",
+  "block.citybuilder.sign_blade_green": "Projecting Sign (Green)",
+  "block.citybuilder.sign_blade_yellow": "Projecting Sign (Yellow)",
+  "block.citybuilder.sign_blade_black": "Projecting Sign (Black)",
+  "block.citybuilder.fascia_sign_wood": "Fascia Sign (Wood)",
+  "block.citybuilder.fascia_sign_white": "Fascia Sign (White)",
+  "block.citybuilder.fascia_sign_navy": "Fascia Sign (Navy)",
+  "block.citybuilder.fascia_sign_green": "Fascia Sign (Green)",
+  "block.citybuilder.fascia_sign_black": "Fascia Sign (Black)",
+  "block.citybuilder.fascia_lit_red": "Lit Fascia Sign (Red Letters)",
+  "block.citybuilder.fascia_lit_blue": "Lit Fascia Sign (Blue Letters)",
+  "block.citybuilder.fascia_lit_green": "Lit Fascia Sign (Green Letters)",
+  "block.citybuilder.fascia_lit_black": "Lit Fascia Sign (Black Letters)"
 }
