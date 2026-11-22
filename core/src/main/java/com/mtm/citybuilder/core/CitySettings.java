@@ -145,12 +145,32 @@ public final class CitySettings {
         public double[] centralPark = {0.0, 3.0, 20.0};
         public double[] sportsPark = {0.0, 3.0, 20.0};
         public double[] cityHall = {0.0, 0.4, 2.5};
+        /** Public libraries (図書館): about one per 10 km2 of built land, at least one in a town; on a block of 0.2-1.5 ha. */
+        public double[] library = {0.1, 0.2, 1.5};
+        /**
+         * The least width across (twice the depth from its streets) of a block a city hall, a library or a hospital is
+         * put on: what their generated buildings need with their forecourts (a narrower block counts a tenth for the
+         * city hall, which every town has; a library or hospital is not put on one).
+         */
+        public double cityHallWidth = 40.0;
+        public double libraryWidth = 38.0;
+        public double hospitalWidth = 66.0;
 
         public double clinic = 6.0;
         public double policeBox = 1.5;
         public double fireStation = 0.4;
         public double postOffice = 1.0;
         public double bathhouse = 0.8;
+        /**
+         * Filling stations (ガソリンスタンド) a km2 of built land, on a lot of a main street at least
+         * {@code gasStationFrontage} wide and {@code gasStationDepth} deep, outside the middle of the town.
+         */
+        public double gasStation = 0.8;
+        public double gasStationFrontage = 16.0;
+        public double gasStationDepth = 18.0;
+        /** The share of a main or shopping street's lots given a convenience store (コンビニ), and a fast food place. */
+        public double konbini = 0.035;
+        public double fastFood = 0.008;
         public double smallShrine = 3.0;
         public double smallTemple = 3.0;
 

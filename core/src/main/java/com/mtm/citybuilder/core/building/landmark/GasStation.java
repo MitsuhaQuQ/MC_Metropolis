@@ -15,8 +15,15 @@ import static com.mtm.citybuilder.core.building.landmark.Civic.*;
  * @param islands the pump islands, 1-4
  * @param carWash whether a car wash bay stands beside the sales room
  * @param seed    the brand's colour and the name's characters
+ * @param compact whether the sales room stands beside the canopy rather than behind it, for a shallow lot (no car
+ *                wash then): about 21 deep instead of 31
  */
-public record GasStation(int islands, boolean carWash, int seed) {
+public record GasStation(int islands, boolean carWash, int seed, boolean compact) {
+    /** A station with its sales room behind the canopy. */
+    public GasStation(int islands, boolean carWash, int seed) {
+        this(islands, carWash, seed, false);
+    }
+
     private static final String[] BRANDS = {"minecraft:red_concrete", "minecraft:blue_concrete",
             "minecraft:green_concrete", "minecraft:orange_concrete"};
     private static final String[] LIT = {"citybuilder:fascia_lit_red", "citybuilder:fascia_lit_blue",
@@ -49,8 +56,14 @@ public record GasStation(int islands, boolean carWash, int seed) {
         int c1 = c0 + 7 * islands + 1;
         int z0 = 4;
         int z1 = 17;
-        int lot = Math.max(c1 + 3, carWash ? 28 : 18);
-        fill(m, 0, 0, 0, lot, 0, 30, "citybuilder:concrete_gray");
+        boolean wash = carWash && !compact;
+        // The sales room: behind the canopy, or (compact) beside it
+        int s0 = compact ? c1 + 2 : 2;
+        int s1 = compact ? c1 + 11 : 13;
+        int b0 = compact ? z0 + 3 : 21;
+        int b1 = compact ? z1 + 1 : 28;
+        int lot = compact ? s1 + 2 : Math.max(c1 + 3, wash ? 28 : 18);
+        fill(m, 0, 0, 0, lot, 0, compact ? z1 + 3 : 30, "citybuilder:concrete_gray");
         // The kerb along the road, two ways in
         for (int x = 0; x <= lot; x++) {
             if (!(x >= 3 && x <= 8) && !(x >= lot - 8 && x <= lot - 3)) {
@@ -87,11 +100,7 @@ public record GasStation(int islands, boolean carWash, int seed) {
                 m.set(x, 8, z, "minecraft:white_concrete");
             }
         }
-        // The sales room behind: glass across its front, the door, its name lit over the glass
-        int s0 = 2;
-        int s1 = 13;
-        int b0 = 21;
-        int b1 = 28;
+        // The sales room: glass across its front, the door, its name lit over the glass
         String wall = ROOMS[Math.floorMod(seed / 8, ROOMS.length)];
         Facade room = new Facade(wall, "citybuilder:window_aluminum_clear", wall, wall, 3, 1, 1);
         int roof = block(m, s0, b0, s1, b1, 0, 1, 5, room, "citybuilder:terminal_tile");
@@ -110,7 +119,7 @@ public record GasStation(int islands, boolean carWash, int seed) {
         }
         plant(m, s0 + 2, b0 + 2, s1 - 2, b1 - 2, roof + 1);
         // The car wash: a bay open to the front, steel on three sides, the washer's frame in it
-        if (carWash) {
+        if (wash) {
             int w0 = 17;
             int w1 = 24;
             for (int y = 1; y <= 4; y++) {

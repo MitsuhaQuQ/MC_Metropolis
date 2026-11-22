@@ -16,8 +16,14 @@ import static com.mtm.citybuilder.core.building.landmark.Civic.*;
  * @param width the outpatient block along the front (the ward block is 8 narrower)
  * @param wards the ward block's storeys
  * @param seed  the name's characters
+ * @param carPark whether its car park runs down the west side (20 wide); without, for a tighter block
  */
-public record Hospital(int width, int wards, int seed) {
+public record Hospital(int width, int wards, int seed, boolean carPark) {
+    /** A hospital with its car park. */
+    public Hospital(int width, int wards, int seed) {
+        this(width, wards, seed, true);
+    }
+
     private static final int FORECOURT = 18;
     private static final int CLINIC = 22;
     private static final int WARD = 18;
@@ -121,9 +127,11 @@ public record Hospital(int width, int wards, int seed) {
             m.set(x1 + 7, 5, e0 + 2 + k, "citybuilder:fascia_lit_red[facing=east,glyph=" + glyph + "]");
         }
         // The car park down the west side
-        parking(m, -22, 0, -3, b1);
-        for (int z = 6; z <= b1; z += 14) {
-            lamp(m, -12, z, 6, "east");
+        if (carPark) {
+            parking(m, -22, 0, -3, b1);
+            for (int z = 6; z <= b1; z += 14) {
+                lamp(m, -12, z, 6, "east");
+            }
         }
         Shapes.connect(m);
         // Laid out with the front to the north; turned to face south as the library's other models do

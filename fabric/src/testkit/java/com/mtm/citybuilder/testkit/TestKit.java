@@ -78,6 +78,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/canal", this::canal);
             route(http, "/embankment", this::embankment);
             route(http, "/airport", this::airport);
+            route(http, "/facilities", this::facilities);
             route(http, "/road", this::road);
             route(http, "/roads-near", this::roadsNear);
             route(http, "/station", this::station);
@@ -659,6 +660,34 @@ public final class TestKit implements DedicatedServerModInitializer {
      * The airport nearest (x, z) within 40 km, as this world sited it: {found, kind, x, z, heading in degrees, length,
      * width, elevation, threshold: a point on the runway's centre line 20 in from an end, apron: the apron's middle}.
      */
+    /**
+     * The public buildings generated whole in the town owning (x, z), as this world placed them (core's
+     * FacilityModels): each one's kind, footprint bounds and ground, nearest first.
+     */
+    private Object facilities(Map<String, String> query, String body) {
+        double x = Double.parseDouble(query.get("x"));
+        double z = Double.parseDouble(query.get("z"));
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if (logic == null || logic.urban(x, z).owner() == null || logic.buildings().facilities() == null) {
+            return Map.of("found", false);
+        }
+        java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+        java.util.List<com.mtm.citybuilder.core.building.FacilityModels.Placed> placed =
+                new java.util.ArrayList<>(logic.buildings().facilities().town(logic.urban(x, z).owner()));
+        placed.sort(java.util.Comparator.comparingDouble(p -> Math.hypot(0.5 * (p.minX() + p.maxX()) - x, 0.5 * (p.minZ() + p.maxZ()) - z)));
+        for (com.mtm.citybuilder.core.building.FacilityModels.Placed p : placed) {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("kind", p.facility().kind().name());
+            m.put("minX", p.minX());
+            m.put("minZ", p.minZ());
+            m.put("maxX", p.maxX());
+            m.put("maxZ", p.maxZ());
+            m.put("ground", p.y());
+            out.add(m);
+        }
+        return Map.of("found", true, "placed", out);
+    }
+
     private Object airport(Map<String, String> query, String body) {
         double x = Double.parseDouble(query.get("x"));
         double z = Double.parseDouble(query.get("z"));

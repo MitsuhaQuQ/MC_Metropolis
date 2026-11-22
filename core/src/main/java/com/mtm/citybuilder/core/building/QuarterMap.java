@@ -13,6 +13,11 @@ public interface QuarterMap {
 
     Quarter at(Plot plot);
 
+    /** The map for one town's lots (a map that knows the towns' layers answers for that town); this one by default. */
+    default QuarterMap forTown(com.mtm.citybuilder.core.plot.TownPlots plots) {
+        return this;
+    }
+
     /** The regional way of building at a lot. */
     default Region region(Plot plot) {
         return Region.KINKI;

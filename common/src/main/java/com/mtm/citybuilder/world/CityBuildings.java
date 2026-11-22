@@ -151,6 +151,79 @@ public final class CityBuildings {
         bridge(chunk, columns, panes);
         join(level, panes);
         tidy(level, chunk, columns);
+        facilities(logic, chunk, pos);
+    }
+
+    private static final Map<String, BlockState> STATES = new ConcurrentHashMap<>();
+
+    /** A block state from its string (the models' {@code namespace:id[property=value,...]}); stone if unknown. */
+    private static BlockState parsed(String s) {
+        return STATES.computeIfAbsent(s, key -> {
+            try {
+                return net.minecraft.commands.arguments.blocks.BlockStateParser
+                        .parseForBlock(BuiltInRegistries.BLOCK.asLookup(), key, false).blockState();
+            } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+                CityBuilder.LOGGER.warn("Unknown block state in a facility model: {}", key);
+                return Blocks.STONE.defaultBlockState();
+            }
+        });
+    }
+
+    /**
+     * The public buildings generated whole (core's {@code FacilityModels}: a city hall, a hospital, a library, a
+     * filling station) over the chunk: under each footprint the ground cut or filled to the model's ground and
+     * grassed, what stood above it cleared, then the model's blocks.
+     */
+    private static void facilities(CityLogic logic, ChunkAccess chunk, BlockPos.MutableBlockPos pos) {
+        com.mtm.citybuilder.core.building.FacilityModels models = logic.buildings().facilities();
+        if (models == null) {
+            return;
+        }
+        java.util.List<com.mtm.citybuilder.core.building.FacilityModels.Placed> near;
+        try {
+            near = models.near(chunk.getPos().x, chunk.getPos().z);
+        } catch (RuntimeException e) {
+            CityBuilder.LOGGER.error("Facility models failed at chunk {}", chunk.getPos(), e);
+            return;
+        }
+        if (near.isEmpty()) {
+            return;
+        }
+        int baseX = chunk.getPos().getMinBlockX();
+        int baseZ = chunk.getPos().getMinBlockZ();
+        int min = chunk.getMinBuildHeight();
+        int max = chunk.getMaxBuildHeight() - 1;
+        for (com.mtm.citybuilder.core.building.FacilityModels.Placed p : near) {
+            int ground = p.y();
+            for (int wx = Math.max(baseX, p.minX()); wx <= Math.min(baseX + 15, p.maxX()); wx++) {
+                for (int wz = Math.max(baseZ, p.minZ()); wz <= Math.min(baseZ + 15, p.maxZ()); wz++) {
+                    int x = wx - baseX;
+                    int z = wz - baseZ;
+                    int floor = Math.min(max, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
+                    BlockState state = chunk.getBlockState(pos.set(wx, floor, wz));
+                    while (floor > min && !state.blocksMotion()) {
+                        state = chunk.getBlockState(pos.set(wx, --floor, wz));
+                    }
+                    for (int y = ground + 1; y <= Math.min(max, Math.max(floor, ground) + 8); y++) {
+                        chunk.setBlockState(pos.set(wx, y, wz), Blocks.AIR.defaultBlockState(), false);
+                    }
+                    for (int y = Math.max(min, floor + 1); y < ground; y++) {
+                        chunk.setBlockState(pos.set(wx, y, wz), Blocks.DIRT.defaultBlockState(), false);
+                    }
+                    if (ground > min && ground <= max) {
+                        chunk.setBlockState(pos.set(wx, ground, wz), Blocks.GRASS_BLOCK.defaultBlockState(), false);
+                    }
+                }
+            }
+            p.model().forEach((mx, my, mz, s) -> {
+                int wx = mx + p.x();
+                int wy = my + p.y();
+                int wz = mz + p.z();
+                if (wx >= baseX && wx < baseX + 16 && wz >= baseZ && wz < baseZ + 16 && wy >= min && wy <= max) {
+                    chunk.setBlockState(pos.set(wx, wy, wz), parsed(s), false);
+                }
+            });
+        }
     }
 
     /**

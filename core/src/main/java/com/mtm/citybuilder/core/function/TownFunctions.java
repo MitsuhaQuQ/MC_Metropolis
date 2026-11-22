@@ -325,6 +325,15 @@ public final class TownFunctions {
         }
     }
 
+    /**
+     * How well a block holds a building of a least width (its building is generated whole, see the building layer's
+     * facility models): 1 where it runs at least that wide across (twice its depth from its streets), else
+     * {@code otherwise} (0: not on it at all).
+     */
+    private static double roomy(Blocks.Block b, double width, double otherwise) {
+        return 2.0 * b.depth() >= width ? 1.0 : otherwise;
+    }
+
     private int count(double[] spec) {
         return (int) Math.round(spec[0] * builtKm2);
     }
@@ -338,7 +347,8 @@ public final class TownFunctions {
         placeAreas(Facility.Kind.CITY_HALL, 1, config.cityHall, 1, b -> {
             boolean fits = b.district() == District.CENTRAL || b.district() == District.OLD_TOWN
                     || b.district() == District.STATION_FRONT;
-            return fits ? 2.0 - fromCentre(b.x(), b.z()) / 1000.0 - mainRoadDistance(b.x(), b.z()) / 200.0 : 0.0;
+            return fits ? roomy(b, config.cityHallWidth, 0.1) * (2.0 - fromCentre(b.x(), b.z()) / 1000.0
+                    - mainRoadDistance(b.x(), b.z()) / 200.0) : 0.0;
         });
         if (city) {
             // A central park near the middle, a sports park and (a metropolis) a university towards the edge
@@ -358,10 +368,16 @@ public final class TownFunctions {
         placeAreas(Facility.Kind.ELEMENTARY_SCHOOL, Math.max(1, count(config.elementarySchool)), config.elementarySchool,
                 1000 / Math.sqrt(config.elementarySchool[0]),
                 b -> houses.applyAsDouble(b) * (mainRoadDistance(b.x(), b.z()) > 60 ? 1.0 : 0.5));
+        // Libraries: one near the middle, more across a larger town
+        placeAreas(Facility.Kind.LIBRARY, Math.max(1, count(config.library)), config.library,
+                1000 / Math.sqrt(Math.max(1e-6, config.library[0])), b -> {
+                    boolean fits = b.district() != District.INDUSTRIAL && b.district() != District.PORT;
+                    return fits ? roomy(b, config.libraryWidth, 0.0) * (1.5 - fromCentre(b.x(), b.z()) / Math.max(500.0, townRadius)) : 0.0;
+                });
         placeAreas(Facility.Kind.HOSPITAL, Math.max(city ? 1 : 0, count(config.hospital)), config.hospital,
                 1000 / Math.sqrt(config.hospital[0]), b -> {
                     boolean fits = b.district() != District.INDUSTRIAL && b.district() != District.PORT;
-                    return fits ? 1.0 - mainRoadDistance(b.x(), b.z()) / 400.0 : 0.0;
+                    return fits ? roomy(b, config.hospitalWidth, 0.0) * (1.0 - mainRoadDistance(b.x(), b.z()) / 400.0) : 0.0;
                 });
         // Temples along the temple streets: the blocks on one side of each, a row of them (teramachi)
         for (int c = 0; c < functions.length; c++) {
@@ -649,10 +665,26 @@ public final class TownFunctions {
                 f -> f == StreetFunction.RESIDENTIAL || f == StreetFunction.SAMURAI || f == StreetFunction.SHOPPING);
         placeLots(Facility.Kind.SMALL_TEMPLE, config.smallTemple * oldTownKm2() / Math.max(1e-6, builtKm2),
                 f -> f == StreetFunction.RESIDENTIAL || f == StreetFunction.TEMPLE);
+        // Filling stations on main streets' larger lots, out of the town's middle
+        placeLots(Facility.Kind.GAS_STATION, config.gasStation, f -> f == StreetFunction.MAIN,
+                (c, side, index) -> plots.lotFrontage(c, side, index) >= config.gasStationFrontage
+                        && plots.lotDepth(c, side, index) >= config.gasStationDepth);
+    }
+
+    /** A test of a lot by its street (chain), side and number. */
+    @FunctionalInterface
+    private interface LotTest {
+        boolean test(int chain, int side, int index);
     }
 
     /** Places lot facilities of a kind, {@code perKm2} of the built land, on lots of streets of the given functions. */
     private void placeLots(Facility.Kind kind, double perKm2, java.util.function.Predicate<StreetFunction> streets) {
+        placeLots(kind, perKm2, streets, (c, side, index) -> true);
+    }
+
+    /** As {@link #placeLots(Facility.Kind, double, java.util.function.Predicate)}, on lots passing a test. */
+    private void placeLots(Facility.Kind kind, double perKm2, java.util.function.Predicate<StreetFunction> streets,
+                           LotTest lot) {
         List<Integer> chains = new ArrayList<>();
         for (int c = 0; c < functions.length; c++) {
             if (streets.test(functions[c]) && plots.lotCount(c, 1) + plots.lotCount(c, -1) > 0) {
@@ -677,6 +709,9 @@ public final class TownFunctions {
                     continue;
                 }
                 int index = (int) Math.floorMod(Hash.mix(hash + 1), (long) lots);
+                if (!lot.test(c, side, index)) {
+                    continue;
+                }
                 double[] centre = plots.lotCentre(c, side, index);
                 if (plan.districts().at(centre[0], centre[1]) == District.NONE || overlaps(centre[0], centre[1], 4)) {
                     continue;

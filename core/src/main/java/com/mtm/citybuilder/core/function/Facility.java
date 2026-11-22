@@ -24,6 +24,8 @@ public record Facility(Kind kind, long id, double x, double z, double radius, in
     /** The kinds of facility, each an area or a lot. */
     public enum Kind {
         CITY_HALL(true),
+        /** A public library (図書館). */
+        LIBRARY(true),
         ELEMENTARY_SCHOOL(true),
         JUNIOR_HIGH_SCHOOL(true),
         HIGH_SCHOOL(true),
@@ -49,6 +51,8 @@ public record Facility(Kind kind, long id, double x, double z, double radius, in
         BATHHOUSE(false),
         SMALL_SHRINE(false),
         SMALL_TEMPLE(false),
+        /** A filling station (ガソリンスタンド) on a main street's lot. */
+        GAS_STATION(false),
         // Landmarks
         CASTLE_KEEP(true),
         PAGODA(true),

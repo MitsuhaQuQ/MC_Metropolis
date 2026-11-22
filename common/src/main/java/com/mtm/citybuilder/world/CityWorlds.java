@@ -76,6 +76,9 @@ public final class CityWorlds {
                 DATABASES.add((SqlitePlanStore) store);
             }
         }
-        return CityLogic.forWorld(level.getSeed(), CitySettings.DEFAULT, terrain, store);
+        CityLogic logic = CityLogic.forWorld(level.getSeed(), CitySettings.DEFAULT, terrain, store);
+        // The towns built as their function layer lays them out: quarters, lots' uses, the public buildings
+        logic.buildings().useFunctions();
+        return logic;
     }
 }

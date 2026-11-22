@@ -38,6 +38,7 @@ public final class FunctionMap {
     private static String label(Facility.Kind kind) {
         return switch (kind) {
             case CITY_HALL -> "Hall";
+            case LIBRARY -> "Lib";
             case ELEMENTARY_SCHOOL -> "ES";
             case JUNIOR_HIGH_SCHOOL -> "JH";
             case HIGH_SCHOOL -> "HS";
@@ -59,6 +60,7 @@ public final class FunctionMap {
             case BATHHOUSE -> "b";
             case SMALL_SHRINE -> "s";
             case SMALL_TEMPLE -> "t";
+            case GAS_STATION -> "g";
             case CASTLE_KEEP -> "Keep";
             case PAGODA -> "Pagoda";
             case TOWER -> "Tower";

@@ -371,6 +371,23 @@ public final class BuildingLayer {
         }
     }
 
+    private volatile FacilityModels facilities;
+
+    /**
+     * Builds the towns as their function layer lays them out: its quarters and lots' uses ({@link FunctionQuarters}),
+     * and the public buildings generated whole on their facilities' sites ({@link FacilityModels}), no ordinary
+     * building on those. The game does this; the library's own tests and tools build without.
+     */
+    public void useFunctions() {
+        facilities = new FacilityModels(logic);
+        quarters(new FunctionQuarters(logic));
+    }
+
+    /** The public buildings generated whole, or null where the function layer is not used. */
+    public FacilityModels facilities() {
+        return facilities;
+    }
+
     /** The least side of a building: walls of a block either side and three blocks of room between them. */
     private static final double MIN_SIDE = 5.0;
 
@@ -395,6 +412,16 @@ public final class BuildingLayer {
             // On a stream the planning cannot see (the plans know the rivers, not every brook): no building in it
             building = null;
         }
+        FacilityModels models = facilities;
+        if (building != null && models != null) {
+            // Over a public building's footprint, or near it: none of the lot's own
+            for (double[] c : outline(plots, plot, building)) {
+                if (models.excludes(plots.settlement(), c[0], c[1])) {
+                    building = null;
+                    break;
+                }
+            }
+        }
         if (building != null && crossesFootpath(plots, building)) {
             // A footpath's open land runs across the lot, laid after the lots were cut: no building is split by it,
             // the lot left a yard
@@ -404,6 +431,27 @@ public final class BuildingLayer {
             cache.put(plot.id(), Optional.ofNullable(building));
         }
         return building;
+    }
+
+    /** A building's corners and middle in the world, from its frontage along the street and its depth back. */
+    private static double[][] outline(TownPlots plots, Plot plot, Building b) {
+        double[][] out = new double[5][];
+        int k = 0;
+        for (double a : new double[]{b.from(), b.to()}) {
+            for (double d : new double[]{b.front(), b.back()}) {
+                out[k++] = at(plots, plot, a, d);
+            }
+        }
+        out[4] = at(plots, plot, 0.5 * (b.from() + b.to()), 0.5 * (b.front() + b.back()));
+        return out;
+    }
+
+    private static double[] at(TownPlots plots, Plot plot, double along, double back) {
+        double[] p = plots.pointAt(plot.chain(), along);
+        double nx = -p[3] * plot.side();
+        double nz = p[2] * plot.side();
+        double d = 0.5 * plot.streetWidth() + back;
+        return new double[]{p[0] + nx * d, p[1] + nz * d};
     }
 
     /** The building at a position, null where none stands. */
@@ -541,10 +589,11 @@ public final class BuildingLayer {
         } else {
             type = Hash.unit(Hash.of(h, 2)) < 0.08 ? Building.Type.APARTMENT : Building.Type.HOUSE;
         }
-        Quarter quarter = quarters.at(plot);
-        Region region = quarters.region(plot);
-        Program program = quarters.program(plot);
-        boolean waterside = quarters.waterside(plot);
+        QuarterMap town = quarters.forTown(plots);
+        Quarter quarter = town.at(plot);
+        Region region = town.region(plot);
+        Program program = town.program(plot);
+        boolean waterside = town.waterside(plot);
         Catalog catalog = Catalog.get();
         // A quarter with styles of its own (a hanamachi, a chaya or storehouse quarter, a merchant town) builds in them;
         // elsewhere the district's kind of building, in the region's style for it (the catalogue)

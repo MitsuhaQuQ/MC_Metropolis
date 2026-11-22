@@ -1235,6 +1235,22 @@ public final class TownPlots {
         return new double[]{p[0] - p[3] * side * back, p[1] + p[2] * side * back};
     }
 
+    /** A lot's frontage along its street. */
+    public double lotFrontage(int chain, int side, int index) {
+        double[] starts = cuts.get(chain)[side > 0 ? 0 : 1];
+        return starts[index + 1] - starts[index];
+    }
+
+    /** How deep a lot runs back from its street's edge. */
+    public double lotDepth(int chain, int side, int index) {
+        return depths.get(chain)[side > 0 ? 0 : 1][index];
+    }
+
+    /** The town the plots are of. */
+    public com.mtm.citybuilder.core.settlement.Settlement settlement() {
+        return plan.settlement();
+    }
+
     /** How many chains (streets) the town's pieces form. */
     public int chainCount() {
         return chains.size();
