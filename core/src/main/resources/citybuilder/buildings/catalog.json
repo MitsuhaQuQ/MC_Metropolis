@@ -2802,10 +2802,10 @@
    "minecraft:potted_fern"
   ],
   "brandKonbini": [
-   "minecraft:lime_concrete",
-   "minecraft:blue_concrete",
-   "minecraft:orange_concrete",
-   "minecraft:green_concrete"
+   "citybuilder:konbini_band_green",
+   "citybuilder:konbini_band_blue",
+   "citybuilder:konbini_band_orange",
+   "citybuilder:konbini_band_red"
   ],
   "brandFastfood": [
    "minecraft:red_concrete",

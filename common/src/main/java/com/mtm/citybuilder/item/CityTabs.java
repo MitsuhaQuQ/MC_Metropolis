@@ -23,7 +23,7 @@ public final class CityTabs {
             "catenary_", "curve_marker", "paving", "marking", "street_light", "side_ditch"};
     private static final String[] BUILDINGS = {"window_", "curtain_", "thin_", "roof_", "adjuster", "door", "lantern",
             "andon", "chochin", "ac_unit", "vending", "water_heater", "postbox", "downpipe", "solar_panel",
-            "tv_antenna", "louvre", "meter", "water_tank", "tank_leg", "sign_blade", "fascia_"};
+            "tv_antenna", "louvre", "meter", "water_tank", "tank_leg", "sign_blade", "fascia_", "konbini_band"};
 
     private CityTabs() {
     }

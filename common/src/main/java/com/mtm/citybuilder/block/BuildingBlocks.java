@@ -219,6 +219,11 @@ public final class BuildingBlocks {
             p.registerBlock("fascia_lit_" + colour, () -> new ShopSignBlock(BlockBehaviour.Properties.copy(Blocks.WHITE_CONCRETE)
                     .strength(1.5f).lightLevel(s -> 14), new double[]{0, 0, 0, 16, 16, 16}));
         }
+        // Convenience stores' lit bands (色帯): whole blocks glowing behind their stripes, alike on every side
+        for (String colour : new String[]{"green", "blue", "orange", "red"}) {
+            p.registerBlock("konbini_band_" + colour, () -> new KonbiniBandBlock(BlockBehaviour.Properties.copy(Blocks.WHITE_CONCRETE)
+                    .strength(1.5f).lightLevel(s -> 13)));
+        }
         // Fixtures (models and boxes drawn by tools/textures/fixture_textures.py, facing north, the wall to the south)
         for (String colour : new String[]{"white", "beige"}) {
             p.registerBlock("ac_unit_" + colour, () -> new AcUnitBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)

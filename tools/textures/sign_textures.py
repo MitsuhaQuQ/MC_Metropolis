@@ -11,7 +11,11 @@ The blocks (see common's block.BuildingBlocks, ShopSignBlock; core's building.Pa
 - fascia_sign_<colour>: a painted fascia board (看板) over a shop front: a whole block, its front lettered, a band top
   and bottom; a wood board with gold letters among them.
 - fascia_lit_<colour>: a lit fascia (内照式看板): a whole block whose front glows white, the letters in a colour. Lit.
-Each carries `facing` (its front, out of the wall; a blade's faces are its sides) and `glyph`: 0 a plain panel, 1-8
+- konbini_band_<colour>: a convenience store's lit band (色帯): a whole block glowing white, the same on every side so
+  the band runs round the corner; `stripes` true (the lowest of a stack) has its brand's stripes across it, false (the
+  rows over it) glows plain, so a fascia rows high shows one striped band along its foot.
+  No brand's own stripes: green and lime, blue and sky, orange and yellow, red and white.
+Signs carry `facing` (its front, out of the wall; a blade's faces are its sides) and `glyph`: 0 a plain panel, 1-8
 the characters. Models are drawn facing north, the wall to the south.
 """
 import os
@@ -53,6 +57,27 @@ LIT = {
     'black': ((30, 30, 32), 'Black Letters', '黑字'),
 }
 GLOW = (250, 248, 240)
+# Konbini bands: {colour: (a broad stripe, a narrow one, English, Chinese)}
+BANDS = {
+    'green': ((44, 150, 74), (150, 200, 70), 'Green', '绿'),
+    'blue': ((30, 82, 170), (110, 170, 220), 'Blue', '蓝'),
+    'orange': ((232, 120, 30), (240, 196, 60), 'Orange', '橙'),
+    'red': ((196, 40, 44), (236, 232, 226), 'Red', '红'),
+}
+
+
+def konbini_band(broad, narrow, rail=True):
+    """A konbini band: white glow, a broad stripe across the middle, a narrow one under it, the light box's rail along
+    its foot (none on the plain rows over it, which run on as one face)."""
+    def f(x, y):
+        if rail and y == 15:
+            return tint((150, 154, 158), noise(x, y, 81) * 3)
+        if 5 <= y <= 8:
+            return tint(broad, noise(x, y, 82) * 3)
+        if 10 <= y <= 11:
+            return tint(narrow, noise(x, y, 83) * 3)
+        return tint(GLOW, noise(x, y, 84) * 2)
+    return f
 
 
 def glyph(index, size=10):
@@ -190,6 +215,9 @@ def draw():
         for g in range(GLYPHS + 1):
             tex(f'fascia_{colour}_{g}', lettered(background, letters, g, bands=band, seed=73))
     tex('fascia_lit_side', plain(ALUMINIUM, 74, 3, -10))
+    tex('konbini_band_plain', konbini_band(GLOW, GLOW, rail=False))
+    for colour, (broad, narrow, _, _) in BANDS.items():
+        tex(f"konbini_band_{colour}", konbini_band(broad, narrow))
     for colour, (letters, _, _) in LIT.items():
         for g in range(GLYPHS + 1):
             tex(f'fascia_lit_{colour}_{g}', lettered(GLOW, letters, g, bands=ALUMINIUM, glow=True, seed=75))
@@ -283,6 +311,17 @@ def main():
         block(f'fascia_lit_{colour}', f'Lit Fascia Sign ({en})', f'内照式招牌（{zh}）',
               {g: model(f'fascia_lit_{colour}_{g}', cube_front(ref(f'fascia_lit_{colour}_{g}'), ref('fascia_lit_side')))
                for g in range(GLYPHS + 1)})
+    for colour, (_, _, en, zh) in BANDS.items():
+        name = f'konbini_band_{colour}'
+        m = model(name, {'parent': 'minecraft:block/cube_all', 'textures': {'all': ref(name)}})
+        plain = model('konbini_band_plain', {'parent': 'minecraft:block/cube_all',
+                                             'textures': {'all': ref('konbini_band_plain')}})
+        write(os.path.join(BLOCKSTATES, f'{name}.json'), {'variants': {'stripes=true': {'model': m},
+                                                                       'stripes=false': {'model': plain}}})
+        write(os.path.join(ITEMS, f'{name}.json'), {'parent': m})
+        names[name] = (f'Convenience Store Band ({en})', f'便利店色带灯箱（{zh}）')
+        pickaxe.append(f'citybuilder:{name}')
+        loot(name)
     add_names(names)
     add_tag('mineable/pickaxe', pickaxe)
 

@@ -439,5 +439,9 @@
   "block.citybuilder.fascia_lit_red": "内照式招牌（红字）",
   "block.citybuilder.fascia_lit_blue": "内照式招牌（蓝字）",
   "block.citybuilder.fascia_lit_green": "内照式招牌（绿字）",
-  "block.citybuilder.fascia_lit_black": "内照式招牌（黑字）"
+  "block.citybuilder.fascia_lit_black": "内照式招牌（黑字）",
+  "block.citybuilder.konbini_band_green": "便利店色带灯箱（绿）",
+  "block.citybuilder.konbini_band_blue": "便利店色带灯箱（蓝）",
+  "block.citybuilder.konbini_band_orange": "便利店色带灯箱（橙）",
+  "block.citybuilder.konbini_band_red": "便利店色带灯箱（红）"
 }

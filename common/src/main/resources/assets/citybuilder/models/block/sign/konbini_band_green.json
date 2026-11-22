@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "citybuilder:block/sign/konbini_band_green"
+  }
+}

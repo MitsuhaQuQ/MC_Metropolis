@@ -93,7 +93,15 @@ test('shop signs in the game', async ({}, testInfo) => {
     }
     x += 9;
   }
+  // Konbini bands: three rows of each, as the front's top row and the parapet over it
+  x = 0;
+  for (const colour of ['green', 'blue', 'orange', 'red']) {
+    await server.command(`fill ${x} ${Y + 1} -6 ${x + 6} ${Y + 1} -6 citybuilder:konbini_band_${colour}[stripes=true]`);
+    await server.command(`fill ${x} ${Y + 2} -6 ${x + 6} ${Y + 3} -6 citybuilder:konbini_band_${colour}[stripes=false]`);
+    x += 9;
+  }
   await view('signs-front', 26, Y + 4, -18, 0, 5, testInfo);
+  await view('signs-konbini', 16, Y + 3, -16, 0, 0, testInfo);
   await view('signs-along', -8, Y + 4, -6, -70, 0, testInfo);
   await view('signs-close', 4, Y + 4, -5, -20, 0, testInfo);
   await server.command('time set 18000');

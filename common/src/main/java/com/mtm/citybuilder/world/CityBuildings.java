@@ -119,6 +119,12 @@ public final class CityBuildings {
                                     alongX ? Direction.Axis.X : Direction.Axis.Z);
                         }
                         placed = fixture(chunk, pos.set(baseX + x, y, baseZ + z), placed, column, y, part);
+                        if (placed.getBlock() instanceof com.mtm.citybuilder.block.KonbiniBandBlock) {
+                            // Laid from the foot up: the stripes on the lowest of a stack only
+                            BlockState below = chunk.getBlockState(pos.set(baseX + x, y - 1, baseZ + z));
+                            placed = placed.setValue(com.mtm.citybuilder.block.KonbiniBandBlock.STRIPES,
+                                    !(below.getBlock() instanceof com.mtm.citybuilder.block.KonbiniBandBlock));
+                        }
                         if (placed.getBlock() instanceof com.mtm.citybuilder.block.ShopSignBlock) {
                             placed = placed.setValue(com.mtm.citybuilder.block.ShopSignBlock.GLYPH, glyph(baseX + x, y, baseZ + z));
                         }

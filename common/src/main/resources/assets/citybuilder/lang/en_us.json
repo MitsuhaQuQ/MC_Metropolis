@@ -439,5 +439,9 @@
   "block.citybuilder.fascia_lit_red": "Lit Fascia Sign (Red Letters)",
   "block.citybuilder.fascia_lit_blue": "Lit Fascia Sign (Blue Letters)",
   "block.citybuilder.fascia_lit_green": "Lit Fascia Sign (Green Letters)",
-  "block.citybuilder.fascia_lit_black": "Lit Fascia Sign (Black Letters)"
+  "block.citybuilder.fascia_lit_black": "Lit Fascia Sign (Black Letters)",
+  "block.citybuilder.konbini_band_green": "Convenience Store Band (Green)",
+  "block.citybuilder.konbini_band_blue": "Convenience Store Band (Blue)",
+  "block.citybuilder.konbini_band_orange": "Convenience Store Band (Orange)",
+  "block.citybuilder.konbini_band_red": "Convenience Store Band (Red)"
 }

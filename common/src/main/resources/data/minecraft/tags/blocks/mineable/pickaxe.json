@@ -283,6 +283,10 @@
     "citybuilder:fascia_lit_red",
     "citybuilder:fascia_lit_blue",
     "citybuilder:fascia_lit_green",
-    "citybuilder:fascia_lit_black"
+    "citybuilder:fascia_lit_black",
+    "citybuilder:konbini_band_green",
+    "citybuilder:konbini_band_blue",
+    "citybuilder:konbini_band_orange",
+    "citybuilder:konbini_band_red"
   ]
 }

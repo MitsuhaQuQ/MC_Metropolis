@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "stripes=true": {
+      "model": "citybuilder:block/sign/konbini_band_red"
+    },
+    "stripes=false": {
+      "model": "citybuilder:block/sign/konbini_band_plain"
+    }
+  }
+}
