@@ -98,7 +98,7 @@ public final class ParkParts {
         Model m = new Model();
         m.set(0, 1, 0, "citybuilder:street_light_pole");
         m.set(0, 2, 0, "citybuilder:street_light_pole");
-        m.set(0, 3, 0, "citybuilder:street_light_lamp");
+        m.set(0, 3, 0, "citybuilder:street_light_lamp[facing=north]");
         return m;
     }
 
@@ -161,8 +161,9 @@ public final class ParkParts {
                 }
             }
         }
-        // A bench at the side for the parents
+        // A bench at the side for the parents, a drinking fountain at the other
         m.place(bench("west"), width - 1, 1, depth / 2 - 1, true);
+        m.place(fountain(), 0, 1, depth / 2, true);
         Shapes.connect(m);
         return m;
     }
@@ -193,6 +194,8 @@ public final class ParkParts {
                 }
             }
         }
+        // A stone lantern on the bank at a corner, outside the water
+        m.place(lantern(), 0, 1, 0, true);
         return m;
     }
 
@@ -247,6 +250,148 @@ public final class ParkParts {
         m.set(3, 3, 3, "citybuilder:window_aluminum_clear");
         m.set(2, 1, 4, "citybuilder:vending_white[facing=south,half=lower]");
         m.set(2, 2, 4, "citybuilder:vending_white[facing=south,half=upper]");
+        Shapes.connect(m);
+        return m;
+    }
+
+    /** A clipped hedge (植え込み) a block high: azalea, some of it in flower. */
+    public static Model hedge(long seed) {
+        Model m = new Model();
+        m.set(0, 1, 0, Hash.unit(seed) < 0.3 ? "minecraft:flowering_azalea_leaves[distance=7,persistent=true,waterlogged=false]"
+                : "minecraft:azalea_leaves[distance=7,persistent=true,waterlogged=false]");
+        return m;
+    }
+
+    /** A low shrub (a rounded azalea, a fern beside it) among the trees. */
+    public static Model shrub(long seed) {
+        Model m = new Model();
+        m.set(0, 1, 0, "minecraft:flowering_azalea");
+        if (Hash.unit(Hash.of(seed, 1)) < 0.5) {
+            m.set(1, 1, 0, "minecraft:fern");
+        }
+        return m;
+    }
+
+    /** A car stop (車止め) across a path's entrance: a white post with a yellow band, a block high. */
+    public static Model bollard() {
+        Model m = new Model();
+        m.set(0, 1, 0, "minecraft:diorite_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]");
+        return m;
+    }
+
+    private static final String[] FLOWERS = {"minecraft:poppy", "minecraft:dandelion", "minecraft:red_tulip",
+            "minecraft:orange_tulip", "minecraft:white_tulip", "minecraft:pink_tulip", "minecraft:cornflower",
+            "minecraft:oxeye_daisy", "minecraft:allium", "minecraft:azure_bluet"};
+
+    /**
+     * A flower bed (花壇) over {@code width} by {@code depth}: a low stone kerb round soil planted in rows of two or
+     * three kinds of flower, as a ward's parks department plants them.
+     */
+    public static Model flowerBed(int width, int depth, long seed) {
+        Model m = new Model();
+        String[] kinds = new String[3];
+        for (int k = 0; k < 3; k++) {
+            kinds[k] = FLOWERS[(int) Math.floorMod(Hash.of(seed, k), (long) FLOWERS.length)];
+        }
+        for (int x = 0; x < width; x++) {
+            for (int z = 0; z < depth; z++) {
+                boolean edge = x == 0 || z == 0 || x == width - 1 || z == depth - 1;
+                if (edge) {
+                    m.set(x, 0, z, "minecraft:polished_andesite");
+                    m.set(x, 1, z, "minecraft:polished_andesite_slab[type=bottom,waterlogged=false]");
+                } else {
+                    m.set(x, 0, z, "minecraft:podzol[snowy=false]");
+                    m.set(x, 1, z, kinds[Math.floorMod(z, 3) == 1 ? 1 : x % 2 == 0 ? 0 : 2]);
+                }
+            }
+        }
+        return m;
+    }
+
+    /**
+     * A wisteria trellis (藤棚) 6 by 5: four timber posts, a lattice of beams over them hung with the vine's leaves and
+     * flowers, benches under it.
+     */
+    public static Model wisteria(long seed) {
+        Model m = new Model();
+        for (int x = 0; x < 6; x++) {
+            for (int z = 0; z < 5; z++) {
+                m.set(x, 0, z, "citybuilder:sidewalk_granite");
+                boolean post = (x == 0 || x == 5) && (z == 0 || z == 4);
+                if (post) {
+                    for (int y = 1; y <= 3; y++) {
+                        m.set(x, y, z, "minecraft:stripped_spruce_log[axis=y]");
+                    }
+                }
+                m.set(x, 4, z, (x + z) % 2 == 0 ? "minecraft:spruce_slab[type=bottom,waterlogged=false]"
+                        : "minecraft:flowering_azalea_leaves[distance=7,persistent=true,waterlogged=false]");
+                if (!post && (x == 0 || x == 5 || z == 0 || z == 4) && Hash.unit(Hash.of(seed, x, z)) < 0.5) {
+                    // The flowers hanging from the edge
+                    m.set(x, 3, z, "minecraft:cave_vines_plant[berries=false]");
+                }
+            }
+        }
+        m.place(bench("north"), 1, 1, 1, true);
+        m.place(bench("south"), 2, 1, 3, true);
+        return m;
+    }
+
+    /**
+     * An arbour (東屋/あずまや) 5 by 5: four posts under a hipped tiled roof, benches round three sides inside, a
+     * stone floor.
+     */
+    public static Model gazebo(long seed) {
+        Model m = new Model();
+        String roof = Hash.unit(seed) < 0.5 ? "citybuilder:roof_kawara" : "citybuilder:roof_copper_green";
+        for (int x = 0; x < 5; x++) {
+            for (int z = 0; z < 5; z++) {
+                m.set(x, 0, z, "minecraft:smooth_stone");
+                boolean post = (x == 0 || x == 4) && (z == 0 || z == 4);
+                if (post) {
+                    for (int y = 1; y <= 3; y++) {
+                        m.set(x, y, z, "minecraft:dark_oak_log[axis=y]");
+                    }
+                }
+            }
+        }
+        // The roof: a slab course over the whole, a smaller one over it, a block at its top
+        for (int x = -1; x <= 5; x++) {
+            for (int z = -1; z <= 5; z++) {
+                m.set(x, 4, z, roof + "_slab[axis=x,type=bottom]");
+            }
+        }
+        for (int x = 0; x <= 4; x++) {
+            for (int z = 0; z <= 4; z++) {
+                m.set(x, 4, z, roof + "_slab[axis=x,type=top]");
+                if (x >= 1 && x <= 3 && z >= 1 && z <= 3) {
+                    m.set(x, 5, z, roof + "_slab[axis=x,type=bottom]");
+                }
+            }
+        }
+        m.set(2, 5, 2, roof + "[axis=x]");
+        m.place(bench("north"), 1, 1, 0, true);
+        for (int z = 1; z <= 3; z++) {
+            m.set(0, 1, z, "minecraft:spruce_stairs[facing=west,half=bottom,shape=straight,waterlogged=false]");
+            m.set(4, 1, z, "minecraft:spruce_stairs[facing=east,half=bottom,shape=straight,waterlogged=false]");
+        }
+        return m;
+    }
+
+    /** A drinking fountain (水飲み場): a stone pillar with its basin and a tap, a step for children beside it. */
+    public static Model fountain() {
+        Model m = new Model();
+        m.set(0, 1, 0, "minecraft:polished_andesite");
+        m.set(0, 2, 0, "minecraft:cauldron");
+        m.set(1, 1, 0, "minecraft:polished_andesite_slab[type=bottom,waterlogged=false]");
+        return m;
+    }
+
+    /** A stone lantern (石灯籠) by a pond: a base, the post, the fire box, its cap. */
+    public static Model lantern() {
+        Model m = new Model();
+        m.set(0, 1, 0, "minecraft:stone_brick_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]");
+        m.set(0, 2, 0, "citybuilder:toro_light[facing=south]");
+        m.set(0, 3, 0, "minecraft:stone_brick_slab[type=bottom,waterlogged=false]");
         return m;
     }
 }

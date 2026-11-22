@@ -562,6 +562,29 @@ public final class CityChunks {
         }
     }
 
+    /**
+     * A footpath's paving inside a facility's grounds (the function layer's walks): a neighbourhood or sports park's
+     * paths in red interlocking pavers, a central or large park's in granite setts, a temple's in gravel, a shrine's
+     * approach in gravel too; a green's and the promenades' packed earth as they were.
+     */
+    private static BlockState walkPaving(WorldGenLevel level, int x, int z, BlockState earth) {
+        CityLogic logic = CityWorlds.of(level.getLevel());
+        com.mtm.citybuilder.core.extent.UrbanSample sample = logic.urban(x + 0.5, z + 0.5);
+        if (sample.owner() == null) {
+            return earth;
+        }
+        com.mtm.citybuilder.core.function.Facility f = logic.functions().town(sample.owner()).facilityAt(x + 0.5, z + 0.5);
+        if (f == null) {
+            return earth;
+        }
+        return switch (f.kind()) {
+            case PARK, SPORTS_PARK -> ours("sidewalk_interlocking").defaultBlockState();
+            case CENTRAL_PARK, LARGE_PARK -> ours("sidewalk_granite").defaultBlockState();
+            case TEMPLE, SHRINE, GRAND_TEMPLE, GRAND_SHRINE, SMALL_TEMPLE, SMALL_SHRINE -> Blocks.GRAVEL.defaultBlockState();
+            default -> earth;
+        };
+    }
+
     /** Before decoration: paving on the ground, decks over water, headroom cleared; the airports graded and paved. */
     public static void pave(WorldGenLevel level, ChunkAccess chunk) {
         ChunkLayer.Column[] columns = columns(level, chunk);
@@ -588,6 +611,9 @@ public final class CityChunks {
                 }
                 ChunkLayer.Column column = columns[x * 16 + z];
                 BlockState block = paving(column);
+                if (block != null && block.is(Blocks.DIRT_PATH)) {
+                    block = walkPaving(level, baseX + x, baseZ + z, block);
+                }
                 if (block == null) {
                     if (column.canal() != 0) {
                         dig(chunk, column, baseX + x, baseZ + z, x, z, pos, top);

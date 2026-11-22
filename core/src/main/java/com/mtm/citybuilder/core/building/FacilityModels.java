@@ -346,8 +346,20 @@ public final class FacilityModels {
         if (kind == Facility.Kind.PARK || kind == Facility.Kind.CENTRAL_PARK) {
             graded(f, open, plots, half, 12, 9, 16, 12, reserved, out, (w, d) -> ParkParts.playground(w, d, seed));
         }
+        if (kind == Facility.Kind.CENTRAL_PARK || kind == Facility.Kind.LARGE_PARK) {
+            graded(f, open, plots, half, 5, 5, 5, 5, reserved, out, (w, d) -> ParkParts.gazebo(seed));
+        }
+        if (kind == Facility.Kind.PARK || kind == Facility.Kind.CENTRAL_PARK) {
+            graded(f, open, plots, half, 6, 5, 6, 5, reserved, out, (w, d) -> ParkParts.wisteria(seed));
+        }
         if (kind != Facility.Kind.GREEN && f.radius() >= 22) {
             graded(f, open, plots, half, 6, 5, 6, 5, reserved, out, (w, d) -> ParkParts.toilet());
+        }
+        // Flower beds: one in a neighbourhood park, two in the larger
+        int beds = kind == Facility.Kind.PARK ? 1 : kind == Facility.Kind.CENTRAL_PARK || kind == Facility.Kind.LARGE_PARK ? 2 : 0;
+        for (int k = 0; k < beds; k++) {
+            long bed = Hash.of(seed, 0xBEDL + k);
+            graded(f, open, plots, half, 5, 3, 10, 4, reserved, out, (w, d) -> ParkParts.flowerBed(w, d, bed));
         }
         // The trees, lamps and benches, each at its own ground
         Model scatter = new Model();
@@ -380,6 +392,13 @@ public final class FacilityModels {
                     default -> edge ? 0.9 : 0.12;
                 };
                 if (Hash.unit(Hash.of(h, 3)) >= chance) {
+                    // A shrub where no tree stands, in the larger parks' lawns and the greens
+                    if (kind != Facility.Kind.PARK && kind != Facility.Kind.SPORTS_PARK && Hash.unit(Hash.of(h, 5)) < 0.3) {
+                        Integer y = groundAt(x, z);
+                        if (y != null) {
+                            set(scatter, ParkParts.shrub(h), x, y, z);
+                        }
+                    }
                     continue;
                 }
                 ParkParts.Tree tree = species(kind, edge, Hash.unit(Hash.of(h, 4)));
@@ -413,6 +432,64 @@ public final class FacilityModels {
                     // A bench beside the path, facing it: its back the way it lies off the path, (uz, -ux)
                     String back = Math.abs(uz) > Math.abs(ux) ? (uz > 0 ? "east" : "west") : (-ux > 0 ? "south" : "north");
                     set(scatter, ParkParts.bench(back), x, y, z);
+                }
+            }
+        }
+        if (kind != Facility.Kind.GREEN) {
+            // A clipped hedge round the edge, open where the paths come in
+            int x0 = (int) Math.floor(f.x() - half);
+            int z0 = (int) Math.floor(f.z() - half);
+            int x1 = (int) Math.ceil(f.x() + half);
+            int z1 = (int) Math.ceil(f.z() + half);
+            for (int x = x0; x <= x1; x++) {
+                for (int z = z0; z <= z1; z++) {
+                    double px = x + 0.5;
+                    double pz = z + 0.5;
+                    if (!land.test(px, pz) || land.test(px + 1, pz) && land.test(px - 1, pz) && land.test(px, pz + 1)
+                            && land.test(px, pz - 1)) {
+                        continue;
+                    }
+                    if (walkDistance(walk, px, pz) < 1.5 || in(reserved, px, pz, 0.0)) {
+                        continue;
+                    }
+                    Integer y = groundAt(x, z);
+                    if (y != null) {
+                        set(scatter, ParkParts.hedge(Hash.of(seed, x, z)), x, y, z);
+                    }
+                }
+            }
+            // Car stops across each path where it comes in from the street
+            for (com.mtm.citybuilder.core.function.Walk w : functions.walks()) {
+                if (w.facility() != f.id() || w.points().size() < 2) {
+                    continue;
+                }
+                List<double[]> pts = w.points();
+                for (int end = 0; end < 2; end++) {
+                    double[] a = end == 0 ? pts.get(0) : pts.get(pts.size() - 1);
+                    double[] b = end == 0 ? pts.get(1) : pts.get(pts.size() - 2);
+                    double len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+                    if (len < 4) {
+                        continue;
+                    }
+                    double ux = (b[0] - a[0]) / len;
+                    double uz = (b[1] - a[1]) / len;
+                    // Only where the path's end lies at the land's edge: a block or two out of it is street
+                    if (land.test(a[0] - ux * 3, a[1] - uz * 3)) {
+                        continue;
+                    }
+                    double in = 0;
+                    while (in < 8 && !land.test(a[0] + ux * in, a[1] + uz * in)) {
+                        in += 0.5;
+                    }
+                    in += 1.5;
+                    for (double k : new double[]{-0.5 * w.width(), 0.0, 0.5 * w.width()}) {
+                        int x = (int) Math.floor(a[0] + ux * in - uz * k);
+                        int z = (int) Math.floor(a[1] + uz * in + ux * k);
+                        Integer y = groundAt(x, z);
+                        if (y != null && land.test(x + 0.5, z + 0.5)) {
+                            set(scatter, ParkParts.bollard(), x, y, z);
+                        }
+                    }
                 }
             }
         }

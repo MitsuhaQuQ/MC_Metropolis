@@ -21,7 +21,17 @@ class CivicTest {
     private static List<Model> all() {
         return List.of(new CityHall(48, 22, 8, 22, 3).build(), new CityHall(30, 16, 5, 0, 5).build(),
                 new Hospital(50, 8, 2).build(), new Hospital(34, 5, 6).build(), new Library(44, 30, 4).build(),
-                new Library(24, 18, 9).build(), new GasStation(3, true, 1).build(), new GasStation(1, false, 2).build());
+                new Library(24, 18, 9).build(), new GasStation(3, true, 1).build(), new GasStation(1, false, 2).build(),
+                new GasStation(2, false, 3, true).build(), new Hospital(40, 6, 4, false).build());
+    }
+
+    /** The parks' parts, for their block states. */
+    private static List<Model> parks() {
+        return List.of(ParkParts.playground(16, 12, 1), ParkParts.pond(20, 14, 2), ParkParts.field(40, 28),
+                ParkParts.toilet(), ParkParts.wisteria(3), ParkParts.gazebo(4), ParkParts.gazebo(5),
+                ParkParts.flowerBed(8, 4, 6), ParkParts.hedge(7), ParkParts.shrub(8), ParkParts.bollard(),
+                ParkParts.lantern(), ParkParts.fountain(), ParkParts.lamp(), ParkParts.bench("east"),
+                ParkParts.tree(ParkParts.Tree.CHERRY, 9));
     }
 
     /**
@@ -50,7 +60,9 @@ class CivicTest {
         // windows, by name)
         Path states = Path.of("..", "common", "src", "main", "resources", "assets", "citybuilder", "blockstates");
         Map<String, JsonObject> files = new HashMap<>();
-        for (Model m : all()) {
+        List<Model> models = new ArrayList<>(all());
+        models.addAll(parks());
+        for (Model m : models) {
             List<String> bad = new ArrayList<>();
             m.forEach((x, y, z, s) -> {
                 if (s.startsWith("minecraft:")) {
