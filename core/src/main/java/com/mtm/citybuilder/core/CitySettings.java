@@ -172,6 +172,16 @@ public final class CitySettings {
         public double[] grandElsewhere = {0.45, 0.2, 0.15, 0.2};
         public double largeEstate = 3.0;
         public double largeEstateChance = 0.4;
+        /**
+         * Temples and shrines in the built-up town (downtown, the old town, the station front, and whatever lies within
+         * {@code suburbReach} of the town's radius from its middle) take one ordinary block at most, up to
+         * {@code templeTownMax} hectares (the user 2026-11-22): the larger estates there become parks and greens, and
+         * the head temples and great shrines are left to the suburbs, where a temple or shrine may take a block up to
+         * {@code templeSuburbScale} times its kind's greatest area.
+         */
+        public double templeTownMax = 1.5;
+        public double suburbReach = 0.6;
+        public double templeSuburbScale = 3.0;
 
         /**
          * Historic pleasure quarters (hanamachi, chaya-gai) of the old town, each laid along one street that its

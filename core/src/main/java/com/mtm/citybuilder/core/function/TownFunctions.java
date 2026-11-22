@@ -135,6 +135,24 @@ public final class TownFunctions {
         return Math.hypot(x - centreX, z - centreZ);
     }
 
+    /**
+     * Whether a block lies in the built-up town rather than its suburbs: downtown, the old town, the station front, or
+     * within {@code suburbReach} of the town's radius from its middle.
+     */
+    private boolean inTown(Blocks.Block b) {
+        District d = b.district();
+        if (d == District.CENTRAL || d == District.OLD_TOWN || d == District.STATION_FRONT) {
+            return true;
+        }
+        return fromCentre(b.x(), b.z()) < config.suburbReach * Math.sqrt(builtKm2 * 1e6 / Math.PI);
+    }
+
+    /** A temple's or shrine's site rule: one ordinary block in town, up to a few times its kind's greatest outside. */
+    private double[] sacredSpec(double[] spec, boolean town) {
+        return town ? new double[]{spec[0], spec[1], Math.min(spec[2], config.templeTownMax)}
+                : new double[]{spec[0], spec[1], spec[2] * config.templeSuburbScale};
+    }
+
     private static int ring(double distance) {
         return distance < 500 ? 0 : distance < 1000 ? 1 : distance < 2000 ? 2 : 3;
     }
@@ -356,16 +374,20 @@ public final class TownFunctions {
                 double back = 0.5 * plots.chainWidth(c) + 6;
                 Blocks.Block b = blockAt(p[0] - p[3] * side * back, p[1] + p[2] * side * back);
                 if (b != null && !taken.contains(b.id()) && b.area() >= config.temple[1] * 1e4
-                        && b.area() <= config.temple[2] * 1e4 && b.district() == District.OLD_TOWN) {
+                        && b.area() <= sacredSpec(config.temple, inTown(b))[2] * 1e4 && b.district() == District.OLD_TOWN) {
                     take(Facility.Kind.TEMPLE, b);
                 }
             }
         }
         // Temples in the old town, shrines anywhere among the houses, neighbourhood parks
         double oldKm2 = oldTownKm2();
-        placeAreas(Facility.Kind.TEMPLE, (int) Math.round(config.temple[0] * oldKm2), config.temple,
-                1000 / Math.sqrt(config.temple[0]), b -> b.district() == District.OLD_TOWN ? 1.0 : 0.0);
-        placeAreas(Facility.Kind.SHRINE, count(config.shrine), config.shrine, 1000 / Math.sqrt(config.shrine[0]), houses);
+        // Each on one ordinary block in town; in the suburbs on blocks up to a few times larger
+        placeAreas(Facility.Kind.TEMPLE, (int) Math.round(config.temple[0] * oldKm2), sacredSpec(config.temple, false),
+                1000 / Math.sqrt(config.temple[0]), b -> b.district() != District.OLD_TOWN ? 0.0
+                        : b.area() <= sacredSpec(config.temple, inTown(b))[2] * 1e4 ? 1.0 : 0.0);
+        placeAreas(Facility.Kind.SHRINE, count(config.shrine), sacredSpec(config.shrine, false),
+                1000 / Math.sqrt(config.shrine[0]),
+                b -> b.area() <= sacredSpec(config.shrine, inTown(b))[2] * 1e4 ? houses.applyAsDouble(b) : 0.0);
         placeAreas(Facility.Kind.PARK, count(config.park), config.park, 1000 / Math.sqrt(config.park[0]), houses);
         // The estates nothing took: the streets kept out of them, so they are left green (a grove, a garden)
         for (Blocks.Block b : blocks.all()) {
@@ -400,7 +422,16 @@ public final class TownFunctions {
             if (!b.grand() && (b.area() < config.largeEstate * 1e4 || Hash.unit(hash) >= config.largeEstateChance)) {
                 continue;
             }
-            double[] weights = b.district() == District.OLD_TOWN ? config.grandOldTown : config.grandElsewhere;
+            double[] weights = (b.district() == District.OLD_TOWN ? config.grandOldTown : config.grandElsewhere).clone();
+            if (inTown(b) && b.area() > config.templeTownMax * 1e4) {
+                // In town a temple or shrine keeps to one block: grounds larger than that are a park or a green
+                weights[2] = 0;
+                weights[3] = 0;
+            } else if (!inTown(b)) {
+                // In the suburbs the large precincts are at home: a head temple or great shrine twice as likely
+                weights[2] *= 2;
+                weights[3] *= 2;
+            }
             double total = 0;
             for (double w : weights) {
                 total += w;
