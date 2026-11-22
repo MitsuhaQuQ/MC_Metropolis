@@ -152,6 +152,14 @@ public final class TempleModels {
             case "ballpark" -> new Ballpark(i(o, "lines", 98), i(o, "centre", 122), i(o, "foul", 16),
                     i(o, "standDepth"), i(o, "floodlights", 0)).build();
             case "athletics" -> new AthleticsGround(i(o, "standDepth"), i(o, "roofLength")).build();
+            case "cityhall" -> new com.mtm.citybuilder.core.building.landmark.CityHall(i(o, "width"), i(o, "depth"),
+                    i(o, "storeys"), i(o, "council", 0), i(o, "seed", 0)).build();
+            case "hospital" -> new com.mtm.citybuilder.core.building.landmark.Hospital(i(o, "width"), i(o, "wards"),
+                    i(o, "seed", 0)).build();
+            case "library" -> new com.mtm.citybuilder.core.building.landmark.Library(i(o, "width"), i(o, "depth"),
+                    i(o, "seed", 0)).build();
+            case "gas_station" -> new com.mtm.citybuilder.core.building.landmark.GasStation(i(o, "islands"),
+                    bool(o, "carWash"), i(o, "seed", 0)).build();
             default -> throw new IllegalArgumentException("unknown kind: " + o.get("kind"));
         };
     }

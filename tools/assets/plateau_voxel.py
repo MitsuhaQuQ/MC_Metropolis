@@ -275,6 +275,18 @@ TEMPLES = {
     "stadium_baseball": dict(kind="ballpark", role="BALLPARK", lines=98, centre=122, foul=16, standDepth=26,
                              floodlights=36),
     "athletics_ground": dict(kind="athletics", role="ATHLETICS_GROUND", standDepth=20, roofLength=60),
+    # Civic and roadside buildings (core.building.landmark), self-made at Japanese sizes: a mid-sized city's hall
+    # (office block 48 x 22, 8 storeys, a council wing), a smaller town's (30 x 16, 5 storeys), a general hospital
+    # (outpatient block 50 wide, 8-storey wards, helipad), a municipal library (44 x 30, two storeys) and a branch
+    # library, filling stations with three and two islands.
+    "city_hall_office": dict(kind="cityhall", role="CITY_HALL", width=48, depth=22, storeys=8, council=22, seed=3),
+    "town_hall": dict(kind="cityhall", role="CITY_HALL", width=30, depth=16, storeys=5, council=0, seed=5),
+    "hospital_general": dict(kind="hospital", role="HOSPITAL", width=50, wards=8, seed=2),
+    "hospital_small": dict(kind="hospital", role="HOSPITAL", width=34, wards=5, seed=6),
+    "library_city": dict(kind="library", role="LIBRARY", width=44, depth=30, seed=4),
+    "library_branch": dict(kind="library", role="LIBRARY", width=24, depth=18, seed=9),
+    "gas_station": dict(kind="gas_station", role="GAS_STATION", islands=3, carWash=True, seed=1),
+    "gas_station_small": dict(kind="gas_station", role="GAS_STATION", islands=2, carWash=False, seed=2),
     # The hillside demos stand on MTM_worldgen's real terrain (seed 12345, round the castle town): each finds the
     # mountainside site nearest the town whose ground climbs as much as asked from the street to the back.
     # A shrine high on a mountainside: the approach climbs 30-60 m from the street.
@@ -349,6 +361,10 @@ LABELS = {
     "harbour_light_white": ("lighthouse", None, "HARBOUR_LIGHT"),
     "stadium_football": ("sports", None, "STADIUM"), "stadium_baseball": ("sports", None, "BALLPARK"),
     "athletics_ground": ("sports", None, "ATHLETICS_GROUND"),
+    "city_hall_office": ("civic", None, "CITY_HALL"), "town_hall": ("civic", None, "CITY_HALL"),
+    "hospital_general": ("civic", None, "HOSPITAL"), "hospital_small": ("civic", None, "HOSPITAL"),
+    "library_city": ("civic", None, "LIBRARY"), "library_branch": ("civic", None, "LIBRARY"),
+    "gas_station": ("roadside", None, "GAS_STATION"), "gas_station_small": ("roadside", None, "GAS_STATION"),
     "demo_precinct_shrine_small_hill": ("sacred", SHRINE, "KEIDAI"),
     "demo_precinct_shrine_medium_hill": ("sacred", SHRINE, "KEIDAI"),
     "demo_precinct_shrine_large": ("sacred", SHRINE, "KEIDAI"),
@@ -362,6 +378,9 @@ LABELS = {
 DEMO_NAMES = {"lighthouse_cape": "灯台（岬、犬吠埼風、退息所付き）", "lighthouse_cape_small": "灯台（岬、潮岬風）",
               "harbour_light_red": "防波堤灯台（赤）", "harbour_light_white": "防波堤灯台（白）",
               "stadium_football": "球技場（サッカー）", "stadium_baseball": "野球場", "athletics_ground": "陸上競技場",
+              "city_hall_office": "市役所（行政棟・議会棟）", "town_hall": "町役場", "hospital_general": "総合病院（ヘリポート付き）",
+              "hospital_small": "病院（中規模）", "library_city": "市立図書館", "library_branch": "図書館（分館）",
+              "gas_station": "ガソリンスタンド（洗車機付き）", "gas_station_small": "ガソリンスタンド（小）",
               "demo_precinct_shrine": "神社の境内（稲荷風）", "demo_precinct_temple": "寺院の伽藍", "demo_kasuga": "本殿（春日造）", "demo_hachiman": "本殿（八幡造）", "demo_shinmei": "本殿（神明造）",
               "demo_precinct_shrine_small_hill": "小さな神社（山の斜面）", "demo_precinct_shrine_medium_hill": "中規模の神社（山麓）",
               "demo_precinct_shrine_large": "大きな神社（稲荷風、緩い斜面）", "demo_precinct_temple_medium_hill": "中規模の寺院（山麓）",
@@ -1614,6 +1633,54 @@ MOD_TEXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".
 _mod_colours = {}
 
 
+_mod_files = []
+
+
+def mod_texture(short):
+    """The texture standing for one of this mod's blocks: its own name's at the top, else in a subfolder (fixtures,
+    signs, walls), else the first whose name starts with it (a sign's characters, a fixture's faces)."""
+    top = os.path.join(MOD_TEXTURES, short + ".png")
+    if os.path.exists(top):
+        return top
+    # The block's own model's particle texture, through its block state file
+    assets = os.path.dirname(os.path.dirname(MOD_TEXTURES))
+    try:
+        with open(os.path.join(assets, "blockstates", short + ".json"), encoding="utf-8") as fh:
+            state = json.load(fh)
+        if "variants" in state:
+            first = next(iter(state["variants"].values()))
+        else:
+            first = state["multipart"][0]["apply"]
+        first = first[0] if isinstance(first, list) else first
+        model = first["model"].split(":", 1)[1]
+        for _ in range(4):  # up through parents until a texture is named
+            with open(os.path.join(assets, "models", model + ".json"), encoding="utf-8") as fh:
+                m = json.load(fh)
+            textures = m.get("textures", {})
+            tex = textures.get("particle") or next((t for t in textures.values() if not t.startswith("#")), None)
+            if tex and tex.startswith("citybuilder:"):
+                path = os.path.join(assets, "textures", tex.split(":", 1)[1] + ".png")
+                if os.path.exists(path):
+                    return path
+            parent = m.get("parent", "")
+            if not parent.startswith("citybuilder:"):
+                break
+            model = parent.split(":", 1)[1]
+    except (OSError, KeyError, StopIteration, ValueError):
+        pass
+    if not _mod_files:
+        for root, _, files in os.walk(MOD_TEXTURES):
+            _mod_files.extend(sorted(os.path.join(root, f) for f in files if f.endswith(".png")))
+    for path in _mod_files:
+        if os.path.basename(path) == short + ".png":
+            return path
+    for path in _mod_files:
+        base = os.path.basename(path)[:-4]
+        if base.startswith(short) or short.startswith(base + "_") and len(base) > 3:
+            return path
+    raise FileNotFoundError("no texture for citybuilder:" + short)
+
+
 def colour_of(name, bc):
     """A block's preview colour: vanilla from the client jar's textures (or COLOURS), this mod's own blocks from their
     textures in the repository, painted lines lighter than their surface."""
@@ -1623,7 +1690,7 @@ def colour_of(name, bc):
         if name not in _mod_colours:
             short = name.split(":", 1)[1]
             line = short.endswith("_line_white")
-            img = Image.open(os.path.join(MOD_TEXTURES, short[:-len("_line_white")] if line else short) + ".png")
+            img = Image.open(mod_texture(short[:-len("_line_white")] if line else short))
             px = list(img.convert("RGB").getdata())
             avg = [sum(p[i] for p in px) / len(px) for i in range(3)]
             if line:

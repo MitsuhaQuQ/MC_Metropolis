@@ -95,7 +95,7 @@ final class Shapes {
     }
 
     private static boolean isThin(String s) {
-        return s.startsWith("minecraft:iron_bars") || s.contains("glass_pane");
+        return s.startsWith("minecraft:iron_bars") || s.contains("glass_pane") || s.startsWith("citybuilder:window_");
     }
 
     private static boolean isWall(String s) {

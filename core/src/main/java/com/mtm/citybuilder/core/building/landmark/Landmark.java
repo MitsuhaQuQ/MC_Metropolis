@@ -14,11 +14,19 @@ public enum Landmark {
     /** 野球場: a baseball stadium, infield stands with a roof behind home plate, a grass bank in the outfield. */
     BALLPARK(Category.SPORTS, "野球場"),
     /** 陸上競技場: a municipal athletics ground, a 400 m track round a pitch, a small main stand and grass banks. */
-    ATHLETICS_GROUND(Category.SPORTS, "陸上競技場");
+    ATHLETICS_GROUND(Category.SPORTS, "陸上競技場"),
+    /** 市役所: a city hall, an office block over a glazed lobby, a council wing, flagpoles in its forecourt. */
+    CITY_HALL(Category.CIVIC, "市役所"),
+    /** 総合病院: a general hospital, an outpatient block, a ward block with a helipad, a porte-cochère. */
+    HOSPITAL(Category.CIVIC, "総合病院"),
+    /** 図書館: a municipal library, a glass front over a two-storey reading room, the stacks behind. */
+    LIBRARY(Category.CIVIC, "図書館"),
+    /** ガソリンスタンド: a filling station, a canopy over pump islands, a sales room, a car wash. */
+    GAS_STATION(Category.ROADSIDE, "ガソリンスタンド");
 
     /** The library category, as in {@code tools/assets/plateau_voxel.py}'s labels. */
     public enum Category {
-        LIGHTHOUSE("lighthouse"), SPORTS("sports");
+        LIGHTHOUSE("lighthouse"), SPORTS("sports"), CIVIC("civic"), ROADSIDE("roadside");
 
         private final String label;
 
