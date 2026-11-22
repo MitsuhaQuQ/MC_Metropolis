@@ -683,6 +683,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             m.put("maxX", p.maxX());
             m.put("maxZ", p.maxZ());
             m.put("ground", p.y());
+            m.put("grade", p.grade());
             out.add(m);
         }
         return Map.of("found", true, "placed", out);

@@ -42,6 +42,9 @@ class FacilityModelsTest {
         Map<Facility.Kind, Integer> built = new EnumMap<>(Facility.Kind.class);
         for (FacilityModels.Placed p : placed) {
             built.merge(p.facility().kind(), 1, Integer::sum);
+            if (!p.grade()) {
+                continue;
+            }
             System.out.printf("%s at %d %d .. %d %d, ground %d, %d blocks%n", p.facility().kind(), p.minX(), p.minZ(),
                     p.maxX(), p.maxZ(), p.y(), p.model().size());
             for (int x = p.minX(); x <= p.maxX(); x += 2) {
@@ -63,6 +66,7 @@ class FacilityModelsTest {
         Map<Program, Integer> programs = new EnumMap<>(Program.class);
         int buildings = 0;
         int inside = 0;
+        int parkBuildings = 0;
         for (double x = town.x() - 1500; x <= town.x() + 1500; x += 6) {
             for (double z = town.z() - 1500; z <= town.z() + 1500; z += 6) {
                 Building b = layer.at(x, z);
@@ -71,9 +75,14 @@ class FacilityModelsTest {
                 }
                 buildings++;
                 for (FacilityModels.Placed p : placed) {
-                    if (p.covers(x, z, 0)) {
+                    if (p.grade() && p.covers(x, z, 0)) {
                         inside++;
                     }
+                }
+                Facility on = functions.facilityAt(x, z);
+                if (on != null && (on.kind() == Facility.Kind.PARK || on.kind() == Facility.Kind.LARGE_PARK
+                        || on.kind() == Facility.Kind.GREEN)) {
+                    parkBuildings++;
                 }
                 if (b.program() != null) {
                     programs.merge(b.program(), 1, Integer::sum);
@@ -85,6 +94,8 @@ class FacilityModelsTest {
         }
         System.out.println("building samples " + buildings + ", in models " + inside + "\nquarters " + quarters + "\nprograms " + programs);
         int in = inside;
+        int onParks = parkBuildings;
+        assertTrue(onParks == 0, () -> onParks + " building samples on parks");
         assertTrue(in == 0, () -> in + " building samples inside public buildings");
         assertTrue(programs.getOrDefault(Program.KONBINI, 0) > 0, () -> "no convenience store: " + programs);
     }

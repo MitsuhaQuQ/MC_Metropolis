@@ -171,8 +171,9 @@ public final class CityBuildings {
 
     /**
      * The public buildings generated whole (core's {@code FacilityModels}: a city hall, a hospital, a library, a
-     * filling station) over the chunk: under each footprint the ground cut or filled to the model's ground and
-     * grassed, what stood above it cleared, then the model's blocks.
+     * filling station; a park's playground, pond, field and toilet) over the chunk: under each footprint the ground
+     * cut or filled to the model's ground and grassed, what stood above it cleared, then the model's blocks; a park's
+     * trees, lamps and benches set into the open at their own ground.
      */
     private static void facilities(CityLogic logic, ChunkAccess chunk, BlockPos.MutableBlockPos pos) {
         com.mtm.citybuilder.core.building.FacilityModels models = logic.buildings().facilities();
@@ -195,7 +196,7 @@ public final class CityBuildings {
         int max = chunk.getMaxBuildHeight() - 1;
         for (com.mtm.citybuilder.core.building.FacilityModels.Placed p : near) {
             int ground = p.y();
-            for (int wx = Math.max(baseX, p.minX()); wx <= Math.min(baseX + 15, p.maxX()); wx++) {
+            for (int wx = Math.max(baseX, p.minX()); p.grade() && wx <= Math.min(baseX + 15, p.maxX()); wx++) {
                 for (int wz = Math.max(baseZ, p.minZ()); wz <= Math.min(baseZ + 15, p.maxZ()); wz++) {
                     int x = wx - baseX;
                     int z = wz - baseZ;
@@ -220,6 +221,13 @@ public final class CityBuildings {
                 int wy = my + p.y();
                 int wz = mz + p.z();
                 if (wx >= baseX && wx < baseX + 16 && wz >= baseZ && wz < baseZ + 16 && wy >= min && wy <= max) {
+                    // A park's trees and benches only into the open (air, plants, leaves), not into what is built
+                    if (!p.grade()) {
+                        BlockState there = chunk.getBlockState(pos.set(wx, wy, wz));
+                        if (!there.isAir() && there.blocksMotion() && !(there.getBlock() instanceof net.minecraft.world.level.block.LeavesBlock)) {
+                            return;
+                        }
+                    }
                     chunk.setBlockState(pos.set(wx, wy, wz), parsed(s), false);
                 }
             });

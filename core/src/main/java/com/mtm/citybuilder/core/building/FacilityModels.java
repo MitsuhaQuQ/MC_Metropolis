@@ -5,6 +5,8 @@ import com.mtm.citybuilder.core.building.landmark.CityHall;
 import com.mtm.citybuilder.core.building.landmark.GasStation;
 import com.mtm.citybuilder.core.building.landmark.Hospital;
 import com.mtm.citybuilder.core.building.landmark.Library;
+import com.mtm.citybuilder.core.building.landmark.ParkParts;
+import com.mtm.citybuilder.core.noise.Hash;
 import com.mtm.citybuilder.core.building.temple.Model;
 import com.mtm.citybuilder.core.function.Facility;
 import com.mtm.citybuilder.core.function.TownFunctions;
@@ -27,9 +29,11 @@ import java.util.Map;
 public final class FacilityModels {
     /**
      * A model placed in the world: its blocks at their model coordinates plus ({@code x}, {@code y}, {@code z}); its
-     * footprint's bounds in the world.
+     * footprint's bounds in the world; whether its footprint is graded to its ground (a building, a playground, a pond,
+     * a field) or its blocks only set into what is there (a park's trees, benches and lamps, each at its own ground).
      */
-    public record Placed(Facility facility, Model model, int x, int y, int z, int minX, int minZ, int maxX, int maxZ) {
+    public record Placed(Facility facility, Model model, int x, int y, int z, int minX, int minZ, int maxX, int maxZ,
+                         boolean grade) {
         /** Whether a column lies within the footprint's bounds, a margin round them. */
         public boolean covers(double wx, double wz, double margin) {
             return wx >= minX - margin && wx < maxX + 1 + margin && wz >= minZ - margin && wz < maxZ + 1 + margin;
@@ -86,12 +90,18 @@ public final class FacilityModels {
      */
     public boolean excludes(Settlement town, double x, double z) {
         for (Placed m : town(town)) {
-            if (m.covers(x, z, 3)) {
+            if (m.grade && m.covers(x, z, 3)) {
                 return true;
             }
         }
-        return false;
+        // A park's land: no building on it
+        Facility f = logic.functions().town(town).facilityAt(x, z);
+        return f != null && PARKS.contains(f.kind());
     }
+
+    /** The facilities laid out as parks. */
+    private static final java.util.Set<Facility.Kind> PARKS = java.util.EnumSet.of(Facility.Kind.PARK,
+            Facility.Kind.CENTRAL_PARK, Facility.Kind.LARGE_PARK, Facility.Kind.SPORTS_PARK, Facility.Kind.GREEN);
 
     private List<Placed> place(Settlement town) {
         TownPlots plots = logic.plots().town(town);
@@ -99,6 +109,10 @@ public final class FacilityModels {
         List<Placed> out = new ArrayList<>();
         for (Facility f : functions.facilities()) {
             if (f.landmark()) {
+                continue;
+            }
+            if (PARKS.contains(f.kind())) {
+                park(f, functions, plots, town, out);
                 continue;
             }
             List<Model> candidates = candidates(f, town.tier());
@@ -291,9 +305,238 @@ public final class FacilityModels {
             }
             int y = ground(minX, minZ, minX + w - 1, minZ + d - 1);
             // The model's ground (y 0, its paving) on the ground's top block
-            return new Placed(f, m, minX - m.minX(), y, minZ - m.minZ(), minX, minZ, minX + w - 1, minZ + d - 1);
+            return new Placed(f, m, minX - m.minX(), y, minZ - m.minZ(), minX, minZ, minX + w - 1, minZ + d - 1, true);
         }
         return null;
+    }
+
+    /**
+     * A park laid out on its land: by its kind a children's playground (a neighbourhood park), a pond and a playground
+     * (a central or large park), a playing field (a sports park), a public toilet where there is room; trees round its
+     * edge and, in the larger parks, among its lawns (a green tract: woodland throughout), the kinds Japanese parks
+     * plant; lamps and benches along its paths (the function layer's walks). The trees, lamps and benches stand on the
+     * ground as the chunk layer leaves it (graded beside the streets).
+     */
+    private void park(Facility f, TownFunctions functions, TownPlots plots, Settlement town, List<Placed> out) {
+        double half = Math.max(40.0, f.radius() * 1.6 + 20.0);
+        long seed = Hash.of(logic.seed() ^ 0x9A4CL, f.id());
+        List<double[]> walk = new ArrayList<>();
+        for (com.mtm.citybuilder.core.function.Walk w : functions.walks()) {
+            if (w.facility() != f.id()) {
+                continue;
+            }
+            for (int k = 1; k < w.points().size(); k++) {
+                double[] a = w.points().get(k - 1);
+                double[] b = w.points().get(k);
+                walk.add(new double[]{a[0], a[1], b[0], b[1], w.width()});
+            }
+        }
+        Ground land = (x, z) -> functions.contains(f, x, z);
+        List<double[]> reserved = new ArrayList<>();
+        Ground open = (x, z) -> land.test(x, z) && walkDistance(walk, x, z) > 2.0 && !in(reserved, x, z, 2.0)
+                && land.test(x + 3, z) && land.test(x - 3, z) && land.test(x, z + 3) && land.test(x, z - 3);
+        Facility.Kind kind = f.kind();
+        // The graded pieces, the largest first
+        if (kind == Facility.Kind.SPORTS_PARK) {
+            graded(f, open, plots, half, 30, 20, 70, 48, reserved, out, (w, d) -> ParkParts.field(w, d));
+        }
+        if (kind == Facility.Kind.CENTRAL_PARK || kind == Facility.Kind.LARGE_PARK) {
+            graded(f, open, plots, half, 12, 10, 30, 22, reserved, out, (w, d) -> ParkParts.pond(w, d, seed));
+        }
+        if (kind == Facility.Kind.PARK || kind == Facility.Kind.CENTRAL_PARK) {
+            graded(f, open, plots, half, 12, 9, 16, 12, reserved, out, (w, d) -> ParkParts.playground(w, d, seed));
+        }
+        if (kind != Facility.Kind.GREEN && f.radius() >= 22) {
+            graded(f, open, plots, half, 6, 5, 6, 5, reserved, out, (w, d) -> ParkParts.toilet());
+        }
+        // The trees, lamps and benches, each at its own ground
+        Model scatter = new Model();
+        double spacing = switch (kind) {
+            case GREEN -> 5.0;
+            case CENTRAL_PARK, LARGE_PARK -> 8.0;
+            default -> 6.0;
+        };
+        double cx0 = f.x() - half;
+        double cz0 = f.z() - half;
+        for (double gx = cx0; gx <= f.x() + half; gx += spacing) {
+            for (double gz = cz0; gz <= f.z() + half; gz += spacing) {
+                long h = Hash.of(seed, (long) Math.floor(gx), (long) Math.floor(gz));
+                int x = (int) Math.floor(gx + (Hash.unit(Hash.of(h, 1)) - 0.5) * spacing * 0.5);
+                int z = (int) Math.floor(gz + (Hash.unit(Hash.of(h, 2)) - 0.5) * spacing * 0.5);
+                if (!land.test(x + 0.5, z + 0.5) || walkDistance(walk, x + 0.5, z + 0.5) < 3.0
+                        || in(reserved, x + 0.5, z + 0.5, 4.0)) {
+                    continue;
+                }
+                boolean edge = !(land.test(x + 6.5, z + 0.5) && land.test(x - 5.5, z + 0.5)
+                        && land.test(x + 0.5, z + 6.5) && land.test(x + 0.5, z - 5.5));
+                boolean inner = land.test(x + 2.5, z + 0.5) && land.test(x - 1.5, z + 0.5)
+                        && land.test(x + 0.5, z + 2.5) && land.test(x + 0.5, z - 1.5);
+                if (!inner) {
+                    continue;
+                }
+                double chance = switch (kind) {
+                    case GREEN -> 0.85;
+                    case CENTRAL_PARK, LARGE_PARK -> edge ? 0.9 : 0.5;
+                    default -> edge ? 0.9 : 0.12;
+                };
+                if (Hash.unit(Hash.of(h, 3)) >= chance) {
+                    continue;
+                }
+                ParkParts.Tree tree = species(kind, edge, Hash.unit(Hash.of(h, 4)));
+                Integer y = groundAt(x, z);
+                if (y == null) {
+                    continue;
+                }
+                set(scatter, ParkParts.tree(tree, h), x, y, z);
+            }
+        }
+        for (double[] g : walk) {
+            double length = Math.hypot(g[2] - g[0], g[3] - g[1]);
+            double ux = (g[2] - g[0]) / Math.max(1e-9, length);
+            double uz = (g[3] - g[1]) / Math.max(1e-9, length);
+            for (double a = 7.0; a < length - 3.0; a += 14.0) {
+                boolean lampSide = Math.floorMod((long) Math.floor(a / 14.0), 2) == 0;
+                double off = 0.5 * g[4] + 1.0;
+                int x = (int) Math.floor(g[0] + ux * a - uz * off * (lampSide ? 1 : -1));
+                int z = (int) Math.floor(g[1] + uz * a + ux * off * (lampSide ? 1 : -1));
+                if (!land.test(x + 0.5, z + 0.5) || in(reserved, x + 0.5, z + 0.5, 1.0)
+                        || walkDistance(walk, x + 0.5, z + 0.5) < 0.5 * g[4] + 0.5) {
+                    continue;
+                }
+                Integer y = groundAt(x, z);
+                if (y == null) {
+                    continue;
+                }
+                if (lampSide || kind == Facility.Kind.GREEN) {
+                    set(scatter, ParkParts.lamp(), x, y, z);
+                } else {
+                    // A bench beside the path, facing it: its back the way it lies off the path, (uz, -ux)
+                    String back = Math.abs(uz) > Math.abs(ux) ? (uz > 0 ? "east" : "west") : (-ux > 0 ? "south" : "north");
+                    set(scatter, ParkParts.bench(back), x, y, z);
+                }
+            }
+        }
+        if (scatter.size() > 0) {
+            out.add(new Placed(f, scatter, 0, 0, 0, scatter.minX(), scatter.minZ(), scatter.maxX(), scatter.maxZ(), false));
+        }
+    }
+
+    /** A part of a size made for a width and depth. */
+    @FunctionalInterface
+    private interface Part {
+        Model make(int width, int depth);
+    }
+
+    /**
+     * A graded part on the largest open rectangle of the park (at least {@code minW} by {@code minD} either way round,
+     * at most {@code maxW} by {@code maxD}), in the middle of it, the rectangle then reserved.
+     */
+    private void graded(Facility f, Ground open, TownPlots plots, double half, int minW, int minD, int maxW, int maxD,
+                        List<double[]> reserved, List<Placed> out, Part part) {
+        double[] site = site(open, plots, f.x(), f.z(), half);
+        if (site == null) {
+            return;
+        }
+        boolean turn = site[3] < site[4];
+        double along = turn ? site[4] : site[3];
+        double across = turn ? site[3] : site[4];
+        int w = (int) Math.min(maxW, Math.floor(along));
+        int d = (int) Math.min(maxD, Math.floor(across));
+        if (w < minW || d < minD) {
+            return;
+        }
+        Model m = part.make(w, d);
+        if (turn) {
+            m = m.rotated(1);
+        }
+        int mw = m.maxX() - m.minX() + 1;
+        int md = m.maxZ() - m.minZ() + 1;
+        int minX = (int) Math.floor(site[1] - 0.5 * mw);
+        int minZ = (int) Math.floor(site[2] - 0.5 * md);
+        int y = ground(minX, minZ, minX + mw - 1, minZ + md - 1);
+        out.add(new Placed(f, m, minX - m.minX(), y, minZ - m.minZ(), minX, minZ, minX + mw - 1, minZ + md - 1, true));
+        reserved.add(new double[]{minX, minZ, minX + mw - 1, minZ + md - 1});
+    }
+
+    private static boolean in(List<double[]> rects, double x, double z, double margin) {
+        for (double[] r : rects) {
+            if (x >= r[0] - margin && x <= r[2] + 1 + margin && z >= r[1] - margin && z <= r[3] + 1 + margin) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** How far a position lies from the nearest edge of a park's paths ({x1, z1, x2, z2, width} each). */
+    private static double walkDistance(List<double[]> walk, double x, double z) {
+        double best = Double.POSITIVE_INFINITY;
+        for (double[] g : walk) {
+            double dx = g[2] - g[0];
+            double dz = g[3] - g[1];
+            double t = Math.max(0, Math.min(1, ((x - g[0]) * dx + (z - g[1]) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+            best = Math.min(best, Math.hypot(g[0] + dx * t - x, g[1] + dz * t - z) - 0.5 * g[4]);
+        }
+        return best;
+    }
+
+    /** The tree a park plants at a spot: its kind's mix, the edge's own. */
+    private static ParkParts.Tree species(Facility.Kind kind, boolean edge, double u) {
+        if (kind == Facility.Kind.GREEN) {
+            return u < 0.45 ? ParkParts.Tree.CAMPHOR : u < 0.8 ? ParkParts.Tree.ZELKOVA : ParkParts.Tree.PINE;
+        }
+        if (edge) {
+            return u < 0.4 ? ParkParts.Tree.ZELKOVA : u < 0.75 ? ParkParts.Tree.CHERRY : ParkParts.Tree.GINKGO;
+        }
+        return u < 0.4 ? ParkParts.Tree.CHERRY : u < 0.65 ? ParkParts.Tree.CAMPHOR : u < 0.85 ? ParkParts.Tree.ZELKOVA
+                : ParkParts.Tree.PINE;
+    }
+
+    /** Copies a part standing on the ground into a park's scattered model, its ground at (x, y, z) in the world. */
+    private static void set(Model into, Model part, int x, int y, int z) {
+        part.forEach((px, py, pz, s) -> into.setIfAbsent(px + x, py + y, pz + z, s));
+    }
+
+    /** The chunks' grades lately read, for {@link #groundAt}. */
+    private final Map<Long, com.mtm.citybuilder.core.chunk.ChunkLayer.Grades> grades = new java.util.LinkedHashMap<>(64, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Long, com.mtm.citybuilder.core.chunk.ChunkLayer.Grades> eldest) {
+            return size() > 256;
+        }
+    };
+
+    /**
+     * The top block of the ground at a column as the chunk layer leaves it: the terrain's, cut or filled beside a street
+     * to its verge's slope (not where a retaining wall holds it), an embankment's level on its cross-section; null on
+     * a street.
+     */
+    private Integer groundAt(int x, int z) {
+        int cx = Math.floorDiv(x, 16);
+        int cz = Math.floorDiv(z, 16);
+        long key = ((long) cx << 32) ^ (cz & 0xFFFFFFFFL);
+        com.mtm.citybuilder.core.chunk.ChunkLayer.Grades g;
+        synchronized (grades) {
+            g = grades.get(key);
+        }
+        if (g == null) {
+            g = logic.chunks().grades(cx, cz);
+            synchronized (grades) {
+                grades.put(key, g);
+            }
+        }
+        int c = Math.floorMod(x, 16) * 16 + Math.floorMod(z, 16);
+        if (!Double.isNaN(g.level()[c])) {
+            return null;
+        }
+        int h = (int) Math.floor(logic.terrain().surfaceHeight(x, z));
+        if (!Double.isNaN(g.bank()[c])) {
+            return (int) Math.floor(g.bank()[c]);
+        }
+        double l = g.verge()[c];
+        if (!Double.isNaN(l) && !g.wall()[c]) {
+            double o = g.outside()[c];
+            h = Math.max((int) Math.floor(l - o), Math.min((int) Math.floor(l + o), h));
+        }
+        return h;
     }
 
     /** The ground a model stands on: the middle of nine samples of the terrain over its footprint. */

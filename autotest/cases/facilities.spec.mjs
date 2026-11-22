@@ -1,6 +1,7 @@
 // The town's public buildings generated whole (seed 12345, the castle town): its city hall, libraries, hospital and
 // filling stations on their sites, generated round each; checks each stands (its blocks there, nothing of the lots'
-// buildings in it); with the test client, a picture of each from above and from the street side.
+// buildings in it); its parks (a neighbourhood park's playground, a large park's pond, a sports park's field, the trees
+// of each); with the test client, a picture of each from above and from the side.
 import { test, expect } from '@playwright/test';
 import { join } from 'node:path';
 import { server } from '../lib/server.mjs';
@@ -44,10 +45,12 @@ test('public buildings stand on their sites', async ({}, testInfo) => {
     await server.command('gamerule doDaylightCycle false');
     await server.command('weather clear');
   }
+  const PARKS = ['PARK', 'CENTRAL_PARK', 'LARGE_PARK', 'SPORTS_PARK', 'GREEN'];
   const seen = new Set();
   for (const p of f.placed) {
-    // The nearest of each kind
-    if (seen.has(p.kind)) {
+    // The nearest of each kind; of a park, its graded piece (a green's trees)
+    const park = PARKS.includes(p.kind);
+    if (seen.has(p.kind) || park && !p.grade && p.kind !== 'GREEN') {
       continue;
     }
     seen.add(p.kind);
@@ -57,11 +60,13 @@ test('public buildings stand on their sites', async ({}, testInfo) => {
     // Its own blocks on top over most of its footprint: not grass and trees left as the land was
     const cells = (p.maxX - p.minX + 1) * (p.maxZ - p.minZ + 1);
     const natural = (blocks.top['minecraft:grass_block'] ?? 0) + (blocks.top['minecraft:snow'] ?? 0);
-    expect(natural, p.kind).toBeLessThan(cells * 0.5);
+    if (!park) {
+      expect(natural, p.kind).toBeLessThan(cells * 0.5);
+    }
     if (withClient) {
       const cx = Math.round(0.5 * (p.minX + p.maxX));
       const cz = Math.round(0.5 * (p.minZ + p.maxZ));
-      const size = Math.max(p.maxX - p.minX, p.maxZ - p.minZ);
+      const size = Math.min(60, Math.max(16, p.maxX - p.minX, p.maxZ - p.minZ));
       await view(`facility-${p.kind.toLowerCase()}-above`, cx, p.ground + size + 30, cz, 0, 90, testInfo);
       await view(`facility-${p.kind.toLowerCase()}`, cx + size, p.ground + 18, cz + size, 135, 20, testInfo);
     }
