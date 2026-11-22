@@ -94,9 +94,23 @@ public final class FacilityModels {
                 return true;
             }
         }
-        // A park's land: no building on it
+        // A park's or a school's land: no building on it
         Facility f = logic.functions().town(town).facilityAt(x, z);
-        return f != null && PARKS.contains(f.kind());
+        return f != null && (PARKS.contains(f.kind()) || SCHOOLS.contains(f.kind()) && built(town, f));
+    }
+
+    /** The schools, laid out to their blocks. */
+    private static final java.util.Set<Facility.Kind> SCHOOLS = java.util.EnumSet.of(Facility.Kind.ELEMENTARY_SCHOOL,
+            Facility.Kind.JUNIOR_HIGH_SCHOOL, Facility.Kind.HIGH_SCHOOL);
+
+    /** Whether a facility got its model (a school on a block too small for one leaves the block to its lots). */
+    private boolean built(Settlement town, Facility f) {
+        for (Placed p : town(town)) {
+            if (p.facility == f) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The facilities laid out as parks. */
@@ -113,6 +127,25 @@ public final class FacilityModels {
             }
             if (PARKS.contains(f.kind())) {
                 park(f, functions, plots, town, out);
+                continue;
+            }
+            if (SCHOOLS.contains(f.kind())) {
+                // A school is laid out to its block's own size (its playground filling what the buildings leave)
+                double[] site = areaSite(functions, plots, f);
+                if (site != null) {
+                    boolean alongX = site[0] == 0 || site[0] == 2;
+                    // Room left round it for the crowns of the trees along its fence and the sign at its gate
+                    int w = (int) Math.floor(Math.min(160, alongX ? site[3] : site[4])) - 8;
+                    int d = (int) Math.floor(Math.min(130, alongX ? site[4] : site[3])) - 6;
+                    if (w >= 60 && d >= 50) {
+                        int storeys = f.kind() == Facility.Kind.ELEMENTARY_SCHOOL ? 3 : 4;
+                        Placed p = fit(f, List.of(new com.mtm.citybuilder.core.building.landmark.School(w, d, storeys,
+                                (int) (f.id() ^ (f.id() >>> 32))).build()), site, plots);
+                        if (p != null) {
+                            out.add(p);
+                        }
+                    }
+                }
                 continue;
             }
             List<Model> candidates = candidates(f, town.tier());
@@ -177,6 +210,10 @@ public final class FacilityModels {
                     out.add(ParkParts.pocketPark((int) Math.round(w * k), (int) Math.round(d * k), f.id()));
                 }
             }
+            case CLINIC -> out.add(com.mtm.citybuilder.core.building.landmark.LocalBuildings.clinic(seed));
+            case POLICE_BOX -> out.add(com.mtm.citybuilder.core.building.landmark.LocalBuildings.policeBox(seed));
+            case FIRE_STATION -> out.add(com.mtm.citybuilder.core.building.landmark.LocalBuildings.fireStation(seed));
+            case BATHHOUSE -> out.add(com.mtm.citybuilder.core.building.landmark.LocalBuildings.bathhouse(seed));
             case GAS_STATION -> {
                 for (int islands : new int[]{3, 2, 1}) {
                     out.add(new GasStation(islands, true, seed).build());
@@ -214,7 +251,7 @@ public final class FacilityModels {
     private static double[] lotSite(TownFunctions functions, TownPlots plots, Facility f) {
         double[] c = plots.lotCentre(f.chain(), f.side(), f.index());
         // A pocket park takes in more of its neighbours than a filling station
-        double reach = f.kind() == Facility.Kind.POCKET_PARK ? 44.0 : 30.0;
+        double reach = f.kind() == Facility.Kind.POCKET_PARK ? 44.0 : f.kind() == Facility.Kind.FIRE_STATION ? 36.0 : 30.0;
         // Off the streets and canals, and off the blocks an area facility took (a park, a school's ground)
         return site((x, z) -> !plots.onStreet(x, z) && !plots.inCanal(x, z) && Math.hypot(x - c[0], z - c[1]) <= reach
                 && functions.facilityAt(x, z) == null, plots, c[0], c[1], reach + 2.0);

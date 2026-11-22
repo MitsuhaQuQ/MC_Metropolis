@@ -31,7 +31,11 @@ class CivicTest {
                 ParkParts.toilet(), ParkParts.wisteria(3), ParkParts.gazebo(4), ParkParts.gazebo(5),
                 ParkParts.flowerBed(8, 4, 6), ParkParts.hedge(7), ParkParts.shrub(8), ParkParts.bollard(),
                 ParkParts.lantern(), ParkParts.fountain(), ParkParts.lamp(), ParkParts.bench("east"),
-                ParkParts.tree(ParkParts.Tree.CHERRY, 9), ParkParts.pocketPark(30, 40, 10), ParkParts.honmaru(30, 26, 11));
+                ParkParts.tree(ParkParts.Tree.CHERRY, 9), ParkParts.pocketPark(30, 40, 10), ParkParts.honmaru(30, 26, 11),
+                new School(120, 90, 3, 0).build(), new School(80, 60, 4, 5).build(), new School(100, 80, 4, 12).build(),
+                LocalBuildings.clinic(0), LocalBuildings.clinic(45), LocalBuildings.policeBox(0), LocalBuildings.policeBox(1),
+                LocalBuildings.policeBox(2), LocalBuildings.fireStation(0), LocalBuildings.fireStation(11),
+                LocalBuildings.bathhouse(0), LocalBuildings.bathhouse(1));
     }
 
     /**
