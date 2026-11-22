@@ -390,4 +390,67 @@ class ChunkLayerTest {
         // Far from the kerb: none
         org.junit.jupiter.api.Assertions.assertNull(ChunkLayer.kerb(3.0, heading, 5.0));
     }
+
+    @Test
+    void streetsRampUpToTheEmbankmentsCrest() {
+        CityLogic logic = new CityLogic(3L, CitySettings.DEFAULT, new SyntheticTerrain(0.0, 20000, 80, Landform.PLAINS));
+        Settlement city = logic.settlements(6000, -20000, 42000, 20000).stream()
+                .filter(s -> s.tier() == SettlementTier.METROPOLIS || s.tier() == SettlementTier.CITY).findFirst().orElseThrow();
+        StreetPlan plan = logic.streetPlan(city);
+        assertTrue(!plan.embankments().isEmpty(), "embankments");
+        ChunkLayer layer = logic.chunks();
+        double ramp = CitySettings.DEFAULT.streets.leveeRamp;
+        int checked = 0;
+        for (StreetSegment g : plan.segments()) {
+            if (g.structure() != StreetStructure.GROUND || g.streetClass() == StreetClass.PATH) {
+                continue;
+            }
+            // A piece leaving the bank road's centre line inland, and the street on along its line
+            boolean first = onCrest(plan, g.x1(), g.z1());
+            if (first == onCrest(plan, g.x2(), g.z2())) {
+                continue;
+            }
+            double sx = first ? g.x1() : g.x2();
+            double sz = first ? g.z1() : g.z2();
+            double length = Math.hypot(g.x2() - g.x1(), g.z2() - g.z1());
+            if (length < 8) {
+                continue;
+            }
+            double ux = ((first ? g.x2() : g.x1()) - sx) / length;
+            double uz = ((first ? g.z2() : g.z1()) - sz) / length;
+            double near = level(layer, sx + ux * 6, sz + uz * 6);
+            double far = level(layer, sx + ux * 21, sz + uz * 21);
+            if (Double.isNaN(near) || Double.isNaN(far)) {
+                continue;
+            }
+            assertTrue(Math.abs(near - far) <= 15.0 / ramp + 0.5,
+                    () -> "a street off the crest at " + sx + ", " + sz + " falls " + (near - far) + " in 15");
+            checked++;
+        }
+        assertTrue(checked > 0, "no street leaves an embankment");
+    }
+
+    private static boolean onCrest(StreetPlan plan, double x, double z) {
+        for (com.mtm.citybuilder.core.street.Embankment e : plan.embankments()) {
+            List<double[]> points = e.points();
+            for (int k = 1; k < points.size(); k++) {
+                double[] a = points.get(k - 1);
+                double[] b = points.get(k);
+                double dx = b[0] - a[0];
+                double dz = b[1] - a[1];
+                double t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+                if (Math.hypot(a[0] + dx * t - x, a[1] + dz * t - z) <= 1.5) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static double level(ChunkLayer layer, double x, double z) {
+        int bx = (int) Math.floor(x);
+        int bz = (int) Math.floor(z);
+        ChunkLayer.Grades grades = layer.grades(Math.floorDiv(bx, 16), Math.floorDiv(bz, 16));
+        return grades.level()[Math.floorMod(bx, 16) * 16 + Math.floorMod(bz, 16)];
+    }
 }

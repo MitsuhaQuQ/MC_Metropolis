@@ -938,6 +938,11 @@ public final class CitySettings {
          */
         public double leveeSlope = 2.0;
         public double leveeRoad = 5.0;
+        /**
+         * Streets climbing to an embankment's crest rise no steeper than 1 in this: the junctions
+         * within reach are raised into a ramp (in the chunk layer, not the plan).
+         */
+        public double leveeRamp = 12.0;
         public double bankOffset = 24.0;
         /**
          * Bank roads follow only water at least this wide: narrower arms, inlets and creeks are crossed on a short

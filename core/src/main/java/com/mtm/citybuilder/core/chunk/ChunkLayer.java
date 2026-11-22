@@ -1197,6 +1197,10 @@ public final class ChunkLayer {
                 verge[c] = Double.NaN;
             }
             if (!Double.isNaN(bank[c])) {
+                // Beside a ramp crossing the back slope or the road at its foot, the land falls from the ramp 1 in 1
+                if (!Double.isNaN(verge[c]) && (bankKind[c] == BANK_SLOPE || bankKind[c] == BANK_ROAD)) {
+                    bank[c] = Math.max(bank[c], verge[c] - outside[c]);
+                }
                 verge[c] = Double.NaN;
             }
             if (Double.isNaN(verge[c])) {
@@ -1266,14 +1270,92 @@ public final class ChunkLayer {
             if (!Double.isNaN(crest)) {
                 return crest;
             }
-            double[] h = new double[5];
-            double[][] at = {{0, 0}, {4, 0}, {-4, 0}, {0, 4}, {0, -4}};
-            for (int i = 0; i < 5; i++) {
-                h[i] = logic.terrain().surfaceHeight((int) Math.floor(x + at[i][0]), (int) Math.floor(z + at[i][1]));
-            }
-            java.util.Arrays.sort(h);
-            return h[2];
+            return groundHeight(x, z);
         });
+    }
+
+    /** The ground height the streets meeting at a point would be laid at: the middle of five samples round it. */
+    private double groundHeight(double x, double z) {
+        double[] h = new double[5];
+        double[][] at = {{0, 0}, {4, 0}, {-4, 0}, {0, 4}, {0, -4}};
+        for (int i = 0; i < 5; i++) {
+            h[i] = logic.terrain().surfaceHeight((int) Math.floor(x + at[i][0]), (int) Math.floor(z + at[i][1]));
+        }
+        java.util.Arrays.sort(h);
+        return h[2];
+    }
+
+    /**
+     * Ramps up to an embankment's crest: the junctions within reach along the streets are raised so that no street
+     * climbs to the bank road steeper than 1 in {@code leveeRamp}, instead of the last piece rising the whole height
+     * (the ramps, sakamichi, onto a Japanese levee). Outward from the highest first, along the streets cars use (not
+     * steps, footpaths or bridges), until the ground is reached. Other bridges' ends are left as they were.
+     */
+    private void ramps(Index index) {
+        double ramp = logic.settings().streets.leveeRamp;
+        if (!(ramp > 0)) {
+            return;
+        }
+        Map<Long, double[]> nodes = new HashMap<>();
+        Map<Long, List<double[]>> links = new HashMap<>();
+        for (StreetSegment g : index.segments) {
+            if (g.structure() == StreetStructure.BRIDGE || g.structure() == StreetStructure.STAIRS
+                    || g.streetClass() == StreetClass.PATH) {
+                continue;
+            }
+            long a = point(g.x1(), g.z1());
+            long b = point(g.x2(), g.z2());
+            if (a == b) {
+                continue;
+            }
+            double length = Math.hypot(g.x2() - g.x1(), g.z2() - g.z1());
+            nodes.putIfAbsent(a, new double[]{g.x1(), g.z1()});
+            nodes.putIfAbsent(b, new double[]{g.x2(), g.z2()});
+            links.computeIfAbsent(a, k -> new ArrayList<>()).add(new double[]{b, length});
+            links.computeIfAbsent(b, k -> new ArrayList<>()).add(new double[]{a, length});
+        }
+        // {height, node}, the highest first
+        java.util.PriorityQueue<double[]> open = new java.util.PriorityQueue<>((u, v) -> Double.compare(v[0], u[0]));
+        Map<Long, Double> best = new HashMap<>();
+        for (Map.Entry<Long, double[]> n : nodes.entrySet()) {
+            double[] at = n.getValue();
+            double seed = crest(index, at[0], at[1], 1.5);
+            if (!Double.isNaN(seed)) {
+                // A bridge landing on the crest: its deck
+                Double preset = index.heights.get(n.getKey());
+                if (preset != null) {
+                    seed = Math.max(seed, preset);
+                }
+                best.put(n.getKey(), seed);
+                open.add(new double[]{seed, n.getKey()});
+            }
+        }
+        while (!open.isEmpty()) {
+            double[] top = open.poll();
+            long node = (long) top[1];
+            if (top[0] < best.get(node)) {
+                continue;
+            }
+            index.heights.merge(node, top[0], Math::max);
+            for (double[] link : links.getOrDefault(node, List.of())) {
+                long next = (long) link[0];
+                double carried = top[0] - link[1] / ramp;
+                Double known = best.get(next);
+                if (known != null && known >= carried) {
+                    continue;
+                }
+                double[] at = nodes.get(next);
+                Double preset = index.heights.get(next);
+                double ground = preset != null ? preset : groundHeight(at[0], at[1]);
+                index.heights.putIfAbsent(next, ground);
+                if (carried <= ground) {
+                    best.put(next, ground);
+                    continue;
+                }
+                best.put(next, carried);
+                open.add(new double[]{carried, next});
+            }
+        }
     }
 
     /** The crest of an embankment whose centre line runs within {@code reach} of a position, or NaN. */
@@ -1539,6 +1621,7 @@ public final class ChunkLayer {
                 heights.merge(point(g.x2(), g.z2()), deck[p], Math::max);
             }
         }
+        ramps(index);
         return index;
     }
 
