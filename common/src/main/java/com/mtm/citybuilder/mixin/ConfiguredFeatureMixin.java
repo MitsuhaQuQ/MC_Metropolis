@@ -15,7 +15,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Keeps the trees of the biome, its huge mushrooms and its forest boulders out of the towns' built land and the
+ * Keeps the trees of the biome, its bamboo (a bamboo jungle's, which would stand over the roofs), its huge mushrooms
+ * and its forest boulders out of the towns' built land and the
  * airports: none is placed where no tree is allowed; and its lakes (lava's too) and springs out of the towns' land
  * altogether.
  */
@@ -26,7 +27,8 @@ abstract class ConfiguredFeatureMixin {
                                            CallbackInfoReturnable<Boolean> cir) {
         // Trees, huge mushrooms, and the boulders of a forest floor, which land on the streets laid before them
         Object feature = ((ConfiguredFeature<?, ?>) (Object) this).feature();
-        if ((feature instanceof TreeFeature || feature instanceof BlockBlobFeature || feature instanceof AbstractHugeMushroomFeature)
+        if ((feature instanceof TreeFeature || feature instanceof BlockBlobFeature || feature instanceof AbstractHugeMushroomFeature
+                || feature instanceof net.minecraft.world.level.levelgen.feature.BambooFeature)
                 && !CityChunks.treeAllowed(level, origin)) {
             cir.setReturnValue(false);
         }

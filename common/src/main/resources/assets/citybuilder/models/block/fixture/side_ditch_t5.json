@@ -1,0 +1,7 @@
+{
+  "parent": "citybuilder:block/paved_5",
+  "textures": {
+    "top": "citybuilder:block/fixture/ditch_lid",
+    "side": "citybuilder:block/fixture/ditch_side"
+  }
+}

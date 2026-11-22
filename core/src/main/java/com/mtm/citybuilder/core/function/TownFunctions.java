@@ -259,15 +259,58 @@ public final class TownFunctions {
         return best;
     }
 
-    /** Whether a position lies on a facility's land, or within a circle round it of the others. */
+    /**
+     * Whether a position lies on a facility's land, or within a circle round it of the others: the blocks' land found
+     * by its cell ({@link #facilityAt}), the others (lots, landmarks) in a grid of {@link #NEAR_CELL} (a large city has
+     * thousands: looking at all of them for each lot tried took minutes).
+     */
     private boolean overlaps(double x, double z, double radius) {
-        for (Facility f : facilities) {
-            Blocks.Land land = lands.get(f.id());
-            if (land != null ? land.contains(x, z) : Math.hypot(f.x() - x, f.z() - z) < radius + f.radius() + 10) {
+        if (facilityAt(x, z) != null) {
+            return true;
+        }
+        double reach = radius + MAX_RADIUS + 10;
+        for (Facility f : near(x, z, reach)) {
+            if (!lands.containsKey(f.id()) && Math.hypot(f.x() - x, f.z() - z) < radius + f.radius() + 10) {
                 return true;
             }
         }
         return false;
+    }
+
+    /** The grid of the facilities without land of their own (lots, landmarks), by cell. */
+    private final Map<Long, List<Facility>> nearGrid = new HashMap<>();
+    private static final double NEAR_CELL = 128.0;
+    /** The largest radius of a facility without land (a department store's). */
+    private static final double MAX_RADIUS = 40.0;
+    private int gridded;
+
+    /** The facilities without land within about {@code reach} of a position (the grid's cells over it). */
+    private List<Facility> near(double x, double z, double reach) {
+        for (; gridded < facilities.size(); gridded++) {
+            Facility f = facilities.get(gridded);
+            if (!lands.containsKey(f.id())) {
+                nearGrid.computeIfAbsent(nearKey((long) Math.floor(f.x() / NEAR_CELL), (long) Math.floor(f.z() / NEAR_CELL)),
+                        k -> new ArrayList<>()).add(f);
+            }
+        }
+        List<Facility> out = new ArrayList<>();
+        long i0 = (long) Math.floor((x - reach) / NEAR_CELL);
+        long i1 = (long) Math.floor((x + reach) / NEAR_CELL);
+        long j0 = (long) Math.floor((z - reach) / NEAR_CELL);
+        long j1 = (long) Math.floor((z + reach) / NEAR_CELL);
+        for (long i = i0; i <= i1; i++) {
+            for (long j = j0; j <= j1; j++) {
+                List<Facility> cell = nearGrid.get(nearKey(i, j));
+                if (cell != null) {
+                    out.addAll(cell);
+                }
+            }
+        }
+        return out;
+    }
+
+    private static long nearKey(long i, long j) {
+        return (i << 32) ^ (j & 0xFFFFFFFFL);
     }
 
     /** A facility taking a whole block: its middle the block's deepest point, its radius that of a circle as large. */
@@ -788,7 +831,7 @@ public final class TownFunctions {
                     continue;
                 }
                 double apart = spacing;
-                for (Facility f : facilities) {
+                for (Facility f : near(centre[0], centre[1], spacing)) {
                     if (f.kind() == kind) {
                         apart = Math.min(apart, Math.hypot(f.x() - centre[0], f.z() - centre[1]));
                     }
@@ -828,6 +871,7 @@ public final class TownFunctions {
                 // of its land); a central or large park a loop further in, six to eight ways in and two across (250-380
                 // m a ha); a sports park a loop round its edge
                 case PARK -> {
+                    deadEnds(f, reach, 0.82, 2.5);
                     if (minimum(reach) >= 12) {
                         clip(f, new Walk(f.id(), f.kind(), ring(f, reach, 0.82), 2.5));
                     }
@@ -835,11 +879,14 @@ public final class TownFunctions {
                     across(f, gate, reach, 0.82, 2.5, 1);
                 }
                 case LARGE_PARK, CENTRAL_PARK -> {
+                    deadEnds(f, reach, 0.72, 3.0);
                     clip(f, new Walk(f.id(), f.kind(), ring(f, reach, 0.72), 3.0));
                     entrances(f, reach, 0.72, 3.0, 8);
                     across(f, gate, reach, 0.72, 3.0, 2);
                 }
                 case CASTLE_PARK -> {
+                    // The avenues to the castle's gates end at its grounds: each carried on in as its main way
+                    deadEnds(f, reach, 0.78, 6.0);
                     // A loop round the castle's grounds inside its edge, ways in from the streets round the moat, the
                     // main one on to the honmaru in the middle
                     clip(f, new Walk(f.id(), f.kind(), ring(f, reach, 0.78), 3.0));
@@ -946,6 +993,53 @@ public final class TownFunctions {
                 ways(f, gate, reach, share, width);
             }
         }
+    }
+
+    /**
+     * A way in from each street that ends at a park's edge (a dead end pointing into it, as an avenue to a castle's
+     * gate does), on to its loop: the street is not cut off at the grass.
+     */
+    private void deadEnds(Facility f, double[] reach, double share, double width) {
+        Map<Long, Integer> degree = new HashMap<>();
+        for (StreetSegment g : plan.segments()) {
+            if (g.streetClass() == StreetClass.PATH) {
+                continue;
+            }
+            degree.merge(endKey(g.x1(), g.z1()), 1, Integer::sum);
+            degree.merge(endKey(g.x2(), g.z2()), 1, Integer::sum);
+        }
+        for (StreetSegment g : plan.segments()) {
+            if (g.streetClass() == StreetClass.PATH || g.streetClass() == StreetClass.LANE) {
+                continue;
+            }
+            for (int e = 0; e < 2; e++) {
+                double ex = e == 0 ? g.x1() : g.x2();
+                double ez = e == 0 ? g.z1() : g.z2();
+                double ox = e == 0 ? g.x2() : g.x1();
+                double oz = e == 0 ? g.z2() : g.z1();
+                if (degree.getOrDefault(endKey(ex, ez), 0) != 1) {
+                    continue;
+                }
+                double len = Math.hypot(ex - ox, ez - oz);
+                if (len < 1e-6) {
+                    continue;
+                }
+                // Pointing into the park: its land a little on past the end
+                double ux = (ex - ox) / len;
+                double uz = (ez - oz) / len;
+                boolean into = false;
+                for (double d = 2; d <= 0.5 * g.width() + 12 && !into; d += 2) {
+                    into = contains(f, ex + ux * d, ez + uz * d);
+                }
+                if (into) {
+                    ways(f, new double[]{ex, ez}, reach, share, Math.max(width, Math.min(6.0, 0.5 * g.width())));
+                }
+            }
+        }
+    }
+
+    private static long endKey(double x, double z) {
+        return (Math.round(x * 2) << 32) ^ (Math.round(z * 2) & 0xFFFFFFFFL);
     }
 
     /** Ways straight across a park's loop through its middle: one from its main way in, a second square to it. */

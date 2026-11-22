@@ -44,6 +44,12 @@ public final class TestKitClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ClientLifecycleEvents.CLIENT_STARTED.register(this::start);
+        // The test client never keeps the mouse: it is driven over HTTP, and the desktop stays usable while it runs
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(minecraft -> {
+            if (minecraft.mouseHandler.isMouseGrabbed()) {
+                minecraft.mouseHandler.releaseMouse();
+            }
+        });
     }
 
     private void start(Minecraft minecraft) {

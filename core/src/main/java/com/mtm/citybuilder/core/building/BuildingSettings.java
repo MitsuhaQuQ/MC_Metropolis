@@ -32,6 +32,12 @@ public final class BuildingSettings {
 
     /** Share of lots left unbuilt (car parks, gardens, empty land) outside downtown. */
     public double vacant = 0.04;
+    /**
+     * Below this urban intensity lots are left empty more and more, up to {@code fringeVacant} of them more at the
+     * built land's edge: the town thins out into its fields rather than ending in a wall of houses.
+     */
+    public double fringe = 0.4;
+    public double fringeVacant = 0.65;
 
     // Roofs, annexes, low upper storeys, storehouse shares and every other interchangeable part are drawn from the
     // styles of the catalogue (citybuilder/buildings/catalog.json), not set here

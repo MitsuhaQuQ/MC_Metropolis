@@ -84,20 +84,31 @@ public final class CityRails {
                 boolean elevated = bed - floor >= 4;
                 double edge = cell.edge();
                 boolean track = edge > (cell.platform() ? 3.5 : 1.5);
-                if (cell.underground() && bed + 7 <= floor) {
-                    // A subway's box: floor, walls, roof of concrete, lights along its roof, the ballast between
+                // Under water (a river, the sea) or by it the line runs in its closed box, never an open cutting
+                boolean wet = !chunk.getBlockState(pos.set(wx, floor + 1, wz)).getFluidState().isEmpty();
+                if (cell.underground() && (wet || bed + (cell.half() >= RailChunks.STATION - 0.01 ? 10 : 7) <= floor)) {
+                    // A subway's box: floor, walls, roof of concrete, lights along its roof, the ballast between; at a
+                    // station taller (seven clear over its platforms), a row of columns down each platform
+                    boolean station = cell.half() >= RailChunks.STATION - 0.01;
+                    int roof = bed + (station ? 9 : 6);
                     chunk.setBlockState(pos.set(wx, bed - 1, wz), deck, false);
                     boolean wall = edge < 1.0;
                     chunk.setBlockState(pos.set(wx, bed, wz), wall ? deck : track ? ballast : shoulder, false);
-                    for (int y = bed + 1; y <= bed + 5; y++) {
+                    for (int y = bed + 1; y < roof; y++) {
                         chunk.setBlockState(pos.set(wx, y, wz), wall ? deck : air, false);
                     }
                     // Lights down the middle every 8, and over a station's platforms every 4
                     boolean lamp = Math.abs(cell.across()) < 0.6 && Math.floorMod((long) Math.floor(cell.along()), 8L) == 0
                             || cell.platform() && edge > 1.0 && edge < 2.0 && Math.floorMod((long) Math.floor(cell.along()), 4L) == 0;
-                    chunk.setBlockState(pos.set(wx, bed + 6, wz), lamp ? own("ceiling_light", Blocks.SEA_LANTERN) : deck, false);
+                    chunk.setBlockState(pos.set(wx, roof, wz), lamp ? own("ceiling_light", Blocks.SEA_LANTERN) : deck, false);
                     if (cell.platform() && !wall) {
-                        chunk.setBlockState(pos.set(wx, bed + 1, wz), edge > 3.0 ? platformEdge : platform, false);
+                        double inner = Math.abs(cell.across()) - RailChunks.TRACKS;
+                        chunk.setBlockState(pos.set(wx, bed + 1, wz), inner < 1.0 ? platformEdge : platform, false);
+                        if (inner >= 3.0 && inner < 4.0 && Math.floorMod((long) Math.floor(cell.along()), 8L) == 4) {
+                            for (int y = bed + 2; y < roof; y++) {
+                                chunk.setBlockState(pos.set(wx, y, wz), deck, false);
+                            }
+                        }
                     }
                     continue;
                 }
@@ -146,8 +157,9 @@ public final class CityRails {
                 }
                 if (cell.platform()) {
                     // A side platform a block over the rails' foot, its edge in tactile strip, a canopy over it
-                    chunk.setBlockState(pos.set(wx, bed + 1, wz), edge > 3.0 ? platformEdge : platform, false);
-                    if (edge < 3.0) {
+                    double inner = Math.abs(cell.across()) - RailChunks.TRACKS;
+                    chunk.setBlockState(pos.set(wx, bed + 1, wz), inner < 1.0 ? platformEdge : platform, false);
+                    if (inner >= 1.0) {
                         chunk.setBlockState(pos.set(wx, bed + 5, wz), canopy, false);
                         if (edge > 1.0 && edge < 2.0 && Math.floorMod((long) Math.floor(cell.along()), 10L) == 0) {
                             for (int y = bed + 2; y <= bed + 4; y++) {
@@ -170,9 +182,26 @@ public final class CityRails {
                             chunk.setBlockState(pos.set(wx, bed + 1, wz), wall, false);
                         }
                     }
-                } else if (edge < 1.0 && bed - floor <= 2) {
-                    // A mesh fence along the bed at grade
-                    BlockState fence = fence(cell.heading());
+                } else if (fenced(cells, x, z) && bed - floor <= 2) {
+                    // A mesh fence along the bed at grade: on the bed's edge blocks, a closed line (each touching the
+                    // next by a side), each panel joined to its neighbours on it
+                    BlockState fence = Blocks.IRON_BARS.defaultBlockState();
+                    int[][] around = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+                    net.minecraft.world.level.block.state.properties.BooleanProperty[] sides = {BlockStateProperties.NORTH,
+                            BlockStateProperties.EAST, BlockStateProperties.SOUTH, BlockStateProperties.WEST};
+                    for (int d = 0; d < 4; d++) {
+                        int nx = x + around[d][0];
+                        int nz = z + around[d][1];
+                        boolean join;
+                        if (nx < 0 || nz < 0 || nx > 15 || nz > 15) {
+                            // Over the chunk's edge: joined where the line runs on that way
+                            double h = cell.heading();
+                            join = Math.abs(Math.cos(h) * around[d][0] + Math.sin(h) * around[d][1]) > 0.38;
+                        } else {
+                            join = fenced(cells, nx, nz);
+                        }
+                        fence = fence.setValue(sides[d], join);
+                    }
                     chunk.setBlockState(pos.set(wx, bed + 1, wz), fence, false);
                     chunk.setBlockState(pos.set(wx, bed + 2, wz), fence, false);
                 }
@@ -189,13 +218,14 @@ public final class CityRails {
             return;
         }
         double[] headings = new double[256];
+        double[] rising = new double[256];
         double[] steps;
         try {
             CityLogic logic = CityWorlds.of(level.getLevel());
             if (logic == null) {
                 return;
             }
-            steps = logic.chunks().rails().entrances(chunk.getPos().x, chunk.getPos().z, headings);
+            steps = logic.chunks().rails().entrances(chunk.getPos().x, chunk.getPos().z, headings, rising);
         } catch (RuntimeException e) {
             failed = true;
             CityBuilder.LOGGER.error("City railways failed at chunk {}; no more railways are built this session", chunk.getPos(), e);
@@ -218,7 +248,37 @@ public final class CityRails {
                     state = chunk.getBlockState(pos.set(wx, --floor, wz));
                 }
                 int y = (int) step;
-                if (y > floor || y < min + 2) {
+                boolean down = rising[x * 16 + z] < 0;
+                if (y < min + 2 || y + 4 > top) {
+                    continue;
+                }
+                if (down && !Double.isNaN(headings[x * 16 + z])) {
+                    // A stair down from a platform above the ground: each step on a pier of concrete, nothing below
+                    // the ground's own top
+                    if (y < floor) {
+                        continue;
+                    }
+                    double h = headings[x * 16 + z];
+                    chunk.setBlockState(pos.set(wx, y, wz), Blocks.STONE_BRICK_STAIRS.defaultBlockState()
+                            .setValue(net.minecraft.world.level.block.StairBlock.FACING,
+                                    net.minecraft.core.Direction.getNearest(Math.cos(h), 0.0, Math.sin(h))), false);
+                    for (int k = floor + 1; k < y; k++) {
+                        chunk.setBlockState(pos.set(wx, k, wz), own("concrete_exposed", Blocks.SMOOTH_STONE), false);
+                    }
+                    for (int k = y + 1; k <= y + 3; k++) {
+                        chunk.setBlockState(pos.set(wx, k, wz), Blocks.AIR.defaultBlockState(), false);
+                    }
+                    continue;
+                }
+                if (down) {
+                    // The way from the platform out to the stair's head, through the parapet
+                    chunk.setBlockState(pos.set(wx, y - 1, wz), own("sidewalk", Blocks.SMOOTH_STONE), false);
+                    for (int k = y; k <= y + 2; k++) {
+                        chunk.setBlockState(pos.set(wx, k, wz), Blocks.AIR.defaultBlockState(), false);
+                    }
+                    continue;
+                }
+                if (y > floor) {
                     continue;
                 }
                 if (Double.isNaN(headings[x * 16 + z])) {
@@ -240,6 +300,13 @@ public final class CityRails {
                 chunk.setBlockState(pos.set(wx, y - 1, wz), Blocks.STONE_BRICKS.defaultBlockState(), false);
             }
         }
+    }
+
+    /** Whether a column carries the fence of a line at grade: its bed's edge, 4-connected (see ChunkLayer.atEdge). */
+    private static boolean fenced(RailChunks.Cell[] cells, int x, int z) {
+        RailChunks.Cell c = cells[x * 16 + z];
+        return c != null && !c.platform() && !c.underground() && !c.elevated()
+                && com.mtm.citybuilder.core.chunk.ChunkLayer.atEdge(c.edge(), c.outward());
     }
 
     /** A run of bars joined along the line's nearer axis. */

@@ -43,7 +43,7 @@ public record Embankment(List<double[]> points, double road, double land) {
 
     /**
      * Whether a position lies on the embankment's land side within {@link #land} of its centre line (the road, the
-     * back slope or the road at its foot): no lot there.
+     * back slope or the road at its foot), or on its water side within {@link #OUTSIDE}: no lot there.
      */
     public boolean covers(double x, double z) {
         for (int k = 1; k < points.size(); k++) {
@@ -70,6 +70,12 @@ public record Embankment(List<double[]> points, double road, double land) {
         double nx = a[NX] + (b[NX] - a[NX]) * t;
         double nz = a[NZ] + (b[NZ] - a[NZ]) * t;
         double s = (x - px) * nx + (z - pz) * nz;
-        return Math.hypot(x - px, z - pz) <= land && s >= -0.5 * road;
+        double d = Math.hypot(x - px, z - pz);
+        // Inland: the road, the back slope, the road at its foot; out on the water's side (堤外地, between the bank
+        // road and the river or the sea) nothing is built at all
+        return s >= -0.5 * road ? d <= land : d <= OUTSIDE && (nx != 0 || nz != 0);
     }
+
+    /** How far out on the water's side of its centre line no lot is cut. */
+    public static final double OUTSIDE = 60.0;
 }

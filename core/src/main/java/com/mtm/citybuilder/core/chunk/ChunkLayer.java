@@ -670,8 +670,14 @@ public final class ChunkLayer {
             StreetSegment g = segments.get(p);
             double dx = g.x2() - g.x1();
             double dz = g.z2() - g.z1();
-            double t = ((x - g.x1()) * dx + (z - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz);
-            return t >= 0 && t <= 1 || t < 0 && round[p][0] || t > 1 && round[p][1];
+            double length2 = Math.max(1e-9, dx * dx + dz * dz);
+            double t = ((x - g.x1()) * dx + (z - g.z1()) * dz) / length2;
+            if (t >= 0 && t <= 1 || t < 0 && round[p][0] || t > 1 && round[p][1]) {
+                return true;
+            }
+            boolean[] on = reachOn.get(g);
+            double past = (t < 0 ? -t : t - 1) * Math.sqrt(length2);
+            return on != null && on[t < 0 ? 0 : 1] && past <= REACH_ON;
         }
 
         /** Whether two pieces are of one street: the same, continuing each other, or with one piece between. */
@@ -765,7 +771,10 @@ public final class ChunkLayer {
                             footpath[c] = true;
                         }
                         int level = bridge ? 1 : 0;
-                        if (firstAny[level][c] < 0) {
+                        // A footpath (a park's, a promenade) touching a street makes no junction of it
+                        if (surface == Surface.PATH) {
+                            // (paved below as the narrowest class, where nothing wider lies)
+                        } else if (firstAny[level][c] < 0) {
                             firstAny[level][c] = p;
                             firstAnyIndex[level][c] = index;
                         } else if (firstAnyIndex[level][c] != index || !index.sameStreet(firstAny[level][c], p)) {
@@ -810,6 +819,11 @@ public final class ChunkLayer {
             Column column = columns[c];
             int level = column.bridge ? 1 : 0;
             if (marked(column.surface) && junction[level][c]) {
+                columns[c] = new Column(column.surface, column.bridge, column.deck, column.across, column.heading,
+                        column.along, column.width, true, carriage[level][c]);
+            } else if (column.bridge && column.surface != Surface.NONE && (meet[1][c] || firstAny[0][c] >= 0)) {
+                // A bridge's end where another street meets it (the bank road along a levee, a street on the ground
+                // under its last span): no parapet across the way
                 columns[c] = new Column(column.surface, column.bridge, column.deck, column.across, column.heading,
                         column.along, column.width, true, carriage[level][c]);
             } else if (!marked(column.surface) && column.surface != Surface.NONE && meet[level][c]) {
@@ -902,6 +916,14 @@ public final class ChunkLayer {
                     double cz = minZ + z + 0.5;
                     StationPlaza.Part part = plaza.part(cx, cz);
                     if (part == StationPlaza.Part.NONE || columns[x * 16 + z].bridge) {
+                        continue;
+                    }
+                    // A street passing by keeps its way: only the square's own carriageways and crossings are laid
+                    // over a street, its pavements and islands not
+                    Surface there = columns[x * 16 + z].surface;
+                    boolean road = part == StationPlaza.Part.ROAD || part == StationPlaza.Part.CROSSING;
+                    if (!road && there != Surface.NONE && there != Surface.PATH && there != Surface.PLAZA
+                            && there != Surface.LANE) {
                         continue;
                     }
                     columns[x * 16 + z] = part == StationPlaza.Part.BUILDING ? Column.EMPTY
@@ -1073,6 +1095,10 @@ public final class ChunkLayer {
         if (airportAt(x, z) || rails().near(x + 0.5, z + 0.5, 3.0)) {
             return false;
         }
+        // No tree on a field (a copse's plot keeps its trees)
+        if (logic.urban(x + 0.5, z + 0.5).use() == com.mtm.citybuilder.core.extent.LandUse.FARMLAND && field(x, z) != FIELD_NONE) {
+            return false;
+        }
         UrbanSample sample = logic.urban(x + 0.5, z + 0.5);
         double built = logic.settings().streets.builtIntensity;
         if (sample.owner() == null || sample.intensity() <= built) {
@@ -1105,6 +1131,55 @@ public final class ChunkLayer {
             }
         }
         return r;
+    }
+
+    private final Map<StationPlaza, Double> plazaLevels = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** A station square's level: the ground under its middle (the middle of five samples round it). */
+    private double plazaLevel(StationPlaza plaza) {
+        return plazaLevels.computeIfAbsent(plaza, p -> {
+            double[] b = p.bounds();
+            return groundHeight(0.5 * (b[0] + b[2]), 0.5 * (b[1] + b[3])) + 0.5;
+        });
+    }
+
+    /** A field's crop, or a bund between fields; see {@link #field}. */
+    public static final int FIELD_NONE = -2;
+    public static final int FIELD_BUND = -1;
+    public static final int FIELD_RICE = 0;
+    public static final int FIELD_WHEAT = 1;
+    public static final int FIELD_CARROT = 2;
+    public static final int FIELD_POTATO = 3;
+    public static final int FIELD_BEET = 4;
+
+    /**
+     * What the farmland at a position grows: the fields of the land round the towns (L3.5's farmland outside the built
+     * land, and the empty lots at a town's edge), in plots of a grid turned by a slow field, 20 to 40 across, one
+     * crop each (rice paddies most, as Japan's plains), a bund a block wide between them; some of the grid's plots
+     * left as copses or fallow ({@link #FIELD_NONE}). Pure: the same wherever asked.
+     */
+    public int field(int x, int z) {
+        UrbanSample sample = logic.urban(x + 0.5, z + 0.5);
+        boolean farm = sample.use() == com.mtm.citybuilder.core.extent.LandUse.FARMLAND
+                || sample.owner() != null && sample.intensity() < logic.settings().buildings.fringe;
+        if (!farm || airportAt(x, z)) {
+            return FIELD_NONE;
+        }
+        // The grid: 32 a side, its rows shifted by the row's hash so the plots do not line up into a chessboard
+        int size = 32;
+        int row = Math.floorDiv(z, 20);
+        long shift = Math.floorMod(com.mtm.citybuilder.core.noise.Hash.of(logic.seed() ^ 0xF1E1DL, row), (long) size);
+        int col = Math.floorDiv((int) (x + shift), size);
+        int u = Math.floorMod((int) (x + shift), size);
+        int v = Math.floorMod(z, 20);
+        if (u == 0 || v == 0) {
+            return FIELD_BUND;
+        }
+        double pick = com.mtm.citybuilder.core.noise.Hash.unit(com.mtm.citybuilder.core.noise.Hash.of(logic.seed() ^ 0xC40B5L, col, row));
+        if (pick < 0.12) {
+            return FIELD_NONE;
+        }
+        return pick < 0.62 ? FIELD_RICE : pick < 0.74 ? FIELD_WHEAT : pick < 0.84 ? FIELD_CARROT : pick < 0.94 ? FIELD_POTATO : FIELD_BEET;
     }
 
     /** Town intensity from which no tree grows: the built-up town, not its leafy edge. */
@@ -1303,6 +1378,25 @@ public final class ChunkLayer {
             }
             if (Double.isNaN(verge[c])) {
                 outside[c] = Double.NaN;
+            }
+        }
+        // A station's square laid level, at the ground under its middle: one level over it all, not the terrain's
+        // ups and downs block by block between the streets it meets
+        for (Settlement town : towns(minX, minZ)) {
+            for (StationPlaza plaza : index(town).plazas.getOrDefault(key(chunkX, chunkZ), List.of())) {
+                double plazaLevel = plazaLevel(plaza);
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        StationPlaza.Part part = plaza.part(minX + x + 0.5, minZ + z + 0.5);
+                        if (part != StationPlaza.Part.NONE && part != StationPlaza.Part.BUILDING) {
+                            int c = x * 16 + z;
+                            level[c] = plazaLevel;
+                            verge[c] = Double.NaN;
+                            outside[c] = Double.NaN;
+                            bank[c] = Double.NaN;
+                        }
+                    }
+                }
             }
         }
         return new Grades(level, verge, outside, bank, bankKind, wall, towardX, towardZ);
@@ -1859,7 +1953,7 @@ public final class ChunkLayer {
             }
         }
         Map<Long, Double> heights = new java.util.concurrent.ConcurrentHashMap<>();
-        Index index = new Index(byChunk, segments, deck, links, canals, plazas, stops, heights, round(segments), banks,
+        Index index = new Index(byChunk, segments, deck, links, canals, plazas, stops, heights, round(segments, links), banks,
                 interior(segments, byChunk), streets(links));
         // A street leaving a bridge starts at its deck
         for (int p = 0; p < segments.size(); p++) {
@@ -1942,6 +2036,35 @@ public final class ChunkLayer {
      * leave notched). A dead end, an end on another street's side (a T), a straight run on and a junction whose
      * pieces leave no such gap stay square, the other pieces' paving filling the junction: no half circle sticks out.
      */
+    /**
+     * The ends' shapes ({@link #round(List)}), and where a piece runs on into another of its street (its links) at a
+     * slight angle, that end reaching a little past (see {@link #REACH_ON}): the wedge the two square ends leave on the
+     * bend's outside paved, not left a column of the land between.
+     */
+    static boolean[][] round(List<StreetSegment> segments, int[][] links) {
+        boolean[][] round = round(segments);
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            for (int q : links[p]) {
+                StreetSegment o = segments.get(q);
+                for (int e = 0; e < 2; e++) {
+                    double ex = e == 0 ? g.x1() : g.x2();
+                    double ez = e == 0 ? g.z1() : g.z2();
+                    if (Math.hypot(o.x1() - ex, o.z1() - ez) < 0.5 || Math.hypot(o.x2() - ex, o.z2() - ez) < 0.5) {
+                        reachOn.computeIfAbsent(g, k -> new boolean[2])[e] = true;
+                    }
+                }
+            }
+        }
+        return round;
+    }
+
+    /** How far past an end running on into its street's next piece its paving reaches. */
+    static final double REACH_ON = 1.5;
+
+    /** The ends of pieces running on into their street's next piece, by piece (filled while the index is built). */
+    private static final Map<StreetSegment, boolean[]> reachOn = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
     static boolean[][] round(List<StreetSegment> segments) {
         // Each end: {piece, which end, angle of the piece's line leaving the point}
         Map<Long, List<double[]>> ends = new HashMap<>();

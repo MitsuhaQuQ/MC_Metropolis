@@ -665,7 +665,7 @@ public final class CityChunks {
                     }
                     continue;
                 }
-                double planned = grades == null || column.plaza() != null || column.surface() == ChunkLayer.Surface.PATH
+                double planned = grades == null || column.surface() == ChunkLayer.Surface.PATH
                         ? Double.NaN : grades.level()[x * 16 + z];
                 if (Double.isNaN(planned) && grades != null && !column.bridge() && column.plaza() == null
                         && column.surface() != ChunkLayer.Surface.PATH) {
@@ -788,6 +788,8 @@ public final class CityChunks {
         // The railways through the town, after its streets: viaducts over them, level crossings giving way to them
         CityRails.lay(level, chunk, columns, pos, top);
         CityRails.entrances(level, chunk, pos, top);
+        // The fields round the towns and on their empty edge lots
+        CityFarms.lay(level, chunk, columns, pos, top);
     }
 
     private static RoadChunks.Cell[] roads(WorldGenLevel level, ChunkAccess chunk, ChunkLayer.Column[] columns) {

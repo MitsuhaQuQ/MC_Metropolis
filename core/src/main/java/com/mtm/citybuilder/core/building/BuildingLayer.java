@@ -423,11 +423,22 @@ public final class BuildingLayer {
             }
         }
         if (building != null && models != null) {
-            // Not over a railway built through the town (its viaduct or its bed)
-            for (double[] c : outline(plots, plot, building)) {
-                if (logic.chunks().rails().near(c[0], c[1], 2.0)) {
-                    building = null;
-                    break;
+            // Not over a railway built through the town (its viaduct, its bed, a station's stairs): its whole footprint
+            // looked at, every 2.5 along and back (a line may cross a large building between its corners)
+            com.mtm.citybuilder.core.chunk.RailChunks rails = logic.chunks().rails();
+            com.mtm.citybuilder.core.settlement.Settlement town = plots.settlement();
+            double length = building.to() - building.from();
+            double deep = building.back() - building.front();
+            int na = Math.max(1, (int) Math.ceil(length / 2.5));
+            int nd = Math.max(1, (int) Math.ceil(deep / 2.5));
+            search:
+            for (int i = 0; i <= na; i++) {
+                for (int j = 0; j <= nd; j++) {
+                    double[] c = at(plots, plot, building.from() + length * i / na, building.front() + deep * j / nd);
+                    if (rails.near(town, c[0], c[1], 2.0)) {
+                        building = null;
+                        break search;
+                    }
                 }
             }
         }
@@ -572,7 +583,18 @@ public final class BuildingLayer {
             group = Hash.of(chainSide, Math.floorDiv(plot.index() + offset, config.projectRun));
             project = Hash.unit(group) < config.projects;
         }
-        if (!downtown && !project && Hash.unit(h) < config.vacant) {
+        // Towards the town's edge the lots thin out (fields, yards, plots left empty), more the thinner the town:
+        // from {@code config.fringe} of urban intensity down to the built land's edge, up to {@code config.fringeVacant}
+        double vacant = config.vacant;
+        if (!downtown) {
+            double[] mid = plots.lotCentre(plot.chain(), plot.side(), Math.max(0, Math.min(plot.index(),
+                    plots.lotCount(plot.chain(), plot.side()) - 1)));
+            double intensity = logic.urban(mid[0], mid[1]).intensity();
+            double built = logic.settings().streets.builtIntensity;
+            double fade = (config.fringe - intensity) / Math.max(1e-6, config.fringe - built);
+            vacant += Math.max(0.0, Math.min(1.0, fade)) * config.fringeVacant;
+        }
+        if (!downtown && !project && Hash.unit(h) < vacant) {
             return null;
         }
         double[] shares = switch (district) {
@@ -830,6 +852,43 @@ public final class BuildingLayer {
             width = Math.floor(plot.frontage() - 2.0 * sideGap);
         }
         depth = Math.floor(Math.min(depth, plot.maxDepth() - front - backGap));
+        // The lot as it really runs back (a corner's, or one whose back another street's lot or a back lot takes, is
+        // shallower than its nominal depth): the building only as deep as the lot reaches all along its frontage, else
+        // its columns past that are another plot's and it comes out a thin slab of its front
+        if (plot.row() == 0) {
+            // Back from the front a block at a time until most of the frontage (three of five points across it) is no
+            // longer this lot's
+            boolean most = true;
+            // Downtown and in the old town a shop, an office or a block of flats fills its lot back to where it ends,
+            // as their buildings do, not standing at its type's depth with a yard behind
+            boolean fill = (downtown || district == District.OLD_TOWN) && (type == Building.Type.SHOP
+                    || type == Building.Type.OFFICE || type == Building.Type.APARTMENT);
+            double limit = fill ? Math.min(45.0, plot.maxDepth() - front) : depth + backGap;
+            double reach = fill ? limit : depth;
+            double some = reach;
+            for (double d = front + 0.5; d <= front + limit; d += 1.0) {
+                int own = 0;
+                for (int k = 0; k < 5; k++) {
+                    double a = plot.start() + 1.0 + (plot.frontage() - 2.0) * k / 4.0;
+                    double[] c = at(plots, plot, a, d);
+                    Plot there = plots.at(c[0], c[1]);
+                    if (there != null && there.id() == plot.id() && !there.interior() && !there.remnant()) {
+                        own++;
+                    }
+                }
+                if (most && own < 3) {
+                    reach = Math.floor(d - front - 0.5);
+                    most = false;
+                }
+                if (own < 1) {
+                    some = Math.floor(d - front - 0.5);
+                    break;
+                }
+            }
+            // A lot too shallow for that keeps the depth some of its frontage reaches, rather than standing empty
+            double own = reach >= MIN_SIDE + 2.0 ? reach : some;
+            depth = fill ? Math.floor(Math.max(MIN_SIDE, Math.min(45.0, own - 1.0))) : Math.min(depth, own);
+        }
         // Room inside its walls: at least three blocks clear between them either way
         if (width < MIN_SIDE || depth < MIN_SIDE) {
             return null;

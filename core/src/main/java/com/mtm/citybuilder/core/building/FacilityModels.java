@@ -33,7 +33,16 @@ public final class FacilityModels {
      * a field) or its blocks only set into what is there (a park's trees, benches and lamps, each at its own ground).
      */
     public record Placed(Facility facility, Model model, int x, int y, int z, int minX, int minZ, int maxX, int maxZ,
-                         boolean grade) {
+                         boolean grade, boolean walkway) {
+        public Placed(Facility facility, Model model, int x, int y, int z, int minX, int minZ, int maxX, int maxZ, boolean grade) {
+            this(facility, model, x, y, z, minX, minZ, maxX, maxZ, grade, false);
+        }
+
+        /** Whether it is a way in (a flat strip of paving out to the street), not the facility itself. */
+        public boolean path() {
+            return walkway;
+        }
+
         /** Whether a column lies within the footprint's bounds, a margin round them. */
         public boolean covers(double wx, double wz, double margin) {
             return wx >= minX - margin && wx < maxX + 1 + margin && wz >= minZ - margin && wz < maxZ + 1 + margin;
@@ -90,13 +99,13 @@ public final class FacilityModels {
      */
     public boolean excludes(Settlement town, double x, double z) {
         for (Placed m : town(town)) {
-            if (m.grade && m.covers(x, z, 3)) {
+            if ((m.grade || m.walkway) && m.covers(x, z, m.walkway ? 1 : 3)) {
                 return true;
             }
         }
-        // A park's or a school's land: no building on it
+        // A park's land: no building on it (a school's block keeps its lots round the school's own ground)
         Facility f = logic.functions().town(town).facilityAt(x, z);
-        return f != null && (PARKS.contains(f.kind()) || SCHOOLS.contains(f.kind()) && built(town, f));
+        return f != null && PARKS.contains(f.kind());
     }
 
     /** The schools, laid out to their blocks. */
@@ -143,6 +152,7 @@ public final class FacilityModels {
                                 (int) (f.id() ^ (f.id() >>> 32))).build()), site, plots);
                         if (p != null) {
                             out.add(p);
+                            access(p, (int) site[0], plots, out);
                         }
                     }
                 }
@@ -159,6 +169,7 @@ public final class FacilityModels {
             Placed p = fit(f, candidates, site, plots);
             if (p != null) {
                 out.add(p);
+                access(p, (int) site[0], plots, out);
             }
         }
         return List.copyOf(out);
@@ -229,6 +240,19 @@ public final class FacilityModels {
         return out;
     }
 
+    /**
+     * Whether a position lies on water (a river, a lake, the sea) or within a few blocks of it: no public building
+     * stands there.
+     */
+    private boolean wet(com.mtm.citybuilder.core.street.StreetPlan plan, double x, double z) {
+        if (plan.water().water(x, z)) {
+            return true;
+        }
+        com.mtm.citybuilder.core.terrain.RiverSample river = logic.terrain().nearestRiver(x, z);
+        return river != null && river.distance() < 0.5 * river.width() + 6.0
+                || !Double.isNaN(logic.terrain().lakeLevel(x, z));
+    }
+
     /** A test of a position. */
     @FunctionalInterface
     private interface Ground {
@@ -242,7 +266,8 @@ public final class FacilityModels {
     private double[] areaSite(TownFunctions functions, TownPlots plots, Facility f) {
         double half = Math.max(40.0, f.radius() * 1.6 + 20.0);
         com.mtm.citybuilder.core.chunk.RailChunks rails = logic.chunks().rails();
-        return site((x, z) -> functions.contains(f, x, z) && !rails.near(x, z, 4.0), plots, f.x(), f.z(), half);
+        com.mtm.citybuilder.core.street.StreetPlan plan = logic.streetPlan(plots.settlement());
+        return site((x, z) -> functions.contains(f, x, z) && !rails.near(x, z, 4.0) && !wet(plan, x, z), plots, f.x(), f.z(), half);
     }
 
     /**
@@ -256,7 +281,8 @@ public final class FacilityModels {
         // Off the streets and canals, and off the blocks an area facility took (a park, a school's ground)
         com.mtm.citybuilder.core.chunk.RailChunks rails = logic.chunks().rails();
         return site((x, z) -> !plots.onStreet(x, z) && !plots.inCanal(x, z) && Math.hypot(x - c[0], z - c[1]) <= reach
-                && functions.facilityAt(x, z) == null && !rails.near(x, z, 4.0), plots, c[0], c[1], reach + 2.0);
+                && functions.facilityAt(x, z) == null && !rails.near(x, z, 4.0)
+                && !wet(logic.streetPlan(plots.settlement()), x, z), plots, c[0], c[1], reach + 2.0);
     }
 
     /**
@@ -348,8 +374,8 @@ public final class FacilityModels {
             }
             // Nothing of a lot's on a street (an area facility's site is its block, its lanes taken over)
             boolean clear = true;
-            for (int x = minX; x < minX + w && clear && !f.kind().area(); x += 2) {
-                for (int z = minZ; z < minZ + d && clear; z += 2) {
+            for (int x = minX - 1; x <= minX + w && clear && !f.kind().area(); x++) {
+                for (int z = minZ - 1; z <= minZ + d && clear; z++) {
                     clear = !plots.onStreet(x + 0.5, z + 0.5);
                 }
             }
@@ -449,11 +475,11 @@ public final class FacilityModels {
                     case GREEN -> 0.85;
                     case CENTRAL_PARK, LARGE_PARK -> edge ? 0.9 : 0.5;
                     case CASTLE_PARK -> edge ? 0.95 : 0.35;
-                    default -> edge ? 0.9 : 0.12;
+                    default -> edge ? 0.9 : 0.35;
                 };
                 if (Hash.unit(Hash.of(h, 3)) >= chance) {
                     // A shrub where no tree stands, in the larger parks' lawns and the greens
-                    if (kind != Facility.Kind.PARK && kind != Facility.Kind.SPORTS_PARK && Hash.unit(Hash.of(h, 5)) < 0.3) {
+                    if (kind != Facility.Kind.SPORTS_PARK && Hash.unit(Hash.of(h, 5)) < 0.3) {
                         Integer y = groundAt(x, z);
                         if (y != null) {
                             set(scatter, ParkParts.shrub(h), x, y, z);
@@ -556,6 +582,42 @@ public final class FacilityModels {
         if (scatter.size() > 0) {
             out.add(new Placed(f, scatter, 0, 0, 0, scatter.minX(), scatter.minZ(), scatter.maxX(), scatter.maxZ(), false));
         }
+    }
+
+    /**
+     * A paved way in to a placed building from the street before it: four wide from the middle of its front straight
+     * out (the way its front faces) to the first street within 80, at the building's ground; none where no street is
+     * met. Graded, so no lot's building stands on it.
+     */
+    private void access(Placed p, int front, TownPlots plots, List<Placed> out) {
+        int[] d = DIRS[front];
+        int mx = (p.minX() + p.maxX()) / 2;
+        int mz = (p.minZ() + p.maxZ()) / 2;
+        int sx = d[0] > 0 ? p.maxX() + 1 : d[0] < 0 ? p.minX() - 1 : mx;
+        int sz = d[1] > 0 ? p.maxZ() + 1 : d[1] < 0 ? p.minZ() - 1 : mz;
+        int length = -1;
+        for (int t = 0; t < 80; t++) {
+            if (plots.onStreet(sx + d[0] * t + 0.5, sz + d[1] * t + 0.5)) {
+                length = t;
+                break;
+            }
+        }
+        if (length <= 0) {
+            return;
+        }
+        // From the building's ground down (or up) to the ground at the street, evenly: each block at its own height,
+        // in world coordinates (laid by the chunk on the ground there, not on a graded pad)
+        Model path = new Model();
+        int end = ground(sx + d[0] * (length - 1), sz + d[1] * (length - 1), sx + d[0] * (length - 1), sz + d[1] * (length - 1));
+        for (int t = 0; t < length; t++) {
+            int y = (int) Math.round(p.y() + (end - p.y()) * (t + 0.5) / length);
+            for (int k = -2; k <= 1; k++) {
+                int x = sx + (d[0] != 0 ? d[0] * t : k);
+                int z = sz + (d[1] != 0 ? d[1] * t : k);
+                path.set(x, y, z, "citybuilder:sidewalk_granite");
+            }
+        }
+        out.add(new Placed(p.facility(), path, 0, 0, 0, path.minX(), path.minZ(), path.maxX(), path.maxZ(), false, true));
     }
 
     /** Whether a castle park's block holds the castle itself (its honmaru there; the rest of its grounds park). */

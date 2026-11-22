@@ -594,10 +594,20 @@ def main():
             'side': 'citybuilder:block/fixture/ditch_side', 'bottom': 'citybuilder:block/fixture/ditch_side'}})
         low = fixture_model(name + '_low', {'parent': 'citybuilder:block/lowered', 'textures': {
             'top': f'citybuilder:block/fixture/{top}', 'side': 'citybuilder:block/fixture/ditch_side'}})
+        # Cut to eighths as the asphalt beside it (road_models.py's paved_<sixteenths> parents), up a ramp
+        import road_models
+        cuts = {}
+        for t in road_models.TOPS:
+            if t not in (16, road_models.LOW):
+                cuts[t] = fixture_model(f'{name}_t{t}', {'parent': f'citybuilder:block/paved_{t}', 'textures': {
+                    'top': f'citybuilder:block/fixture/{top}', 'side': 'citybuilder:block/fixture/ditch_side'}})
         variants = {}
         for f, y in FACING_Y.items():
-            for lowered, m in (('false', whole), ('true', low)):
-                variants[f'facing={f},low={lowered}'] = {'model': m, 'y': y} if y else {'model': m}
+            for lowered in ('false', 'true'):
+                for h in road_models.HEIGHTS:
+                    t = road_models.top(h, lowered == 'true')
+                    m = whole if t == 16 else low if t == road_models.LOW else cuts[t]
+                    variants[f'facing={f},height={h},low={lowered}'] = {'model': m, 'y': y} if y else {'model': m}
         block(name, en, zh, {'variants': variants}, whole)
         loot(name)
     m = fixture_model('street_light_pole', street_light_pole())

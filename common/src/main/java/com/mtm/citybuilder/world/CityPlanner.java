@@ -102,6 +102,11 @@ public final class CityPlanner {
             }
             long start = System.nanoTime();
             logic.streetPlan(town);
+            // Its lots' uses and public buildings too, so the chunks find them ready (a large city's take a while)
+            logic.functions().town(town);
+            if (logic.buildings().facilities() != null) {
+                logic.buildings().facilities().town(town);
+            }
             CityBuilder.LOGGER.info("Planned the {} at {} {} ahead of the players in {} s", town.tier(),
                     Math.round(town.x()), Math.round(town.z()), String.format("%.1f", (System.nanoTime() - start) / 1e9));
         }

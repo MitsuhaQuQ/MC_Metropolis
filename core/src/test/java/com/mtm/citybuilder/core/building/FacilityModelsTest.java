@@ -41,6 +41,9 @@ class FacilityModelsTest {
         }
         Map<Facility.Kind, Integer> built = new EnumMap<>(Facility.Kind.class);
         for (FacilityModels.Placed p : placed) {
+            if (p.path()) {
+                continue;
+            }
             built.merge(p.facility().kind(), 1, Integer::sum);
             if (!p.grade()) {
                 continue;

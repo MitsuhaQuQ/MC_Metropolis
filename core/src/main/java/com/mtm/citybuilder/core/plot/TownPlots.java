@@ -105,8 +105,9 @@ public final class TownPlots {
             for (int i = 1; i < e.points().size(); i++) {
                 double[] a = e.points().get(i - 1);
                 double[] b = e.points().get(i);
-                for (long cx = (long) Math.floor((Math.min(a[0], b[0]) - e.land()) / 64.0); cx <= (long) Math.floor((Math.max(a[0], b[0]) + e.land()) / 64.0); cx++) {
-                    for (long cz = (long) Math.floor((Math.min(a[1], b[1]) - e.land()) / 64.0); cz <= (long) Math.floor((Math.max(a[1], b[1]) + e.land()) / 64.0); cz++) {
+                double reach = Math.max(e.land(), com.mtm.citybuilder.core.street.Embankment.OUTSIDE);
+                for (long cx = (long) Math.floor((Math.min(a[0], b[0]) - reach) / 64.0); cx <= (long) Math.floor((Math.max(a[0], b[0]) + reach) / 64.0); cx++) {
+                    for (long cz = (long) Math.floor((Math.min(a[1], b[1]) - reach) / 64.0); cz <= (long) Math.floor((Math.max(a[1], b[1]) + reach) / 64.0); cz++) {
                         embankmentCells.computeIfAbsent((cx << 32) ^ (cz & 0xFFFFFFFFL), q -> new ArrayList<>()).add(new int[]{k, i});
                     }
                 }

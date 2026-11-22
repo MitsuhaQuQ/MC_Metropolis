@@ -194,12 +194,18 @@ public final class CityBuildings {
         int baseZ = chunk.getPos().getMinBlockZ();
         int min = chunk.getMinBuildHeight();
         int max = chunk.getMaxBuildHeight() - 1;
+        // The streets' columns: none of a model graded or laid on them
+        com.mtm.citybuilder.core.chunk.ChunkLayer.Column[] streets = logic.chunks().columns(chunk.getPos().x, chunk.getPos().z);
+        java.util.function.IntPredicate street = c -> streets[c].surface() != com.mtm.citybuilder.core.chunk.ChunkLayer.Surface.NONE;
         for (com.mtm.citybuilder.core.building.FacilityModels.Placed p : near) {
             int ground = p.y();
             for (int wx = Math.max(baseX, p.minX()); p.grade() && wx <= Math.min(baseX + 15, p.maxX()); wx++) {
                 for (int wz = Math.max(baseZ, p.minZ()); wz <= Math.min(baseZ + 15, p.maxZ()); wz++) {
                     int x = wx - baseX;
                     int z = wz - baseZ;
+                    if (street.test(x * 16 + z)) {
+                        continue;
+                    }
                     int floor = Math.min(max, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
                     BlockState state = chunk.getBlockState(pos.set(wx, floor, wz));
                     while (floor > min && !state.blocksMotion()) {
@@ -220,7 +226,23 @@ public final class CityBuildings {
                 int wx = mx + p.x();
                 int wy = my + p.y();
                 int wz = mz + p.z();
-                if (wx >= baseX && wx < baseX + 16 && wz >= baseZ && wz < baseZ + 16 && wy >= min && wy <= max) {
+                if (wx >= baseX && wx < baseX + 16 && wz >= baseZ && wz < baseZ + 16 && wy >= min && wy <= max
+                        && !street.test((wx - baseX) * 16 + (wz - baseZ))) {
+                    if (p.walkway()) {
+                        // A way in: on the ground at its own height, filled under, cleared over
+                        for (int k = wy + 1; k <= Math.min(max, wy + 4); k++) {
+                            chunk.setBlockState(pos.set(wx, k, wz), Blocks.AIR.defaultBlockState(), false);
+                        }
+                        for (int k = wy - 1; k > Math.max(min, wy - 6); k--) {
+                            BlockState under = chunk.getBlockState(pos.set(wx, k, wz));
+                            if (under.blocksMotion()) {
+                                break;
+                            }
+                            chunk.setBlockState(pos, Blocks.DIRT.defaultBlockState(), false);
+                        }
+                        chunk.setBlockState(pos.set(wx, wy, wz), parsed(s), false);
+                        return;
+                    }
                     // A park's trees and benches only into the open (air, plants, leaves), not into what is built
                     if (!p.grade()) {
                         BlockState there = chunk.getBlockState(pos.set(wx, wy, wz));

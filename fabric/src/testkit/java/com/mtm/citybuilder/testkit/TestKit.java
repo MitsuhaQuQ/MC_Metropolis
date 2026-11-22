@@ -80,6 +80,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/airport", this::airport);
             route(http, "/facilities", this::facilities);
             route(http, "/rail", this::rail);
+            route(http, "/plot", this::plot);
             route(http, "/road", this::road);
             route(http, "/roads-near", this::roadsNear);
             route(http, "/station", this::station);
@@ -717,6 +718,49 @@ public final class TestKit implements DedicatedServerModInitializer {
         out.put("level", Double.isNaN(p[2]) ? null : p[2]);
         out.put("ground", Double.isNaN(p[3]) ? null : p[3]);
         out.put("heading", Math.toDegrees(p[4]));
+        return out;
+    }
+
+    /**
+     * The plot at (x, z) in the town owning it, as this world planned it, and the building on it: its kind, its lot's
+     * row, use, depth and frontage; the building's type, storeys, frontage and depth, and whether it covers the point.
+     */
+    private Object plot(Map<String, String> query, String body) {
+        double x = Double.parseDouble(query.get("x"));
+        double z = Double.parseDouble(query.get("z"));
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if (logic == null || logic.urban(x, z).owner() == null) {
+            return Map.of("found", false);
+        }
+        com.mtm.citybuilder.core.settlement.Settlement town = logic.urban(x, z).owner();
+        logic.streetPlan(town);
+        com.mtm.citybuilder.core.plot.TownPlots plots = logic.plots().town(town);
+        com.mtm.citybuilder.core.plot.Plot p = plots.at(x, z);
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("found", true);
+        out.put("town", town.tier().name());
+        if (p == null) {
+            out.put("plot", "street");
+            return out;
+        }
+        out.put("plot", p.interior() ? "interior" : p.remnant() ? "remnant" : p.row() > 0 ? "back" : "front");
+        out.put("use", p.use() == null ? null : p.use().name());
+        out.put("district", p.district().name());
+        out.put("street", p.street().name());
+        out.put("depth", Math.round(p.depth() * 10) / 10.0);
+        out.put("maxDepth", Math.round(p.maxDepth() * 10) / 10.0);
+        out.put("frontage", Math.round(p.frontage() * 10) / 10.0);
+        com.mtm.citybuilder.core.function.Facility f = logic.functions().town(town).facilityAt(x, z);
+        out.put("facility", f == null ? null : f.kind().name());
+        com.mtm.citybuilder.core.building.Building b = logic.buildings().building(plots, p);
+        if (b != null) {
+            out.put("type", b.type().name());
+            out.put("storeys", b.storeys());
+            out.put("buildingFrontage", Math.round((b.to() - b.from()) * 10) / 10.0);
+            out.put("buildingDepth", Math.round((b.back() - b.front()) * 10) / 10.0);
+            out.put("front", Math.round(b.front() * 10) / 10.0);
+        }
+        out.put("covered", logic.buildings().at(x, z) != null);
         return out;
     }
 

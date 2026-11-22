@@ -1,0 +1,7 @@
+{
+  "parent": "citybuilder:block/paved_4",
+  "textures": {
+    "top": "citybuilder:block/fixture/ditch_grate",
+    "side": "citybuilder:block/fixture/ditch_side"
+  }
+}
