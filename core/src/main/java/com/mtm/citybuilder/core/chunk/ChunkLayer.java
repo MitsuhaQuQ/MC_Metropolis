@@ -918,14 +918,8 @@ public final class ChunkLayer {
                     if (part == StationPlaza.Part.NONE || columns[x * 16 + z].bridge) {
                         continue;
                     }
-                    // A street passing by keeps its way: only the square's own carriageways and crossings are laid
-                    // over a street, its pavements and islands not
-                    Surface there = columns[x * 16 + z].surface;
-                    boolean road = part == StationPlaza.Part.ROAD || part == StationPlaza.Part.CROSSING;
-                    if (!road && there != Surface.NONE && there != Surface.PATH && there != Surface.PLAZA
-                            && there != Surface.LANE) {
-                        continue;
-                    }
+                    // The streets in its land end at its edge (the plan cut them there); the last blocks of one
+                    // reaching in are paved over
                     columns[x * 16 + z] = part == StationPlaza.Part.BUILDING ? Column.EMPTY
                             : Column.plaza(plazaMark(plaza, cx, cz));
                 }
@@ -960,8 +954,8 @@ public final class ChunkLayer {
                 return new Mark(Paving.MEDIAN, 0, 0);
             case CROSSING:
                 for (StationPlaza.Crossing crossing : plaza.crossings()) {
-                    if (crossing.area().contains(u, v)) {
-                        double w = crossing.alongU() ? v : u;
+                    if (crossing.contains(u, v)) {
+                        double w = crossing.across(u, v);
                         boolean stripe = Math.floorMod((long) Math.floor(w), 2L) == 0;
                         return new Mark(stripe ? Paving.PAINT : Paving.ASPHALT, 0, 0, true);
                     }
@@ -1135,11 +1129,29 @@ public final class ChunkLayer {
 
     private final Map<StationPlaza, Double> plazaLevels = new java.util.concurrent.ConcurrentHashMap<>();
 
-    /** A station square's level: the ground under its middle (the middle of five samples round it). */
-    private double plazaLevel(StationPlaza plaza) {
+    /**
+     * A station square's level: the ground at its mouth, where the avenue meets it, and before the station building,
+     * the lower of the two (a square stood well over the land round it when it took the ground under its bounds'
+     * middle); the middle of the ground over its land when that lies lower still.
+     */
+    double plazaLevel(StationPlaza plaza) {
         return plazaLevels.computeIfAbsent(plaza, p -> {
-            double[] b = p.bounds();
-            return groundHeight(0.5 * (b[0] + b[2]), 0.5 * (b[1] + b[3])) + 0.5;
+            double[] mouth = p.mouth();
+            double[] door = p.world(0.0, p.forecourt().v2());
+            List<Double> grounds = new ArrayList<>();
+            StationPlaza.Land land = p.land();
+            for (int i = 0; i < land.width(); i += 6) {
+                for (int j = 0; j < land.height(); j += 6) {
+                    if (land.contains(land.u0() + i + 0.5, land.v0() + j + 0.5)) {
+                        double[] w = p.world(land.u0() + i + 0.5, land.v0() + j + 0.5);
+                        grounds.add(groundHeight(w[0], w[1]));
+                    }
+                }
+            }
+            java.util.Collections.sort(grounds);
+            double middle = grounds.isEmpty() ? Double.POSITIVE_INFINITY : grounds.get(grounds.size() / 2);
+            double ends = Math.min(groundHeight(mouth[0], mouth[1]), groundHeight(door[0], door[1]));
+            return Math.floor(Math.min(ends, middle)) + 0.5;
         });
     }
 

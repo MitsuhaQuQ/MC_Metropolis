@@ -1568,7 +1568,7 @@ public final class StreetLayer {
         dropLooseBridges(segments);
         List<Promenade> promenades = formation == Formation.VILLAGE ? List.of()
                 : promenades(settlement, window, canals, segments, embankments);
-        List<StationPlaza> plazas = plazas(fronts, railways, urban, segments);
+        List<StationPlaza> plazas = plazas(fronts, railways, urban, segments, window);
         List<StationSite> sites = formation == Formation.VILLAGE ? List.of()
                 : sites(settlement, window, anchors, railways, urban, segments, fronts, plazas);
         List<List<double[]>> highSpeed = highSpeedCorridor(settlement, window, districts, anchors);
@@ -2034,11 +2034,13 @@ public final class StreetLayer {
      * A station's front, decided before its avenue is laid: the platforms' heading, the side toward the avenue's
      * goal, the square's template and depth.
      */
-    private record Front(Anchor station, double heading, int side, StationPlaza.Template template, double depth) {
-        /** Where the avenue leaves the square: the middle of its far edge. */
+    private record Front(Anchor station, double heading, int side, StationPlaza.Template template, double depth,
+                         double shift) {
+        /** Where the avenue leaves the square: on its far edge, {@code shift} along the platforms off their middle. */
         double[] mouth(double siteWidth) {
             double out = 0.5 * siteWidth + depth;
-            return new double[]{station.x() - side * out * Math.sin(heading), station.z() + side * out * Math.cos(heading)};
+            return new double[]{station.x() + shift * Math.cos(heading) - side * out * Math.sin(heading),
+                    station.z() + shift * Math.sin(heading) + side * out * Math.cos(heading)};
         }
 
         /** The direction out of the square, {x, z}. */
@@ -2054,7 +2056,10 @@ public final class StreetLayer {
         double toward = -(goal[0] - station.x()) * Math.sin(heading) + (goal[1] - station.z()) * Math.cos(heading);
         int side = toward < 0 ? -1 : 1;
         StationPlaza.Template template = StationPlaza.template(settlement.tier());
-        return new Front(station, heading, side, template, StationPlaza.depth(template, logic.settings().plazas));
+        // The avenue off the station's middle line, as often as not (Toyama's leaves the square at a corner)
+        double shift = StationPlaza.mouthShift(template, logic.settings().plazas, Hash.unit(Hash.of(logic.seed(),
+                settlement.id(), Double.doubleToLongBits(station.x()) ^ 0x6d6f757468L)));
+        return new Front(station, heading, side, template, StationPlaza.depth(template, logic.settings().plazas), shift);
     }
 
     /**
@@ -2117,8 +2122,15 @@ public final class StreetLayer {
      * The stations' squares, each with two more bus berths for every railway line meeting at it, its throat as wide as
      * the avenue leaving it (a boulevard's median running on as the throat's).
      */
+    private static double distanceToSegment(double x, double z, StreetSegment g) {
+        double dx = g.x2() - g.x1();
+        double dz = g.z2() - g.z1();
+        double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+        return Math.hypot(x - g.x1() - t * dx, z - g.z1() - t * dz);
+    }
+
     private List<StationPlaza> plazas(List<Front> fronts, List<CityRailway> railways, List<UrbanLine> urban,
-                                      List<StreetSegment> segments) {
+                                      List<StreetSegment> segments, Window window) {
         List<StationPlaza> plazas = new ArrayList<>();
         CitySettings.Transit transit = logic.settings().transit;
         for (Front front : fronts) {
@@ -2140,13 +2152,61 @@ public final class StreetLayer {
             }
             double[] mouth = front.mouth(transit.mainWidth);
             double avenue = config.stationAvenueWidth;
+            double[] way = front.outward();
+            double ax = Math.cos(front.heading());
+            double az = Math.sin(front.heading());
+            double[] out = {0.0, 1.0};
             for (StreetSegment g : segments) {
-                if (Math.hypot(g.x1() - mouth[0], g.z1() - mouth[1]) < 1.0 || Math.hypot(g.x2() - mouth[0], g.z2() - mouth[1]) < 1.0) {
+                boolean atFirst = Math.hypot(g.x1() - mouth[0], g.z1() - mouth[1]) < 1.0;
+                boolean atSecond = Math.hypot(g.x2() - mouth[0], g.z2() - mouth[1]) < 1.0;
+                if (atFirst || atSecond) {
                     avenue = Math.max(avenue, g.width());
+                    double dx = atFirst ? g.x2() - g.x1() : g.x1() - g.x2();
+                    double dz = atFirst ? g.z2() - g.z1() : g.z1() - g.z2();
+                    double length = Math.hypot(dx, dz);
+                    if (length > 1.0 && (dx * way[0] + dz * way[1]) > 0) {
+                        // In the square's frame: u along the platforms, v outward
+                        out = new double[]{(dx * ax + dz * az) / length, (dx * way[0] + dz * way[1]) / length};
+                    }
                 }
             }
-            plazas.add(StationPlaza.lay(front.template(), station.x(), station.z(), front.heading(), front.side(),
-                    transit.mainWidth, Math.max(1, lines), logic.settings().plazas, avenue));
+            // The arterials passing along the station's front bound the square (not its own avenue); water too. The
+            // streets heading into the station (the town's roads drawn to it) end at the square's edge instead
+            double reach = 200.0;
+            List<StreetSegment> bounding = new ArrayList<>();
+            for (StreetSegment g : segments) {
+                boolean avenueEnd = Math.hypot(g.x1() - mouth[0], g.z1() - mouth[1]) < 1.0
+                        || Math.hypot(g.x2() - mouth[0], g.z2() - mouth[1]) < 1.0;
+                boolean along = Math.abs((g.x2() - g.x1()) * ax + (g.z2() - g.z1()) * az)
+                        > Math.cos(Math.toRadians(30)) * Math.max(1e-9, g.length());
+                if (!avenueEnd && along && (g.width() >= 10.0 || major(g.streetClass()))
+                        && Math.min(Math.hypot(g.x1() - station.x(), g.z1() - station.z()),
+                        Math.hypot(g.x2() - station.x(), g.z2() - station.z())) < reach + g.length()) {
+                    bounding.add(g);
+                }
+            }
+            double heading = front.heading();
+            int side = front.side();
+            StationPlaza.Free free = (u, v) -> {
+                double wx = station.x() + u * ax - side * v * az;
+                double wz = station.z() + u * az + side * v * ax;
+                if (window.water(wx, wz)) {
+                    return false;
+                }
+                for (StreetSegment g : bounding) {
+                    if (distanceToSegment(wx, wz, g) <= 0.5 * g.width() + 1.0) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+            plazas.add(StationPlaza.lay(front.template(), station.x(), station.z(), heading, side,
+                    transit.mainWidth, Math.max(1, lines), logic.settings().plazas, avenue, front.shift(), out,
+                    Hash.of(logic.seed(), Double.doubleToLongBits(station.x()), Double.doubleToLongBits(station.z())),
+                    free));
+            // The square's land is its own: the streets in it end at its edge
+            StationPlaza square = plazas.get(plazas.size() - 1);
+            segments.removeIf(g -> square.contains(0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2())));
         }
         return plazas;
     }
@@ -6690,10 +6750,15 @@ public final class StreetLayer {
             segments.set(k, new StreetSegment(g.x1(), g.z1(), g.x2(), g.z2(), StreetClass.ARTERIAL, Era.MODERN,
                     Math.max(g.width(), config.stationAvenueWidth), g.structure()));
         }
-        // The station's own short way onto the network: out of the square's mouth straight on, then to the network
+        // The station's own short way onto the network: out of the square's mouth toward it (at a slant of at most
+        // 35 degrees off straight out), then to the network
         double[] first = nodes.get(from);
         double straight = Math.min(approach, Math.max(0.0, (first[0] - mouth[0]) * out[0] + (first[1] - mouth[1]) * out[1]));
-        double[] bend = {mouth[0] + out[0] * straight, mouth[1] + out[1] * straight};
+        double off = Math.atan2(-(first[0] - mouth[0]) * out[1] + (first[1] - mouth[1]) * out[0],
+                (first[0] - mouth[0]) * out[0] + (first[1] - mouth[1]) * out[1]);
+        off = Math.max(-Math.toRadians(35), Math.min(Math.toRadians(35), off));
+        double[] way = {out[0] * Math.cos(off) - out[1] * Math.sin(off), out[0] * Math.sin(off) + out[1] * Math.cos(off)};
+        double[] bend = {mouth[0] + way[0] * straight, mouth[1] + way[1] * straight};
         connect(mouth, bend, window, segments);
         connect(bend, first, window, segments);
     }

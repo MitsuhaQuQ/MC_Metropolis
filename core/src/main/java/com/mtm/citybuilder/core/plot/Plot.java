@@ -60,7 +60,12 @@ public record Plot(long id, int chain, int side, int index, double start, double
         /** Open: a small field, at the town's edge. */
         FIELD,
         /** Front lots merged downtown with the land behind them into one large parcel: a mid-rise office or flats. */
-        PARCEL;
+        PARCEL,
+        /**
+         * The main station's lot: its building against the platforms and the square in front of it, laid together
+         * ({@code StationPlaza}); no other building on it.
+         */
+        STATION;
 
         /** Whether it is built on. */
         public boolean built() {

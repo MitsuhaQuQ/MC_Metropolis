@@ -398,7 +398,7 @@ public final class BuildingLayer {
 
     /** The building on a lot, null where none stands (a street, a block's interior, a remnant, a vacant lot). */
     public Building building(TownPlots plots, Plot plot) {
-        if (plot == null || plot.interior() || plot.remnant()) {
+        if (plot == null || plot.interior() || plot.remnant() || plot.use() == Plot.Use.STATION) {
             return null;
         }
         synchronized (cache) {
@@ -407,7 +407,10 @@ public final class BuildingLayer {
                 return known.orElse(null);
             }
         }
-        Building building = make(plots, plot);
+        // Beside a railway built through the town the lot is cut back to its bed: Japanese towns build right up to
+        // the tracks (a viaduct's piers, a line's fence), so a lot it crosses keeps what lies clear of it
+        Plot fitted = facilities == null ? plot : clearOfRails(plots, plot);
+        Building building = fitted == null ? null : make(plots, fitted);
         if (building != null && overWater(building)) {
             // On a stream the planning cannot see (the plans know the rivers, not every brook): no building in it
             building = null;
@@ -435,7 +438,7 @@ public final class BuildingLayer {
             for (int i = 0; i <= na; i++) {
                 for (int j = 0; j <= nd; j++) {
                     double[] c = at(plots, plot, building.from() + length * i / na, building.front() + deep * j / nd);
-                    if (rails.near(town, c[0], c[1], 2.0)) {
+                    if (rails.near(town, c[0], c[1], RAIL_GAP)) {
                         building = null;
                         break search;
                     }
@@ -451,6 +454,83 @@ public final class BuildingLayer {
             cache.put(plot.id(), Optional.ofNullable(building));
         }
         return building;
+    }
+
+    /** How far a building keeps off a railway's bed: a block, the fence's or the piers' room. */
+    private static final double RAIL_GAP = 1.0;
+
+    /**
+     * A lot cut back to keep clear of a railway built through the town: where the line runs behind the lot, shallower;
+     * where it runs across it, narrower (the longest stretch of frontage clear back to a house's depth); whichever
+     * leaves more land, null where neither leaves enough to build on. The lot itself where no railway comes near.
+     */
+    private Plot clearOfRails(TownPlots plots, Plot plot) {
+        com.mtm.citybuilder.core.chunk.RailChunks rails = logic.chunks().rails();
+        com.mtm.citybuilder.core.settlement.Settlement town = plots.settlement();
+        double frontage = plot.end() - plot.start();
+        double deepest = plot.maxDepth();
+        if (frontage <= 0 || deepest <= 0) {
+            return plot;
+        }
+        int na = Math.max(1, (int) Math.ceil(frontage / 2.0));
+        int nd = Math.max(1, (int) Math.ceil(deepest / 2.0));
+        // The depth at each step along the frontage where the railway's bed (with its gap) is first met
+        double[] clear = new double[na + 1];
+        boolean any = false;
+        for (int i = 0; i <= na; i++) {
+            clear[i] = deepest;
+            double a = plot.start() + frontage * i / na;
+            for (int j = 0; j <= nd; j++) {
+                double d = deepest * j / nd;
+                double[] c = at(plots, plot, a, d);
+                if (rails.near(town, c[0], c[1], RAIL_GAP + 0.5)) {
+                    clear[i] = Math.max(0.0, d - deepest / nd);
+                    any = true;
+                    break;
+                }
+            }
+        }
+        if (!any) {
+            return plot;
+        }
+        // Shallower: the whole frontage, back to where the bed is first met anywhere along it
+        double shallow = deepest;
+        for (double c : clear) {
+            shallow = Math.min(shallow, c);
+        }
+        double bestArea = shallow >= 6.0 && frontage >= 5.0 ? shallow * frontage : 0.0;
+        double bestStart = plot.start();
+        double bestEnd = plot.end();
+        double bestDepth = shallow;
+        // Narrower: the longest run of steps clear to a house's depth at least
+        double need = Math.min(deepest, 10.0);
+        for (int i = 0; i <= na; i++) {
+            if (clear[i] < need) {
+                continue;
+            }
+            int k = i;
+            double depth = clear[i];
+            while (k + 1 <= na && clear[k + 1] >= need) {
+                k++;
+                depth = Math.min(depth, clear[k]);
+            }
+            // A step short of the first and last steps met, where the railway may cut between them
+            double s = plot.start() + frontage * Math.max(0, i == 0 ? 0 : i) / na + (i == 0 ? 0.0 : 1.0);
+            double e = plot.start() + frontage * k / na - (k == na ? 0.0 : 1.0);
+            if (e - s >= 5.0 && (e - s) * depth > bestArea) {
+                bestArea = (e - s) * depth;
+                bestStart = s;
+                bestEnd = e;
+                bestDepth = depth;
+            }
+            i = k;
+        }
+        if (bestArea <= 0) {
+            return null;
+        }
+        return new Plot(plot.id(), plot.chain(), plot.side(), plot.index(), bestStart, bestEnd, plot.along(), plot.depth(),
+                bestDepth, plot.district(), plot.street(), plot.streetWidth(), plot.heading(), plot.interior(),
+                plot.remnant(), plot.row(), plot.use(), plot.pole());
     }
 
     /** A building's corners and middle in the world, from its frontage along the street and its depth back. */

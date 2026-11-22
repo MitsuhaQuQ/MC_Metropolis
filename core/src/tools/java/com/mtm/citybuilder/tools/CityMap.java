@@ -143,7 +143,7 @@ public final class CityMap {
                 for (com.mtm.citybuilder.core.street.StationPlaza plaza : plan.plazas()) {
                     long buses = plaza.berths().stream().filter(b -> b.use() == com.mtm.citybuilder.core.street.StationPlaza.Use.BUS).count();
                     double[] mouth = plaza.mouth();
-                    String radii = plaza.loops().stream().map(q -> String.format("r %.0f straight %.0f", q.radius(), 2 * q.half()))
+                    String radii = plaza.loops().stream().map(q -> String.format("r %.0f-%.0f round %.0f", q.least(), q.most(), q.perimeter()))
                             .collect(java.util.stream.Collectors.joining(", "));
                     System.out.printf("Station square %s at (%.0f, %.0f), heading %.0f deg, side %d: %.0f deep, %.0f along the platforms;"
                                     + " loops %s; %d bus berths, %d taxi pools, %d crossings; mouth (%.0f, %.0f)%n",

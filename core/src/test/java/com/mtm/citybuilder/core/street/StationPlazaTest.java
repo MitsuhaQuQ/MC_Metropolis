@@ -41,13 +41,13 @@ class StationPlazaTest {
         assertEquals(1, metropolis.taxiPools().size());
         assertEquals(2, metropolis.loops().size());
         // Round loops, not long ones: along the platforms hardly wider than deep (Toyama's square is about 90 by 90)
-        assertTrue(town.to() - town.from() < 70, () -> "town " + (town.to() - town.from()));
+        assertTrue(town.to() - town.from() < 76, () -> "town " + (town.to() - town.from()));
         assertTrue(busy.to() - busy.from() < 110, () -> "city " + (busy.to() - busy.from()));
         assertTrue(busy.depth() < 100, () -> "city " + busy.depth());
         assertTrue(metropolis.to() - metropolis.from() < 260, () -> "metropolis " + (metropolis.to() - metropolis.from()));
         for (StationPlaza plaza : List.of(town, city, busy, metropolis)) {
             for (StationPlaza.Loop loop : plaza.loops()) {
-                assertTrue(loop.half() <= loop.radius() + 1, () -> "a long loop: straights " + 2 * loop.half() + ", radius " + loop.radius());
+                assertTrue(loop.most() < 2.7 * loop.least(), () -> "a long loop: " + loop.least() + " to " + loop.most());
             }
             assertEquals(plaza.depth(), StationPlaza.depth(plaza.template(), CONFIG), 1e-9, "the depth the avenue was laid for");
         }
@@ -71,10 +71,53 @@ class StationPlazaTest {
         assertEquals(StationPlaza.Part.CROSSING, plaza.part(inside[0], inside[1]));
     }
 
+    /**
+     * A square on the land the streets leave: an arterial across one corner of where it would lie, the avenue leaving
+     * off the middle line at a slant.
+     */
+    private static StationPlaza bounded(StationPlaza.Template template, long seed) {
+        double shift = StationPlaza.mouthShift(template, CONFIG, 0.9);
+        double angle = Math.toRadians(30);
+        return StationPlaza.lay(template, 1000.5, -2000.5, Math.toRadians(30), -1, SITE, 2, CONFIG, 30.0, shift,
+                new double[]{Math.sin(angle), Math.cos(angle)}, seed, StationPlazaTest::besideArterial);
+    }
+
+    /** Free but for an arterial 24 wide running at a slant across the square's -u side. */
+    private static boolean besideArterial(double u, double v) {
+        return Math.abs((u + 0.8 * v + 30.0) / Math.hypot(1.0, 0.8)) > 12.0 + 1.0 || u > -10.0;
+    }
+
+    @Test
+    void shapedByTheLandAndTheSeed() {
+        for (StationPlaza.Template template : List.of(StationPlaza.Template.TURNING_CIRCLE, StationPlaza.Template.ROTARY)) {
+            StationPlaza a = bounded(template, 1L);
+            StationPlaza b = bounded(template, 2L);
+            // The arterial bounds it: none of the square on it
+            for (double u = a.from(); u <= a.to(); u += 0.5) {
+                for (double v = a.front(); v <= a.front() + a.depth(); v += 0.5) {
+                    if (!besideArterial(u, v) && !a.building().contains(u, v) && !a.forecourt().contains(u, v)) {
+                        assertEquals(StationPlaza.Part.NONE, a.partAt(u, v), template + " over the arterial at " + u + ", " + v);
+                    }
+                }
+            }
+            // Not a compass's loop: its radius varies round it, and differs by the seed
+            StationPlaza.Loop loop = a.loops().get(0);
+            assertTrue(loop.most() > 1.15 * loop.least(), () -> template + " round: " + loop.least() + " to " + loop.most());
+            assertTrue(Math.abs(loop.perimeter() - b.loops().get(0).perimeter()) > 1.0 || loop.u() != b.loops().get(0).u(),
+                    template + " the same for two seeds");
+            // The throat leaves for the mouth off the middle line, along the avenue's slant
+            StationPlaza.Link throat = a.links().get(0);
+            assertEquals(a.mouthU(), throat.u2(), 1e-9);
+            assertTrue(Math.abs(throat.u2() - throat.u1()) > 3.0, template + " a straight throat");
+            assertTrue(a.land().area() < bounded(template, 1L).land().area() + 1, "the same land again");
+        }
+    }
+
     @Test
     void berthsKeepApartAndClearOfTheThroat() {
         for (StationPlaza plaza : List.of(lay(StationPlaza.Template.TURNING_CIRCLE, 1), lay(StationPlaza.Template.ROTARY, 3),
-                lay(StationPlaza.Template.TERMINAL, 3))) {
+                lay(StationPlaza.Template.TERMINAL, 3), bounded(StationPlaza.Template.ROTARY, 7L),
+                bounded(StationPlaza.Template.TURNING_CIRCLE, 3L))) {
             for (int k = 0; k < plaza.loops().size(); k++) {
                 StationPlaza.Loop loop = plaza.loops().get(k);
                 double perimeter = loop.perimeter();

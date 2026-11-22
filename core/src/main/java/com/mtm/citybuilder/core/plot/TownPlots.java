@@ -482,6 +482,17 @@ public final class TownPlots {
      * in grounds and corridors kept clear). A lot too small to build on is joined to its neighbour, or is a remnant.
      */
     public Plot at(double x, double z) {
+        // The main station and its square: one lot, the square's land (the lanes it covers included)
+        List<com.mtm.citybuilder.core.street.StationPlaza> squares = plan.plazas();
+        for (int k = 0; k < squares.size(); k++) {
+            com.mtm.citybuilder.core.street.StationPlaza square = squares.get(k);
+            if (square.contains(x, z)) {
+                double[] local = square.local(x, z);
+                return new Plot(Hash.of(seed, 0x5354L, k), -1, square.side(), k, square.from(), square.to(), local[0],
+                        local[1] - square.front(), square.depth(), District.STATION_FRONT, StreetClass.ARTERIAL, 0.0,
+                        square.heading(), false, false, 0, Plot.Use.STATION, false);
+            }
+        }
         // The footpaths and the open land along them, to the water
         for (com.mtm.citybuilder.core.street.Promenade promenade : footpathsNear(x, z, x, z)) {
             if (promenade.open(x, z)) {

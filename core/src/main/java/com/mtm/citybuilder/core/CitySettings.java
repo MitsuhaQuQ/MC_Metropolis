@@ -788,10 +788,11 @@ public final class CitySettings {
         /** Built land, where streets run: the town's own urban intensity above this. */
         public double builtIntensity = 0.12;
         /**
-         * Whether the chunks pave the main stations' squares (their loops, bays, taxi pools). Off for now (the user,
-         * 2026-11-23): the square stood well over the ground round it; the plan keeps the land, the streets stay.
+         * Whether the chunks pave the main stations' squares (their loops, bays, taxi pools). Off for a while (the
+         * user, 2026-11-23: the square stood well over the ground round it); on again since the square is laid on the
+         * land the streets leave, level with the ground at its mouth.
          */
-        public boolean plazaPaving = false;
+        public boolean plazaPaving = true;
         /** Steepest grade a street climbs; steeper ground ends it. */
         public double maxGrade = 0.10;
         /** Tracing step along a streamline. */
