@@ -527,6 +527,36 @@ public final class CityChunks {
      * Whether a chunk lies in a town's land (any intensity) or on an airport: no structure of the game (a village, an
      * igloo, a ruin) starts there.
      */
+    /** How far out of a town's land a structure may not start: about a mineshaft's reach. */
+    private static final double STRUCTURE_MARGIN = 96.0;
+
+    /**
+     * Whether caves and ravines are not carved into a chunk: in a town's land (its streets, its subways and its
+     * buildings' foundations stand on solid ground) or an airport's.
+     */
+    public static boolean carvingBarred(net.minecraft.server.level.ServerLevel level, int chunkX, int chunkZ) {
+        if (failed) {
+            return false;
+        }
+        try {
+            CityLogic logic = CityWorlds.of(level);
+            if (logic == null) {
+                return false;
+            }
+            for (double[] p : new double[][]{{8, 8}, {0, 0}, {16, 0}, {0, 16}, {16, 16}}) {
+                com.mtm.citybuilder.core.extent.UrbanSample sample = logic.urban(chunkX * 16 + p[0], chunkZ * 16 + p[1]);
+                if (sample.owner() != null && sample.intensity() > 0) {
+                    return true;
+                }
+            }
+            return logic.chunks().airportAt(chunkX * 16 + 8, chunkZ * 16 + 8);
+        } catch (RuntimeException e) {
+            failed = true;
+            CityBuilder.LOGGER.error("City logic failed at chunk {} {}; no more cities are built this session", chunkX, chunkZ, e);
+            return false;
+        }
+    }
+
     public static boolean structureBarred(net.minecraft.server.level.ServerLevel level, int chunkX, int chunkZ) {
         if (failed) {
             return false;
@@ -538,8 +568,18 @@ public final class CityChunks {
             }
             double x = chunkX * 16 + 8.0;
             double z = chunkZ * 16 + 8.0;
-            com.mtm.citybuilder.core.extent.UrbanSample sample = logic.urban(x, z);
-            return sample.owner() != null && sample.intensity() > 0 || logic.chunks().airportAt((int) x, (int) z);
+            if (logic.chunks().airportAt((int) x, (int) z)) {
+                return true;
+            }
+            // In a town's land, or near enough that what starts here (a mineshaft, an ancient city) would reach under
+            // it: a ring of points {@code STRUCTURE_MARGIN} out
+            for (double[] d : new double[][]{{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                com.mtm.citybuilder.core.extent.UrbanSample sample = logic.urban(x + d[0] * STRUCTURE_MARGIN, z + d[1] * STRUCTURE_MARGIN);
+                if (sample.owner() != null && sample.intensity() > 0) {
+                    return true;
+                }
+            }
+            return false;
         } catch (RuntimeException e) {
             failed = true;
             CityBuilder.LOGGER.error("City logic failed at chunk {} {}; no more cities are built this session", chunkX, chunkZ, e);
@@ -745,6 +785,9 @@ public final class CityChunks {
                 fixture(chunk, ChunkLayer.furniture(column), baseX + x, eighths >= 6 ? y : y - 1, baseZ + z, pos, top);
             }
         }
+        // The railways through the town, after its streets: viaducts over them, level crossings giving way to them
+        CityRails.lay(level, chunk, columns, pos, top);
+        CityRails.entrances(level, chunk, pos, top);
     }
 
     private static RoadChunks.Cell[] roads(WorldGenLevel level, ChunkAccess chunk, ChunkLayer.Column[] columns) {
@@ -870,7 +913,7 @@ public final class CityChunks {
      * corners and inner posts where the edge steps across the blocks at an angle, so the parapet is one closed line
      * with no gap between its pieces. Null where none fits (a deck too narrow for one).
      */
-    private static BlockState parapet(double edge, double outward) {
+    static BlockState parapet(double edge, double outward) {
         double ox = Math.cos(outward);
         double oz = Math.sin(outward);
         int sides = 0;
@@ -1045,7 +1088,13 @@ public final class CityChunks {
                 } catch (RuntimeException e) {
                     return;
                 }
-                clearOver(chunk, columns);
+                com.mtm.citybuilder.core.chunk.RailChunks.Cell[] rails;
+                try {
+                    rails = logic.chunks().rails().cells(cx + dx, cz + dz);
+                } catch (RuntimeException e) {
+                    return;
+                }
+                clearOver(chunk, columns, rails);
                 try {
                     clearOverRoads(chunk, logic.chunks().roads(cx + dx, cz + dz, columns));
                 } catch (RuntimeException e) {
@@ -1080,7 +1129,8 @@ public final class CityChunks {
         }
     }
 
-    private static void clearOver(ChunkAccess chunk, ChunkLayer.Column[] columns) {
+    private static void clearOver(ChunkAccess chunk, ChunkLayer.Column[] columns,
+                                  com.mtm.citybuilder.core.chunk.RailChunks.Cell[] rails) {
         int baseX = chunk.getPos().getMinBlockX();
         int baseZ = chunk.getPos().getMinBlockZ();
         int max = chunk.getMaxBuildHeight() - 1;
@@ -1095,6 +1145,10 @@ public final class CityChunks {
                 // only what lies over it is cleared, and nothing where it is not found
                 int ground = column.bridge() ? (int) column.deck() : chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z) - 1;
                 int high = Math.min(max, ground + CLEAR_REACH);
+                if (rails[x * 16 + z] != null) {
+                    // Under a railway's viaduct: only up to its beams
+                    high = Math.min(high, (int) Math.floor(rails[x * 16 + z].level()) - 3);
+                }
                 int paved = Integer.MIN_VALUE;
                 for (int y = high; y >= ground - 8 && y > chunk.getMinBuildHeight(); y--) {
                     if (paving(chunk.getBlockState(pos.set(baseX + x, y, baseZ + z)))) {

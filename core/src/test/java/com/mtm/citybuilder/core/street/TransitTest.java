@@ -38,10 +38,12 @@ class TransitTest {
         double cx = logic.extent(city).coreX();
         double cz = logic.extent(city).coreZ();
         for (UrbanLine line : plan.urbanLines()) {
-            // Through downtown, underground there
+            // Through downtown: a subway underground there, or a surface line (transit.surfaceShare) never under it
             List<double[]> downtown = line.points().stream()
                     .filter(p -> plan.districts().at(p[0], p[1]) == District.CENTRAL).toList();
-            assertTrue(downtown.stream().allMatch(p -> (int) p[2] == TransitMode.UNDERGROUND.ordinal()), "a line above ground downtown");
+            boolean surface = line.length(TransitMode.UNDERGROUND) == 0;
+            assertTrue(surface || downtown.stream().allMatch(p -> (int) p[2] == TransitMode.UNDERGROUND.ordinal()),
+                    "a subway above ground downtown");
             List<double[]> stations = line.stations();
             assertTrue(stations.size() >= 2);
             for (int k = 1; k < stations.size(); k++) {

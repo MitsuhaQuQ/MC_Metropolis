@@ -422,6 +422,15 @@ public final class BuildingLayer {
                 }
             }
         }
+        if (building != null && models != null) {
+            // Not over a railway built through the town (its viaduct or its bed)
+            for (double[] c : outline(plots, plot, building)) {
+                if (logic.chunks().rails().near(c[0], c[1], 2.0)) {
+                    building = null;
+                    break;
+                }
+            }
+        }
         if (building != null && crossesFootpath(plots, building)) {
             // A footpath's open land runs across the lot, laid after the lots were cut: no building is split by it,
             // the lot left a yard

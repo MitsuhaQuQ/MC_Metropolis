@@ -40,6 +40,7 @@ export const server = {
   /** The airport nearest a point within 40 km, as this world sited it: {found, kind, x, z, heading, length, width, elevation, threshold, apron}. */
   airport: (x, z) => call('/airport', { x, z }),
   facilities: (x, z) => call('/facilities', { x, z }),
+  rail: (x, z, kind) => call('/rail', { x, z, kind }),
   /** The point of an intercity road nearest a point within 8 km, outside built land, mid-stretch of a kind (or any): {found, x, z, road, ground, kind, heading, width, key}. */
   road: (x, z, kind) => call('/road', kind ? { x, z, kind } : { x, z }),
   /** The main station's square of the town owning a point: {found, template, x, z, heading, outward, depth, along, middle, loop, mouth, ground once loaded}. */

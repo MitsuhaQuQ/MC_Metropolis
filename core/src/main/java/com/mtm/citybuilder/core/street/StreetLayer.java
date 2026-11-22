@@ -2181,12 +2181,16 @@ public final class StreetLayer {
     /**
      * A railway's line through a town resampled at the step, each point given the way it is built: a town's own line
      * underground through downtown, the old town and the station front, elevated through the rest of the built land,
-     * at grade where the town thins out; an intercity line elevated through the dense town, at grade elsewhere. Runs
+     * at grade where the town thins out, or ({@code surfaceShare} of them) above ground throughout as an intercity
+     * line; an intercity line elevated through the dense town, at grade elsewhere. Runs
      * shorter than {@code minModeRun} take the way of the run before them.
      */
     private List<double[]> moded(Window window, Districts districts, List<double[]> line, boolean urban) {
         CitySettings.Transit transit = logic.settings().transit;
         List<double[]> points = resampleLine(line, config.step);
+        // A town's own line runs above ground ({@code surfaceShare} of them), by its first point
+        boolean surface = urban && !line.isEmpty() && com.mtm.citybuilder.core.noise.Hash.unit(com.mtm.citybuilder.core.noise.Hash.of(
+                logic.seed() ^ 0x5E7FACEL, Math.round(line.get(0)[0]), Math.round(line.get(0)[1]))) < transit.surfaceShare;
         int[] modes = new int[points.size()];
         for (int k = 0; k < points.size(); k++) {
             double x = points.get(k)[0];
@@ -2196,7 +2200,11 @@ public final class StreetLayer {
                     || district == District.STATION_FRONT || district == District.GROUNDS;
             double intensity = window.intensity(x, z);
             TransitMode mode;
-            if (urban) {
+            if (urban && surface) {
+                // A surface line (a private railway's, a commuter line's): routed along the arterials, it runs over
+                // them on a viaduct all through the town (a continuous grade separation), never at grade on a street
+                mode = TransitMode.ELEVATED;
+            } else if (urban) {
                 boolean core = district == District.CENTRAL || district == District.STATION_FRONT
                         || district == District.GROUNDS
                         || district == District.OLD_TOWN && intensity >= transit.undergroundIntensity;
@@ -2704,6 +2712,7 @@ public final class StreetLayer {
             shaped.add(new double[]{raw.get(q)[0], raw.get(q)[1]});
         }
         List<double[]> points = moded(window, districts, shaped, true);
+        overpass(points, segments, transit);
         // Viaducts sharing a corridor with another line's viaduct: one two-level viaduct, this line on top
         List<List<double[]>> viaducts = new ArrayList<>();
         railways.forEach(r -> viaducts.add(r.line()));
@@ -3048,6 +3057,63 @@ public final class StreetLayer {
             }
         }
         return best;
+    }
+
+    /**
+     * A town's own line at grade raised over the streets laid before it (the arterials, the gates' and the station's
+     * avenues): it is planned after them, which cross it where they were already laid, so it passes over them on a
+     * viaduct (a continuous grade separation, 連続立体交差) for {@code minModeRun} either side, rather than at a level
+     * crossing; the streets laid after it cross it at level crossings.
+     */
+    private static void overpass(List<double[]> points, List<StreetSegment> streets, CitySettings.Transit transit) {
+        int n = points.size();
+        boolean[] raise = new boolean[n];
+        for (int k = 1; k < n; k++) {
+            double[] a = points.get(k - 1);
+            double[] b = points.get(k);
+            if ((int) a[2] != TransitMode.GROUND.ordinal() && (int) b[2] != TransitMode.GROUND.ordinal()) {
+                continue;
+            }
+            for (StreetSegment g : streets) {
+                if (g.streetClass() == StreetClass.LANE || g.streetClass() == StreetClass.PATH
+                        || !crossing(a[0], a[1], b[0], b[1], g.x1(), g.z1(), g.x2(), g.z2())) {
+                    continue;
+                }
+                raise[k - 1] = true;
+                raise[k] = true;
+                break;
+            }
+        }
+        double reach = 0.5 * transit.minModeRun;
+        double[] along = new double[n];
+        for (int k = 1; k < n; k++) {
+            along[k] = along[k - 1] + Math.hypot(points.get(k)[0] - points.get(k - 1)[0], points.get(k)[1] - points.get(k - 1)[1]);
+        }
+        for (int k = 0; k < n; k++) {
+            if (!raise[k]) {
+                continue;
+            }
+            for (int j = 0; j < n; j++) {
+                if (Math.abs(along[j] - along[k]) <= reach && (int) points.get(j)[2] == TransitMode.GROUND.ordinal()) {
+                    points.get(j)[2] = TransitMode.ELEVATED.ordinal();
+                }
+            }
+        }
+    }
+
+    /** Whether two segments cross (each at a point strictly inside the other). */
+    private static boolean crossing(double ax, double az, double bx, double bz, double cx, double cz, double dx, double dz) {
+        double rx = bx - ax;
+        double rz = bz - az;
+        double sx = dx - cx;
+        double sz = dz - cz;
+        double den = rx * sz - rz * sx;
+        if (Math.abs(den) < 1e-9) {
+            return false;
+        }
+        double t = ((cx - ax) * sz - (cz - az) * sx) / den;
+        double u = ((cx - ax) * rz - (cz - az) * rx) / den;
+        return t >= 0 && t <= 1 && u >= 0 && u <= 1;
     }
 
     /**

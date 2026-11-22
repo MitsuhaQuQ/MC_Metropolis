@@ -644,7 +644,8 @@ public final class CitySettings {
             ALL
         }
 
-        public Build build = Build.LINES;
+        /** Everything: the lines above ground and the subways with their stations (the user, 2026-11-22). */
+        public Build build = Build.ALL;
         /** A city or metropolis has a line for every {@code areaPerLine} km2 of built land, at least one, at most {@code maxLines}; none below {@code minArea}. */
         public double areaPerLine = 12.0;
         public double minArea = 6.0;
@@ -735,6 +736,12 @@ public final class CitySettings {
          * town where its intensity is at least this; through the rest of the old town and the suburbs it is elevated.
          */
         public double undergroundIntensity = 0.75;
+        /**
+         * The share of a town's own lines that run above ground through it, as Japan's private railways and JR's
+         * commuter lines do (Hankyu, Keihan, the Chuo line): elevated through the dense town, at grade where it thins
+         * out, never under it; the rest subways.
+         */
+        public double surfaceShare = 0.5;
         public double elevatedIntensity = 0.45;
         public double minModeRun = 400.0;
         /** Roads along a line at grade run this far from its centre; a street crosses it only this far from any other crossing. */

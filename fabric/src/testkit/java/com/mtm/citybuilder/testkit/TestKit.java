@@ -79,6 +79,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/embankment", this::embankment);
             route(http, "/airport", this::airport);
             route(http, "/facilities", this::facilities);
+            route(http, "/rail", this::rail);
             route(http, "/road", this::road);
             route(http, "/roads-near", this::roadsNear);
             route(http, "/station", this::station);
@@ -687,6 +688,30 @@ public final class TestKit implements DedicatedServerModInitializer {
             out.add(m);
         }
         return Map.of("found", true, "placed", out);
+    }
+
+    /**
+     * The built railway piece nearest (x, z) in the town owning it, of a kind (elevated, ground, station): {found, x, z,
+     * level, ground, heading in degrees}.
+     */
+    private Object rail(Map<String, String> query, String body) {
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if (logic == null) {
+            return Map.of("found", false);
+        }
+        double[] p = logic.chunks().rails().nearest(Double.parseDouble(query.get("x")), Double.parseDouble(query.get("z")),
+                query.getOrDefault("kind", "elevated"));
+        if (p == null) {
+            return Map.of("found", false);
+        }
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("found", true);
+        out.put("x", p[0]);
+        out.put("z", p[1]);
+        out.put("level", Double.isNaN(p[2]) ? null : p[2]);
+        out.put("ground", Double.isNaN(p[3]) ? null : p[3]);
+        out.put("heading", Math.toDegrees(p[4]));
+        return out;
     }
 
     private Object airport(Map<String, String> query, String body) {

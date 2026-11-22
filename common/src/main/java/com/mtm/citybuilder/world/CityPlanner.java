@@ -108,6 +108,8 @@ public final class CityPlanner {
         // The intercity roads that may pass within AHEAD, routed and indexed for the chunks
         long roadStart = System.nanoTime();
         int routed = logic.chunks().prepareRoads(x - AHEAD, z - AHEAD, x + AHEAD, z + AHEAD);
+        // And the intercity railways
+        routed += logic.chunks().prepareRails(x - AHEAD, z - AHEAD, x + AHEAD, z + AHEAD);
         double roadSeconds = (System.nanoTime() - roadStart) / 1e9;
         if (routed > 0) {
             CityBuilder.LOGGER.info("Routed {} roads ahead of the players in {} s", routed, String.format("%.1f", roadSeconds));

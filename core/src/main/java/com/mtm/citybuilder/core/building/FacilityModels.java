@@ -239,22 +239,24 @@ public final class FacilityModels {
      * An area facility's site: the largest rectangle on its block (see {@link #site}), the lanes and footpaths inside
      * it taken over (the block is bounded by streets; its lanes go with its lots).
      */
-    private static double[] areaSite(TownFunctions functions, TownPlots plots, Facility f) {
+    private double[] areaSite(TownFunctions functions, TownPlots plots, Facility f) {
         double half = Math.max(40.0, f.radius() * 1.6 + 20.0);
-        return site((x, z) -> functions.contains(f, x, z), plots, f.x(), f.z(), half);
+        com.mtm.citybuilder.core.chunk.RailChunks rails = logic.chunks().rails();
+        return site((x, z) -> functions.contains(f, x, z) && !rails.near(x, z, 4.0), plots, f.x(), f.z(), half);
     }
 
     /**
      * A lot facility's site: the largest rectangle off the streets about its lot, taking in its neighbours' land as a
      * filling station does (their buildings give way, see {@link #excludes}).
      */
-    private static double[] lotSite(TownFunctions functions, TownPlots plots, Facility f) {
+    private double[] lotSite(TownFunctions functions, TownPlots plots, Facility f) {
         double[] c = plots.lotCentre(f.chain(), f.side(), f.index());
         // A pocket park takes in more of its neighbours than a filling station
         double reach = f.kind() == Facility.Kind.POCKET_PARK ? 44.0 : f.kind() == Facility.Kind.FIRE_STATION ? 36.0 : 30.0;
         // Off the streets and canals, and off the blocks an area facility took (a park, a school's ground)
+        com.mtm.citybuilder.core.chunk.RailChunks rails = logic.chunks().rails();
         return site((x, z) -> !plots.onStreet(x, z) && !plots.inCanal(x, z) && Math.hypot(x - c[0], z - c[1]) <= reach
-                && functions.facilityAt(x, z) == null, plots, c[0], c[1], reach + 2.0);
+                && functions.facilityAt(x, z) == null && !rails.near(x, z, 4.0), plots, c[0], c[1], reach + 2.0);
     }
 
     /**
@@ -382,7 +384,8 @@ public final class FacilityModels {
                 walk.add(new double[]{a[0], a[1], b[0], b[1], w.width()});
             }
         }
-        Ground land = (x, z) -> functions.contains(f, x, z);
+        com.mtm.citybuilder.core.chunk.RailChunks rails = logic.chunks().rails();
+        Ground land = (x, z) -> functions.contains(f, x, z) && !rails.near(x, z, 3.0);
         List<double[]> reserved = new ArrayList<>();
         Ground open = (x, z) -> land.test(x, z) && walkDistance(walk, x, z) > 2.0 && !in(reserved, x, z, 2.0)
                 && land.test(x + 3, z) && land.test(x - 3, z) && land.test(x, z + 3) && land.test(x, z - 3);

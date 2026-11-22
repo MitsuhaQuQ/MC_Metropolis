@@ -630,6 +630,11 @@ public final class ChunkLayer {
         return roads.prepare(minX, minZ, maxX, maxZ);
     }
 
+    /** Routes ahead the intercity railways whose windows touch a rectangle (see {@link RailChunks#prepare}). */
+    public int prepareRails(double minX, double minZ, double maxX, double maxZ) {
+        return rails().prepare(minX, minZ, maxX, maxZ);
+    }
+
     /** The direction of the {@link #ANGLES} nearest a heading, a line having no sense. */
     public static int angle(double heading) {
         double steps = heading / Math.PI * ANGLES;
@@ -1065,7 +1070,7 @@ public final class ChunkLayer {
      * the town, by the position's own hash, none from an intensity of {@link #TREELESS} on, where houses will stand.
      */
     public boolean treeAllowed(int x, int z) {
-        if (airportAt(x, z)) {
+        if (airportAt(x, z) || rails().near(x + 0.5, z + 0.5, 3.0)) {
             return false;
         }
         UrbanSample sample = logic.urban(x + 0.5, z + 0.5);
@@ -1084,6 +1089,22 @@ public final class ChunkLayer {
         }
         double keep = 1.0 - (sample.intensity() - built) / (TREELESS - built);
         return keep > 0 && com.mtm.citybuilder.core.noise.Hash.unit(com.mtm.citybuilder.core.noise.Hash.of(0x7EE5L, x, z)) < keep;
+    }
+
+    private volatile RailChunks rails;
+
+    /** The railways built through the towns (their lines above ground). */
+    public RailChunks rails() {
+        RailChunks r = rails;
+        if (r == null) {
+            synchronized (this) {
+                if (rails == null) {
+                    rails = new RailChunks(logic);
+                }
+                r = rails;
+            }
+        }
+        return r;
     }
 
     /** Town intensity from which no tree grows: the built-up town, not its leafy edge. */
