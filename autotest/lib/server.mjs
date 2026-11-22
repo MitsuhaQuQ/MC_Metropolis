@@ -33,7 +33,8 @@ export const server = {
   embankment: (x, z) => call('/embankment', { x, z }),
   /** Every intercity road within r of a point. */
   roadsNear: (x, z, r = 40) => call('/roads-near', { x, z, r }),
-  street: (x, z, streetClass, end = false) => call('/street', { x, z, class: streetClass, end: end ? 1 : 0 }),
+  street: (x, z, streetClass, end = false, structure = undefined) =>
+    call('/street', { x, z, class: streetClass, end: end ? 1 : 0, ...(structure ? { structure } : {}) }),
   /** The nearest point of a canal (its middle third) in this world's plan: {found, x, z, heading, ground once loaded}. */
   canal: (x, z) => call('/canal', { x, z }),
   /** The airport nearest a point within 40 km, as this world sited it: {found, kind, x, z, heading, length, width, elevation, threshold, apron}. */

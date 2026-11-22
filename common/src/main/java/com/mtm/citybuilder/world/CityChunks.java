@@ -209,7 +209,43 @@ public final class CityChunks {
      * lies, no lower than its level less that; cut down, its top block moved down with it, or filled with earth under
      * its top. Not under water.
      */
-    private static void verge(ChunkAccess chunk, double street, double outside, int wx, int wz, int x, int z,
+    private static BlockState slopeFacing;
+    private static BlockState retainingWall;
+    private static BlockState retainingKerb;
+
+    /** A retaining wall's concrete: this mod's fair-faced concrete, form-tie holes and all, else stone. */
+    private static BlockState retainingWall() {
+        if (retainingWall == null) {
+            retainingWall = ownBlock("concrete_exposed", Blocks.SMOOTH_STONE);
+        }
+        return retainingWall;
+    }
+
+    /** The kerb along a high retaining wall's top: a course of this mod's concrete block (ブロック), else stone bricks. */
+    private static BlockState retainingKerb() {
+        if (retainingKerb == null) {
+            retainingKerb = ownBlock("concrete_block", Blocks.STONE_BRICKS);
+        }
+        return retainingKerb;
+    }
+
+    private static BlockState ownBlock(String name, Block fallback) {
+        Block block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                new net.minecraft.resources.ResourceLocation(CityBuilder.MOD_ID, name));
+        return (block == Blocks.AIR ? fallback : block).defaultBlockState();
+    }
+
+    /** The masonry facing a raised street's side slopes: this mod's ashlar, else stone bricks. */
+    private static BlockState slopeFacing() {
+        if (slopeFacing == null) {
+            Block block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                    new net.minecraft.resources.ResourceLocation(CityBuilder.MOD_ID, "stone_ashlar"));
+            slopeFacing = (block == Blocks.AIR ? Blocks.STONE_BRICKS : block).defaultBlockState();
+        }
+        return slopeFacing;
+    }
+
+    private static void verge(ChunkAccess chunk, double street, double outside, boolean wall, int wx, int wz, int x, int z,
                               BlockPos.MutableBlockPos pos, int top) {
         int surface = Math.min(top, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
         int ground = surface;
@@ -220,6 +256,29 @@ public final class CityChunks {
             }
             state = chunk.getBlockState(pos.set(wx, --ground, wz));
         }
+        int level = (int) Math.floor(street);
+        if (wall && Math.abs(ground - level) >= 2) {
+            // A concrete retaining wall (擁壁) along the street's edge, straight up or down to the land, which is
+            // left as it is beyond it: the wall's block a block out, from the land to the street's level (the street
+            // above), or from the street's level up to the land (the street in a cutting)
+            if (outside < 1.0) {
+                BlockState concrete = retainingWall();
+                if (ground < level) {
+                    for (int y = ground; y <= level; y++) {
+                        chunk.setBlockState(pos.set(wx, y, wz), concrete, false);
+                    }
+                    // A low kerb on top where the drop is a storey, so nothing walks off it
+                    if (level - ground >= 3) {
+                        chunk.setBlockState(pos.set(wx, level + 1, wz), retainingKerb(), false);
+                    }
+                } else {
+                    for (int y = level + 1; y <= ground; y++) {
+                        chunk.setBlockState(pos.set(wx, y, wz), concrete, false);
+                    }
+                }
+            }
+            return;
+        }
         int high = (int) Math.floor(street + outside);
         int low = (int) Math.floor(street - outside);
         if (ground > high) {
@@ -229,9 +288,13 @@ public final class CityChunks {
             }
             chunk.setBlockState(pos.set(wx, high, wz), topBlock, false);
         } else if (ground < low) {
-            BlockState topBlock = state;
+            // A street raised two blocks and more over the land (a bridge's approach, a ramp onto a levee) stands on
+            // a slope faced in masonry (間知ブロック積み); a block's fill is earth under the land's own top
+            boolean faced = low - ground >= 2;
+            BlockState topBlock = faced ? slopeFacing() : state;
+            BlockState fill = faced ? slopeFacing() : Blocks.DIRT.defaultBlockState();
             for (int y = ground; y < low; y++) {
-                chunk.setBlockState(pos.set(wx, y, wz), Blocks.DIRT.defaultBlockState(), false);
+                chunk.setBlockState(pos.set(wx, y, wz), fill, false);
             }
             chunk.setBlockState(pos.set(wx, low, wz), topBlock, false);
         }
@@ -402,7 +465,8 @@ public final class CityChunks {
                     } else if (grades != null && !Double.isNaN(grades.bank()[x * 16 + z])) {
                         bank(chunk, grades.bank()[x * 16 + z], grades.bankKind()[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
                     } else if (grades != null && !Double.isNaN(grades.verge()[x * 16 + z])) {
-                        verge(chunk, grades.verge()[x * 16 + z], grades.outside()[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
+                        verge(chunk, grades.verge()[x * 16 + z], grades.outside()[x * 16 + z], grades.wall()[x * 16 + z],
+                                baseX + x, baseZ + z, x, z, pos, top);
                     }
                     continue;
                 }

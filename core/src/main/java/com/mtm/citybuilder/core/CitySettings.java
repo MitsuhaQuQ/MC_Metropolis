@@ -953,6 +953,21 @@ public final class CitySettings {
          * within reach are raised into a ramp (in the chunk layer, not the plan).
          */
         public double leveeRamp = 12.0;
+        /**
+         * A street bridge's deck stands over its higher bank (or the embankment's crest) by a block, plus
+         * {@code bridgeRise} for each block of its length, up to {@code bridgeRiseMax} (Japanese towns' bridges rise
+         * over their rivers, the streets of both banks ramped up to them, the user 2026-11-22). Its ends' streets ramp
+         * up to it where it stands no more than {@code bridgeRampMax} over the ground there.
+         */
+        public double bridgeRise = 0.04;
+        public double bridgeRiseMax = 5.0;
+        public double bridgeRampMax = 10.0;
+        /**
+         * The share of street pieces whose edges are held by vertical concrete retaining walls (擁壁) where they stand
+         * above or below the land beside them, the land beyond left as it is (the user 2026-11-22); the rest are
+         * graded to the land in a slope, faced in masonry where it is two blocks or more.
+         */
+        public double retainingWall = 0.5;
         public double bankOffset = 24.0;
         /**
          * Bank roads follow only water at least this wide: narrower arms, inlets and creeks are crossed on a short

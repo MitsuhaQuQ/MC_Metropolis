@@ -108,6 +108,57 @@ class BridgeEndsTest {
         noStreetStopsShortOfAnother(segments);
         builtLandIsReachedByStreets(logic, town, segments);
         streetsAreLaidSmoothlyNearTheGround(logic, terrain);
+        bridgeApproachesStayNearTheLand(logic, terrain, segments);
+    }
+
+    /**
+     * Round every street bridge's ends the streets ramp up to its deck, but stand no higher over the land than the
+     * deck may over its end (bridgeRampMax) and the land's own ups and downs: a ramp is not carried out over low land.
+     */
+    private static void bridgeApproachesStayNearTheLand(CityLogic logic, WorldgenTerrainView terrain, List<StreetSegment> segments) {
+        com.mtm.citybuilder.core.chunk.ChunkLayer chunks = logic.chunks();
+        java.util.Set<Long> done = new java.util.HashSet<>();
+        double worst = 0;
+        String where = "";
+        int checked = 0;
+        for (StreetSegment g : segments) {
+            if (g.structure() != StreetStructure.BRIDGE) {
+                continue;
+            }
+            int cx0 = Math.floorDiv((int) Math.floor(g.x1()), 16);
+            int cz0 = Math.floorDiv((int) Math.floor(g.z1()), 16);
+            for (int cx = cx0 - 6; cx <= cx0 + 6; cx++) {
+                for (int cz = cz0 - 6; cz <= cz0 + 6; cz++) {
+                    if (!done.add(((long) cx << 32) ^ (cz & 0xFFFFFFFFL))) {
+                        continue;
+                    }
+                    com.mtm.citybuilder.core.chunk.ChunkLayer.Grades grades = chunks.grades(cx, cz);
+                    for (int c = 0; c < 256; c += 5) {
+                        double level = grades.level()[c];
+                        if (Double.isNaN(level)) {
+                            continue;
+                        }
+                        int wx = cx * 16 + c / 16;
+                        int wz = cz * 16 + c % 16;
+                        double over = level - terrain.surfaceHeight(wx, wz);
+                        checked++;
+                        if (over > worst) {
+                            worst = over;
+                            where = wx + " " + wz;
+                        }
+                    }
+                }
+            }
+            if (done.size() > 3000) {
+                break;
+            }
+        }
+        double w = worst;
+        String at = where;
+        System.out.println("bridge approaches: " + checked + " street columns, highest over the land " + w + " at " + at);
+        int n = checked;
+        assertTrue(n > 1000, () -> "street columns round the bridges " + n);
+        assertTrue(w < CitySettings.DEFAULT.streets.bridgeRampMax + 8.0, () -> "a street " + w + " over the land at " + at);
     }
 
     private static void streetsAreLaidSmoothlyNearTheGround(CityLogic logic, WorldgenTerrainView terrain) {

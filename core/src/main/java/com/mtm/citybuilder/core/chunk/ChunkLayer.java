@@ -637,7 +637,7 @@ public final class ChunkLayer {
     private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links,
                          Map<Long, List<double[]>> canals, Map<Long, List<StationPlaza>> plazas,
                          Map<Long, List<Stop>> stops, Map<Long, Double> heights, boolean[][] round,
-                         Map<Long, List<double[]>> banks) {
+                         Map<Long, List<double[]>> banks, double[][][] interior) {
         /**
          * Whether a column lies on a piece's paving: within half its width of its line and, past an end, only where
          * that end is round (a bend's outside); a square end stops at the end's line.
@@ -1069,15 +1069,27 @@ public final class ChunkLayer {
     public static final double TREELESS = 0.3;
 
     /** How far out from a street's edge the land is graded to it, 1 in 1. */
-    public static final double VERGE = 6.0;
+    public static final double VERGE = 8.0;
 
     /**
      * The heights a chunk's streets are laid at, and the land beside them graded to (see {@link #grades}): each
      * column's street level (NaN off the streets, on a bridge or a footpath, which follow their own levels), and for
      * the land within {@link #VERGE} of a street's edge the level of that street there and how far out it lies (NaN
-     * elsewhere), x-major as {@link #columns}.
+     * elsewhere), and whether that street's edge is a retaining wall (see {@link #retained}), x-major as
+     * {@link #columns}.
      */
-    public record Grades(double[] level, double[] verge, double[] outside, double[] bank, int[] bankKind) {
+    public record Grades(double[] level, double[] verge, double[] outside, double[] bank, int[] bankKind,
+                         boolean[] wall) {
+    }
+
+    /**
+     * Whether a piece's edges are held by concrete retaining walls (擁壁) where it stands above or below the land
+     * beside it, the land left as it is a block out (else graded to it in a slope): by the piece, {@code retainingWall}
+     * of them.
+     */
+    private boolean retained(StreetSegment g) {
+        long h = com.mtm.citybuilder.core.noise.Hash.of(0x4E7A11L, Math.round(g.x1() + g.x2()), Math.round(g.z1() + g.z2()));
+        return com.mtm.citybuilder.core.noise.Hash.unit(h) < logic.settings().streets.retainingWall;
     }
 
     /** An embankment's terrace by the water, a block above it: grass, the promenade on it. */
@@ -1106,6 +1118,7 @@ public final class ChunkLayer {
         // level passes from one to the next without a step, instead of jumping where the nearest changes
         double[] weight = new double[256];
         double[] weighted = new double[256];
+        boolean[] wall = new boolean[256];
         java.util.Arrays.fill(level, Double.NaN);
         java.util.Arrays.fill(verge, Double.NaN);
         java.util.Arrays.fill(outside, Double.POSITIVE_INFINITY);
@@ -1125,6 +1138,14 @@ public final class ChunkLayer {
                 }
                 double h1 = nodeHeight(index, g.x1(), g.z1());
                 double h2 = nodeHeight(index, g.x2(), g.z2());
+                double[][] inner = index.interior()[p];
+                double[] hs = null;
+                if (inner != null) {
+                    hs = new double[inner.length];
+                    for (int k = 0; k < inner.length; k++) {
+                        hs[k] = nodeHeight(index, inner[k][1], inner[k][2]);
+                    }
+                }
                 double half = 0.5 * Math.max(1.0, g.width());
                 double dx = g.x2() - g.x1();
                 double dz = g.z2() - g.z1();
@@ -1136,7 +1157,7 @@ public final class ChunkLayer {
                         double t = Math.max(0, Math.min(1, ((cx - g.x1()) * dx + (cz - g.z1()) * dz) / length2));
                         double d = Math.hypot(g.x1() + dx * t - cx, g.z1() + dz * t - cz);
                         int c = x * 16 + z;
-                        double at = h1 + (h2 - h1) * t;
+                        double at = inner == null ? h1 + (h2 - h1) * t : along(t, h1, h2, inner, hs);
                         boolean covered = index.covers(p, cx, cz);
                         if (d <= half && covered) {
                             double w = 1.0 / ((d + 0.5) * (d + 0.5));
@@ -1146,6 +1167,7 @@ public final class ChunkLayer {
                         } else if (d <= half + VERGE && covered && d - half < outside[c]) {
                             outside[c] = d - half;
                             verge[c] = at;
+                            wall[c] = retained(g);
                         }
                     }
                 }
@@ -1207,7 +1229,7 @@ public final class ChunkLayer {
                 outside[c] = Double.NaN;
             }
         }
-        return new Grades(level, verge, outside, bank, bankKind);
+        return new Grades(level, verge, outside, bank, bankKind, wall);
     }
 
     /**
@@ -1274,6 +1296,81 @@ public final class ChunkLayer {
         });
     }
 
+    /**
+     * A piece's level at {@code t} along it, through the heights of the side streets joining it between its ends
+     * ({@code inner}: {t, x, z} by t; {@code hs} their heights), straight between one and the next.
+     */
+    static double along(double t, double h1, double h2, double[][] inner, double[] hs) {
+        double t0 = 0;
+        double a = h1;
+        for (int k = 0; k < inner.length; k++) {
+            if (t <= inner[k][0]) {
+                double f = (t - t0) / Math.max(1e-9, inner[k][0] - t0);
+                return a + (hs[k] - a) * f;
+            }
+            t0 = inner[k][0];
+            a = hs[k];
+        }
+        return a + (h2 - a) * (t - t0) / Math.max(1e-9, 1 - t0);
+    }
+
+    /**
+     * The side streets joining each piece between its ends (a T whose stem ends on the piece's line): {t, x, z} by t,
+     * null for a piece none joins. Footpaths, steps and bridges neither have nor make them.
+     */
+    static double[][][] interior(List<StreetSegment> segments, Map<Long, List<Integer>> byChunk) {
+        double[][][] out = new double[segments.size()][][];
+        Map<Integer, List<double[]>> found = new HashMap<>();
+        for (int q = 0; q < segments.size(); q++) {
+            StreetSegment e = segments.get(q);
+            if (!ramped(e)) {
+                continue;
+            }
+            for (double[] end : new double[][]{{e.x1(), e.z1()}, {e.x2(), e.z2()}}) {
+                List<Integer> near = byChunk.get(key(Math.floorDiv((int) Math.floor(end[0]), 16), Math.floorDiv((int) Math.floor(end[1]), 16)));
+                if (near == null) {
+                    continue;
+                }
+                for (int p : near) {
+                    StreetSegment g = segments.get(p);
+                    if (p == q || !ramped(g)) {
+                        continue;
+                    }
+                    double dx = g.x2() - g.x1();
+                    double dz = g.z2() - g.z1();
+                    double length2 = dx * dx + dz * dz;
+                    double t = ((end[0] - g.x1()) * dx + (end[1] - g.z1()) * dz) / Math.max(1e-9, length2);
+                    double margin = 1.0 / Math.max(1.0, Math.sqrt(length2));
+                    if (t <= margin || t >= 1 - margin) {
+                        continue;
+                    }
+                    if (Math.hypot(g.x1() + dx * t - end[0], g.z1() + dz * t - end[1]) > 0.75) {
+                        continue;
+                    }
+                    List<double[]> list = found.computeIfAbsent(p, k -> new ArrayList<>());
+                    boolean known = false;
+                    for (double[] f : list) {
+                        known |= Math.abs(f[0] - t) * Math.sqrt(length2) < 0.5;
+                    }
+                    if (!known) {
+                        list.add(new double[]{t, end[0], end[1]});
+                    }
+                }
+            }
+        }
+        for (Map.Entry<Integer, List<double[]>> f : found.entrySet()) {
+            f.getValue().sort((a, b) -> Double.compare(a[0], b[0]));
+            out[f.getKey()] = f.getValue().toArray(new double[0][]);
+        }
+        return out;
+    }
+
+    /** Whether a piece takes part in the streets' levels and ramps: not a bridge, steps or a footpath. */
+    private static boolean ramped(StreetSegment g) {
+        return g.structure() != StreetStructure.BRIDGE && g.structure() != StreetStructure.STAIRS
+                && g.streetClass() != StreetClass.PATH;
+    }
+
     /** The ground height the streets meeting at a point would be laid at: the middle of five samples round it. */
     private double groundHeight(double x, double z) {
         double[] h = new double[5];
@@ -1286,10 +1383,12 @@ public final class ChunkLayer {
     }
 
     /**
-     * Ramps up to an embankment's crest: the junctions within reach along the streets are raised so that no street
-     * climbs to the bank road steeper than 1 in {@code leveeRamp}, instead of the last piece rising the whole height
-     * (the ramps, sakamichi, onto a Japanese levee). Outward from the highest first, along the streets cars use (not
-     * steps, footpaths or bridges), until the ground is reached. Other bridges' ends are left as they were.
+     * Ramps up to an embankment's crest and to the bridges' ends: the junctions within reach along the streets
+     * (side streets joining a piece between its ends among them) are raised so that no street climbs to them
+     * steeper than 1 in {@code leveeRamp}, instead of the last piece rising the whole height (the ramps, sakamichi,
+     * onto a Japanese levee; the raised approaches of a town's bridges). Outward from the highest first, along the
+     * streets cars use (not steps, footpaths or bridges), until the ground is reached. A bridge standing more than
+     * {@code bridgeRampMax} over its end's ground (a viaduct over a valley) is left to its last piece.
      */
     private void ramps(Index index) {
         double ramp = logic.settings().streets.leveeRamp;
@@ -1298,36 +1397,67 @@ public final class ChunkLayer {
         }
         Map<Long, double[]> nodes = new HashMap<>();
         Map<Long, List<double[]>> links = new HashMap<>();
-        for (StreetSegment g : index.segments) {
-            if (g.structure() == StreetStructure.BRIDGE || g.structure() == StreetStructure.STAIRS
-                    || g.streetClass() == StreetClass.PATH) {
+        for (int p = 0; p < index.segments.size(); p++) {
+            StreetSegment g = index.segments.get(p);
+            if (!ramped(g)) {
                 continue;
             }
-            long a = point(g.x1(), g.z1());
-            long b = point(g.x2(), g.z2());
-            if (a == b) {
-                continue;
+            // The piece's points in order: its ends and the side streets joining it between them
+            List<double[]> points = new ArrayList<>();
+            points.add(new double[]{g.x1(), g.z1()});
+            if (index.interior()[p] != null) {
+                for (double[] in : index.interior()[p]) {
+                    points.add(new double[]{in[1], in[2]});
+                }
             }
-            double length = Math.hypot(g.x2() - g.x1(), g.z2() - g.z1());
-            nodes.putIfAbsent(a, new double[]{g.x1(), g.z1()});
-            nodes.putIfAbsent(b, new double[]{g.x2(), g.z2()});
-            links.computeIfAbsent(a, k -> new ArrayList<>()).add(new double[]{b, length});
-            links.computeIfAbsent(b, k -> new ArrayList<>()).add(new double[]{a, length});
+            points.add(new double[]{g.x2(), g.z2()});
+            for (int k = 1; k < points.size(); k++) {
+                double[] u = points.get(k - 1);
+                double[] v = points.get(k);
+                long a = point(u[0], u[1]);
+                long b = point(v[0], v[1]);
+                if (a == b) {
+                    continue;
+                }
+                double length = Math.hypot(v[0] - u[0], v[1] - u[1]);
+                nodes.putIfAbsent(a, u);
+                nodes.putIfAbsent(b, v);
+                links.computeIfAbsent(a, q -> new ArrayList<>()).add(new double[]{b, length});
+                links.computeIfAbsent(b, q -> new ArrayList<>()).add(new double[]{a, length});
+            }
         }
-        // {height, node}, the highest first
+        // {height, node, lift over the node's ground}, the highest first. What is carried along the streets is the
+        // lift, falling 1 in leveeRamp: on flat land the street then rises 1 in leveeRamp to the crest or deck, and
+        // where the land falls away from a bridge landing on high ground the lift still dies out, instead of the
+        // height being carried out over the low land
         java.util.PriorityQueue<double[]> open = new java.util.PriorityQueue<>((u, v) -> Double.compare(v[0], u[0]));
         Map<Long, Double> best = new HashMap<>();
         for (Map.Entry<Long, double[]> n : nodes.entrySet()) {
             double[] at = n.getValue();
             double seed = crest(index, at[0], at[1], 1.5);
-            if (!Double.isNaN(seed)) {
-                // A bridge landing on the crest: its deck
-                Double preset = index.heights.get(n.getKey());
-                if (preset != null) {
-                    seed = Math.max(seed, preset);
+            Double preset = index.heights.get(n.getKey());
+            if (Double.isNaN(seed) && preset == null) {
+                // Neither on a crest nor a bridge's end: its ground (precise terrain, dear) only if a ramp reaches it
+                continue;
+            }
+            double ground = groundHeight(at[0], at[1]);
+            double most = logic.settings().streets.bridgeRampMax;
+            // Nothing more than bridgeRampMax over what it stands on starts a ramp: a crest raised to the top of a steep
+            // bank, or a deck high over a valley, is left to its last piece rather than carried out over low land. A
+            // bridge's end behind a levee stands on the levee: its deck is measured from the crest
+            if (!Double.isNaN(seed) && seed - ground > most) {
+                seed = Double.NaN;
+            }
+            if (preset != null) {
+                double levee = crest(index, at[0], at[1], logic.settings().streets.bankOffset + 8.0);
+                double base = Double.isNaN(levee) ? ground : Math.max(ground, levee);
+                if (preset - base <= most) {
+                    seed = Double.isNaN(seed) ? preset : Math.max(seed, preset);
                 }
+            }
+            if (!Double.isNaN(seed) && seed > ground) {
                 best.put(n.getKey(), seed);
-                open.add(new double[]{seed, n.getKey()});
+                open.add(new double[]{seed, n.getKey(), seed - ground});
             }
         }
         while (!open.isEmpty()) {
@@ -1339,21 +1469,19 @@ public final class ChunkLayer {
             index.heights.merge(node, top[0], Math::max);
             for (double[] link : links.getOrDefault(node, List.of())) {
                 long next = (long) link[0];
-                double carried = top[0] - link[1] / ramp;
-                Double known = best.get(next);
-                if (known != null && known >= carried) {
-                    continue;
-                }
                 double[] at = nodes.get(next);
                 Double preset = index.heights.get(next);
                 double ground = preset != null ? preset : groundHeight(at[0], at[1]);
                 index.heights.putIfAbsent(next, ground);
-                if (carried <= ground) {
-                    best.put(next, ground);
+                double lift = Math.min(top[0] - link[1] / ramp - ground, top[2] - link[1] / ramp);
+                double carried = ground + lift;
+                Double known = best.get(next);
+                if (lift <= 0 || known != null && known >= carried) {
+                    best.putIfAbsent(next, ground);
                     continue;
                 }
                 best.put(next, carried);
-                open.add(new double[]{carried, next});
+                open.add(new double[]{carried, next, lift});
             }
         }
     }
@@ -1547,7 +1675,15 @@ public final class ChunkLayer {
             if (Double.isInfinite(bank)) {
                 bank = logic.terrain().seaLevel();
             }
-            double level = Math.max(bank, logic.terrain().seaLevel()) + 1.0;
+            // Higher the longer it is, as a town's bridges rise over their rivers: their banks' streets ramp up to them
+            double span = 0;
+            for (int p : run) {
+                StreetSegment g = segments.get(p);
+                span += Math.hypot(g.x2() - g.x1(), g.z2() - g.z1());
+            }
+            CitySettings.Streets cfg = logic.settings().streets;
+            double rise = Math.min(cfg.bridgeRiseMax, Math.floor(span * cfg.bridgeRise));
+            double level = Math.max(bank, logic.terrain().seaLevel()) + 1.0 + rise;
             for (int p : run) {
                 deck[p] = Math.floor(level);
             }
@@ -1612,7 +1748,8 @@ public final class ChunkLayer {
             }
         }
         Map<Long, Double> heights = new java.util.concurrent.ConcurrentHashMap<>();
-        Index index = new Index(byChunk, segments, deck, links, canals, plazas, stops, heights, round(segments), banks);
+        Index index = new Index(byChunk, segments, deck, links, canals, plazas, stops, heights, round(segments), banks,
+                interior(segments, byChunk));
         // A street leaving a bridge starts at its deck
         for (int p = 0; p < segments.size(); p++) {
             StreetSegment g = segments.get(p);

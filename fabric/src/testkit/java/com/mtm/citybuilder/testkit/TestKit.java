@@ -394,7 +394,8 @@ public final class TestKit implements DedicatedServerModInitializer {
         com.mtm.citybuilder.core.street.StreetSegment best = null;
         double nearest = Double.POSITIVE_INFINITY;
         java.util.List<com.mtm.citybuilder.core.street.StreetSegment> of = logic.streetPlan(logic.urban(x, z).owner()).segments()
-                .stream().filter(g -> g.streetClass() == wanted).toList();
+                .stream().filter(g -> g.streetClass() == wanted && (query.get("structure") == null
+                        || g.structure().name().equals(query.get("structure")))).toList();
         for (com.mtm.citybuilder.core.street.StreetSegment g : of) {
             double mx = 0.5 * (g.x1() + g.x2());
             double mz = 0.5 * (g.z1() + g.z2());
