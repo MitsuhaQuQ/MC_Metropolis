@@ -50,7 +50,8 @@ decided:
 
 Everything below the settlements is deterministic: the same plan gives the same city, on Fabric and Forge, in
 whatever order the world is explored. The design is written up in [docs/city-logic-design.md](docs/city-logic-design.md)
-(in Chinese).
+(in Chinese); [docs/overview.md](docs/overview.md) (also Chinese) explains how the pipeline works and where each part
+stands.
 
 ## Requirements
 
@@ -128,7 +129,7 @@ City Builder 是 [Realistic Landforms（MTM Worldgen）](https://github.com/Mits
 
   寺社、车站和地标要等建筑库接入。按 **K** 或输入 `/citymap` 打开城市规划地图。不同版本生成的世界可能对不上，暂时不要用在想保留的存档里。
 - **依赖**：Minecraft 1.20.1，Fabric 或 Forge，Java 17。地形需要 MTM Worldgen（没装时不生成城市）；MTR 可选，只读取它的车站。
-- **构建、调试图、数据来源和许可证**见上文英文部分。设计文档是中文的：[docs/city-logic-design.md](docs/city-logic-design.md)。
+- **构建、调试图、数据来源和许可证**见上文英文部分。设计文档是中文的：[docs/city-logic-design.md](docs/city-logic-design.md)；工作流程和现状的总说明见 [docs/overview.md](docs/overview.md)。
 - **许可证**：代码采用 MIT；随 mod 发布的每件素材的来源和许可证都记在 ATTRIBUTION 里。PLATEAU 和 OpenStreetMap 的数据只用来做统计，不随 mod 发布。
 
 ## 日本語の紹介
@@ -148,5 +149,5 @@ City Builder は [Realistic Landforms（MTM Worldgen）](https://github.com/Mits
 
   寺社、駅、ランドマークは建物ライブラリの組み込み後になります。**K** キーまたは `/citymap` で都市計画の地図を開けます。版が変わると以前に生成したワールドと合わないことがあるので、残したいワールドにはまだ使わないでください。
 - **必要なもの**：Minecraft 1.20.1、Fabric または Forge、Java 17。地形には MTM Worldgen が必要です（入っていないと都市は生成されません）。MTR は任意で、その駅を読み取るだけです。
-- **ビルド、計画図、データの出典とライセンス**は上の英語の部分を見てください。設計書は中国語です：[docs/city-logic-design.md](docs/city-logic-design.md)。
+- **ビルド、計画図、データの出典とライセンス**は上の英語の部分を見てください。設計書は中国語です：[docs/city-logic-design.md](docs/city-logic-design.md)（仕組みと現状の概要は [docs/overview.md](docs/overview.md)）。
 - **ライセンス**：コードは MIT です。mod に同梱する素材はすべて出典とライセンスを ATTRIBUTION に記録しています。PLATEAU と OpenStreetMap のデータは統計を取るためだけに使い、mod には同梱していません。

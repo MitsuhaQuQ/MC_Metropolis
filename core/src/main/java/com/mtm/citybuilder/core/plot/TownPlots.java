@@ -1132,6 +1132,48 @@ public final class TownPlots {
                 g.width(), Math.atan2(uz, ux), bestEdge > maxDepth, false);
     }
 
+    /**
+     * Why a position belongs to no lot, for the tools' statistics: "footpath", "embankment", "district", "canal",
+     * "square", "no street near", "street", "street ends", "lot" (on a lot, as made, that is then dropped), or null
+     * where it has a lot.
+     */
+    public String whyNone(double x, double z) {
+        for (com.mtm.citybuilder.core.street.Promenade promenade : footpathsNear(x, z, x, z)) {
+            if (promenade.open(x, z)) {
+                return "footpath";
+            }
+        }
+        long cell = ((long) Math.floor(x / 64.0) << 32) ^ ((long) Math.floor(z / 64.0) & 0xFFFFFFFFL);
+        for (int[] piece : embankmentCells.getOrDefault(cell, List.of())) {
+            if (plan.embankments().get(piece[0]).covers(piece[1], x, z)) {
+                boolean land = false;
+                for (int[] other : embankmentCells.getOrDefault(cell, List.of())) {
+                    land |= plan.embankments().get(other[0]).coversLand(other[1], x, z);
+                }
+                return land ? "embankment" : "water side";
+            }
+        }
+        District district = plan.districts().at(x, z);
+        if (district == District.NONE || district == District.GROUNDS || district == District.HIGH_SPEED) {
+            return "district";
+        }
+        if (inCanal(x, z)) {
+            return "canal";
+        }
+        if (plan.plazaAt(x, z) != null) {
+            return "square";
+        }
+        int[] near = cells.get(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL));
+        if (near == null) {
+            return "no street near";
+        }
+        Plot plot = raw(x, z);
+        if (plot == null) {
+            return onStreet(x, z) ? "street" : "street ends";
+        }
+        return at(x, z) == null ? "lot" : null;
+    }
+
     /** Whether a position lies in one of the town's canals, its walls included. */
     public boolean inCanal(double x, double z) {
         for (double[] c : canalCells.getOrDefault(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL), List.of())) {

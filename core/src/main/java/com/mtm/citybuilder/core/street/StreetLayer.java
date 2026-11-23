@@ -3644,8 +3644,13 @@ public final class StreetLayer {
         double lake = terrain.lakeLevel(qx, qz);
         double level = !Double.isNaN(lake) ? lake
                 : terrain.landform(qx, qz) == Landform.OCEAN ? terrain.seaLevel() : terrain.smoothHeight(qx, qz);
+        // The water at a bank lies no higher than the bank's ground (the point sampled across it may fall on another
+        // water, a lake up in the hills); the back slope falls at most two levees' height, the ground beyond left
+        // as it is (a bank above a drop would otherwise reach hundreds of blocks inland, and keep the lots off)
+        level = Math.min(level, ground);
         double crest = Math.max(ground, level + config.leveeHeight);
-        return new double[]{x, z, crest, nx, nz, Math.min(crest, town), level};
+        double behind = Math.max(Math.min(crest, town), crest - 2.0 * config.leveeHeight);
+        return new double[]{x, z, crest, nx, nz, behind, level};
     }
 
     private static long endKey(double x, double z) {
@@ -4248,8 +4253,10 @@ public final class StreetLayer {
 
     /**
      * Streets laid twice, however they came to be (two intercity roads into a town on one way, an arterial traced
-     * again beside another, a lane run along a road's paving): a piece mostly within the paving of pieces running the
-     * same way that outrank it (by class, width, then laid first) is taken out, and the streets that met it meet the
+     * again beside another, a lane run along a road's paving, a street meeting a boulevard at its edge and running on
+     * inside it to its node): a piece mostly within the paving
+     * of pieces running the same way that outrank it (by class, width, then laid first), or with its middle line
+     * mostly inside a wider one's paving whatever its way, is taken out, and the streets that met it meet the
      * road it ran along instead, at a junction on its line (the road split there), so none is left hanging in its
      * paving (unless it would then run over water or across a canal on the ground). Streets on the ground only, not
      * lanes; a station avenue's first piece at its square's mouth stays.
@@ -4282,8 +4289,10 @@ public final class StreetLayer {
             boolean judged = g.structure() == StreetStructure.GROUND && g.streetClass() != StreetClass.PATH
                     && g.streetClass() != StreetClass.LANE && length > 1e-6 && !atAny(g, keep);
             if (judged) {
-                // The kept pieces near it that run its way and share no end with it
+                // The kept pieces near it that run its way, and the wider ones whatever their way (a piece run inside a
+                // wider road's paving, as a street meeting a boulevard at its edge and then running in to its node)
                 List<Integer> along = new ArrayList<>();
+                java.util.Set<Integer> wide = new java.util.HashSet<>();
                 java.util.Set<Integer> near = new java.util.TreeSet<>();
                 long cx = (long) Math.floor(0.5 * (g.x1() + g.x2()) / cell);
                 long cz = (long) Math.floor(0.5 * (g.z1() + g.z2()) / cell);
@@ -4296,9 +4305,16 @@ public final class StreetLayer {
                     StreetSegment h = segments.get(q);
                     double dot = ((g.x2() - g.x1()) * (h.x2() - h.x1()) + (g.z2() - g.z1()) * (h.z2() - h.z1()))
                             / Math.max(1e-9, length * h.length());
-                    if (Math.abs(dot) >= cos && !sharesEnd(g, h) && h.structure() == StreetStructure.GROUND
-                            && h.streetClass() != StreetClass.LANE) {
+                    if (h.structure() != StreetStructure.GROUND || h.streetClass() == StreetClass.LANE) {
+                        continue;
+                    }
+                    if (Math.abs(dot) >= cos) {
+                        if (!sharesEnd(g, h)) {
+                            along.add(q);
+                        }
+                    } else if (h.width() >= g.width() + 2.0) {
                         along.add(q);
+                        wide.add(q);
                     }
                 }
                 if (!along.isEmpty()) {
@@ -4310,7 +4326,18 @@ public final class StreetLayer {
                         samples++;
                         for (int q : along) {
                             StreetSegment h = segments.get(q);
-                            if (distanceToSegment(x, z, h) < 0.5 * (h.width() + g.width()) - 0.5) {
+                            // A wider piece sharing an end with it: only where it lies over it, not on beyond its end
+                            if (sharesEnd(g, h)) {
+                                double hx = h.x2() - h.x1();
+                                double hz = h.z2() - h.z1();
+                                double raw = ((x - h.x1()) * hx + (z - h.z1()) * hz) / Math.max(1e-9, hx * hx + hz * hz);
+                                if (raw < 0.0 || raw > 1.0) {
+                                    continue;
+                                }
+                            }
+                            // Running its way: within the two pavings; across it, its middle within the wider paving
+                            double reach = wide.contains(q) ? 0.5 * h.width() - 0.5 : 0.5 * (h.width() + g.width()) - 0.5;
+                            if (distanceToSegment(x, z, h) < reach) {
                                 covered++;
                                 break;
                             }

@@ -76,6 +76,24 @@ public record Embankment(List<double[]> points, double road, double land) {
         return s >= -0.5 * road ? d <= land : d <= OUTSIDE && (nx != 0 || nz != 0);
     }
 
+    /** Whether a position lies on the piece's land side within {@link #land} (not its water side). */
+    public boolean coversLand(int k, double x, double z) {
+        double[] a = points.get(k - 1);
+        double[] b = points.get(k);
+        double dx = b[X] - a[X];
+        double dz = b[Z] - a[Z];
+        double length2 = dx * dx + dz * dz;
+        if (length2 < 1e-12) {
+            return false;
+        }
+        double t = Math.max(0.0, Math.min(1.0, ((x - a[X]) * dx + (z - a[Z]) * dz) / length2));
+        double px = a[X] + dx * t;
+        double pz = a[Z] + dz * t;
+        double nx = a[NX] + (b[NX] - a[NX]) * t;
+        double nz = a[NZ] + (b[NZ] - a[NZ]) * t;
+        return (x - px) * nx + (z - pz) * nz >= -0.5 * road && Math.hypot(x - px, z - pz) <= land;
+    }
+
     /** How far out on the water's side of its centre line no lot is cut. */
     public static final double OUTSIDE = 60.0;
 }

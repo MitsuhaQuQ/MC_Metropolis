@@ -216,6 +216,8 @@ public final class CityMap {
                 image = com.mtm.citybuilder.core.debug.SanctuaryMap.render(logic, found, towns, centerX, centerZ, scale, size);
             }
             case "buildings" -> {
+                // As in the game: the function layer's quarters and public buildings
+                logic.buildings().useFunctions();
                 StreetPlan plan = streetStats(logic, centerX, centerZ);
                 com.mtm.citybuilder.core.plot.TownPlots plots = logic.plots().town(plan.settlement());
                 BuildingStats.print(logic, plots, logic.extent(plan.settlement()).coreX(), logic.extent(plan.settlement()).coreZ(),

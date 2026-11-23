@@ -213,9 +213,12 @@ class PlotLayerTest {
                     double back2 = Math.max(0.0, plot.depth() - 1.0);
                     Plot toward = plots.at(x + nx * (plot.depth() - back2), z + nz * (plot.depth() - back2));
                     // The same pole, or one it shares out to the street (two back lots' first edges close together)
-                    // (a lane doubling back may bring its other side near: only along the pole's own side)
+                    // (a lane doubling back may bring its other side near: only along the pole's own side; and round
+                    // a lane's bend the lots of its other leg meet it: only where the street runs the pole's way)
                     assertTrue(toward == null || toward.chain() != plot.chain() || toward.side() != plot.side()
-                            || toward.id() == plot.id() || toward.pole(), () -> "a pole broken " + plot + " at " + toward);
+                            || toward.id() == plot.id() || toward.pole()
+                            || Math.abs(Math.IEEEremainder(toward.heading() - heading, 2 * Math.PI)) > Math.toRadians(30),
+                            () -> "a pole broken " + plot + " at " + toward);
                 }
             }
         }

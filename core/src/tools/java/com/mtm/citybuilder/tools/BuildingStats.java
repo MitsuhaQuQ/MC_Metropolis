@@ -35,22 +35,99 @@ final class BuildingStats {
         int samples = 0;
         int covered = 0;
         int step = 2;
+        // Gross (streets included) by the rings Kyoto was measured in: samples, covered, floor area in storeys
+        double[] ringEdges = {0, 500, 1000, 1500, 2000, 3000, 4000, 6000, 8000};
+        long[] ringSamples = new long[ringEdges.length - 1];
+        long[] ringCovered = new long[ringEdges.length - 1];
+        long[] ringFloors = new long[ringEdges.length - 1];
+        // What the rest of each ring is: 0 street, 1 no lot (water, rails, outside the town), 2 a block's interior or
+        // a remnant, 3 open back lot (garden, car park, field), 4 a facility's land, 5 a lot left empty, 6 the
+        // lot's yard (around its building), 7 built
+        String[] uses = {"street", "no lot", "interior", "open lot", "facility", "empty lot", "yard", "built",
+                "  of no lot: outside districts", "grounds", "high-speed", "other"};
+        com.mtm.citybuilder.core.street.StreetPlan plan = logic.streetPlan(plots.settlement());
+        Map<String, long[]> whyNone = new TreeMap<>();
+        long[][] ringUse = new long[ringEdges.length - 1][uses.length];
+        com.mtm.citybuilder.core.function.TownFunctions functions = logic.functions().town(plots.settlement());
         for (double x = centerX - half; x < centerX + half; x += step) {
             for (double z = centerZ - half; z < centerZ + half; z += step) {
                 samples++;
+                double d = Math.hypot(x - coreX, z - coreZ);
+                int ring = -1;
+                for (int r = 0; r < ringSamples.length; r++) {
+                    if (d >= ringEdges[r] && d < ringEdges[r + 1]) {
+                        ring = r;
+                    }
+                }
+                if (ring >= 0) {
+                    ringSamples[ring]++;
+                }
                 Plot plot = plots.at(x, z);
                 Building b = layer.building(plots, plot);
+                if (ring >= 0) {
+                    int use;
+                    if (b != null && BuildingLayer.inside(b, plot, x, z)) {
+                        use = 7;
+                    } else if (plots.onStreet(x, z)) {
+                        use = 0;
+                    } else if (plot == null) {
+                        use = 1;
+                        District at = plan.districts().at(x, z);
+                        ringUse[ring][at == District.NONE ? 8 : at == District.GROUNDS ? 9 : at == District.HIGH_SPEED ? 10 : 11]++;
+                        String why = plots.whyNone(x, z);
+                        whyNone.computeIfAbsent(why == null ? "null" : why, k -> new long[ringSamples.length])[ring]++;
+                    } else if (plot.interior() || plot.remnant()) {
+                        use = 2;
+                    } else if (plot.use() != null && !plot.use().built()) {
+                        use = 3;
+                    } else if (functions.facilityAt(x, z) != null) {
+                        use = 4;
+                    } else if (b == null) {
+                        use = 5;
+                    } else {
+                        use = 6;
+                    }
+                    ringUse[ring][use]++;
+                }
                 if (b == null || !BuildingLayer.inside(b, plot, x, z)) {
                     continue;
                 }
                 covered++;
-                double d = Math.hypot(x - coreX, z - coreZ);
+                if (ring >= 0) {
+                    ringCovered[ring]++;
+                    ringFloors[ring] += b.storeys();
+                }
                 Seen s = seen.computeIfAbsent(b.id(), k -> new Seen(b, plot, d, new int[1]));
                 s.cells[0]++;
             }
         }
         System.out.printf("L8 buildings: %d over %.1f km2, found in %.1f s; footprint coverage %.0f%% of the area (Kyoto 0-2 km: 39-57%%)%n",
                 seen.size(), samples * step * step / 1e6, (System.nanoTime() - start) / 1e9, 100.0 * covered / Math.max(1, samples));
+
+        double[] kyoto = {57, 51, 44, 39, 34, 30, 24, 13};
+        System.out.println("  gross coverage and floor area ratio by distance from the core (streets included):");
+        for (int r = 0; r < ringSamples.length; r++) {
+            if (ringSamples[r] < 1000) {
+                continue;
+            }
+            System.out.printf("    %.1f-%.1f km  coverage %3.0f%% (Kyoto %2.0f%%)  floor area ratio %.2f  area %.2f km2%n",
+                    ringEdges[r] / 1000, ringEdges[r + 1] / 1000, 100.0 * ringCovered[r] / ringSamples[r], kyoto[r],
+                    (double) ringFloors[r] / ringSamples[r], ringSamples[r] * step * step / 1e6);
+            StringBuilder line = new StringBuilder("        ");
+            for (int u = 0; u < uses.length; u++) {
+                line.append(String.format("%s %.0f%%  ", uses[u], 100.0 * ringUse[r][u] / ringSamples[r]));
+            }
+            System.out.println(line);
+        }
+        for (var e : whyNone.entrySet()) {
+            StringBuilder line = new StringBuilder(String.format("    no lot: %-14s", e.getKey()));
+            for (int r = 0; r < ringSamples.length; r++) {
+                if (ringSamples[r] >= 1000) {
+                    line.append(String.format(" %4.0f%%", 100.0 * e.getValue()[r] / ringSamples[r]));
+                }
+            }
+            System.out.println(line);
+        }
 
         List<Seen> all = new ArrayList<>(seen.values());
         System.out.println("  storeys: " + shares(all, s -> s.building.storeys()) + "   (Kyoto: 1F 9%, 2F 68%, 3F 18%, 4-5F 3.5%, 6F+ 1.4%)");
