@@ -2218,8 +2218,135 @@ public final class StreetLayer {
                     out, squareSeed, free, entries);
             plazas.add(square);
             segments.removeIf(inside::contains);
+            prune(square, segments);
         }
         return plazas;
+    }
+
+    /** How far back a street left ending at a square is taken away, at most. */
+    private static final double PRUNE_REACH = 150.0;
+
+    /**
+     * The streets cars use left ending at a square and not joined to its loop (beside its throat: the other arm of a
+     * Y with the avenue, both having run to the station) taken away back to the junction they leave the network at,
+     * not past a side street meeting them nor further than {@link #PRUNE_REACH}.
+     */
+    private static void prune(StationPlaza square, List<StreetSegment> segments) {
+        Map<Long, List<StreetSegment>> at = new HashMap<>();
+        for (StreetSegment g : segments) {
+            at.computeIfAbsent(node(g.x1(), g.z1()), k -> new ArrayList<>()).add(g);
+            at.computeIfAbsent(node(g.x2(), g.z2()), k -> new ArrayList<>()).add(g);
+        }
+        java.util.Set<StreetSegment> gone = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (StreetSegment g : segments) {
+            if (!carried(g)) {
+                continue;
+            }
+            for (int end = 0; end < 2; end++) {
+                double px = end == 0 ? g.x1() : g.x2();
+                double pz = end == 0 ? g.z1() : g.z2();
+                if (at.get(node(px, pz)).size() != 1 || !reaches(square, px, pz, 0.5 * g.width() + 3.0)
+                        || joined(square, px, pz, g.width()) || meets(segments, g, px, pz)) {
+                    continue;
+                }
+                // Back along the street from its dead end to where it leaves the network
+                List<StreetSegment> chain = new ArrayList<>();
+                StreetSegment piece = g;
+                double x = px;
+                double z = pz;
+                double length = 0.0;
+                boolean ends = false;
+                while (piece != null && length <= PRUNE_REACH) {
+                    chain.add(piece);
+                    length += piece.length();
+                    boolean first = Math.hypot(piece.x1() - x, piece.z1() - z) < 0.5;
+                    x = first ? piece.x2() : piece.x1();
+                    z = first ? piece.z2() : piece.z1();
+                    List<StreetSegment> there = at.get(node(x, z));
+                    StreetSegment next = null;
+                    int others = 0;
+                    for (StreetSegment o : there) {
+                        if (o != piece) {
+                            others++;
+                            next = o;
+                        }
+                    }
+                    if (others != 1 || sideOn(segments, piece, chain)) {
+                        ends = others >= 2 && !sideOn(segments, piece, chain);
+                        break;
+                    }
+                    piece = next;
+                }
+                if (ends && length <= PRUNE_REACH) {
+                    gone.addAll(chain);
+                }
+            }
+        }
+        segments.removeIf(gone::contains);
+    }
+
+    private static long node(double x, double z) {
+        return ((long) Math.round(2 * x) << 32) ^ (Math.round(2 * z) & 0xFFFFFFFFL);
+    }
+
+    /** Whether a square's land lies within {@code r} of a point. */
+    private static boolean reaches(StationPlaza square, double x, double z, double r) {
+        double[] b = square.bounds();
+        if (x < b[0] - r || x > b[2] + r || z < b[1] - r || z > b[3] + r) {
+            return false;
+        }
+        if (square.contains(x, z)) {
+            return true;
+        }
+        for (double d = 1.0; d <= r; d += 1.0) {
+            for (int k = 0; k < 16; k++) {
+                double a = Math.PI * k / 8;
+                if (square.contains(x + d * Math.cos(a), z + d * Math.sin(a))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether a street's end is joined to the square: one of its links (the throat or a joined street) starts by it. */
+    private static boolean joined(StationPlaza square, double x, double z, double width) {
+        double[] p = square.local(x, z);
+        for (StationPlaza.Link link : square.links()) {
+            if (Math.hypot(link.u1() - p[0], link.v1() - p[1]) <= 0.5 * width + 4.0
+                    || Math.hypot(link.u2() - p[0], link.v2() - p[1]) <= 0.5 * width + 4.0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether a street's end meets another piece between its ends (a T onto it): not a dead end. */
+    private static boolean meets(List<StreetSegment> segments, StreetSegment g, double x, double z) {
+        for (StreetSegment o : segments) {
+            if (o != g && distanceToSegment(x, z, o) <= Math.max(1.0, 0.5 * o.width())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether a street other than the chain's meets a piece of it between its ends, on its centre line. */
+    private static boolean sideOn(List<StreetSegment> segments, StreetSegment piece, List<StreetSegment> chain) {
+        for (StreetSegment o : segments) {
+            if (chain.contains(o)) {
+                continue;
+            }
+            for (double[] e : new double[][]{{o.x1(), o.z1()}, {o.x2(), o.z2()}}) {
+                boolean atEnd = Math.hypot(e[0] - piece.x1(), e[1] - piece.z1()) < 0.5
+                        || Math.hypot(e[0] - piece.x2(), e[1] - piece.z2()) < 0.5;
+                // On its centre line (a T onto it), not a street of its own merely running within its paving
+                if (!atEnd && distanceToSegment(e[0], e[1], piece) <= 2.0) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Whether cars use a street piece: not a lane, footpath, steps or bridge. */

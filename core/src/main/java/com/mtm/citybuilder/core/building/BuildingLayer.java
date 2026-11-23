@@ -533,16 +533,22 @@ public final class BuildingLayer {
                 plot.remnant(), plot.row(), plot.use(), plot.pole());
     }
 
-    /** A building's corners and middle in the world, from its frontage along the street and its depth back. */
+    /**
+     * Points over a building's footprint in the world, every 4 or less along the street and back from it, its corners
+     * included (a long shop may cross a small park between its corners).
+     */
     private static double[][] outline(TownPlots plots, Plot plot, Building b) {
-        double[][] out = new double[5][];
+        double length = b.to() - b.from();
+        double deep = b.back() - b.front();
+        int na = Math.max(1, (int) Math.ceil(length / 4.0));
+        int nd = Math.max(1, (int) Math.ceil(deep / 4.0));
+        double[][] out = new double[(na + 1) * (nd + 1)][];
         int k = 0;
-        for (double a : new double[]{b.from(), b.to()}) {
-            for (double d : new double[]{b.front(), b.back()}) {
-                out[k++] = at(plots, plot, a, d);
+        for (int i = 0; i <= na; i++) {
+            for (int j = 0; j <= nd; j++) {
+                out[k++] = at(plots, plot, b.from() + length * i / na, b.front() + deep * j / nd);
             }
         }
-        out[4] = at(plots, plot, 0.5 * (b.from() + b.to()), 0.5 * (b.front() + b.back()));
         return out;
     }
 
