@@ -1,7 +1,8 @@
-// A subway in the game: seed 12345's city at (-18568, -19860), its own line underground through its middle. The
-// stretch of it nearest an underground station, generated round; checks the box is laid (ballast at its bed, air over
-// it, the roof's concrete over that); with the test client, pictures inside the box along the line, of the station's
-// platform and down its entrance stair.
+// A subway in the game: seed 12345's city at (-18568, -19860), its own line underground through its middle, its
+// stations and the box between them built whole from the structure library. The stretch of it nearest an underground
+// station, generated round; checks the box is laid (solid under the rails, air over them) and the station's stairs
+// (between its platforms and concourse, up its exits) are there; with the test client, pictures inside the box along
+// the line, of the station's platform and concourse, and of its exits from above.
 import { test, expect } from '@playwright/test';
 import { join } from 'node:path';
 import { server } from '../lib/server.mjs';
@@ -55,8 +56,8 @@ test('a subway runs under the city', async ({}, testInfo) => {
     }
   }
   console.log('column from the bed down one', JSON.stringify(found));
-  expect(found[0]).toBe('minecraft:gravel');
   expect(found[3]).toBe('minecraft:air');
+  expect(found[0] === undefined || found[0] === 'minecraft:air').toBe(false);
   if (clientRunning()) {
     if (!(await client.state()).inWorld) {
       await client.join();
@@ -74,29 +75,26 @@ test('a subway runs under the city', async ({}, testInfo) => {
       const sh = s.heading * Math.PI / 180;
       const salong = (Math.atan2(-Math.cos(sh), Math.sin(sh)) * 180) / Math.PI;
       const sbed = Math.floor(s.level);
-      // The nearest entrance stair: its steps (the test world's only: turning them all one way counts them)
-      const e = await server.rail(sx, sz, 'entrance');
-      console.log('entrance', JSON.stringify(e));
-      expect(e.found).toBe(true);
-      const ex0 = Math.round(e.x);
-      const ez0 = Math.round(e.z);
-      await server.generate(ex0 - 48, ez0 - 48, ex0 + 47, ez0 + 47);
+      // The station's stairs (between the platforms and the concourse, up its exits): their steps round it, turned
+      // one way and back to count them
+      // The exits from above: their stairs out of the pavement beside the street
+      await view('subway-exits', sx, Math.round(s.ground ?? sbed + 14) + 30, sz, 0, 70, testInfo);
+      // The concourse, over the platforms
+      await view('subway-concourse', sx, sbed + 10, sz, Math.round(salong), 5, testInfo);
       let steps = 0;
-      for (let dx = -48; dx < 48; dx += 24) {
-        for (let dz = -48; dz < 48; dz += 24) {
-          for (const facing of ['north', 'south']) {
-            const r = JSON.stringify(await server.command(`fill ${ex0 + dx} ${Math.floor(e.level)} ${ez0 + dz} ${ex0 + dx + 23} ${Math.floor(e.level) + 30} ${ez0 + dz + 23} minecraft:stone_brick_stairs[facing=${facing}] replace minecraft:stone_brick_stairs`));
-            const m = r.match(/filled (\d+)/);
+      for (const facing of ['north', 'south'])
+      for (const kind of ['minecraft:polished_andesite_stairs', 'minecraft:andesite_stairs', 'minecraft:polished_diorite_stairs', 'minecraft:stone_brick_stairs']) {
+        for (let dx = -96; dx < 96; dx += 32) {
+          for (let dz = -96; dz < 96; dz += 32) {
+            const y0 = sbed - 4;
+            const r1 = JSON.stringify(await server.command(`fill ${sx + dx} ${y0} ${sz + dz} ${sx + dx + 31} ${y0 + 30} ${sz + dz + 31} ${kind}[facing=${facing}] replace ${kind}`));
+            const m = r1.match(/filled (\d+)/);
             steps += m ? Number(m[1]) : 0;
           }
         }
       }
-      console.log('entrance steps found', steps);
-      expect(steps).toBeGreaterThan(3);
-      const eh = e.heading * Math.PI / 180;
-      const eAlong = (Math.atan2(-Math.cos(eh), Math.sin(eh)) * 180) / Math.PI;
-      await view('subway-entrance', Math.round(ex0 + Math.cos(eh) * 30), Math.round(e.ground) + 6,
-        Math.round(ez0 + Math.sin(eh) * 30), Math.round(eAlong + 180), 35, testInfo);
+      console.log('station steps found', steps);
+      expect(steps).toBeGreaterThan(20);
       // On the platform's edge, looking along it
       const px = sx - Math.sin(sh) * 6;
       const pz = sz + Math.cos(sh) * 6;

@@ -4,13 +4,17 @@ import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.building.rail.BrickViaduct;
 import com.mtm.citybuilder.core.building.rail.CrossSection;
 import com.mtm.citybuilder.core.building.rail.Curve;
+import com.mtm.citybuilder.core.building.rail.CurvedStation;
+import com.mtm.citybuilder.core.building.rail.CutCoverTunnel;
 import com.mtm.citybuilder.core.building.rail.ElevatedStation;
+import com.mtm.citybuilder.core.building.rail.Flights;
 import com.mtm.citybuilder.core.building.rail.FrameViaduct;
 import com.mtm.citybuilder.core.building.rail.Ground;
 import com.mtm.citybuilder.core.building.rail.GroundStation;
 import com.mtm.citybuilder.core.building.rail.Path;
 import com.mtm.citybuilder.core.building.rail.RailPalette;
 import com.mtm.citybuilder.core.building.rail.Spans;
+import com.mtm.citybuilder.core.building.rail.UndergroundStation;
 import com.mtm.citybuilder.core.building.rail.Viaduct;
 import com.mtm.citybuilder.core.building.temple.Model;
 import com.mtm.citybuilder.core.noise.Hash;
@@ -82,9 +86,17 @@ final class RailStructures {
         private final Map<String, Integer> stateIndex = new HashMap<>();
         final Map<Long, long[]> blocks = new HashMap<>();
         final Map<Long, long[]> masks = new HashMap<>();
+        /** The columns a structure takes under the ground (a subway's box): the chunk layer lays no box of its own. */
+        final Map<Long, long[]> under = new HashMap<>();
         private final Map<Long, List<Long>> building = new HashMap<>();
 
+        /** A block at or over the ground: its column kept clear of buildings and trees. */
         void add(int x, int y, int z, String state) {
+            add(x, y, z, state, true);
+        }
+
+        /** A block, at or over the ground ({@code surface}: its column kept clear) or under it. */
+        void add(int x, int y, int z, String state, boolean surface) {
             Integer i = stateIndex.get(state);
             if (i == null) {
                 i = states.size();
@@ -96,7 +108,8 @@ final class RailStructures {
             int lz = Math.floorMod(z, 16);
             building.computeIfAbsent(chunk, k -> new ArrayList<>())
                     .add(((long) i << 24) | ((long) (y + 2048) << 8) | ((long) lx << 4) | lz);
-            masks.computeIfAbsent(chunk, k -> new long[4])[(lx * 16 + lz) >> 6] |= 1L << ((lx * 16 + lz) & 63);
+            long[] mask = (surface ? masks : under).computeIfAbsent(chunk, k -> new long[4]);
+            mask[(lx * 16 + lz) >> 6] |= 1L << ((lx * 16 + lz) & 63);
         }
 
         Built done() {
@@ -181,6 +194,22 @@ final class RailStructures {
             return false;
         }
 
+        /** Half the width of the widest street whose paving covers a point, 0 where none does. */
+        double halfAt(double x, double z) {
+            double best = 0.0;
+            for (com.mtm.citybuilder.core.street.StreetSegment g : cells.getOrDefault(
+                    key((int) Math.floor(x / 32), (int) Math.floor(z / 32)), List.of())) {
+                double dx = g.x2() - g.x1();
+                double dz = g.z2() - g.z1();
+                double l2 = Math.max(1e-9, dx * dx + dz * dz);
+                double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / l2));
+                if (Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z) <= 0.5 * g.width() + 0.5) {
+                    best = Math.max(best, 0.5 * g.width());
+                }
+            }
+            return best;
+        }
+
         /** Whether a street's paving covers a point and runs across a heading (more than 30 degrees off it). */
         boolean across(double x, double z, double heading) {
             for (com.mtm.citybuilder.core.street.StreetSegment g : cells.getOrDefault(
@@ -217,9 +246,18 @@ final class RailStructures {
      */
     static Built build(CityLogic logic, long townId, SettlementTier tier, TownPlots plots,
                        com.mtm.citybuilder.core.street.StreetPlan plan, List<double[]> pieces, List<int[]> runs,
-                       int intercity, List<Station> stations) {
+                       int intercity, List<Station> stations, List<Station> buried) {
         Built out = new Built();
         Streets streets = new Streets(plan);
+        for (int k = 0; k < buried.size(); k++) {
+            Station st = buried.get(k);
+            try {
+                buried(logic, Hash.of(townId, 41, k), tier, streets, st, buried, out);
+            } catch (RuntimeException e) {
+                // A station the library cannot build (too short for its stairs, too shallow) stays the chunk layer's
+                st.built = false;
+            }
+        }
         for (int k = 0; k < stations.size(); k++) {
             Station st = stations.get(k);
             try {
@@ -233,6 +271,11 @@ final class RailStructures {
                 viaducts(logic, Hash.of(townId, 37, r), tier, streets, pieces, runs.get(r), r >= intercity, stations, out);
             } catch (RuntimeException e) {
                 // A run the library cannot build stays the chunk layer's own deck
+            }
+            try {
+                tunnels(logic, Hash.of(townId, 43, r), pieces, runs.get(r), buried, out);
+            } catch (RuntimeException e) {
+                // Nor its own box
             }
         }
         return out.done();
@@ -454,6 +497,188 @@ final class RailStructures {
         st.built = true;
         st.half = section.half();
         st.bounds = bounds;
+    }
+
+    /** How deep under the ground a line's rails must lie for its box to be a tunnel: the box and a block over it. */
+    private static final int TUNNEL_COVER = 9;
+
+    /**
+     * An underground station built whole (the library's cut-and-cover {@link UndergroundStation}): the concourse over
+     * the platforms, stairs and escalators between, exits out under the pavement of the street over it and up to
+     * entrance houses beside it. Its rails at the line's (the bed a block under them), the box's cover what the ground
+     * leaves over its two levels; too shallow for them, or its platform too short for the stairs, it is left to the
+     * chunk layer. Only its blocks at or over the ground keep the buildings off; the box under them does not.
+     */
+    private static void buried(CityLogic logic, long h, SettlementTier tier, Streets streets, Station st,
+                               List<Station> all, Built out) {
+        st.built = false;
+        Line line = new Line(st.line);
+        int platform = (int) Math.round(line.length());
+        double[] middle = line.point(0.5 * line.length());
+        // One box where two lines' stations meet: the later one left to the chunk layer
+        for (Station other : all) {
+            if (other != st && other.built && other.bounds != null && middle[0] >= other.bounds[0]
+                    && middle[0] <= other.bounds[2] && middle[1] >= other.bounds[1] && middle[1] <= other.bounds[3]) {
+                return;
+            }
+        }
+        CrossSection section = section(h, tier, false);
+        int rails = (int) Math.floor(st.level) + 1;
+        int groundMid = terrain(logic, middle[0], middle[1]);
+        int concourse = 4;
+        int headroom = 5;
+        int cover = groundMid - rails - concourse - headroom - 3;
+        if (cover < 2) {
+            concourse = 3;
+            headroom = 4;
+            cover = groundMid - rails - concourse - headroom - 3;
+        }
+        if (cover < 1) {
+            return;
+        }
+        int approach = 4;
+        Curve curve = Curve.along(line, 0.5, approach + 0.5);
+        int half = section.half() + 1;
+        // The exits' stairs come up beside the street over the station, past its paving
+        int outward = Math.max(2, (int) Math.ceil(streets.halfAt(middle[0], middle[1]) + 2.5 - half));
+        List<UndergroundStation.Exit> exits = List.of(
+                new UndergroundStation.Exit(approach + 4, 1, outward, -1, 3),
+                new UndergroundStation.Exit(approach + platform - 7, -1, outward, 1, 3));
+        int[] datum = {groundMid};
+        Ground ground = (x, z) -> {
+            double[] q = curve.place(x + 0.5, z + 0.5);
+            return terrain(logic, q[0], q[1]) - datum[0];
+        };
+        RailPalette p = palette(h);
+        UndergroundStation us = new UndergroundStation(section, platform, approach, cover, concourse, headroom, 6,
+                exits, p, ground);
+        datum[0] = rails - us.level();
+        Model laid = CurvedStation.underground(us, curve, null, CurvedStation.CAR_SPACING, CurvedStation.CAR_WIDTH, p);
+        // Lit through: a grid of lights in the concourse's ceiling and in the platforms' (the concourse floor's
+        // underside), every four blocks wherever the ceiling has air under it (the library's own run in a row or two)
+        List<int[]> lights = new ArrayList<>();
+        laid.forEach((x, y, z, s) -> {
+            boolean ceiling = y == us.topSlab() || y == us.concourseFloor() - 1;
+            if (ceiling && Math.floorMod(x, 4) == 0 && Math.floorMod(z, 4) == 0
+                    && Flights.AIR.equals(laid.get(x, y - 1, z)) && Flights.AIR.equals(laid.get(x, y - 2, z))) {
+                lights.add(new int[]{x, y, z});
+            }
+        });
+        for (int[] l : lights) {
+            laid.set(l[0], l[1], l[2], p.light());
+        }
+        Map<Long, Integer> surface = new HashMap<>();
+        int[] bounds = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+        laid.forEach((x, y, z, s) -> {
+            int wy = y + datum[0];
+            int top = surface.computeIfAbsent(key(x, z), k -> terrain(logic, x, z));
+            out.add(x, wy, z, s, wy >= top - 1);
+            bounds[0] = Math.min(bounds[0], x);
+            bounds[1] = Math.min(bounds[1], z);
+            bounds[2] = Math.max(bounds[2], x);
+            bounds[3] = Math.max(bounds[3], z);
+        });
+        st.built = true;
+        st.half = half;
+        st.bounds = bounds;
+    }
+
+    /**
+     * A run's tunnels: its stretches in the ground deep enough for a box ({@link #TUNNEL_COVER}), less the stations
+     * built whole, each long enough built as the library's cut-and-cover box ({@link CutCoverTunnel}) on the line's
+     * curve and grade. Shallower, the line's cutting down to its portal stays the chunk layer's.
+     */
+    private static void tunnels(CityLogic logic, long h, List<double[]> pieces, int[] run, List<Station> buried,
+                                Built out) {
+        int from = run[0];
+        int to = run[1];
+        int m = to - from;
+        if (m < 1) {
+            return;
+        }
+        List<double[]> pts = new ArrayList<>();
+        double[] level = new double[m + 1];
+        double[] ground = new double[m + 1];
+        boolean[] under = new boolean[m];
+        for (int i = 0; i < m; i++) {
+            double[] g = pieces.get(from + i);
+            if (i == 0) {
+                pts.add(new double[]{g[0], g[1]});
+            }
+            pts.add(new double[]{g[2], g[3]});
+            level[i] = g[4];
+            level[i + 1] = g[5];
+            ground[i] = g[8];
+            ground[i + 1] = g[9];
+            under[i] = g[10] > 0.5;
+        }
+        Line line = new Line(pts);
+        int length = (int) Math.floor(line.length());
+        if (length < MIN_LENGTH) {
+            return;
+        }
+        boolean[] down = new boolean[length + 1];
+        for (int s = 0; s <= length; s++) {
+            double at = Math.min(line.length(), s + 0.5);
+            int i = line.segment(at);
+            double t = (at - line.ss[i]) / Math.max(1e-9, line.ss[i + 1] - line.ss[i]);
+            double lv = level[i] + (level[i + 1] - level[i]) * t;
+            double gr = ground[i] + (ground[i + 1] - ground[i]) * t;
+            down[s] = under[i] && gr - lv >= TUNNEL_COVER;
+            if (down[s]) {
+                double[] q = line.point(at);
+                for (Station st : buried) {
+                    if (st.built && st.bounds != null && q[0] >= st.bounds[0] - 1 && q[0] <= st.bounds[2] + 1
+                            && q[1] >= st.bounds[1] - 1 && q[1] <= st.bounds[3] + 1 && inStation(st, q[0], q[1])) {
+                        down[s] = false;
+                        break;
+                    }
+                }
+            }
+        }
+        RailPalette p = palette(h);
+        int k = 0;
+        while (k <= length) {
+            if (!down[k]) {
+                k++;
+                continue;
+            }
+            int end = k;
+            while (end <= length && down[end]) {
+                end++;
+            }
+            if (end - k >= MIN_LENGTH) {
+                tunnel(line, level, k, end, p, out);
+            }
+            k = end;
+        }
+    }
+
+    /** One stretch of box tunnel, from {@code from} to {@code to} along a run's line, each block at the rails' level. */
+    private static void tunnel(Line line, double[] level, int from, int to, RailPalette p, Built out) {
+        int length = to - from;
+        int[] rail = new int[length + 1];
+        for (int x = 0; x <= length; x++) {
+            double at = Math.min(line.length(), from + x + 0.5);
+            int i = line.segment(at);
+            double t = (at - line.ss[i]) / Math.max(1e-9, line.ss[i + 1] - line.ss[i]);
+            rail[x] = (int) Math.floor(level[i] + (level[i + 1] - level[i]) * t) + 1;
+        }
+        List<double[]> pts = new ArrayList<>();
+        for (double s = from; s < to; s += 4.0) {
+            double[] q = line.point(s);
+            pts.add(new double[]{q[0], q[1]});
+        }
+        double[] last = line.point(to);
+        pts.add(new double[]{last[0], last[1]});
+        if (pts.size() < 2) {
+            return;
+        }
+        Curve curve = Curve.along(new Line(pts), 0.5, 0.0);
+        Model straight = new CutCoverTunnel(length, new int[]{-2, 2}, 0, 0, 6, p).build();
+        Model shifted = new Model();
+        straight.forEach((x, y, z, s) -> shifted.set(x, y + rail[Math.max(0, Math.min(length, x))], z, s));
+        curve.applyBand(shifted, null).forEach((x, y, z, s) -> out.add(x, y, z, s, false));
     }
 
     /**

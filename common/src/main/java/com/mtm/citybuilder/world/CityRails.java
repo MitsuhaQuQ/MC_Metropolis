@@ -40,6 +40,7 @@ public final class CityRails {
         }
         RailChunks.Cell[] cells;
         boolean[] built;
+        boolean[] buried;
         try {
             CityLogic logic = CityWorlds.of(level.getLevel());
             if (logic == null) {
@@ -48,6 +49,7 @@ public final class CityRails {
             RailChunks rails = logic.chunks().rails();
             cells = rails.cells(chunk.getPos().x, chunk.getPos().z);
             built = rails.structureColumns(chunk.getPos().x, chunk.getPos().z);
+            buried = rails.undergroundColumns(chunk.getPos().x, chunk.getPos().z);
         } catch (RuntimeException e) {
             failed = true;
             CityBuilder.LOGGER.error("City railways failed at chunk {}; no more railways are built this session", chunk.getPos(), e);
@@ -89,6 +91,10 @@ public final class CityRails {
                 }
                 int bed = (int) Math.floor(cell.level());
                 if (bed + 8 > top || bed < min + 3) {
+                    continue;
+                }
+                // A subway's station or box built whole from the library takes the column under the ground
+                if (cell.underground() && buried[x * 16 + z]) {
                     continue;
                 }
                 boolean elevated = bed - floor >= 4;

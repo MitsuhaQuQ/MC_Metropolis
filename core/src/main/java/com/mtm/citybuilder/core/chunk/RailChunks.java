@@ -379,6 +379,25 @@ public final class RailChunks {
         return out;
     }
 
+    /**
+     * The columns of a chunk (x-major) where a structure built whole takes the ground under it (a subway's station
+     * or box tunnel): the chunk layer lays no box of its own there.
+     */
+    public boolean[] undergroundColumns(int chunkX, int chunkZ) {
+        boolean[] out = new boolean[256];
+        for (Settlement town : towns(chunkX * 16.0, chunkZ * 16.0)) {
+            Index index = index(town);
+            long[] mask = index == null ? null : index.structures.under.get(key(chunkX, chunkZ));
+            if (mask == null) {
+                continue;
+            }
+            for (int c = 0; c < 256; c++) {
+                out[c] |= (mask[c >> 6] & (1L << (c & 63))) != 0;
+            }
+        }
+        return out;
+    }
+
     /** Whether a position lies within {@code margin} of a built railway's bed (no building or tree stands there). */
     public boolean near(double x, double z, double margin) {
         int cx = Math.floorDiv((int) Math.floor(x), 16);
@@ -718,6 +737,9 @@ public final class RailChunks {
         // The stations above the ground: their platforms' lines, their middles {x, z, heading, half}
         List<List<double[]>> aboveLines = new ArrayList<>();
         List<double[]> aboveMiddles = new ArrayList<>();
+        // The stations under the ground: their platforms' lines, their middles {x, z, heading}
+        List<List<double[]>> underLines = new ArrayList<>();
+        List<double[]> underMiddles = new ArrayList<>();
         for (UrbanLine line : plan.urbanLines()) {
             stretch(line.points(), DOUBLE, pieces, subways, flats);
             for (int s = 0; s < line.stations().size() && s < line.platforms().size(); s++) {
@@ -733,10 +755,8 @@ public final class RailChunks {
                             under ? 1 : 0, number});
                 }
                 if (under) {
-                    // A stair from each side platform's middle along the line: up beside a subway's box, out past the
-                    // street it runs under (on its pavement's far side)
-                    double off = Math.max(STATION + 1.0, streetHalf(plan, st[0], st[1]) + 2.5);
-                    stairs(entrances, st[0], st[1], st[3], off, 1, STATION);
+                    underLines.add(pts);
+                    underMiddles.add(new double[]{st[0], st[1], st[3]});
                 } else {
                     aboveLines.add(pts);
                     aboveMiddles.add(new double[]{st[0], st[1], st[3], STATION});
@@ -797,10 +817,25 @@ public final class RailChunks {
             stations.add(new RailStructures.Station(aboveLines.get(k), levelAt(pieces, mid[0], mid[1]), isMain, side,
                     houseLength, houseDepth));
         }
+        List<RailStructures.Station> buried = new ArrayList<>();
+        for (int k = 0; k < underLines.size(); k++) {
+            double[] mid = underMiddles.get(k);
+            buried.add(new RailStructures.Station(underLines.get(k), levelAt(pieces, mid[0], mid[1]), false, 1, 0, 0));
+        }
         RailStructures.Built structures = logic.settings().transit.models
                 ? RailStructures.build(logic, plan.settlement().id(), plan.settlement().tier(), plots, plan, pieces,
-                runs, firstRailway, stations)
+                runs, firstRailway, stations, buried)
                 : new RailStructures.Built().done();
+        for (int k = 0; k < buried.size(); k++) {
+            if (buried.get(k).built) {
+                continue;
+            }
+            // Not built whole: a stair from each side platform's middle along the line, up beside the subway's box,
+            // out past the street it runs under (on its pavement's far side)
+            double[] mid = underMiddles.get(k);
+            double off = Math.max(STATION + 1.0, streetHalf(plan, mid[0], mid[1]) + 2.5);
+            stairs(entrances, mid[0], mid[1], mid[2], off, 1, STATION);
+        }
         for (int k = 0; k < stations.size(); k++) {
             RailStructures.Station st = stations.get(k);
             double[] mid = aboveMiddles.get(k);
