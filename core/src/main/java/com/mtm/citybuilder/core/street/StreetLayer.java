@@ -1563,6 +1563,11 @@ public final class StreetLayer {
                 segments.set(k, kept);
             }
         }
+        List<double[]> mouths = new ArrayList<>();
+        for (Front front : fronts) {
+            mouths.add(front.mouth(logic.settings().transit.mainWidth));
+        }
+        unoverlap(window, canals, segments, mouths);
         clearEstates(window, segments);
         snapEnds(segments);
         dropLooseBridges(segments);
@@ -4236,6 +4241,392 @@ public final class StreetLayer {
         }
     }
 
+    /** How much of a piece another road's paving must hold for it to be that road laid twice. */
+    private static final double DOUBLE_COVER = 0.9;
+
+    /** How far apart in direction two pieces may run and still be one road laid twice. */
+    private static final double DOUBLE_ANGLE = Math.toRadians(25);
+
+    /**
+     * Streets laid twice, however they came to be (two intercity roads into a town on one way, an arterial traced
+     * again beside another, a lane run along a road's paving): a piece mostly within the paving of pieces running the
+     * same way that outrank it (by class, width, then laid first) is taken out, and the streets that met it meet the
+     * road it ran along instead, at a junction on its line (the road split there), so none is left hanging in its
+     * paving (unless it would then run over water or across a canal on the ground). Streets on the ground only, not
+     * lanes; a station avenue's first piece at its square's mouth stays.
+     */
+    private static void unoverlap(Window window, List<Canal> canals, List<StreetSegment> segments, List<double[]> keep) {
+        int n = segments.size();
+        Integer[] order = new Integer[n];
+        for (int k = 0; k < n; k++) {
+            order[k] = k;
+        }
+        java.util.Arrays.sort(order, (a, b) -> {
+            StreetSegment g = segments.get(a);
+            StreetSegment h = segments.get(b);
+            int c = Integer.compare(rank(h.streetClass()), rank(g.streetClass()));
+            if (c == 0) {
+                c = Double.compare(h.width(), g.width());
+            }
+            return c != 0 ? c : Integer.compare(a, b);
+        });
+        double cell = 32.0;
+        Map<Long, List<Integer>> kept = new HashMap<>();
+        boolean[] gone = new boolean[n];
+        List<List<Integer>> cover = new ArrayList<>(java.util.Collections.nCopies(n, (List<Integer>) null));
+        double cos = Math.cos(DOUBLE_ANGLE);
+        for (int k : order) {
+            StreetSegment g = segments.get(k);
+            double length = g.length();
+            // Streets on the ground only (a bridge, culvert or crossing is its own), not lanes (the paths to the back
+            // lots: under a road's paving they are its)
+            boolean judged = g.structure() == StreetStructure.GROUND && g.streetClass() != StreetClass.PATH
+                    && g.streetClass() != StreetClass.LANE && length > 1e-6 && !atAny(g, keep);
+            if (judged) {
+                // The kept pieces near it that run its way and share no end with it
+                List<Integer> along = new ArrayList<>();
+                java.util.Set<Integer> near = new java.util.TreeSet<>();
+                long cx = (long) Math.floor(0.5 * (g.x1() + g.x2()) / cell);
+                long cz = (long) Math.floor(0.5 * (g.z1() + g.z2()) / cell);
+                for (long ix = cx - 1; ix <= cx + 1; ix++) {
+                    for (long iz = cz - 1; iz <= cz + 1; iz++) {
+                        near.addAll(kept.getOrDefault((ix << 32) ^ (iz & 0xFFFFFFFFL), List.of()));
+                    }
+                }
+                for (int q : near) {
+                    StreetSegment h = segments.get(q);
+                    double dot = ((g.x2() - g.x1()) * (h.x2() - h.x1()) + (g.z2() - g.z1()) * (h.z2() - h.z1()))
+                            / Math.max(1e-9, length * h.length());
+                    if (Math.abs(dot) >= cos && !sharesEnd(g, h) && h.structure() == StreetStructure.GROUND
+                            && h.streetClass() != StreetClass.LANE) {
+                        along.add(q);
+                    }
+                }
+                if (!along.isEmpty()) {
+                    int samples = 0;
+                    int covered = 0;
+                    for (double t = 0.5; t < length; t += 1.0) {
+                        double x = g.x1() + (g.x2() - g.x1()) * t / length;
+                        double z = g.z1() + (g.z2() - g.z1()) * t / length;
+                        samples++;
+                        for (int q : along) {
+                            StreetSegment h = segments.get(q);
+                            if (distanceToSegment(x, z, h) < 0.5 * (h.width() + g.width()) - 0.5) {
+                                covered++;
+                                break;
+                            }
+                        }
+                    }
+                    if (covered >= DOUBLE_COVER * samples) {
+                        gone[k] = true;
+                        cover.set(k, along);
+                    }
+                }
+            }
+            if (!gone[k]) {
+                for (long ix = (long) Math.floor(Math.min(g.x1(), g.x2()) / cell) - 1; ix <= (long) Math.floor(Math.max(g.x1(), g.x2()) / cell) + 1; ix++) {
+                    for (long iz = (long) Math.floor(Math.min(g.z1(), g.z2()) / cell) - 1; iz <= (long) Math.floor(Math.max(g.z1(), g.z2()) / cell) + 1; iz++) {
+                        kept.computeIfAbsent((ix << 32) ^ (iz & 0xFFFFFFFFL), q -> new ArrayList<>()).add(k);
+                    }
+                }
+            }
+        }
+        // The ends kept streets meet a piece taken out at: each moved onto the nearest of the roads that covered it
+        Map<Long, Integer> keptEnds = new HashMap<>();
+        for (int k = 0; k < n; k++) {
+            if (!gone[k] && segments.get(k).streetClass() != StreetClass.PATH) {
+                StreetSegment g = segments.get(k);
+                keptEnds.merge(nodeKey(g.x1(), g.z1()), 1, Integer::sum);
+                keptEnds.merge(nodeKey(g.x2(), g.z2()), 1, Integer::sum);
+            }
+        }
+        Map<Long, List<Integer>> byNode = new HashMap<>();
+        for (int k = 0; k < n; k++) {
+            if (!gone[k]) {
+                StreetSegment g = segments.get(k);
+                byNode.computeIfAbsent(nodeKey(g.x1(), g.z1()), q -> new ArrayList<>()).add(k);
+                byNode.computeIfAbsent(nodeKey(g.x2(), g.z2()), q -> new ArrayList<>()).add(k);
+            }
+        }
+        Map<Long, double[]> moved = new HashMap<>();
+        Map<Integer, List<double[]>> splits = new HashMap<>();
+        for (int k = 0; k < n; k++) {
+            if (!gone[k]) {
+                continue;
+            }
+            StreetSegment g = segments.get(k);
+            for (double[] e : new double[][]{{g.x1(), g.z1()}, {g.x2(), g.z2()}}) {
+                long key = nodeKey(e[0], e[1]);
+                if (!keptEnds.containsKey(key) || moved.containsKey(key)) {
+                    continue;
+                }
+                int best = -1;
+                double bestD = Double.POSITIVE_INFINITY;
+                double bestT = 0;
+                for (int q : cover.get(k)) {
+                    StreetSegment h = segments.get(q);
+                    double dx = h.x2() - h.x1();
+                    double dz = h.z2() - h.z1();
+                    double t = Math.max(0, Math.min(1, ((e[0] - h.x1()) * dx + (e[1] - h.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+                    double d = Math.hypot(h.x1() + dx * t - e[0], h.z1() + dz * t - e[1]);
+                    if (d < bestD) {
+                        bestD = d;
+                        best = q;
+                        bestT = t;
+                    }
+                }
+                if (best < 0) {
+                    continue;
+                }
+                StreetSegment h = segments.get(best);
+                double along = bestT * h.length();
+                double[] to;
+                double[] splitAt = null;
+                if (along < 2.0) {
+                    to = new double[]{h.x1(), h.z1()};
+                } else if (along > h.length() - 2.0) {
+                    to = new double[]{h.x2(), h.z2()};
+                } else {
+                    to = new double[]{h.x1() + (h.x2() - h.x1()) * bestT, h.z1() + (h.z2() - h.z1()) * bestT};
+                    splitAt = new double[]{bestT, to[0], to[1]};
+                }
+                // Not where a street meeting it would then run over water
+                boolean dry = true;
+                for (int q : byNode.getOrDefault(key, List.of())) {
+                    StreetSegment o = segments.get(q);
+                    if (!dry || o.structure() != StreetStructure.GROUND) {
+                        continue;
+                    }
+                    double[] from = nodeKey(o.x1(), o.z1()) == key ? new double[]{o.x2(), o.z2()}
+                            : nodeKey(o.x2(), o.z2()) == key ? new double[]{o.x1(), o.z1()} : null;
+                    if (from == null) {
+                        continue;
+                    }
+                    from = moved.getOrDefault(nodeKey(from[0], from[1]), from);
+                    for (Canal canal : canals) {
+                        dry &= !canal.crosses(from[0], from[1], to[0], to[1]);
+                    }
+                    double span = Math.hypot(to[0] - from[0], to[1] - from[1]);
+                    for (double t = 0; t <= span && dry; t += 2.0) {
+                        dry = !window.water(from[0] + (to[0] - from[0]) * t / Math.max(1e-9, span),
+                                from[1] + (to[1] - from[1]) * t / Math.max(1e-9, span));
+                    }
+                }
+                if (!dry) {
+                    continue;
+                }
+                if (splitAt != null) {
+                    splits.computeIfAbsent(best, q -> new ArrayList<>()).add(splitAt);
+                }
+                moved.put(key, to);
+            }
+        }
+        List<StreetSegment> left = new ArrayList<>(n);
+        for (int k = 0; k < n; k++) {
+            if (gone[k]) {
+                continue;
+            }
+            StreetSegment g = segments.get(k);
+            List<double[]> cuts = splits.get(k);
+            if (cuts != null) {
+                cuts.sort((a, b) -> Double.compare(a[0], b[0]));
+                double[] first = moved.get(nodeKey(g.x1(), g.z1()));
+                double[] last = moved.get(nodeKey(g.x2(), g.z2()));
+                double px = first == null ? g.x1() : first[0];
+                double pz = first == null ? g.z1() : first[1];
+                double ex = last == null ? g.x2() : last[0];
+                double ez = last == null ? g.z2() : last[1];
+                for (double[] c : cuts) {
+                    if (Math.hypot(c[1] - px, c[2] - pz) >= 0.5) {
+                        left.add(new StreetSegment(px, pz, c[1], c[2], g.streetClass(), g.era(), g.width(), g.structure()));
+                        px = c[1];
+                        pz = c[2];
+                    }
+                }
+                if (Math.hypot(ex - px, ez - pz) >= 0.5) {
+                    left.add(new StreetSegment(px, pz, ex, ez, g.streetClass(), g.era(), g.width(), g.structure()));
+                }
+                continue;
+            }
+            if (g.streetClass() == StreetClass.PATH) {
+                left.add(g);
+                continue;
+            }
+            double[] a = moved.get(nodeKey(g.x1(), g.z1()));
+            double[] b = moved.get(nodeKey(g.x2(), g.z2()));
+            if (a == null && b == null) {
+                left.add(g);
+                continue;
+            }
+            double x1 = a == null ? g.x1() : a[0];
+            double z1 = a == null ? g.z1() : a[1];
+            double x2 = b == null ? g.x2() : b[0];
+            double z2 = b == null ? g.z2() : b[1];
+            if (Math.hypot(x2 - x1, z2 - z1) >= 0.5) {
+                left.add(new StreetSegment(x1, z1, x2, z2, g.streetClass(), g.era(), g.width(), g.structure()));
+            }
+        }
+        segments.clear();
+        segments.addAll(left);
+        dedupe(segments);
+        crowded(window, canals, segments, keep);
+    }
+
+    /** How near two junctions may lie before they are made one. */
+    private static final double CROWDED = 5.0;
+
+    /**
+     * Junctions crowded together, two streets meeting a road a block or two apart: the one fewer streets meet (else
+     * the narrower) moved onto the other, within {@link #CROWDED} and the narrower street's paving, where none of its
+     * streets is a bridge or would run over water or across a canal on the ground; a station's mouth stays.
+     */
+    private static void crowded(Window window, List<Canal> canals, List<StreetSegment> segments, List<double[]> keep) {
+        Map<Long, List<Integer>> byNode = new HashMap<>();
+        Map<Long, double[]> at = new java.util.LinkedHashMap<>();
+        for (int k = 0; k < segments.size(); k++) {
+            StreetSegment g = segments.get(k);
+            if (g.streetClass() == StreetClass.PATH || g.streetClass() == StreetClass.LANE) {
+                continue;
+            }
+            for (double[] e : new double[][]{{g.x1(), g.z1()}, {g.x2(), g.z2()}}) {
+                long key = nodeKey(e[0], e[1]);
+                byNode.computeIfAbsent(key, q -> new ArrayList<>()).add(k);
+                at.putIfAbsent(key, e);
+            }
+        }
+        Map<Long, List<Long>> cells = new HashMap<>();
+        List<Long> junctions = new ArrayList<>();
+        for (Map.Entry<Long, double[]> e : at.entrySet()) {
+            if (byNode.get(e.getKey()).size() >= 3) {
+                junctions.add(e.getKey());
+                cells.computeIfAbsent(((long) Math.floor(e.getValue()[0] / 16) << 32)
+                        ^ ((long) Math.floor(e.getValue()[1] / 16) & 0xFFFFFFFFL), q -> new ArrayList<>()).add(e.getKey());
+            }
+        }
+        Map<Long, double[]> moved = new HashMap<>();
+        java.util.Set<Long> taken = new java.util.HashSet<>();
+        for (long a : junctions) {
+            if (taken.contains(a)) {
+                continue;
+            }
+            double[] pa = at.get(a);
+            long cx = (long) Math.floor(pa[0] / 16);
+            long cz = (long) Math.floor(pa[1] / 16);
+            for (long ix = cx - 1; ix <= cx + 1 && !taken.contains(a); ix++) {
+                for (long iz = cz - 1; iz <= cz + 1 && !taken.contains(a); iz++) {
+                    for (long b : cells.getOrDefault((ix << 32) ^ (iz & 0xFFFFFFFFL), List.of())) {
+                        if (b == a || taken.contains(b)) {
+                            continue;
+                        }
+                        double[] pb = at.get(b);
+                        double narrow = Double.POSITIVE_INFINITY;
+                        for (long node : new long[]{a, b}) {
+                            for (int q : byNode.get(node)) {
+                                narrow = Math.min(narrow, segments.get(q).width());
+                            }
+                        }
+                        double d = Math.hypot(pa[0] - pb[0], pa[1] - pb[1]);
+                        if (d >= Math.min(CROWDED, 0.5 * narrow + 1.0)) {
+                            continue;
+                        }
+                        // The one fewer streets meet moves, else the narrower
+                        long from = a;
+                        long to = b;
+                        if (byNode.get(a).size() > byNode.get(b).size() || byNode.get(a).size() == byNode.get(b).size()
+                                && widest(segments, byNode.get(a)) > widest(segments, byNode.get(b))) {
+                            from = b;
+                            to = a;
+                        }
+                        double[] target = at.get(to);
+                        if (fixedPoint(at.get(from), keep)
+                                || !movable(window, canals, segments, byNode.get(from), from, target, moved)) {
+                            continue;
+                        }
+                        moved.put(from, target);
+                        taken.add(from);
+                        taken.add(to);
+                        break;
+                    }
+                }
+            }
+        }
+        if (moved.isEmpty()) {
+            return;
+        }
+        List<StreetSegment> left = new ArrayList<>(segments.size());
+        for (StreetSegment g : segments) {
+            double[] p = g.streetClass() == StreetClass.PATH ? null : moved.get(nodeKey(g.x1(), g.z1()));
+            double[] q = g.streetClass() == StreetClass.PATH ? null : moved.get(nodeKey(g.x2(), g.z2()));
+            if (p == null && q == null) {
+                left.add(g);
+                continue;
+            }
+            double x1 = p == null ? g.x1() : p[0];
+            double z1 = p == null ? g.z1() : p[1];
+            double x2 = q == null ? g.x2() : q[0];
+            double z2 = q == null ? g.z2() : q[1];
+            if (Math.hypot(x2 - x1, z2 - z1) >= 0.5) {
+                left.add(new StreetSegment(x1, z1, x2, z2, g.streetClass(), g.era(), g.width(), g.structure()));
+            }
+        }
+        segments.clear();
+        segments.addAll(left);
+        dedupe(segments);
+    }
+
+    private static double widest(List<StreetSegment> segments, List<Integer> pieces) {
+        double w = 0;
+        for (int q : pieces) {
+            w = Math.max(w, segments.get(q).width());
+        }
+        return w;
+    }
+
+    private static boolean fixedPoint(double[] p, List<double[]> keep) {
+        for (double[] k : keep) {
+            if (Math.hypot(p[0] - k[0], p[1] - k[1]) < 1.0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether a junction's streets may be moved to end at a point: none a bridge, none then over water or a canal. */
+    private static boolean movable(Window window, List<Canal> canals, List<StreetSegment> segments, List<Integer> pieces,
+                                   long node, double[] to, Map<Long, double[]> moved) {
+        for (int q : pieces) {
+            StreetSegment g = segments.get(q);
+            if (g.structure() != StreetStructure.GROUND) {
+                return false;
+            }
+            double[] from = nodeKey(g.x1(), g.z1()) == node ? new double[]{g.x2(), g.z2()} : new double[]{g.x1(), g.z1()};
+            from = moved.getOrDefault(nodeKey(from[0], from[1]), from);
+            for (Canal canal : canals) {
+                if (canal.crosses(from[0], from[1], to[0], to[1])) {
+                    return false;
+                }
+            }
+            double span = Math.hypot(to[0] - from[0], to[1] - from[1]);
+            for (double t = 0; t <= span; t += 2.0) {
+                if (window.water(from[0] + (to[0] - from[0]) * t / Math.max(1e-9, span),
+                        from[1] + (to[1] - from[1]) * t / Math.max(1e-9, span))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /** Whether a piece ends at one of some points. */
+    private static boolean atAny(StreetSegment g, List<double[]> points) {
+        for (double[] p : points) {
+            if (Math.hypot(g.x1() - p[0], g.z1() - p[1]) < 1.0 || Math.hypot(g.x2() - p[0], g.z2() - p[1]) < 1.0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** How much a class of street outranks another where they meet: the lesser one gives way. */
     private static int rank(StreetClass streetClass) {
         return switch (streetClass) {
@@ -6776,9 +7167,17 @@ public final class StreetLayer {
         double minZ = (double) window.originZ * grid;
         double maxX = (double) (window.originX + window.size) * grid;
         double maxZ = (double) (window.originZ + window.size) * grid;
+        int first = segments.size();
         for (RoadEdge edge : logic.roads(minX, minZ, maxX, maxZ)) {
             RoadRoute route = logic.route(edge);
             boolean[] enclosed = enclosed(route, window);
+            // Where two intercity roads come into the town on one way, it is one old road: a stretch of this route
+            // within the paving of a route laid before is left out, and where it parts from it, it leaves from that
+            // route's nearest point
+            int before = segments.size();
+            List<StreetSegment> laid = new ArrayList<>(segments.subList(first, before));
+            int last = -1;
+            boolean skipped = false;
             for (int i = 1; i < route.samples(); i++) {
                 double ax = route.x(i - 1);
                 double az = route.z(i - 1);
@@ -6803,11 +7202,73 @@ public final class StreetLayer {
                 }
                 StreetStructure structure = bridge ? StreetStructure.BRIDGE
                         : overStream(ax, az, bx, bz) ? StreetStructure.CULVERT : StreetStructure.GROUND;
-                segments.add(new StreetSegment(ax, az, bx, bz, StreetClass.OLD_ROAD, Era.OLD, config.oldRoadWidth, structure));
+                double width = config.oldRoadWidth;
+                if (alongLaid(laid, ax, az, bx, bz, width)) {
+                    // On a road laid before: the last piece laid ends on its line
+                    if (last >= 0 && !skipped) {
+                        double[] at = nearestEnd(laid, ax, az, width + 2.0);
+                        if (at != null) {
+                            StreetSegment g = segments.get(last);
+                            segments.set(last, new StreetSegment(g.x1(), g.z1(), at[0], at[1], g.streetClass(), g.era(),
+                                    g.width(), g.structure()));
+                        }
+                    }
+                    skipped = true;
+                    continue;
+                }
+                if (skipped) {
+                    double[] at = nearestEnd(laid, ax, az, width + 2.0);
+                    if (at != null) {
+                        ax = at[0];
+                        az = at[1];
+                    }
+                    skipped = false;
+                }
+                segments.add(new StreetSegment(ax, az, bx, bz, StreetClass.OLD_ROAD, Era.OLD, width, structure));
+                last = segments.size() - 1;
                 points.add(new double[]{bx, bz, Math.atan2(bz - az, bx - ax)});
             }
         }
         return points;
+    }
+
+    /** Whether a piece runs the way of old-road pieces laid before, within their paving from end to end. */
+    private static boolean alongLaid(List<StreetSegment> laid, double ax, double az, double bx, double bz, double width) {
+        double length = Math.hypot(bx - ax, bz - az);
+        if (length < 1e-6) {
+            return false;
+        }
+        double cos = Math.cos(DOUBLE_ANGLE);
+        for (double[] p : new double[][]{{ax, az}, {0.5 * (ax + bx), 0.5 * (az + bz)}, {bx, bz}}) {
+            boolean in = false;
+            for (StreetSegment g : laid) {
+                double dot = ((bx - ax) * (g.x2() - g.x1()) + (bz - az) * (g.z2() - g.z1())) / Math.max(1e-9, length * g.length());
+                if (Math.abs(dot) >= cos && distanceToSegment(p[0], p[1], g) < width - 0.5) {
+                    in = true;
+                    break;
+                }
+            }
+            if (!in) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The end of an old-road piece laid before nearest a point, within {@code reach}, or null. */
+    private static double[] nearestEnd(List<StreetSegment> laid, double x, double z, double reach) {
+        double[] best = null;
+        double bestD = reach;
+        for (StreetSegment g : laid) {
+            for (double[] e : new double[][]{{g.x1(), g.z1()}, {g.x2(), g.z2()}}) {
+                double d = Math.hypot(e[0] - x, e[1] - z);
+                if (d < bestD) {
+                    bestD = d;
+                    best = e;
+                }
+            }
+        }
+        return best;
     }
 
     /**

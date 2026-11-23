@@ -1891,7 +1891,8 @@ public final class ChunkLayer {
             }
             for (int p : pieces) {
                 StreetSegment g = index.segments.get(p);
-                if (g.streetClass() == StreetClass.OLD_ROAD && distance(g, x, z) <= 1.5) {
+                // Within its paving as the street layer leaves out a second route on one way (StreetLayer#oldRoads)
+                if (g.streetClass() == StreetClass.OLD_ROAD && distance(g, x, z) <= Math.max(1.5, g.width() - 0.5)) {
                     return true;
                 }
             }
