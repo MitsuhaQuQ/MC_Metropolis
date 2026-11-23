@@ -75,6 +75,14 @@ test('railways stand through the town', async ({}, testInfo) => {
         await view('rail-subway', x, Math.floor(p.level) + 2, z, Math.round(along), 0, testInfo);
       } else {
         await view(`rail-${kind}`, Math.round(sx), y + 6, Math.round(sz), Math.round(yaw), 15, testInfo);
+        if (kind === 'elevated' || kind === 'station') {
+          // From the ground beside it, obliquely along it: the piers, the spans, a station's concourse
+          const g = Math.round(p.ground ?? (y - 9));
+          const ox = x - Math.sin(h) * 22 - Math.cos(h) * 30;
+          const oz = z + Math.cos(h) * 22 - Math.sin(h) * 30;
+          const oyaw = (Math.atan2(-(x - ox), z - oz) * 180) / Math.PI;
+          await view(`rail-${kind}-low`, Math.round(ox), g + 3, Math.round(oz), Math.round(oyaw), -8, testInfo);
+        }
       }
       await view(`rail-${kind}-above`, x, y + 40, z, 0, 90, testInfo);
     }

@@ -86,7 +86,8 @@ public final class RailChunks {
     /** A built piece: {x1, z1, x2, z2, level1, level2, half, along1, ground1, ground2, underground 0/1}. */
     private record Index(List<double[]> pieces, List<double[]> platforms, Map<Long, List<Integer>> byChunk,
                          Map<Long, List<Integer>> platformsByChunk, List<double[]> entrances,
-                         Map<Long, List<Integer>> entrancesByChunk) {
+                         Map<Long, List<Integer>> entrancesByChunk, RailStructures.Built structures,
+                         List<double[]> through, Map<Long, List<Integer>> throughByChunk) {
     }
 
     private final CityLogic logic;
@@ -197,8 +198,26 @@ public final class RailChunks {
         return routed;
     }
 
-    /** An intercity line's column outside the towns, or null. */
-    private Cell wildCell(List<Wild> near, long chunk, double cx, double cz) {
+    /** Where along each line a town's own railway takes it over, by line and town (see {@link #cut}). */
+    private final Map<String, double[]> cuts = new HashMap<>();
+
+    private double[] cutIn(Wild w, Settlement town) {
+        String k = key(w.route.edge()) + "@" + town.id();
+        synchronized (cuts) {
+            double[] known = cuts.get(k);
+            if (known != null) {
+                return known;
+            }
+        }
+        double[] made = cut(w, town, logic.streetPlan(town));
+        synchronized (cuts) {
+            cuts.put(k, made);
+        }
+        return made;
+    }
+
+    /** An intercity line's column, or null: outside the towns, or through a town where its own railway does not run. */
+    private Cell wildCell(List<Wild> near, long chunk, double cx, double cz, Settlement town) {
         Wild best = null;
         int bestI = -1;
         double bestD = Double.POSITIVE_INFINITY;
@@ -231,6 +250,13 @@ public final class RailChunks {
         }
         com.mtm.citybuilder.core.rail.RailRoute r = best.route;
         int i = bestI;
+        if (town != null) {
+            double along = best.along[i - 1] + bestT * (best.along[i] - best.along[i - 1]);
+            double[] cut = cutIn(best, town);
+            if (along < cut[0] || along > cut[1]) {
+                return null;
+            }
+        }
         double level = r.rail(i - 1) + (r.rail(i) - r.rail(i - 1)) * bestT;
         double ground = r.ground(i - 1) + (r.ground(i) - r.ground(i - 1)) * bestT;
         com.mtm.citybuilder.core.rail.RailKind kind = r.kind(bestT < 0.5 ? i - 1 : i);
@@ -285,11 +311,64 @@ public final class RailChunks {
                     double cx = minX + x + 0.5;
                     double cz = minZ + z + 0.5;
                     UrbanSample sample = logic.urban(cx, cz);
-                    if (sample.owner() != null && sample.intensity() > built) {
-                        continue;
-                    }
-                    out[x * 16 + z] = wildCell(near, chunk, cx, cz);
+                    // In a town's built land only where the town's own railway does not take the line over
+                    out[x * 16 + z] = wildCell(near, chunk, cx, cz,
+                            sample.owner() != null && sample.intensity() > built ? sample.owner() : null);
                 }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The blocks of the structures built whole (viaducts, stations) over a chunk, one entry a town: each block packed
+     * as {@code state << 24 | (y + 2048) << 8 | x << 4 | z} (x, z in the chunk), its state's string in {@code states}.
+     */
+    public record Structure(long[] packed, List<String> states) {
+        public int x(int i) {
+            return (int) (packed[i] >> 4) & 15;
+        }
+
+        public int z(int i) {
+            return (int) packed[i] & 15;
+        }
+
+        public int y(int i) {
+            return (int) ((packed[i] >> 8) & 0xFFFF) - 2048;
+        }
+
+        public String state(int i) {
+            return states.get((int) (packed[i] >>> 24));
+        }
+    }
+
+    /** The structures built whole over a chunk (see {@link Structure}). */
+    public List<Structure> structures(int chunkX, int chunkZ) {
+        List<Structure> out = new ArrayList<>();
+        for (Settlement town : towns(chunkX * 16.0, chunkZ * 16.0)) {
+            Index index = index(town);
+            if (index == null) {
+                continue;
+            }
+            long[] packed = index.structures.blocks.get(key(chunkX, chunkZ));
+            if (packed != null) {
+                out.add(new Structure(packed, index.structures.states));
+            }
+        }
+        return out;
+    }
+
+    /** The columns of a chunk (x-major) a structure built whole takes: the chunk layer lays nothing of its own there. */
+    public boolean[] structureColumns(int chunkX, int chunkZ) {
+        boolean[] out = new boolean[256];
+        for (Settlement town : towns(chunkX * 16.0, chunkZ * 16.0)) {
+            Index index = index(town);
+            long[] mask = index == null ? null : index.structures.masks.get(key(chunkX, chunkZ));
+            if (mask == null) {
+                continue;
+            }
+            for (int c = 0; c < 256; c++) {
+                out[c] |= (mask[c >> 6] & (1L << (c & 63))) != 0;
             }
         }
         return out;
@@ -316,6 +395,23 @@ public final class RailChunks {
         {
             if (index == null) {
                 return false;
+            }
+            // A structure built whole (a viaduct, a station and its building), its columns and a margin round them
+            int reach = (int) Math.ceil(margin);
+            for (int dx = -reach; dx <= reach; dx++) {
+                for (int dz = -reach; dz <= reach; dz++) {
+                    if (index.structures.taken((int) Math.floor(x) + dx, (int) Math.floor(z) + dz)) {
+                        return true;
+                    }
+                }
+            }
+            // An intercity line passing through the town
+            for (int p : index.throughByChunk.getOrDefault(key(cx, cz), List.of())) {
+                double[] g = index.through.get(p);
+                boolean deep = g[4] < g[8] - 8 && g[5] < g[9] - 8;
+                if (!deep && foot(g, x, z)[1] <= g[6] + margin) {
+                    return true;
+                }
             }
             for (int p : index.byChunk.getOrDefault(key(cx, cz), List.of())) {
                 double[] g = index.pieces.get(p);
@@ -591,8 +687,10 @@ public final class RailChunks {
 
     private Index build(StreetPlan plan) {
         runsOf.get().clear();
-        plotsOf.set(logic.plots().town(plan.settlement()));
+        com.mtm.citybuilder.core.plot.TownPlots plots = logic.plots().town(plan.settlement());
+        plotsOf.set(plots);
         List<double[]> pieces = new ArrayList<>();
+        // Each platform piece: {x1, z1, x2, z2, half, underground 0/1, station (an above-ground one's number, or -1)}
         List<double[]> platforms = new ArrayList<>();
         boolean subways = logic.settings().transit.build == com.mtm.citybuilder.core.CitySettings.Transit.Build.ALL;
         List<double[]> entrances = new ArrayList<>();
@@ -612,6 +710,9 @@ public final class RailChunks {
                 flats.add(new double[]{site.x() - ux, site.z() - uz, site.x() + ux, site.z() + uz});
             }
         }
+        // The stations above the ground: their platforms' lines, their middles {x, z, heading, half}
+        List<List<double[]>> aboveLines = new ArrayList<>();
+        List<double[]> aboveMiddles = new ArrayList<>();
         for (UrbanLine line : plan.urbanLines()) {
             stretch(line.points(), DOUBLE, pieces, subways, flats);
             for (int s = 0; s < line.stations().size() && s < line.platforms().size(); s++) {
@@ -621,14 +722,20 @@ public final class RailChunks {
                     continue;
                 }
                 List<double[]> pts = line.platforms().get(s);
+                int number = under ? -1 : aboveLines.size();
                 for (int k = 1; k < pts.size(); k++) {
                     platforms.add(new double[]{pts.get(k - 1)[0], pts.get(k - 1)[1], pts.get(k)[0], pts.get(k)[1], STATION,
-                            under ? 1 : 0});
+                            under ? 1 : 0, number});
                 }
-                // A stair from each side platform's middle along the line: up beside a subway's box, out past the
-                // street it runs under (on its pavement's far side), or down beside a viaduct to the street
-                double off = under ? Math.max(STATION + 1.0, streetHalf(plan, st[0], st[1]) + 2.5) : STATION + 2.5;
-                stairs(entrances, st[0], st[1], st[3], off, under ? 1 : -1, STATION);
+                if (under) {
+                    // A stair from each side platform's middle along the line: up beside a subway's box, out past the
+                    // street it runs under (on its pavement's far side)
+                    double off = Math.max(STATION + 1.0, streetHalf(plan, st[0], st[1]) + 2.5);
+                    stairs(entrances, st[0], st[1], st[3], off, 1, STATION);
+                } else {
+                    aboveLines.add(pts);
+                    aboveMiddles.add(new double[]{st[0], st[1], st[3], STATION});
+                }
             }
         }
         StationSite main = null;
@@ -647,8 +754,11 @@ public final class RailChunks {
             mainLevel(pieces, runsOf.get(), firstRailway, main);
         }
         separate(pieces, runsOf.get(), firstRailway, main);
+        List<int[]> runs = new ArrayList<>(runsOf.get());
         runsOf.get().clear();
         // The main station's platforms, where a line reaches it above ground
+        int mainNumber = -1;
+        com.mtm.citybuilder.core.street.StationPlaza square = null;
         for (StationSite site : plan.sites()) {
             if (site.kind() != StationSite.Kind.MAIN || !aboveGround(pieces, site.x(), site.z())) {
                 continue;
@@ -656,8 +766,50 @@ public final class RailChunks {
             double ux = Math.cos(site.heading()) * 0.5 * site.length();
             double uz = Math.sin(site.heading()) * 0.5 * site.length();
             double half = Math.max(STATION, Math.min(12.0, 0.5 * site.width()));
-            platforms.add(new double[]{site.x() - ux, site.z() - uz, site.x() + ux, site.z() + uz, half, 0});
-            stairs(entrances, site.x(), site.z(), site.heading(), half + 2.5, -1, half);
+            mainNumber = aboveLines.size();
+            platforms.add(new double[]{site.x() - ux, site.z() - uz, site.x() + ux, site.z() + uz, half, 0, mainNumber});
+            aboveLines.add(List.of(new double[]{site.x() - ux, site.z() - uz}, new double[]{site.x() + ux, site.z() + uz}));
+            aboveMiddles.add(new double[]{site.x(), site.z(), site.heading(), half});
+            for (com.mtm.citybuilder.core.street.StationPlaza pz : plan.plazas()) {
+                if (Math.hypot(pz.x() - site.x(), pz.z() - site.z()) < 1.0) {
+                    square = pz;
+                }
+            }
+        }
+        // The stations built whole, then the viaducts between them
+        List<RailStructures.Station> stations = new ArrayList<>();
+        for (int k = 0; k < aboveLines.size(); k++) {
+            double[] mid = aboveMiddles.get(k);
+            boolean isMain = k == mainNumber;
+            int side = 1;
+            double houseLength = 0;
+            double houseDepth = 0;
+            if (isMain && square != null) {
+                side = square.side();
+                houseLength = Math.abs(square.building().u2() - square.building().u1());
+                houseDepth = Math.abs(square.building().v2() - square.building().v1());
+            }
+            stations.add(new RailStructures.Station(aboveLines.get(k), levelAt(pieces, mid[0], mid[1]), isMain, side,
+                    houseLength, houseDepth));
+        }
+        RailStructures.Built structures = logic.settings().transit.models
+                ? RailStructures.build(logic, plan.settlement().id(), plan.settlement().tier(), plots, plan, pieces,
+                runs, firstRailway, stations)
+                : new RailStructures.Built().done();
+        for (int k = 0; k < stations.size(); k++) {
+            RailStructures.Station st = stations.get(k);
+            double[] mid = aboveMiddles.get(k);
+            double half = st.built ? st.half : mid[3];
+            for (double[] g : platforms) {
+                if ((int) g[6] == k) {
+                    g[4] = half;
+                }
+            }
+            // A stair down beside the line from each side platform's middle to the street: where the station is not
+            // built whole, or its concourse is a mezzanine over a street (the library's stairs reach only that)
+            if (!st.built || st.mezzanine) {
+                stairs(entrances, mid[0], mid[1], mid[2], half + 2.5, -1, half);
+            }
         }
         Map<Long, List<Integer>> byChunk = new HashMap<>();
         for (int p = 0; p < pieces.size(); p++) {
@@ -672,15 +824,7 @@ public final class RailChunks {
         // Each entrance's foot at its platform's level: the bed of the piece nearest its station, a block up
         for (int k = 0; k < entrances.size(); k++) {
             double[] e = entrances.get(k);
-            double best = Double.POSITIVE_INFINITY;
-            double level = Double.NaN;
-            for (double[] g : pieces) {
-                double[] at = foot(g, e[0], e[1]);
-                if (at[1] < best) {
-                    best = at[1];
-                    level = g[4] + (g[5] - g[4]) * at[0];
-                }
-            }
+            double level = levelAt(pieces, e[0], e[1]);
             entrances.set(k, new double[]{e[0], e[1], e[2], e[3], e[4], e[5], level, e[6], e[7], e[8]});
         }
         Map<Long, List<Integer>> entrancesByChunk = new HashMap<>();
@@ -688,7 +832,94 @@ public final class RailChunks {
             double[] e = entrances.get(p);
             bucket(entrancesByChunk, p, e[0], e[1], e[0] + e[2] * ENTRANCE, e[1] + e[3] * ENTRANCE, 4.0);
         }
-        return new Index(pieces, platforms, byChunk, platformsByChunk, entrances, entrancesByChunk);
+        // The intercity lines passing through the town's built land (not ending here): kept clear as its own are
+        List<double[]> through = through(plan);
+        Map<Long, List<Integer>> throughByChunk = new HashMap<>();
+        for (int p = 0; p < through.size(); p++) {
+            double[] g = through.get(p);
+            bucket(throughByChunk, p, g[0], g[1], g[2], g[3], g[6] + 4.0);
+        }
+        return new Index(pieces, platforms, byChunk, platformsByChunk, entrances, entrancesByChunk, structures,
+                through, throughByChunk);
+    }
+
+    /** The bed's level of the piece nearest a point. */
+    private static double levelAt(List<double[]> pieces, double x, double z) {
+        double best = Double.POSITIVE_INFINITY;
+        double level = Double.NaN;
+        for (double[] g : pieces) {
+            double[] at = foot(g, x, z);
+            if (at[1] < best) {
+                best = at[1];
+                level = g[4] + (g[5] - g[4]) * at[0];
+            }
+        }
+        return level;
+    }
+
+    /**
+     * The intercity lines' pieces through a town's built land that its own railways do not take over (a line passing
+     * through on its way to another town, or one of its own beyond where its stretch to the main station leaves it):
+     * {x1, z1, x2, z2, level1, level2, half, along1, ground1, ground2}, as the index's pieces.
+     */
+    private List<double[]> through(StreetPlan plan) {
+        com.mtm.citybuilder.core.settlement.Settlement town = plan.settlement();
+        com.mtm.citybuilder.core.extent.CityExtent extent = logic.extent(town);
+        double reach = 2.5 * extent.radius() + 1000.0;
+        double built = logic.settings().streets.builtIntensity;
+        List<double[]> out = new ArrayList<>();
+        for (com.mtm.citybuilder.core.rail.RailEdge edge : logic.railLines(extent.coreX() - reach, extent.coreZ() - reach,
+                extent.coreX() + reach, extent.coreZ() + reach)) {
+            Wild w = wild(edge);
+            if (w == null) {
+                continue;
+            }
+            com.mtm.citybuilder.core.rail.RailRoute r = w.route;
+            double[] cut = cut(w, town, plan);
+            for (int i = 1; i < r.samples(); i++) {
+                double mx = 0.5 * (r.x(i - 1) + r.x(i));
+                double mz = 0.5 * (r.z(i - 1) + r.z(i));
+                if (Math.abs(mx - extent.coreX()) > reach || Math.abs(mz - extent.coreZ()) > reach) {
+                    continue;
+                }
+                double along = 0.5 * (w.along[i - 1] + w.along[i]);
+                if (along < cut[0] || along > cut[1]) {
+                    continue;
+                }
+                UrbanSample s = logic.urban(mx, mz);
+                if (s.owner() != town || s.intensity() <= built) {
+                    continue;
+                }
+                out.add(new double[]{r.x(i - 1), r.z(i - 1), r.x(i), r.z(i), r.rail(i - 1), r.rail(i), w.half,
+                        w.along[i - 1], r.ground(i - 1), r.ground(i)});
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Where along an intercity line its own railway in a town at one of its ends takes over: {from, to} of the line's
+     * length it lays itself there; all of it where the town has no stretch of its own for the line (or is not one of
+     * its ends).
+     */
+    private double[] cut(Wild w, com.mtm.citybuilder.core.settlement.Settlement town, StreetPlan plan) {
+        com.mtm.citybuilder.core.rail.RailEdge edge = w.route.edge();
+        boolean a = edge.a().id() == town.id();
+        boolean b = edge.b().id() == town.id();
+        double total = w.along[w.along.length - 1];
+        if (!a && !b) {
+            return new double[]{Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
+        }
+        for (CityRailway railway : plan.railways()) {
+            if (!key(railway.edge()).equals(key(edge))) {
+                continue;
+            }
+            int entry = Math.max(0, Math.min(w.along.length - 1, railway.entry()));
+            // The town's own stretch from the entry inward: toward sample 0 at end a, toward the last at end b
+            return a ? new double[]{w.along[entry], Double.POSITIVE_INFINITY}
+                    : new double[]{Double.NEGATIVE_INFINITY, w.along[entry]};
+        }
+        return new double[]{Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
     }
 
     /**

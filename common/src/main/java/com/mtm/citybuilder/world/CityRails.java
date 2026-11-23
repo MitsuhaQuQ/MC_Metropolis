@@ -39,12 +39,15 @@ public final class CityRails {
             return;
         }
         RailChunks.Cell[] cells;
+        boolean[] built;
         try {
             CityLogic logic = CityWorlds.of(level.getLevel());
             if (logic == null) {
                 return;
             }
-            cells = logic.chunks().rails().cells(chunk.getPos().x, chunk.getPos().z);
+            RailChunks rails = logic.chunks().rails();
+            cells = rails.cells(chunk.getPos().x, chunk.getPos().z);
+            built = rails.structureColumns(chunk.getPos().x, chunk.getPos().z);
         } catch (RuntimeException e) {
             failed = true;
             CityBuilder.LOGGER.error("City railways failed at chunk {}; no more railways are built this session", chunk.getPos(), e);
@@ -76,7 +79,9 @@ public final class CityRails {
                 int wx = baseX + x;
                 int wz = baseZ + z;
                 ChunkLayer.Column column = columns == null ? null : columns[x * 16 + z];
-                boolean street = column != null && column.surface() != ChunkLayer.Surface.NONE;
+                // A street crossing the line (a level crossing keeps its paving); one running along it gives way to it
+                boolean street = column != null && column.surface() != ChunkLayer.Surface.NONE
+                        && Math.abs(Math.IEEEremainder(column.heading() - cell.heading(), Math.PI)) > Math.toRadians(30);
                 int floor = Math.min(top, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
                 BlockState state = chunk.getBlockState(pos.set(wx, floor, wz));
                 while (floor > min && !state.blocksMotion()) {
@@ -88,6 +93,20 @@ public final class CityRails {
                 }
                 boolean elevated = bed - floor >= 4;
                 double edge = cell.edge();
+                if (built[x * 16 + z] && pass == 1 && !cell.underground()) {
+                    // A structure built whole takes the column (a viaduct, a station): only the room over the bed
+                    // cleared, and at grade the ground made up to the bed under a station
+                    if (!elevated && !street) {
+                        for (int y = floor + 1; y < bed; y++) {
+                            chunk.setBlockState(pos.set(wx, y, wz), Blocks.DIRT.defaultBlockState(), false);
+                        }
+                        chunk.setBlockState(pos.set(wx, bed, wz), ballast, false);
+                    }
+                    for (int y = bed + 1; y <= Math.min(top, bed + 6); y++) {
+                        chunk.setBlockState(pos.set(wx, y, wz), air, false);
+                    }
+                    continue;
+                }
                 boolean track = edge > (cell.platform() ? 3.5 : 1.5);
                 // Under water (a river, the sea) or by it the line runs in its closed box, never an open cutting
                 boolean wet = !chunk.getBlockState(pos.set(wx, floor + 1, wz)).getFluidState().isEmpty();
@@ -210,6 +229,37 @@ public final class CityRails {
                     chunk.setBlockState(pos.set(wx, bed + 1, wz), fence, false);
                     chunk.setBlockState(pos.set(wx, bed + 2, wz), fence, false);
                 }
+            }
+        }
+    }
+
+    /** The blocks of the structures built whole over the chunk (core's {@link RailChunks.Structure}). */
+    static void structures(WorldGenLevel level, ChunkAccess chunk, BlockPos.MutableBlockPos pos, int top) {
+        if (failed) {
+            return;
+        }
+        java.util.List<RailChunks.Structure> structures;
+        try {
+            CityLogic logic = CityWorlds.of(level.getLevel());
+            if (logic == null) {
+                return;
+            }
+            structures = logic.chunks().rails().structures(chunk.getPos().x, chunk.getPos().z);
+        } catch (RuntimeException e) {
+            failed = true;
+            CityBuilder.LOGGER.error("City railways failed at chunk {}; no more railways are built this session", chunk.getPos(), e);
+            return;
+        }
+        int baseX = chunk.getPos().getMinBlockX();
+        int baseZ = chunk.getPos().getMinBlockZ();
+        int min = chunk.getMinBuildHeight();
+        for (RailChunks.Structure s : structures) {
+            for (int i = 0; i < s.packed().length; i++) {
+                int y = s.y(i);
+                if (y < min || y > top) {
+                    continue;
+                }
+                chunk.setBlockState(pos.set(baseX + s.x(i), y, baseZ + s.z(i)), CityBuildings.parsed(s.state(i)), false);
             }
         }
     }

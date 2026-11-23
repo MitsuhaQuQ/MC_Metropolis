@@ -2934,10 +2934,10 @@ public final class StreetLayer {
             placed.add(chosen);
         }
         // Each platform: along its road, curved with it where the road bends gently enough, else straight
-        double half = 0.5 * transit.platformLength;
+        double half = 0.5 * transit.platformLength(window.extent.settlement().tier());
         List<List<double[]>> platforms = new ArrayList<>();
         for (double[] st : placed) {
-            List<double[]> along = st.length > 6 ? roadPlatform(segments, roadEnds, (int) st[6], st, transit) : null;
+            List<double[]> along = st.length > 6 ? roadPlatform(segments, roadEnds, (int) st[6], st, half, transit) : null;
             if (along == null) {
                 along = List.of(new double[]{st[1] - st[3] * half, st[2] - st[4] * half}, new double[]{st[1], st[2]},
                         new double[]{st[1] + st[3] * half, st[2] + st[4] * half});
@@ -3021,8 +3021,7 @@ public final class StreetLayer {
      * road ends first or bends tighter than {@code platformRadius}.
      */
     private List<double[]> roadPlatform(List<StreetSegment> segments, Map<Long, List<Integer>> roadEnds, int piece,
-                                        double[] st, CitySettings.Transit transit) {
-        double half = 0.5 * transit.platformLength;
+                                        double[] st, double half, CitySettings.Transit transit) {
         StreetSegment g = segments.get(piece);
         boolean forward = (g.x2() - g.x1()) * st[3] + (g.z2() - g.z1()) * st[4] >= 0;
         double[] middle = {0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2())};
@@ -6004,7 +6003,26 @@ public final class StreetLayer {
             if (Double.isNaN(axis)) {
                 axis = stretch.arrival();
             }
-            railways.add(new CityRailway(route.edge(), (int) entry[0], stretch.line()));
+            // The corridor from where it enters the built land on to where the line leaves it is the line's own too:
+            // laid with the rest of its stretch (its way and the streets' crossings of it), the corridor beyond the
+            // built land left to the intercity line
+            int k0 = (int) entry[0];
+            int dir = route.edge().a().id() == settlement.id() ? -1 : 1;
+            int edge = (int) entries.get(e)[0];
+            if ((k0 - edge) * dir < 0) {
+                // The line leaves the corridor before the built land: nothing of it to take in
+                edge = k0;
+            }
+            List<double[]> line = new ArrayList<>();
+            int width = stretch.line().isEmpty() ? 2 : stretch.line().get(0).length;
+            for (int k = edge; k != k0; k += dir) {
+                double[] q = new double[width];
+                q[0] = route.x(k);
+                q[1] = route.z(k);
+                line.add(q);
+            }
+            line.addAll(stretch.line());
+            railways.add(new CityRailway(route.edge(), edge, line));
         }
     }
 
@@ -6084,7 +6102,7 @@ public final class StreetLayer {
                 f++;
             }
             sites.add(new StationSite(StationSite.Kind.MAIN, anchor.x(), anchor.z(), fronts.get(f).heading(),
-                    transit.mainLength, transit.mainWidth, plazas.get(f).depth()));
+                    transit.mainLength(settlement.tier()), transit.mainWidth, plazas.get(f).depth()));
         }
         // The town lines' stations; an interchange gets a square
         for (UrbanLine line : urban) {
@@ -6102,7 +6120,7 @@ public final class StreetLayer {
                     interchange |= main.kind() == StationSite.Kind.MAIN && Math.hypot(main.x() - st[0], main.z() - st[1]) < 300;
                 }
                 sites.add(new StationSite(StationSite.Kind.TOWN_LINE, st[0], st[1], st.length > 3 ? st[3] : 0.0,
-                        transit.platformLength, transit.townLineWidth, interchange ? transit.interchangePlaza : 0.0));
+                        transit.platformLength(settlement.tier()), transit.townLineWidth, interchange ? transit.interchangePlaza : 0.0));
             }
         }
         // The intercity lines' suburban stops, counted out from the main station
@@ -6123,7 +6141,7 @@ public final class StreetLayer {
                 }
                 double[] a = line.get(k - 1);
                 sites.add(new StationSite(StationSite.Kind.SUBURBAN, p[0], p[1], Math.atan2(q[1] - a[1], q[0] - a[0]),
-                        transit.platformLength, transit.siteWidth, transit.interchangePlaza));
+                        transit.platformLength(settlement.tier()), transit.siteWidth, transit.interchangePlaza));
                 next = run + transit.suburbanSpacing;
             }
         }
@@ -6185,7 +6203,7 @@ public final class StreetLayer {
                 continue;
             }
             sites.add(new StationSite(StationSite.Kind.RESERVED, x, z, roadHeading(segments, x, z, d),
-                    transit.platformLength, transit.siteWidth, transit.interchangePlaza));
+                    transit.platformLength(settlement.tier()), transit.siteWidth, transit.interchangePlaza));
         }
         // Bus stops: one beside every station, then along the arterials
         List<double[]> stops = new ArrayList<>();

@@ -669,6 +669,8 @@ public final class CitySettings {
          * line station's width; a suburban or reserved site's width; an interchange's square.
          */
         public double mainLength = 300.0;
+        public double mainLengthCity = 240.0;
+        public double mainLengthTown = 160.0;
         public double mainWidth = 40.0;
         public double townLineWidth = 14.0;
         public double siteWidth = 20.0;
@@ -696,7 +698,36 @@ public final class CitySettings {
          * its platform {@code platformLength} straight along the road.
          */
         public double stationSnap = 250.0;
-        public double platformLength = 200.0;
+        /**
+         * Whether the railways' viaducts and stations above the ground are built whole from the structure library
+         * ({@code core.building.rail}: concrete, rigid-frame and brick viaducts, elevated and ground stations) rather
+         * than laid block by block.
+         */
+        public boolean models = true;
+        public double platformLength = 160.0;
+        public double platformLengthCity = 120.0;
+        public double platformLengthTown = 80.0;
+
+        /**
+         * A town line's platform by the town's size (20 m cars: eight in a metropolis, six in a city, four in a
+         * smaller town, as Tokyo's, Kyoto's and the local private lines' trains).
+         */
+        public double platformLength(com.mtm.citybuilder.core.settlement.SettlementTier tier) {
+            return switch (tier) {
+                case METROPOLIS -> platformLength;
+                case CITY -> platformLengthCity;
+                default -> platformLengthTown;
+            };
+        }
+
+        /** The main station's platform by the town's size (the intercity trains: fifteen cars down to eight). */
+        public double mainLength(com.mtm.citybuilder.core.settlement.SettlementTier tier) {
+            return switch (tier) {
+                case METROPOLIS -> mainLength;
+                case CITY -> mainLengthCity;
+                default -> mainLengthTown;
+            };
+        }
         /**
          * A platform follows its road where the road bends no tighter than this (MTR's curved platforms: a 25-block car
          * on a radius of 156 leaves half a block between its doors and the edge); along a tighter road it is straight.

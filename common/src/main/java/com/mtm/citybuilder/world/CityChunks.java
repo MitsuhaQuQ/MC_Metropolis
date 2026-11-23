@@ -787,6 +787,7 @@ public final class CityChunks {
         }
         // The railways through the town, after its streets: viaducts over them, level crossings giving way to them
         CityRails.lay(level, chunk, columns, pos, top);
+        CityRails.structures(level, chunk, pos, top);
         CityRails.entrances(level, chunk, pos, top);
         // The fields round the towns and on their empty edge lots
         CityFarms.lay(level, chunk, columns, pos, top);
@@ -1096,7 +1097,13 @@ public final class CityChunks {
                 } catch (RuntimeException e) {
                     return;
                 }
-                clearOver(chunk, columns, rails);
+                boolean[] built;
+                try {
+                    built = logic.chunks().rails().structureColumns(cx + dx, cz + dz);
+                } catch (RuntimeException e) {
+                    return;
+                }
+                clearOver(chunk, columns, rails, built);
                 try {
                     clearOverRoads(chunk, logic.chunks().roads(cx + dx, cz + dz, columns));
                 } catch (RuntimeException e) {
@@ -1132,7 +1139,7 @@ public final class CityChunks {
     }
 
     private static void clearOver(ChunkAccess chunk, ChunkLayer.Column[] columns,
-                                  com.mtm.citybuilder.core.chunk.RailChunks.Cell[] rails) {
+                                  com.mtm.citybuilder.core.chunk.RailChunks.Cell[] rails, boolean[] built) {
         int baseX = chunk.getPos().getMinBlockX();
         int baseZ = chunk.getPos().getMinBlockZ();
         int max = chunk.getMaxBuildHeight() - 1;
@@ -1140,7 +1147,8 @@ public final class CityChunks {
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 ChunkLayer.Column column = columns[x * 16 + z];
-                if (column.surface() == ChunkLayer.Surface.NONE) {
+                if (column.surface() == ChunkLayer.Surface.NONE || built[x * 16 + z]) {
+                    // Nothing cleared under a structure built whole (its girders and beams hang low over the street)
                     continue;
                 }
                 // The paving, looked for in a window round the ground or the deck, not trusting the heightmaps;

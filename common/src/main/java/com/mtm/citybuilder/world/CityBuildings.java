@@ -157,7 +157,7 @@ public final class CityBuildings {
     private static final Map<String, BlockState> STATES = new ConcurrentHashMap<>();
 
     /** A block state from its string (the models' {@code namespace:id[property=value,...]}); stone if unknown. */
-    private static BlockState parsed(String s) {
+    static BlockState parsed(String s) {
         return STATES.computeIfAbsent(s, key -> {
             try {
                 return net.minecraft.commands.arguments.blocks.BlockStateParser

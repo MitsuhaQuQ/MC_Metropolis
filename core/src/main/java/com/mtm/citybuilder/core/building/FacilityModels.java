@@ -207,6 +207,8 @@ public final class FacilityModels {
                 for (int width : new int[]{32, 26, 20, 16}) {
                     for (int depth : new int[]{24, 18, 15}) {
                         out.add(new Library(width, depth, seed).build());
+                        // On a shallow block, the forecourt shallower
+                        out.add(new Library(width, depth, seed, 7).build());
                     }
                 }
             }

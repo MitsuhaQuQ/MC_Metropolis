@@ -263,6 +263,46 @@ public final class Curve {
         return out;
     }
 
+    /**
+     * As {@link #apply(Model, Filter)}, looking only at the columns the straight structure can reach (a band swept
+     * along the path across its width) rather than every column of the bounding box: for long, winding structures,
+     * whose boxes hold far more columns than their bands.
+     */
+    public Model applyBand(Model straight, Filter filter) {
+        Model out = new Model();
+        if (straight.size() == 0) {
+            return out;
+        }
+        Map<Long, TreeMap<Integer, String>> columns = new HashMap<>();
+        straight.forEach((x, y, z, s) -> columns.computeIfAbsent(key(x, z), k -> new TreeMap<>()).put(y, s));
+        int sx0 = straight.minX(), sx1 = straight.maxX(), d0 = straight.minZ(), d1 = straight.maxZ();
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        for (double s = sx0 - 1; s <= sx1 + 2; s += 0.5) {
+            for (double d = d0 - 1; d <= d1 + 2; d += 0.5) {
+                double[] p = place(s, d);
+                int x = (int) Math.floor(p[0]);
+                int z = (int) Math.floor(p[1]);
+                if (!seen.add(key(x, z))) {
+                    continue;
+                }
+                double[] sd = project(x + 0.5, z + 0.5);
+                int bs = (int) Math.floor(sd[0]), bd = (int) Math.floor(sd[1]);
+                TreeMap<Integer, String> col = columns.get(key(bs, bd));
+                if (col == null) {
+                    continue;
+                }
+                int turns = quarterTurns(bs + 0.5);
+                for (Map.Entry<Integer, String> e : col.entrySet()) {
+                    String b = filter == null ? e.getValue() : filter.block(x, e.getKey(), z, e.getValue(), sd[0], sd[1]);
+                    if (b != null) {
+                        out.set(x, e.getKey(), z, rotate(b, turns));
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
     private static long key(int x, int z) {
         return ((long) x << 32) ^ (z & 0xFFFFFFFFL);
     }

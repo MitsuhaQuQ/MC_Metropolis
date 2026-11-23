@@ -16,21 +16,26 @@ import static com.mtm.citybuilder.core.building.landmark.Civic.*;
  * @param width along the front
  * @param depth back from the front
  * @param seed  the name's characters
+ * @param forecourt the forecourt's depth in front of it (7 or more: the name stone and the cherry trees)
  */
-public record Library(int width, int depth, int seed) {
-    private static final int FORECOURT = 10;
+public record Library(int width, int depth, int seed, int forecourt) {
     private static final int STOREY = 5;
 
     public Library {
-        if (width < 16 || depth < 15) {
-            throw new IllegalArgumentException("a library needs width >= 16 and depth >= 15");
+        if (width < 16 || depth < 15 || forecourt < 7) {
+            throw new IllegalArgumentException("a library needs width >= 16, depth >= 15 and a forecourt of 7 or more");
         }
+    }
+
+    /** With the usual forecourt, ten deep. */
+    public Library(int width, int depth, int seed) {
+        this(width, depth, seed, 10);
     }
 
     public Model build() {
         Model m = new Model();
         int x1 = width - 1;
-        int z0 = FORECOURT;
+        int z0 = forecourt;
         int z1 = z0 + depth - 1;
         int cx = width / 2;
         fill(m, -2, 0, 0, x1 + 2, 0, z0 - 1, PAVING);
