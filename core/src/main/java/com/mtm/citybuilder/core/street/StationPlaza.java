@@ -649,6 +649,8 @@ public record StationPlaza(Template template, double x, double z, double heading
         if (!entries.isEmpty()) {
             land = join(entries, land, loops, links, crossings, berths, building, forecourt, walk);
         }
+        // Every link on its land (a throat leaving at a slant runs over the land's corner by the mouth)
+        land = cover(land, links);
         land = trim(land, building, forecourt, loops, links, 0.5 * lane + walk + CANOPY + 2.0);
         double fromU = land.u0 + land.width;
         double toU = land.u0;
@@ -662,6 +664,34 @@ public record StationPlaza(Template template, double x, double z, double heading
         }
         return new StationPlaza(template, x, z, heading, side, front, end - front, fromU, toU, mouthU, building,
                 forecourt, land, loops, links, berths, pools, crossings);
+    }
+
+    /** The land grown by a few blocks round and taking in every block of the links. */
+    private static Land cover(Land land, List<Link> links) {
+        int margin = 6;
+        int width = land.width + 2 * margin;
+        int height = land.height + 2 * margin;
+        BitSet cells = new BitSet(width * height);
+        for (int i = 0; i < land.width; i++) {
+            for (int j = 0; j < land.height; j++) {
+                if (land.cells.get(i * land.height + j)) {
+                    cells.set((i + margin) * height + j + margin);
+                }
+            }
+        }
+        int u0 = land.u0 - margin;
+        int v0 = land.v0 - margin;
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < height; j++) {
+                for (Link link : links) {
+                    if (link.contains(u0 + i + 0.5, v0 + j + 0.5)) {
+                        cells.set(i * height + j);
+                        break;
+                    }
+                }
+            }
+        }
+        return new Land(u0, v0, width, height, cells);
     }
 
     /** How far past the square's land a street joined to it may end. */

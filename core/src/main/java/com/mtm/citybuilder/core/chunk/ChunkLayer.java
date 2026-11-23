@@ -918,8 +918,16 @@ public final class ChunkLayer {
                     if (part == StationPlaza.Part.NONE || columns[x * 16 + z].bridge) {
                         continue;
                     }
-                    // The streets in its land end at its edge (the plan cut them there); the last blocks of one
-                    // reaching in are paved over
+                    // The streets in its land end at its edge (the plan cut them there or joined them to its loop):
+                    // only its own carriageways are laid over one that reaches in, its pavements and islands not (the
+                    // avenue's first blocks past the mouth, where the land runs a block beyond the throat's end, would
+                    // else be cut off from the throat by a strip of paving)
+                    Surface there = columns[x * 16 + z].surface;
+                    boolean ownRoad = part == StationPlaza.Part.ROAD || part == StationPlaza.Part.CROSSING;
+                    if (!ownRoad && part != StationPlaza.Part.BUILDING && (there == Surface.STREET
+                            || there == Surface.OLD_ROAD || there == Surface.ARTERIAL || there == Surface.BOULEVARD)) {
+                        continue;
+                    }
                     columns[x * 16 + z] = part == StationPlaza.Part.BUILDING ? Column.EMPTY
                             : Column.plaza(plazaMark(plaza, cx, cz));
                 }
@@ -1732,6 +1740,44 @@ public final class ChunkLayer {
                 }
                 if (onSquare(plaza, at[0], at[1], r)) {
                     fixed.merge(n.getKey(), level, Math::min);
+                }
+            }
+            // A street running past the square, its paving at its edge: at its level along it, both ends of the piece
+            // (and the side streets joining it between them), else it slopes past the level square a step off it
+            for (int p = 0; p < index.segments.size(); p++) {
+                StreetSegment g = index.segments.get(p);
+                if (!ramped(g) || Math.max(g.x1(), g.x2()) < b[0] - g.width() || Math.min(g.x1(), g.x2()) > b[2] + g.width()
+                        || Math.max(g.z1(), g.z2()) < b[1] - g.width() || Math.min(g.z1(), g.z2()) > b[3] + g.width()) {
+                    continue;
+                }
+                double length = Math.max(1e-9, g.length());
+                double nx = -(g.z2() - g.z1()) / length;
+                double nz = (g.x2() - g.x1()) / length;
+                double side = 0.5 * g.width() + 1.5;
+                boolean touches = false;
+                for (double t = 0.0; t <= 1.0 && !touches; t += 1.0 / Math.ceil(length)) {
+                    double x = g.x1() + (g.x2() - g.x1()) * t;
+                    double z = g.z1() + (g.z2() - g.z1()) * t;
+                    for (double c = -side; c <= side && !touches; c += 1.0) {
+                        touches = plaza.contains(x + nx * c, z + nz * c);
+                    }
+                }
+                if (!touches) {
+                    continue;
+                }
+                List<double[]> points = new ArrayList<>();
+                points.add(new double[]{g.x1(), g.z1()});
+                points.add(new double[]{g.x2(), g.z2()});
+                if (index.interior()[p] != null) {
+                    for (double[] in : index.interior()[p]) {
+                        points.add(new double[]{in[1], in[2]});
+                    }
+                }
+                for (double[] q : points) {
+                    long key = point(q[0], q[1]);
+                    if (nodes.containsKey(key)) {
+                        fixed.merge(key, level, Math::min);
+                    }
                 }
             }
         }

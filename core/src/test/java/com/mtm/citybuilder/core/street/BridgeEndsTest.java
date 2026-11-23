@@ -144,12 +144,54 @@ class BridgeEndsTest {
                         checked++;
                         if (Math.abs(next - level) > worst) {
                             worst = Math.abs(next - level);
-                            where = x + " " + z + ": square " + level + ", street " + next;
+                            where = x + " " + z + ": square " + level + ", street " + next + " (" + column.surface()
+                                    + " " + column.width() + " wide, heading " + Math.round(Math.toDegrees(column.heading()))
+                                    + ", junction " + column.junction() + ")";
                         }
                     }
                 }
             }
         }
+        // Driven through from the throat onto the avenue: across its carriageway, a few blocks either side of the mouth
+        List<String> broken = new ArrayList<>();
+        for (StationPlaza plaza : plan.plazas()) {
+            StationPlaza.Link throat = null;
+            for (StationPlaza.Link link : plaza.links()) {
+                if (Math.abs(link.u2() - plaza.mouthU()) < 1e-6 && Math.abs(link.v2() - plaza.front() - plaza.depth()) < 1e-6) {
+                    throat = link;
+                }
+            }
+            if (throat == null) {
+                continue;
+            }
+            double length = throat.length();
+            double du = (throat.u2() - throat.u1()) / length;
+            double dv = (throat.v2() - throat.v1()) / length;
+            double carriage = 0.5 * throat.width() - throat.walk() - 1.0;
+            for (double a = -6.0; a <= 6.0; a += 0.5) {
+                for (double c = throat.median() > 0 ? 0.5 * throat.median() + 1.0 : 0.0; c <= carriage; c += 1.0) {
+                    for (int sign : new int[]{1, -1}) {
+                        double u = throat.u2() + du * a - dv * c * sign;
+                        double v = throat.v2() + dv * a + du * c * sign;
+                        double[] w = plaza.world(u, v);
+                        int bx = (int) Math.floor(w[0]);
+                        int bz = (int) Math.floor(w[1]);
+                        com.mtm.citybuilder.core.chunk.ChunkLayer.Column column = chunks.columns(Math.floorDiv(bx, 16),
+                                Math.floorDiv(bz, 16))[Math.floorMod(bx, 16) * 16 + Math.floorMod(bz, 16)];
+                        StationPlaza.Part part = plaza.part(bx + 0.5, bz + 0.5);
+                        boolean driven = column.surface() == com.mtm.citybuilder.core.chunk.ChunkLayer.Surface.PLAZA
+                                ? part == StationPlaza.Part.ROAD || part == StationPlaza.Part.CROSSING
+                                : column.surface() == com.mtm.citybuilder.core.chunk.ChunkLayer.Surface.ARTERIAL
+                                || column.surface() == com.mtm.citybuilder.core.chunk.ChunkLayer.Surface.BOULEVARD
+                                || column.surface() == com.mtm.citybuilder.core.chunk.ChunkLayer.Surface.STREET;
+                        if (!driven && broken.size() < 10) {
+                            broken.add(bx + " " + bz + " (" + a + " along, " + c * sign + " across): " + column.surface() + " " + part);
+                        }
+                    }
+                }
+            }
+        }
+        assertTrue(broken.isEmpty(), () -> "a square's throat cut off from its avenue: " + broken);
         System.out.println("square edges by the mouths " + checked + ", worst step " + worst + " at " + where);
         double step = worst;
         String at = where;
