@@ -392,6 +392,15 @@ public final class BuildingLayer {
     private static final double MIN_SIDE = 5.0;
 
     /** The least depth a building of so many storeys stands with. */
+    /**
+     * The narrowest a building of more than one storey stands: Kyoto's houses are 4.6 wide at the first quartile, 5.9
+     * at the median, and two storeys (PLATEAU); narrower, a single storey.
+     */
+    private static final double NARROWEST_UPPER = 4.5;
+
+    /** How deep an old-town machiya runs back on a deep lot (its rooms and inner garden, 奥へ深い鰻の寝床). */
+    private static final double MACHIYA_DEEPEST = 24.0;
+
     private static double minDepth(int storeys) {
         return storeys >= 6 ? 9.0 : storeys >= 3 ? 7.0 : storeys == 2 ? 6.0 : MIN_SIDE;
     }
@@ -805,7 +814,7 @@ public final class BuildingLayer {
         double depth;
         switch (type) {
             case HOUSE -> {
-                front = 1.0 + Math.floor((project ? 2.0 : 4.0) * Hash.unit(Hash.of(seed, 3)));
+                front = 1.0 + Math.floor((project ? 2.0 : 3.0) * Hash.unit(Hash.of(seed, 3)));
                 sideGap = 1.0;
                 backGap = 2.0;
                 // Hokuriku's houses and a merchant town's estates run larger
@@ -947,9 +956,13 @@ public final class BuildingLayer {
             boolean most = true;
             // Downtown and in the old town a shop, an office or a block of flats fills its lot back to where it ends,
             // as their buildings do, not standing at its type's depth with a yard behind
+            // So does a machiya in the old town, back to its storehouse yard (a block or two clear behind it)
+            boolean machiya = district == District.OLD_TOWN && type == Building.Type.MACHIYA;
             boolean fill = (downtown || district == District.OLD_TOWN) && (type == Building.Type.SHOP
-                    || type == Building.Type.OFFICE || type == Building.Type.APARTMENT);
-            double limit = fill ? Math.min(45.0, plot.maxDepth() - front) : depth + backGap;
+                    || type == Building.Type.OFFICE || type == Building.Type.APARTMENT) || machiya;
+            double deepest = machiya ? MACHIYA_DEEPEST : 45.0;
+            double limit = fill ? Math.min(deepest, plot.maxDepth() - front - (machiya ? backGap : 0.0))
+                    : depth + backGap;
             double reach = fill ? limit : depth;
             double some = reach;
             for (double d = front + 0.5; d <= front + limit; d += 1.0) {
@@ -973,7 +986,7 @@ public final class BuildingLayer {
             }
             // A lot too shallow for that keeps the depth some of its frontage reaches, rather than standing empty
             double own = reach >= MIN_SIDE + 2.0 ? reach : some;
-            depth = fill ? Math.floor(Math.max(MIN_SIDE, Math.min(45.0, own - 1.0))) : Math.min(depth, own);
+            depth = fill ? Math.floor(Math.max(Math.min(depth, own), Math.min(deepest, own - 1.0))) : Math.min(depth, own);
         }
         // Room inside its walls: at least three blocks clear between them either way
         if (width < MIN_SIDE || depth < MIN_SIDE) {
@@ -1089,7 +1102,8 @@ public final class BuildingLayer {
         // storeys, 7 deep for three, 9 for six and more), and walls no higher than four times the narrower side, so a
         // block does not come out a sheet; storeys taken off where the lot is too small for them
         double narrow = Math.min(width, depth);
-        while (storeys > 1 && (depth < minDepth(storeys) || narrow < 6.0 || ground + (storeys - 1) * upper > 4.0 * narrow)) {
+        while (storeys > 1 && (depth < minDepth(storeys) || narrow < NARROWEST_UPPER
+                || ground + (storeys - 1) * upper > 4.0 * narrow)) {
             storeys--;
         }
         step = Math.min(step, storeys);

@@ -3919,9 +3919,9 @@
      "stones": 0.5
     },
     "UPPER": {
-     "normal": 0.35,
-     "low": 0.5,
-     "single": 0.15
+     "normal": 0.4,
+     "low": 0.55,
+     "single": 0.05
     },
     "WAINSCOT": {
      "band": 1.0
@@ -4197,9 +4197,9 @@
      "stones": 1.0
     },
     "UPPER": {
-     "normal": 0.2,
-     "low": 0.7,
-     "single": 0.1
+     "normal": 0.22,
+     "low": 0.73,
+     "single": 0.05
     },
     "WAINSCOT": {
      "band": 1.0

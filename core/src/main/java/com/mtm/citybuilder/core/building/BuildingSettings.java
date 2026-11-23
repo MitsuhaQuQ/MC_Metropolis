@@ -13,7 +13,7 @@ public final class BuildingSettings {
      */
     public double[] storeysCentral = {0.04, 0.24, 0.24, 0.12, 0.10, 0.06, 0.05, 0.05, 0.03, 0.03, 0.02, 0.02};
     public double[] storeysStationFront = {0.03, 0.20, 0.22, 0.12, 0.10, 0.08, 0.06, 0.06, 0.04, 0.04, 0.03, 0.02};
-    public double[] storeysOldTown = {0.08, 0.70, 0.17, 0.03, 0.02};
+    public double[] storeysOldTown = {0.04, 0.71, 0.20, 0.03, 0.02};
     public double[] storeysResidential = {0.09, 0.68, 0.18, 0.025, 0.01, 0.006, 0.004, 0.003, 0.002};
     public double[] storeysIndustrial = {0.50, 0.40, 0.10};
 

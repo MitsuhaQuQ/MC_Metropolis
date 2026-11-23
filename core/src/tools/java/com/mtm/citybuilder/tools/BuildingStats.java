@@ -47,6 +47,8 @@ final class BuildingStats {
                 "  of no lot: outside districts", "grounds", "high-speed", "other"};
         com.mtm.citybuilder.core.street.StreetPlan plan = logic.streetPlan(plots.settlement());
         Map<String, long[]> whyNone = new TreeMap<>();
+        // Within 2 km: each district's lot land, built on and as yard
+        Map<District, long[]> lotLand = new EnumMap<>(District.class);
         long[][] ringUse = new long[ringEdges.length - 1][uses.length];
         com.mtm.citybuilder.core.function.TownFunctions functions = logic.functions().town(plots.settlement());
         for (double x = centerX - half; x < centerX + half; x += step) {
@@ -88,6 +90,9 @@ final class BuildingStats {
                         use = 6;
                     }
                     ringUse[ring][use]++;
+                    if (d < 2000 && plot != null && (use == 6 || use == 7)) {
+                        lotLand.computeIfAbsent(plot.district(), k -> new long[2])[use == 7 ? 0 : 1]++;
+                    }
                 }
                 if (b == null || !BuildingLayer.inside(b, plot, x, z)) {
                     continue;
@@ -129,7 +134,23 @@ final class BuildingStats {
             System.out.println(line);
         }
 
+        System.out.println("  within 2 km, the lots built on (net of yards) by district:");
+        for (var e : lotLand.entrySet()) {
+            long[] v = e.getValue();
+            System.out.printf("    %-14s built %4.0f%%  of %.2f km2%n", e.getKey(), 100.0 * v[0] / Math.max(1, v[0] + v[1]),
+                    (v[0] + v[1]) * step * step / 1e6);
+        }
+
         List<Seen> all = new ArrayList<>(seen.values());
+        Map<Building.Type, int[]> single = new EnumMap<>(Building.Type.class);
+        for (Seen s : all) {
+            int[] c = single.computeIfAbsent(s.building.type(), k -> new int[2]);
+            c[0]++;
+            c[1] += s.building.storeys() == 1 ? 1 : 0;
+        }
+        StringBuilder line1 = new StringBuilder("  one storey by kind:");
+        single.forEach((k, v) -> line1.append(String.format(" %s %d/%d", k, v[1], v[0])));
+        System.out.println(line1);
         System.out.println("  storeys: " + shares(all, s -> s.building.storeys()) + "   (Kyoto: 1F 9%, 2F 68%, 3F 18%, 4-5F 3.5%, 6F+ 1.4%)");
         Map<Building.Type, Integer> types = new EnumMap<>(Building.Type.class);
         Map<Building.Roof, Integer> roofs = new EnumMap<>(Building.Roof.class);
