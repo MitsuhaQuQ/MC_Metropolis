@@ -1023,7 +1023,8 @@ public final class ChunkLayer {
             double[] a = plaza.world(onLink.u1(), onLink.v1());
             double across = (wx - a[0]) * -Math.sin(heading) + (wz - a[1]) * Math.cos(heading);
             double along = wx * Math.cos(heading) + wz * Math.sin(heading);
-            if (onLink.median() <= 0) {
+            // Past a throat's median nose, as the avenue it runs on into: marked as a street of its width
+            if (onLink.median() <= 0 || onLink.local(u, v)[0] > onLink.length() - (onLink.walk() + 4.0)) {
                 Mark mark = mark(new Column(Surface.ARTERIAL, false, Double.NaN, across, heading, along, onLink.width()));
                 return new Mark(mark.paving(), mark.angle(), mark.offset(), true);
             }

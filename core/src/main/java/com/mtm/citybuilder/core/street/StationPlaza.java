@@ -273,6 +273,19 @@ public record StationPlaza(Template template, double x, double z, double heading
             return l[0] >= 0 && l[0] <= length() && Math.abs(l[1]) <= 0.5 * width;
         }
 
+        /**
+         * Whether a position lies on its planted median: from its first end (a throat's, in the loop's island) to a
+         * nose its zebra and four blocks short of its second (the mouth: an avenue without a median runs on into it,
+         * not grass in the middle of the junction).
+         */
+        public boolean onMedian(double u, double v) {
+            if (median <= 0) {
+                return false;
+            }
+            double[] l = local(u, v);
+            return l[0] >= 0 && l[0] <= length() - (walk + 4.0) && Math.abs(l[1]) <= 0.5 * median;
+        }
+
         /** Whether a position lies on its carriageway (its median included). */
         public boolean carriage(double u, double v) {
             double[] l = local(u, v);
@@ -379,7 +392,7 @@ public record StationPlaza(Template template, double x, double z, double heading
         }
         // A throat's median, on through the loop's carriageway to its island
         for (Link link : links) {
-            if (link.median > 0 && link.contains(u, v) && Math.abs(link.local(u, v)[1]) <= 0.5 * link.median) {
+            if (link.onMedian(u, v)) {
                 return Part.ISLAND;
             }
         }
