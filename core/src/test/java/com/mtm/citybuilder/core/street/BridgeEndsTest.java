@@ -109,6 +109,60 @@ class BridgeEndsTest {
         builtLandIsReachedByStreets(logic, town, segments);
         streetsAreLaidSmoothlyNearTheGround(logic, terrain);
         bridgeApproachesStayNearTheLand(logic, terrain, segments);
+        squaresMeetTheirStreetsLevel(logic, plan);
+    }
+
+    /**
+     * Round each station square's mouth the avenue leaves it at the square's level: no step of more than a block from
+     * the square's paving to the street beside it.
+     */
+    private static void squaresMeetTheirStreetsLevel(CityLogic logic, StreetPlan plan) {
+        com.mtm.citybuilder.core.chunk.ChunkLayer chunks = logic.chunks();
+        double worst = 0;
+        String where = "";
+        int checked = 0;
+        for (StationPlaza plaza : plan.plazas()) {
+            double[] mouth = plaza.mouth();
+            for (int x = (int) Math.floor(mouth[0]) - 12; x <= (int) Math.floor(mouth[0]) + 12; x++) {
+                for (int z = (int) Math.floor(mouth[1]) - 12; z <= (int) Math.floor(mouth[1]) + 12; z++) {
+                    if (!onPaving(plaza, x, z)) {
+                        continue;
+                    }
+                    double level = levelAt(chunks, x, z);
+                    for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                        int nx = x + d[0];
+                        int nz = z + d[1];
+                        if (onPaving(plaza, nx, nz) || plaza.part(nx + 0.5, nz + 0.5) != StationPlaza.Part.NONE) {
+                            continue;
+                        }
+                        com.mtm.citybuilder.core.chunk.ChunkLayer.Column column = chunks.columns(Math.floorDiv(nx, 16),
+                                Math.floorDiv(nz, 16))[Math.floorMod(nx, 16) * 16 + Math.floorMod(nz, 16)];
+                        double next = levelAt(chunks, nx, nz);
+                        if (column.surface() == com.mtm.citybuilder.core.chunk.ChunkLayer.Surface.NONE || Double.isNaN(next)) {
+                            continue;
+                        }
+                        checked++;
+                        if (Math.abs(next - level) > worst) {
+                            worst = Math.abs(next - level);
+                            where = x + " " + z + ": square " + level + ", street " + next;
+                        }
+                    }
+                }
+            }
+        }
+        System.out.println("square edges by the mouths " + checked + ", worst step " + worst + " at " + where);
+        double step = worst;
+        String at = where;
+        assertTrue(step <= 1.0, () -> "a square stepped from its avenue by " + step + " at " + at);
+    }
+
+    private static boolean onPaving(StationPlaza plaza, int x, int z) {
+        StationPlaza.Part part = plaza.part(x + 0.5, z + 0.5);
+        return part != StationPlaza.Part.NONE && part != StationPlaza.Part.BUILDING;
+    }
+
+    private static double levelAt(com.mtm.citybuilder.core.chunk.ChunkLayer chunks, int x, int z) {
+        return chunks.grades(Math.floorDiv(x, 16), Math.floorDiv(z, 16)).level()[Math.floorMod(x, 16) * 16 + Math.floorMod(z, 16)];
     }
 
     /**

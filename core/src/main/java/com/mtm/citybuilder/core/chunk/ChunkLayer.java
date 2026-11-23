@@ -1643,6 +1643,7 @@ public final class ChunkLayer {
                 }
             }
         }
+        squares(index, nodes, links, reach, ramp);
         // {height, node, lift over the node's ground}, the highest first. What is carried along the streets is the
         // lift, falling 1 in leveeRamp: on flat land the street then rises 1 in leveeRamp to the crest or deck, and
         // where the land falls away from a bridge landing on high ground the lift still dies out, instead of the
@@ -1701,6 +1702,98 @@ public final class ChunkLayer {
                 open.add(new double[]{carried, next, lift});
             }
         }
+    }
+
+    /**
+     * The streets meeting a station's square at its level: every junction on or at the edge of its land (the avenue's
+     * mouth, the side streets ending at it) set to the square's level, and where that lies below the ground, the
+     * junctions beyond lowered so that no street falls to it steeper than 1 in {@code ramp} (the square sunk into a
+     * slope, the streets coming down to it), the drop dying out along the streets as the lift does for a ramp. Where
+     * the square stands over the ground the ramps carry its height out ({@link #ramps}: its junctions are presets).
+     */
+    private void squares(Index index, Map<Long, double[]> nodes, Map<Long, List<double[]>> links, Map<Long, Double> reach,
+                         double ramp) {
+        java.util.Set<StationPlaza> plazas = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (List<StationPlaza> list : index.plazas.values()) {
+            plazas.addAll(list);
+        }
+        if (plazas.isEmpty()) {
+            return;
+        }
+        Map<Long, Double> fixed = new HashMap<>();
+        for (StationPlaza plaza : plazas) {
+            double level = plazaLevel(plaza);
+            double[] b = plaza.bounds();
+            for (Map.Entry<Long, double[]> n : nodes.entrySet()) {
+                double[] at = n.getValue();
+                double r = Math.max(EDGE, reach.getOrDefault(n.getKey(), 0.0) + 1.0);
+                if (at[0] < b[0] - r || at[0] > b[2] + r || at[1] < b[1] - r || at[1] > b[3] + r) {
+                    continue;
+                }
+                if (onSquare(plaza, at[0], at[1], r)) {
+                    fixed.merge(n.getKey(), level, Math::min);
+                }
+            }
+        }
+        // {level, node, drop under the node's ground}, the deepest first
+        java.util.PriorityQueue<double[]> open = new java.util.PriorityQueue<>((u, v) -> Double.compare(v[2], u[2]));
+        Map<Long, Double> best = new HashMap<>(fixed);
+        for (Map.Entry<Long, Double> f : fixed.entrySet()) {
+            index.heights.put(f.getKey(), f.getValue());
+            double[] at = nodes.get(f.getKey());
+            double drop = groundHeight(at[0], at[1]) - f.getValue();
+            if (drop > 0) {
+                open.add(new double[]{f.getValue(), f.getKey(), drop});
+            }
+        }
+        while (!open.isEmpty()) {
+            double[] top = open.poll();
+            long node = (long) top[1];
+            if (top[0] > best.get(node)) {
+                continue;
+            }
+            for (double[] link : links.getOrDefault(node, List.of())) {
+                long next = (long) link[0];
+                if (fixed.containsKey(next)) {
+                    continue;
+                }
+                double[] at = nodes.get(next);
+                Double preset = index.heights.get(next);
+                double ground = preset != null ? preset : groundHeight(at[0], at[1]);
+                double drop = Math.min(ground - (top[0] + link[1] / ramp), top[2] - link[1] / ramp);
+                double carried = ground - drop;
+                Double known = best.get(next);
+                if (drop <= 0 || known != null && known <= carried) {
+                    continue;
+                }
+                best.put(next, carried);
+                index.heights.put(next, carried);
+                open.add(new double[]{carried, next, drop});
+            }
+        }
+    }
+
+    /** How far past a square's land a junction still counts as on it, at the least. */
+    private static final double EDGE = 2.5;
+
+    /**
+     * Whether a junction lies on a square's land or within {@code r} of it (its paving reaching the square: an
+     * arterial cut at the square's edge ends a half-width short of it).
+     */
+    private static boolean onSquare(StationPlaza plaza, double x, double z, double r) {
+        if (plaza.contains(x, z)) {
+            return true;
+        }
+        for (double d = Math.min(2.0, r); d <= r + 1e-9; d += 2.0) {
+            int steps = Math.max(8, (int) Math.ceil(2 * Math.PI * d / 2.0));
+            for (int k = 0; k < steps; k++) {
+                double a = 2 * Math.PI * k / steps;
+                if (plaza.contains(x + d * Math.cos(a), z + d * Math.sin(a))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** The crest of an embankment whose centre line runs within {@code reach} of a position, or NaN. */
