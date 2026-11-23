@@ -1203,6 +1203,72 @@ public final class ChunkLayer {
         return pick < 0.62 ? FIELD_RICE : pick < 0.74 ? FIELD_WHEAT : pick < 0.84 ? FIELD_CARROT : pick < 0.94 ? FIELD_POTATO : FIELD_BEET;
     }
 
+    /** What an empty lot in town is laid as (see {@link #lot}): left as it is, asphalt, a stall's white line, gravel. */
+    public static final int LOT_NONE = 0;
+    public static final int LOT_ASPHALT = 1;
+    public static final int LOT_STALL = 2;
+    public static final int LOT_GRAVEL = 3;
+
+    /** Share of the town's lots left without a building (not by the railway) laid as car parks rather than grass. */
+    public static final double LOT_PARKING = 0.7;
+
+    /** How near the railway a lot left without a building is always a car park (the land along the line). */
+    public static final double LOT_RAIL = 6.0;
+
+    /**
+     * What a column of an empty lot in town is laid as. Japan's towns leave little bare ground: a lot without its
+     * building is mostly a monthly or coin car park (月極、コインパーキング), and so is the land along a railway its
+     * buildings keep off. So: a back lot given to parking, and a lot along a street left without a building (within
+     * {@link #LOT_RAIL} of the railway and downtown, by the station and in the old town always, elsewhere
+     * {@link #LOT_PARKING} of them by the lot), asphalt with a white
+     * line between stalls every three blocks along the street in its first six back (on a lot square to the blocks), or
+     * gravel (a quarter of them);
+     * not at the town's thinning edge (its fields), on a facility's land, a block's interior or a remnant.
+     */
+    public int lot(int x, int z) {
+        UrbanSample sample = logic.urban(x + 0.5, z + 0.5);
+        Settlement town = sample.owner();
+        if (town == null || sample.intensity() < logic.settings().buildings.fringe || !logic.streetPlanReady(town)) {
+            return LOT_NONE;
+        }
+        com.mtm.citybuilder.core.plot.TownPlots plots = logic.plots().town(town);
+        com.mtm.citybuilder.core.plot.Plot plot = plots.at(x + 0.5, z + 0.5);
+        if (plot == null || plot.interior() || plot.remnant() || plot.use() == com.mtm.citybuilder.core.plot.Plot.Use.STATION) {
+            return LOT_NONE;
+        }
+        if (logic.functions().town(town).facilityAt(x + 0.5, z + 0.5) != null) {
+            return LOT_NONE;
+        }
+        if (logic.buildings().building(plots, plot) != null) {
+            return LOT_NONE;
+        }
+        boolean parking;
+        if (plot.use() == com.mtm.citybuilder.core.plot.Plot.Use.PARKING) {
+            parking = true;
+        } else if (plot.use() != null && !plot.use().built()) {
+            parking = false;
+        } else {
+            // Downtown, by the station and in the old town every one (land there is too dear to leave bare)
+            com.mtm.citybuilder.core.street.District d = plot.district();
+            boolean dear = d == com.mtm.citybuilder.core.street.District.CENTRAL
+                    || d == com.mtm.citybuilder.core.street.District.STATION_FRONT
+                    || d == com.mtm.citybuilder.core.street.District.OLD_TOWN;
+            parking = dear || rails().near(town, x + 0.5, z + 0.5, LOT_RAIL)
+                    || com.mtm.citybuilder.core.noise.Hash.unit(com.mtm.citybuilder.core.noise.Hash.of(logic.seed() ^ 0x9A4C1L, plot.id())) < LOT_PARKING;
+        }
+        if (!parking) {
+            return LOT_NONE;
+        }
+        if (com.mtm.citybuilder.core.noise.Hash.unit(com.mtm.citybuilder.core.noise.Hash.of(logic.seed() ^ 0x9A4C2L, plot.id())) < 0.25) {
+            return LOT_GRAVEL;
+        }
+        // Stall lines only on a lot square to the world's blocks: turned, they come out a scatter of white blocks
+        boolean square = Math.abs(Math.IEEEremainder(plot.heading(), 0.5 * Math.PI)) < 0.05;
+        boolean stall = square && plot.depth() >= 1.0 && plot.depth() < 6.0
+                && Math.floorMod((long) Math.floor(plot.along()), 3L) == 0;
+        return stall ? LOT_STALL : LOT_ASPHALT;
+    }
+
     /** Town intensity from which no tree grows: the built-up town, not its leafy edge. */
     public static final double TREELESS = 0.3;
 

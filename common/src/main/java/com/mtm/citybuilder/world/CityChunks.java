@@ -791,6 +791,7 @@ public final class CityChunks {
         CityRails.entrances(level, chunk, pos, top);
         // The fields round the towns and on their empty edge lots
         CityFarms.lay(level, chunk, columns, pos, top);
+        CityLots.lay(level, chunk, columns, pos, top);
     }
 
     private static RoadChunks.Cell[] roads(WorldGenLevel level, ChunkAccess chunk, ChunkLayer.Column[] columns) {

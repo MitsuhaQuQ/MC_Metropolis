@@ -67,6 +67,7 @@ public final class CityRails {
         BlockState platformEdge = own("tactile_line", Blocks.YELLOW_CONCRETE);
         BlockState canopy = Blocks.WHITE_CONCRETE.defaultBlockState();
         BlockState post = own("street_light_pole", Blocks.IRON_BARS);
+        BlockState underDeck = own("asphalt", Blocks.GRAY_CONCRETE);
         // First a subway's box under another line (see Cell.below), then the lines themselves
         for (int pass = 0; pass < 2; pass++)
         for (int x = 0; x < 16; x++) {
@@ -107,6 +108,17 @@ public final class CityRails {
                             chunk.setBlockState(pos.set(wx, y, wz), Blocks.DIRT.defaultBlockState(), false);
                         }
                         chunk.setBlockState(pos.set(wx, bed, wz), ballast, false);
+                    } else if (elevated && !street && column != null && column.surface() == ChunkLayer.Surface.NONE
+                            && chunk.getBlockState(pos.set(wx, floor + 1, wz)).getFluidState().isEmpty()) {
+                        // Under a viaduct the ground is a car park (高架下駐車場), not grass: asphalt, the plants over
+                        // it cleared
+                        chunk.setBlockState(pos.set(wx, floor, wz), underDeck, false);
+                        for (int y = floor + 1; y <= floor + 2; y++) {
+                            BlockState above = chunk.getBlockState(pos.set(wx, y, wz));
+                            if (!above.isAir() && !above.blocksMotion()) {
+                                chunk.setBlockState(pos, air, false);
+                            }
+                        }
                     }
                     for (int y = bed + 1; y <= Math.min(top, bed + 6); y++) {
                         chunk.setBlockState(pos.set(wx, y, wz), air, false);

@@ -465,6 +465,9 @@ public final class BuildingLayer {
         return building;
     }
 
+    /** How deep a lot cut back by a railway must still run, along a stretch of its frontage, to be built on. */
+    private static final double RAIL_LOT_DEPTH = 7.0;
+
     /** How far a building keeps off a railway's bed: a block, the fence's or the piers' room. */
     private static final double RAIL_GAP = 1.0;
 
@@ -512,7 +515,7 @@ public final class BuildingLayer {
         double bestEnd = plot.end();
         double bestDepth = shallow;
         // Narrower: the longest run of steps clear to a house's depth at least
-        double need = Math.min(deepest, 10.0);
+        double need = Math.min(deepest, RAIL_LOT_DEPTH);
         for (int i = 0; i <= na; i++) {
             if (clear[i] < need) {
                 continue;
