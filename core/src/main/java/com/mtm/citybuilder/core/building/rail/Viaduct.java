@@ -43,6 +43,7 @@ public final class Viaduct {
     private final RailPalette p;
     private final Ground ground;
     private final List<Spans.Span> spans;
+    private final java.util.function.IntFunction<int[]> bentColumns;
 
     /** The sizes of a viaduct; everything but the length and level has a default. */
     public static final class Builder {
@@ -58,6 +59,7 @@ public final class Viaduct {
         private boolean soundWall;
         private boolean catenary = true;
         private RailPalette palette = RailPalette.CONCRETE;
+        private java.util.function.IntFunction<int[]> bentColumns;
         private Ground ground = Ground.FLAT;
 
         public Builder(Deck deck, int length, int level) {
@@ -121,6 +123,16 @@ public final class Viaduct {
             return this;
         }
 
+        /**
+         * The columns of the bent at x where they cannot stand where {@link #columns} puts them (a road under the
+         * deck): their z, possibly beyond the deck, the cap beam reaching across to them (a portal frame); null keeps
+         * the usual bent there.
+         */
+        public Builder bentColumns(java.util.function.IntFunction<int[]> bentColumns) {
+            this.bentColumns = bentColumns;
+            return this;
+        }
+
         public Builder soundWall(boolean soundWall) {
             this.soundWall = soundWall;
             return this;
@@ -173,6 +185,7 @@ public final class Viaduct {
         this.catenary = b.catenary && deck == Deck.RAIL;
         this.p = b.palette;
         this.ground = b.ground;
+        this.bentColumns = b.bentColumns;
         if (length < 2) {
             throw new IllegalArgumentException("length " + length);
         }
@@ -450,16 +463,21 @@ public final class Viaduct {
         int pl = pierLength();
         int x0 = x - pl / 2;
         // Cap beam across the deck, a block or two deep
-        int capDepth = h > 7 ? 2 : 1;
+        int[] portal = bentColumns == null ? null : bentColumns.apply(x);
+        int[] cz = portal != null && portal.length > 0 ? portal.clone() : columnZ();
+        java.util.Arrays.sort(cz);
+        int across = portal != null ? 2 : deck == Deck.FOOT ? 1 : columns == 1 ? 3 : 2;
+        // A portal's cap spans its columns, deeper the wider it reaches
+        int zLow = Math.min(-h, cz[0] - across / 2);
+        int zHigh = Math.max(h, cz[cz.length - 1] - across / 2 + across - 1);
+        int capDepth = h > 7 || zHigh - zLow > 16 ? 2 : 1;
         for (int dx = 0; dx < pl; dx++) {
-            for (int z = -h; z <= h; z++) {
+            for (int z = zLow; z <= zHigh; z++) {
                 for (int y = capTop - capDepth + 1; y <= capTop; y++) {
                     m.set(x0 + dx, y, z, p.concrete());
                 }
             }
         }
-        int[] cz = columnZ();
-        int across = deck == Deck.FOOT ? 1 : columns == 1 ? 3 : 2;
         int lowest = Integer.MAX_VALUE;
         for (int c : cz) {
             for (int dx = 0; dx < pl; dx++) {

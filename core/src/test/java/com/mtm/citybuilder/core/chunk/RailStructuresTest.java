@@ -40,6 +40,7 @@ class RailStructuresTest {
         int blocks = 0;
         int piers = 0;
         int piersOnStreets = 0;
+        int piersOnPaving = 0;
         int bedColumns = 0;
         int built = 0;
         for (int cx = ccx - r; cx <= ccx + r; cx++) {
@@ -90,17 +91,23 @@ class RailStructuresTest {
                             if (streets.across(wx, wz, c.heading())) {
                                 piersOnStreets++;
                             }
+                            if (streets.paved(wx, wz)) {
+                                piersOnPaving++;
+                            }
                         }
                     }
                 }
             }
         }
-        System.out.printf("structure blocks %d %s, bed columns %d built whole %d, pier blocks %d on streets %d%n",
-                blocks, kinds, bedColumns, built, piers, piersOnStreets);
+        System.out.printf("structure blocks %d %s, bed columns %d built whole %d, pier blocks %d across streets %d"
+                + " on any paving %d%n", blocks, kinds, bedColumns, built, piers, piersOnStreets, piersOnPaving);
         assertTrue(blocks > 50_000, "structures built whole: " + blocks);
         assertTrue(built > 0.5 * bedColumns, "share of the beds above ground built whole: " + built + " of " + bedColumns);
         assertTrue(kinds.getOrDefault("steel", 0) > 0 && kinds.size() >= 4, "kinds " + kinds);
         assertTrue(piersOnStreets < 0.05 * piers, "pier blocks on streets: " + piersOnStreets + " of " + piers);
+        // Bents over a road along the line are portals or inverted Ls; what is left is mostly abutments at the
+        // stretches' ends and stations' supports
+        assertTrue(piersOnPaving < 0.08 * piers, "pier blocks on paving: " + piersOnPaving + " of " + piers);
 
         // The intercity lines through built land: laid there by the town or as the line itself
         double builtIntensity = logic.settings().streets.builtIntensity;

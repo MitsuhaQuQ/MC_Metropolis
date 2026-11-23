@@ -33,6 +33,11 @@ public final class RailChunks {
     /** An elevated deck's top over the ground under it, in blocks; a stacked one's over that. */
     public static final double CLEARANCE = 9.0;
     public static final double STACKED = 8.0;
+    /**
+     * Rail over rail where one line crosses over another: the lower line's trains, its catenary and the upper deck's
+     * girders between (a stacked line along a street needs only {@link #STACKED}, nothing running under it).
+     */
+    public static final double OVER = 11.0;
     /** The steepest a line rises: 1 in this. */
     public static final double GRADE_RUN = 30.0;
     /** Half the width of a double track's bed, of a single track's, of a station's (its tracks and side platforms). */
@@ -1067,7 +1072,7 @@ public final class RailChunks {
 
     /**
      * Lines never cross at one level (Japanese railways are grade-separated): where a run crosses an earlier run's
-     * piece within a storey of its level, the later one is raised {@link #STACKED} over it there (lowered under it, if
+     * piece within a storey of its level, the later one is raised {@link #OVER} over it there (lowered under it, if
      * it runs in the ground), ramped no steeper than 1 in {@link #GRADE_RUN} either way, a station it reaches raised
      * whole and kept level.
      */
@@ -1118,16 +1123,16 @@ public final class RailChunks {
                         }
                         double mine = g[4] + (g[5] - g[4]) * tu[0];
                         double theirs = h[4] + (h[5] - h[4]) * tu[1];
-                        if (Math.abs(mine - theirs) >= STACKED - 1.0) {
+                        boolean under = mine < g[8] + (g[9] - g[8]) * tu[0] - 4.0;
+                        if (under ? theirs - mine >= STACKED - 1.0 : Math.abs(mine - theirs) >= OVER - 0.5) {
                             continue;
                         }
-                        boolean under = mine < g[8] + (g[9] - g[8]) * tu[0] - 4.0;
                         if (under) {
                             hi[i] = Math.min(hi[i], theirs - STACKED);
                             hi[i + 1] = Math.min(hi[i + 1], theirs - STACKED);
                         } else {
-                            lo[i] = Math.max(lo[i], theirs + STACKED);
-                            lo[i + 1] = Math.max(lo[i + 1], theirs + STACKED);
+                            lo[i] = Math.max(lo[i], theirs + OVER);
+                            lo[i + 1] = Math.max(lo[i + 1], theirs + OVER);
                         }
                         changed = true;
                     }

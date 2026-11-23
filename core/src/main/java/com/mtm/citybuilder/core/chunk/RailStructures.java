@@ -155,6 +155,32 @@ final class RailStructures {
             return false;
         }
 
+        /**
+         * Whether a street's paving covers a point where no pier may stand: any street's width but a boulevard's
+         * planted median.
+         */
+        boolean paved(double x, double z) {
+            for (com.mtm.citybuilder.core.street.StreetSegment g : cells.getOrDefault(
+                    key((int) Math.floor(x / 32), (int) Math.floor(z / 32)), List.of())) {
+                double dx = g.x2() - g.x1();
+                double dz = g.z2() - g.z1();
+                double l2 = dx * dx + dz * dz;
+                if (l2 < 1e-9) {
+                    continue;
+                }
+                double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / l2));
+                double off = Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z);
+                if (off > 0.5 * g.width() + 0.5) {
+                    continue;
+                }
+                if (g.streetClass() == com.mtm.citybuilder.core.street.StreetClass.BOULEVARD && off < 2.0) {
+                    continue;
+                }
+                return true;
+            }
+            return false;
+        }
+
         /** Whether a street's paving covers a point and runs across a heading (more than 30 degrees off it). */
         boolean across(double x, double z, double heading) {
             for (com.mtm.citybuilder.core.street.StreetSegment g : cells.getOrDefault(
@@ -522,6 +548,64 @@ final class RailStructures {
         return sd[1] <= st.half + 1.0 && sd[0] > -APPROACH - 0.5;
     }
 
+    /** How far out from the line a portal's columns may stand, to either side. */
+    private static final int PORTAL_REACH = 20;
+
+    /**
+     * The columns of a viaduct's bent at x (two tracks, half-width 5, two blocks along) where its usual columns would
+     * stand on a street's paving: a portal frame, a column on each side at the nearest blocks clear of paving, or an
+     * inverted L where only one side is clear within reach; null where the usual ones stand clear (or nothing clear
+     * is within reach).
+     */
+    private static int[] portal(Streets streets, Curve curve, int x, int columns) {
+        int[] usual = columns == 1 ? new int[]{-1, 0, 1} : new int[]{-4, -3, 2, 3};
+        boolean blocked = false;
+        for (int z : usual) {
+            blocked |= paved(streets, curve, x, z);
+        }
+        if (!blocked) {
+            return null;
+        }
+        int left = Integer.MIN_VALUE;
+        for (int c = -1; c >= -PORTAL_REACH && left == Integer.MIN_VALUE; c--) {
+            if (!paved(streets, curve, x, c - 1) && !paved(streets, curve, x, c)) {
+                left = c;
+            }
+        }
+        int right = Integer.MIN_VALUE;
+        for (int c = 1; c <= PORTAL_REACH && right == Integer.MIN_VALUE; c++) {
+            if (!paved(streets, curve, x, c - 1) && !paved(streets, curve, x, c)) {
+                right = c;
+            }
+        }
+        // Clear on one side only (the line along a wide street's edge): an inverted L, its cap reaching over the road
+        if (left == Integer.MIN_VALUE && right == Integer.MIN_VALUE) {
+            return null;
+        }
+        if (left == Integer.MIN_VALUE || right == Integer.MIN_VALUE) {
+            return new int[]{left == Integer.MIN_VALUE ? right : left};
+        }
+        // Clear on both sides close in (a median wide enough): one column there is enough
+        if (right - left <= 2) {
+            return new int[]{left};
+        }
+        return new int[]{left, right};
+    }
+
+    /** Whether the block at (x, z) of a straight structure laid on a curve (two blocks along) lies on paving. */
+    private static boolean paved(Streets streets, Curve curve, int x, int z) {
+        // Every half block round it: a column laid on a curve may reach the world's columns next to its own
+        for (double dx = -1.0; dx <= 1.0; dx += 0.5) {
+            for (double dz = -0.5; dz <= 0.5; dz += 0.5) {
+                double[] q = curve.place(x + dx + 0.5, z + dz + 0.5);
+                if (streets.paved(q[0], q[1])) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private static void viaduct(CityLogic logic, long h, SettlementTier tier, Streets streets, Line line, double[] level,
                                 double[] ground, int from, int to, boolean intercity, boolean abutStart,
                                 boolean abutEnd, Built out) {
@@ -566,11 +650,22 @@ final class RailStructures {
             onStreet += streets.on(q[0], q[1]) ? 2 : 0;
         }
         boolean median = onStreet > 0.2 * length;
+        // A street under the deck anywhere but where it crosses (kept clear by the spans): only the plain viaduct,
+        // whose bents become portal frames over the road
+        boolean roadUnder = false;
+        for (int x = 0; x <= length && !roadUnder; x += 2) {
+            for (int z = -5; z <= 5 && !roadUnder; z += 2) {
+                double[] q = curve.place(x + 0.5, z + 0.5);
+                roadUnder = streets.paved(q[0], q[1]) && !streets.across(q[0], q[1], q[2]);
+            }
+        }
         Model straight;
         boolean old = !intercity && tier.ordinal() <= SettlementTier.CITY.ordinal();
-        if (median) {
-            straight = Viaduct.builder(Viaduct.Deck.RAIL, length, datum).tracks(2).columns(1)
-                    .soundWall(Hash.unit(Hash.of(h, 8)) < 0.25).keepClear(clear).palette(p).ground(terrain).build().build();
+        if (median || roadUnder) {
+            int columns = median ? 1 : Hash.unit(Hash.of(h, 7)) < 0.5 ? 1 : 2;
+            straight = Viaduct.builder(Viaduct.Deck.RAIL, length, datum).tracks(2).columns(columns)
+                    .soundWall(Hash.unit(Hash.of(h, 8)) < 0.25).keepClear(clear).palette(p).ground(terrain)
+                    .bentColumns(x -> portal(streets, curve, x, columns)).build().build();
         } else if (old && u < 0.2) {
             straight = new BrickViaduct(length, datum, 8 + (int) (Hash.unit(Hash.of(h, 5)) * 4), clear, 2, true,
                     Hash.of(h, 6), p, terrain).build();
