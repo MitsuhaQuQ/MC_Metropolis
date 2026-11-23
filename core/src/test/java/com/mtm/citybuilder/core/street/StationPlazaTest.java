@@ -113,11 +113,42 @@ class StationPlazaTest {
         }
     }
 
+    /** {@link #bounded} with a street 8 wide running up to its +u side, square on, a few blocks short of its land. */
+    private static StationPlaza joined(StationPlaza.Template template, long seed) {
+        StationPlaza plain = bounded(template, seed);
+        StationPlaza.Loop loop = plain.loops().get(0);
+        double shift = StationPlaza.mouthShift(template, CONFIG, 0.9);
+        double angle = Math.toRadians(30);
+        return StationPlaza.lay(template, 1000.5, -2000.5, Math.toRadians(30), -1, SITE, 2, CONFIG, 30.0, shift,
+                new double[]{Math.sin(angle), Math.cos(angle)}, seed, StationPlazaTest::besideArterial,
+                List.of(new StationPlaza.Entry(plain.to() + 4.0, loop.v(), -1.0, 0.0, 8.0)));
+    }
+
+    @Test
+    void sideStreetsJoinTheLoop() {
+        for (StationPlaza.Template template : List.of(StationPlaza.Template.TURNING_CIRCLE, StationPlaza.Template.ROTARY)) {
+            StationPlaza plain = bounded(template, 7L);
+            StationPlaza plaza = joined(template, 7L);
+            assertEquals(plain.links().size() + 1, plaza.links().size(), template + " the street not joined");
+            StationPlaza.Link link = plaza.links().get(plaza.links().size() - 1);
+            // Driven from its end to the loop, a zebra over it by the loop
+            for (double a = 0.0; a <= link.length(); a += 0.5) {
+                double f = a / link.length();
+                double u = link.u1() + (link.u2() - link.u1()) * f;
+                double v = link.v1() + (link.v2() - link.v1()) * f;
+                assertTrue(driven(plaza.partAt(u, v)), template + " the joining street at " + u + ", " + v + ": " + plaza.partAt(u, v));
+            }
+            assertTrue(plaza.crossings().stream().anyMatch(c -> c.link() == link), template + " no zebra");
+            assertTrue(plaza.to() > plain.to() + 3.0, template + " the land not grown to the street's end");
+        }
+    }
+
     @Test
     void berthsKeepApartAndClearOfTheThroat() {
         for (StationPlaza plaza : List.of(lay(StationPlaza.Template.TURNING_CIRCLE, 1), lay(StationPlaza.Template.ROTARY, 3),
                 lay(StationPlaza.Template.TERMINAL, 3), bounded(StationPlaza.Template.ROTARY, 7L),
-                bounded(StationPlaza.Template.TURNING_CIRCLE, 3L))) {
+                bounded(StationPlaza.Template.TURNING_CIRCLE, 3L), joined(StationPlaza.Template.ROTARY, 7L),
+                joined(StationPlaza.Template.TURNING_CIRCLE, 7L))) {
             for (int k = 0; k < plaza.loops().size(); k++) {
                 StationPlaza.Loop loop = plaza.loops().get(k);
                 double perimeter = loop.perimeter();

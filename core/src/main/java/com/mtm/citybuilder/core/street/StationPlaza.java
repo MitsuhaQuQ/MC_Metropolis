@@ -99,6 +99,13 @@ public record StationPlaza(Template template, double x, double z, double heading
         boolean free(double u, double v);
     }
 
+    /**
+     * A street running up to the square, to be joined to its loop: its end ({@code u}, {@code v}) in the frame (on the
+     * square's land or just short of it), its way on into the square {@code du}, {@code dv}, its width.
+     */
+    public record Entry(double u, double v, double du, double dv, double width) {
+    }
+
     /** A rectangle in the square's frame. */
     public record Rect(double u1, double v1, double u2, double v2) {
         public boolean contains(double u, double v) {
@@ -463,6 +470,13 @@ public record StationPlaza(Template template, double x, double z, double heading
                 (u, v) -> true);
     }
 
+    /** Lays a square out by its template, no street joined to its loop but the avenue. */
+    public static StationPlaza lay(Template template, double x, double z, double heading, int side, double siteWidth,
+                                   int lines, CitySettings.Plazas config, double avenue, double mouthU, double[] out,
+                                   long seed, Free free) {
+        return lay(template, x, z, heading, side, siteWidth, lines, config, avenue, mouthU, out, seed, free, List.of());
+    }
+
     /** A loop's middle and its stadium: {u, v, half the straights, radius}. */
     private record Stadium(double u, double v, double half, double radius) {
     }
@@ -477,10 +491,11 @@ public record StationPlaza(Template template, double x, double z, double heading
      * @param out       the avenue's way out of the mouth, {du, dv} in the frame
      * @param seed      the square's own seed, for the loops' shapes
      * @param free      where the square may lie: not on water nor over an arterial
+     * @param entries   the streets running up to it, each joined to its loop where it can be
      */
     public static StationPlaza lay(Template template, double x, double z, double heading, int side, double siteWidth,
                                    int lines, CitySettings.Plazas config, double avenue, double mouthU, double[] out,
-                                   long seed, Free free) {
+                                   long seed, Free free, List<Entry> entries) {
         double lane = config.lane;
         double walk = config.walk;
         double berth = config.berth;
@@ -630,6 +645,10 @@ public record StationPlaza(Template template, double x, double z, double heading
                 }
             }
         }
+        // The streets running up to it joined to its loops, on land of their own where they run short of it
+        if (!entries.isEmpty()) {
+            land = join(entries, land, loops, links, crossings, berths, building, forecourt, walk);
+        }
         land = trim(land, building, forecourt, loops, links, 0.5 * lane + walk + CANOPY + 2.0);
         double fromU = land.u0 + land.width;
         double toU = land.u0;
@@ -643,6 +662,144 @@ public record StationPlaza(Template template, double x, double z, double heading
         }
         return new StationPlaza(template, x, z, heading, side, front, end - front, fromU, toU, mouthU, building,
                 forecourt, land, loops, links, berths, pools, crossings);
+    }
+
+    /** How far past the square's land a street joined to it may end. */
+    private static final int ENTRY_REACH = 24;
+
+    /**
+     * Joins the streets running up to the square to its loops: each on from its end (back to the land's edge where it
+     * ends on the land) along its own way, else turned at most 50 degrees to the loop's middle, to the loop's centre
+     * line; with a zebra over it where the loop's pavement crosses. Not where it would run through the building or the
+     * forecourt or over another link, nor meet a loop beside the throat or another street joined; the berths it cuts
+     * dropped. Returns the land grown by the joining links.
+     */
+    private static Land join(List<Entry> entries, Land land, List<Loop> loops, List<Link> links, List<Crossing> crossings,
+                             List<Berth> berths, Rect building, Rect forecourt, double walk) {
+        int margin = ENTRY_REACH;
+        int width = land.width + 2 * margin;
+        int height = land.height + 2 * margin;
+        BitSet cells = new BitSet(width * height);
+        for (int i = 0; i < land.width; i++) {
+            for (int j = 0; j < land.height; j++) {
+                if (land.cells.get(i * land.height + j)) {
+                    cells.set((i + margin) * height + j + margin);
+                }
+            }
+        }
+        Land grown = new Land(land.u0 - margin, land.v0 - margin, width, height, cells);
+        List<Link> fixed = new ArrayList<>(links);
+        // The arc lengths round each loop taken, {loop, arc, half-width}: the throats' first
+        List<double[]> taken = new ArrayList<>();
+        double widest = 0.0;
+        for (Link link : links) {
+            widest = Math.max(widest, link.width());
+        }
+        for (int k = 0; k < loops.size(); k++) {
+            taken.add(new double[]{k, loops.get(k).throat, 0.5 * widest});
+        }
+        for (Entry e : entries) {
+            double length = Math.hypot(e.du(), e.dv());
+            if (length < 1e-9) {
+                continue;
+            }
+            double du = e.du() / length;
+            double dv = e.dv() / length;
+            // From the land's edge behind its end, else its end
+            double su = e.u();
+            double sv = e.v();
+            for (double back = 0.0; back < 40.0 && land.contains(e.u() - du * back, e.v() - dv * back); back += 0.5) {
+                su = e.u() - du * (back + 0.5);
+                sv = e.v() - dv * (back + 0.5);
+            }
+            // The nearest loop
+            int which = -1;
+            double nearest = Double.POSITIVE_INFINITY;
+            for (int k = 0; k < loops.size(); k++) {
+                double r = loops.get(k).radial(su, sv);
+                if (r < nearest) {
+                    nearest = r;
+                    which = k;
+                }
+            }
+            if (which < 0 || nearest > 60.0) {
+                continue;
+            }
+            Loop loop = loops.get(which);
+            double t = march(loop, su, sv, du, dv, 0.0);
+            if (Double.isNaN(t) || t > 60.0) {
+                double tu = loop.u - su;
+                double tv = loop.v - sv;
+                double d = Math.hypot(tu, tv);
+                if (d < 1e-9 || (tu * du + tv * dv) / d < Math.cos(Math.toRadians(50))) {
+                    continue;
+                }
+                du = tu / d;
+                dv = tv / d;
+                t = march(loop, su, sv, du, dv, 0.0);
+                if (Double.isNaN(t) || t > 60.0) {
+                    continue;
+                }
+            }
+            double outer = march(loop, su, sv, du, dv, 0.5 * loop.lane);
+            double pavement = march(loop, su, sv, du, dv, 0.5 * loop.lane + walk);
+            if (Double.isNaN(outer)) {
+                continue;
+            }
+            Link link = new Link(su, sv, su + du * t, sv + dv * t, e.width(), walk(e.width()), 0.0);
+            // Clear of the building, the forecourt, the other links and loops until it meets its loop's carriageway
+            boolean clear = true;
+            for (double a = 0.0; a <= outer && clear; a += 0.5) {
+                for (double c = -0.5 * e.width(); c <= 0.5 * e.width() && clear; c += 0.5) {
+                    double pu = su + du * a - dv * c;
+                    double pv = sv + dv * a + du * c;
+                    clear = !building.contains(pu, pv) && !forecourt.contains(pu, pv);
+                    for (Link other : fixed) {
+                        clear &= !other.contains(pu, pv);
+                    }
+                    for (int k = 0; k < loops.size(); k++) {
+                        clear &= k == which || loops.get(k).radial(pu, pv) > 0.5 * loops.get(k).lane + walk;
+                    }
+                }
+            }
+            if (!clear) {
+                continue;
+            }
+            // Not beside the throat or another joined street round the loop
+            double arc = loop.arc(su + du * t, sv + dv * t);
+            double perimeter = loop.perimeter();
+            boolean apart = true;
+            for (double[] other : taken) {
+                if ((int) other[0] != which) {
+                    continue;
+                }
+                double gap = Math.abs(arc - other[1]) % perimeter;
+                gap = Math.min(gap, perimeter - gap);
+                apart &= gap > 0.5 * e.width() + other[2] + 6.0;
+            }
+            if (!apart) {
+                continue;
+            }
+            taken.add(new double[]{which, arc, 0.5 * e.width()});
+            fixed.add(link);
+            links.add(link);
+            double from = Double.isNaN(pavement) ? Math.max(0.0, outer - walk) : pavement;
+            crossings.add(new Crossing(null, false, link, Math.max(0.0, Math.min(from, outer - 1.0)), outer));
+            int k = which;
+            berths.removeIf(b -> b.loop == k && b.use != Use.DROP_OFF
+                    && b.holds(arc, perimeter, 0.5 * e.width() + 1.0));
+            // Its own land, where it runs short of the square's
+            for (double a = 0.0; a <= t; a += 0.5) {
+                for (double c = -0.5 * e.width(); c <= 0.5 * e.width(); c += 0.5) {
+                    int i = (int) Math.floor(su + du * a - dv * c) - grown.u0;
+                    int j = (int) Math.floor(sv + dv * a + du * c) - grown.v0;
+                    if (i >= 0 && j >= 0 && i < width && j < height) {
+                        cells.set(i * height + j);
+                    }
+                }
+            }
+        }
+        return grown;
     }
 
     /**

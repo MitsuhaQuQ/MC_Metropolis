@@ -2200,15 +2200,94 @@ public final class StreetLayer {
                 }
                 return true;
             };
-            plazas.add(StationPlaza.lay(front.template(), station.x(), station.z(), heading, side,
+            long squareSeed = Hash.of(logic.seed(), Double.doubleToLongBits(station.x()), Double.doubleToLongBits(station.z()));
+            StationPlaza first = StationPlaza.lay(front.template(), station.x(), station.z(), heading, side,
                     transit.mainWidth, Math.max(1, lines), logic.settings().plazas, avenue, front.shift(), out,
-                    Hash.of(logic.seed(), Double.doubleToLongBits(station.x()), Double.doubleToLongBits(station.z())),
-                    free));
-            // The square's land is its own: the streets in it end at its edge
-            StationPlaza square = plazas.get(plazas.size() - 1);
-            segments.removeIf(g -> square.contains(0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2())));
+                    squareSeed, free);
+            // The square's land is its own: the streets in it end at its edge, and those cars use are joined to its
+            // loop (laid again with them)
+            java.util.Set<StreetSegment> inside = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+            for (StreetSegment g : segments) {
+                if (first.contains(0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2()))) {
+                    inside.add(g);
+                }
+            }
+            List<StationPlaza.Entry> entries = entries(first, segments, inside, mouth, avenue);
+            StationPlaza square = entries.isEmpty() ? first : StationPlaza.lay(front.template(), station.x(), station.z(),
+                    heading, side, transit.mainWidth, Math.max(1, lines), logic.settings().plazas, avenue, front.shift(),
+                    out, squareSeed, free, entries);
+            plazas.add(square);
+            segments.removeIf(inside::contains);
         }
         return plazas;
+    }
+
+    /** Whether cars use a street piece: not a lane, footpath, steps or bridge. */
+    private static boolean carried(StreetSegment g) {
+        return g.streetClass() != StreetClass.PATH && g.streetClass() != StreetClass.LANE
+                && g.structure() != StreetStructure.STAIRS && g.structure() != StreetStructure.BRIDGE;
+    }
+
+    /**
+     * The streets cars use running up to a square, to be joined to its loop: a kept piece's end on its land (the piece
+     * on into it), or a kept piece's end where a piece the square takes leaves it (on along the piece taken); not the
+     * avenue at its mouth. In the square's frame, nearest the station first.
+     */
+    private static List<StationPlaza.Entry> entries(StationPlaza square, List<StreetSegment> segments,
+                                                    java.util.Set<StreetSegment> inside, double[] mouth, double avenue) {
+        double ax = Math.cos(square.heading());
+        double az = Math.sin(square.heading());
+        List<double[]> found = new ArrayList<>();
+        for (StreetSegment g : segments) {
+            if (inside.contains(g) || !carried(g)) {
+                continue;
+            }
+            for (int end = 0; end < 2; end++) {
+                double px = end == 0 ? g.x1() : g.x2();
+                double pz = end == 0 ? g.z1() : g.z2();
+                double ox = end == 0 ? g.x2() : g.x1();
+                double oz = end == 0 ? g.z2() : g.z1();
+                if (Math.hypot(px - mouth[0], pz - mouth[1]) < 0.5 * avenue + 4.0) {
+                    continue;
+                }
+                double dx = Double.NaN;
+                double dz = Double.NaN;
+                if (square.contains(px, pz)) {
+                    dx = px - ox;
+                    dz = pz - oz;
+                } else {
+                    for (StreetSegment r : inside) {
+                        if (Math.hypot(r.x1() - px, r.z1() - pz) < 0.5) {
+                            dx = r.x2() - px;
+                            dz = r.z2() - pz;
+                        } else if (Math.hypot(r.x2() - px, r.z2() - pz) < 0.5) {
+                            dx = r.x1() - px;
+                            dz = r.z1() - pz;
+                        }
+                    }
+                }
+                if (Double.isNaN(dx) || Math.hypot(dx, dz) < 1e-9) {
+                    continue;
+                }
+                boolean known = false;
+                for (double[] f : found) {
+                    known |= Math.hypot(f[0] - px, f[1] - pz) < 0.5 * Math.max(f[4], g.width()) + 2.0;
+                }
+                if (!known) {
+                    found.add(new double[]{px, pz, dx, dz, g.width()});
+                }
+            }
+        }
+        found.sort((a, b) -> Double.compare(Math.hypot(a[0] - square.x(), a[1] - square.z()),
+                Math.hypot(b[0] - square.x(), b[1] - square.z())));
+        List<StationPlaza.Entry> entries = new ArrayList<>();
+        for (double[] f : found) {
+            double[] at = square.local(f[0], f[1]);
+            double du = f[2] * ax + f[3] * az;
+            double dv = square.side() * (-f[2] * az + f[3] * ax);
+            entries.add(new StationPlaza.Entry(at[0], at[1], du, dv, f[4]));
+        }
+        return entries;
     }
 
     /** Points every {@code spacing} blocks along a line, its two ends included, as {x, z}. */
