@@ -55,7 +55,7 @@ class CastleTerrainTest {
         assertEquals(flat.at(532,0).ground(), terraced.at(532,0).ground());
         assertEquals(flat.at(463,0).ground(), terraced.at(463,0).ground());
         // Inside, terraces of whole steps, some of them up, edged in stone where they drop
-        int highest = Integer.MIN_VALUE, faced = 0, lawn = 0;
+        int highest = Integer.MIN_VALUE, faced = 0, lawn = 0, walls = 0;
         java.util.Set<Integer> levels = new java.util.TreeSet<>();
         for (int x = 170; x <= 630; x++) {
             for (int z = -230; z <= 230; z += 5) {
@@ -69,11 +69,18 @@ class CastleTerrainTest {
                 highest = Math.max(highest, up);
                 levels.add(up);
                 if (a.faced()) faced++;
+                if (a.wall()) {
+                    walls++;
+                    assertTrue(a.faced(), "a wall on an unfaced column");
+                }
             }
         }
         assertTrue(highest >= 2 * CastleTerrain.STEP, "highest terrace " + highest);
         assertTrue(levels.size() >= 3, "levels " + levels);
         assertTrue(faced > 0 && faced < lawn / 3, faced + " faced of " + lawn);
+        assertTrue(walls > 0 && walls <= faced, walls + " walls of " + faced + " faced");
+        // Along the outermost bailey (no terraces) no column carries a wall
+        for (int x = 192; x <= 250; x++) assertFalse(terraced.at(x + 0.5, -200.5).wall(), "wall at " + x);
         // A path's grade across the terraces climbs without steps, inside the outer moat
         for (int z : new int[]{-100, 0, 100}) {
             double last = terraced.at(189.5, z + 0.5).crossing();

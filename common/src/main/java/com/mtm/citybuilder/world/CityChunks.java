@@ -648,7 +648,7 @@ public final class CityChunks {
     }
 
     private static void castleGround(ChunkAccess chunk, BlockPos.MutableBlockPos pos, int x, int z,
-                                     com.mtm.citybuilder.core.chunk.CastleTerrain.Cell cell) {
+                                     com.mtm.citybuilder.core.chunk.CastleTerrain.Cell cell, boolean way) {
         int low = chunk.getMinBuildHeight(), high = chunk.getMaxBuildHeight() - 1;
         int target = Math.max(low + 1, Math.min(high, cell.ground()));
         int old = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x & 15, z & 15);
@@ -657,8 +657,14 @@ public final class CityChunks {
             case MASONRY -> Blocks.STONE_BRICKS.defaultBlockState();
             case BED -> Blocks.GRAVEL.defaultBlockState();
         };
-        // A terrace's edge over lower ground is faced in stone (石垣), its top still the lawn
-        BlockState fill = cell.moat() || cell.faced() ? Blocks.STONE_BRICKS.defaultBlockState() : Blocks.DIRT.defaultBlockState();
+        // A terrace's edge over lower ground is a stone wall (石垣) of squared stones, its top course too, with a
+        // plastered wall (塀) along it under a tiled coping, broken where a street or path climbs past; a moat's edge
+        // is faced like the moat
+        boolean terrace = cell.wall();
+        BlockState ashlar = ownBlock("stone_ashlar", Blocks.STONE_BRICKS);
+        BlockState fill = terrace ? ashlar
+                : cell.moat() || cell.faced() ? Blocks.STONE_BRICKS.defaultBlockState() : Blocks.DIRT.defaultBlockState();
+        if (terrace) face = ashlar;
         for (int y = Math.max(low, Math.min(old - 1, target - 2)); y < target; y++)
             chunk.setBlockState(pos.set(x, y, z), fill, false);
         chunk.setBlockState(pos.set(x, target, z), face, false);
@@ -667,6 +673,10 @@ public final class CityChunks {
             chunk.setBlockState(pos.set(x, y, z), Blocks.WATER.defaultBlockState(), false);
         for (int y = water + 1; y <= Math.min(high, old + 1); y++)
             chunk.setBlockState(pos.set(x, y, z), Blocks.AIR.defaultBlockState(), false);
+        if (terrace && !way && target + 2 <= high) {
+            chunk.setBlockState(pos.set(x, target + 1, z), ownBlock("plaster_white", Blocks.WHITE_CONCRETE), false);
+            chunk.setBlockState(pos.set(x, target + 2, z), ownBlock("roof_kawara_slab", Blocks.DEEPSLATE_TILE_SLAB), false);
+        }
     }
 
     /** Before decoration: paving on the ground, decks over water, headroom cleared; the airports graded and paved. */
@@ -690,7 +700,8 @@ public final class CityChunks {
                     continue;
                 }
                 var castle = grades == null ? null : grades.castleAt(x * 16 + z);
-                if (castle != null) castleGround(chunk, pos, baseX + x, baseZ + z, castle);
+                if (castle != null) castleGround(chunk, pos, baseX + x, baseZ + z, castle,
+                        columns[x * 16 + z].surface() != ChunkLayer.Surface.NONE);
                 if (roads != null && roads[x * 16 + z] != null) {
                     road(chunk, roads[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
                     continue;

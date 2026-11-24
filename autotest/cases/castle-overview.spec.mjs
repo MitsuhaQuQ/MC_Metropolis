@@ -58,4 +58,20 @@ test('castle site overview', async ({}, info) => {
     await photograph(out,info,'oblique-'+name,x,y0+45,z,yaw,28);
   }
   await photograph(out,info,'low-sw',cx-120,y0+12,cz-120,-45,4);
+  // A terrace's stone wall and its plastered wall, from the lower terrace in front of it
+  let wall=null;
+  search: for (const [dx,dz] of [[-1,0],[0,-1],[1,0],[0,1]]) {
+    for (let r=30;r<=R-20;r++) {
+      const x=cx+dx*r, z=cz+dz*r;
+      const p=await server.columnProfile(x,z,keep.ground-20,keep.ground+20);
+      const top=p.blocks.findLast(b=>b.top!=null);
+      if (top?.id==='citybuilder:roof_kawara_slab') { wall={x,z,y:top.y,dx,dz}; break search; }
+    }
+  }
+  writeFileSync(join(out,'wall.json'),JSON.stringify(wall));
+  if (wall) {
+    const x=wall.x+wall.dx*14+wall.dz*6, z=wall.z+wall.dz*14-wall.dx*6;
+    const yaw=Math.atan2(-(wall.x-x),(wall.z-z))*180/Math.PI;
+    await photograph(out,info,'terrace-wall',x,wall.y,z,yaw,8);
+  }
 });

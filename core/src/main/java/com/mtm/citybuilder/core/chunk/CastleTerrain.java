@@ -19,12 +19,13 @@ import java.util.List;
 public final class CastleTerrain {
     public enum Surface { LAWN, MASONRY, BED }
     /**
-     * Block Y of the ground surface, optional water top, the continuous grade for a crossing, and whether the column
-     * is faced in stone (a terrace's edge over lower ground beside it).
+     * Block Y of the ground surface, optional water top, the continuous grade for a crossing, whether the column is
+     * faced in stone (over lower ground beside it: a terrace's or a moat's edge), and whether it is the top of a
+     * terrace's stone wall (石垣), a plastered wall (塀) along it.
      */
-    public record Cell(int ground, Integer water, Surface surface, double crossing, boolean faced) {
+    public record Cell(int ground, Integer water, Surface surface, double crossing, boolean faced, boolean wall) {
         public Cell(int ground, Integer water, Surface surface, double crossing) {
-            this(ground, water, surface, crossing, false);
+            this(ground, water, surface, crossing, false, false);
         }
 
         public boolean moat() { return surface != Surface.LAWN; }
@@ -194,9 +195,8 @@ public final class CastleTerrain {
     }
 
     /** The ground's top at a position, without facing: for the neighbours a terrace's edge is judged by. */
-    private int groundAt(double x, double z) {
-        Cell cell = cell(x, z, false);
-        return cell == null ? Integer.MIN_VALUE : cell.ground();
+    private Cell plain(double x, double z) {
+        return cell(x, z, false);
     }
 
     public Cell at(double x, double z) {
@@ -250,16 +250,17 @@ public final class CastleTerrain {
 
     /** A bailey's lawn, faced in stone where a neighbour lies two and more lower (a terrace's or a moat's edge). */
     private Cell lawnCell(int ground, double grade, double x, double z, boolean face) {
-        boolean faced = false;
+        boolean faced = false, wall = false;
         if (face) {
             for (double[] o : new double[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-                int beside = groundAt(x + o[0], z + o[1]);
-                if (beside != Integer.MIN_VALUE && beside <= ground - 2) {
+                Cell beside = plain(x + o[0], z + o[1]);
+                if (beside != null && beside.ground() <= ground - 2) {
                     faced = true;
-                    break;
+                    // A terrace's own edge (not a moat's, whose bank is the moat's masonry) carries the wall
+                    wall |= !beside.moat();
                 }
             }
         }
-        return new Cell(ground, null, Surface.LAWN, grade, faced);
+        return new Cell(ground, null, Surface.LAWN, grade, faced, wall);
     }
 }
