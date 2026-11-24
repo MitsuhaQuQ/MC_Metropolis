@@ -203,7 +203,7 @@ public final class CityBuildings {
                 for (int wz = Math.max(baseZ, p.minZ()); wz <= Math.min(baseZ + 15, p.maxZ()); wz++) {
                     int x = wx - baseX;
                     int z = wz - baseZ;
-                    if (street.test(x * 16 + z)) {
+                    if (!p.occupiesColumn(wx, wz) || street.test(x * 16 + z)) {
                         continue;
                     }
                     int floor = Math.min(max, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
@@ -226,8 +226,19 @@ public final class CityBuildings {
                 int wx = mx + p.x();
                 int wy = my + p.y();
                 int wz = mz + p.z();
-                if (wx >= baseX && wx < baseX + 16 && wz >= baseZ && wz < baseZ + 16 && wy >= min && wy <= max
-                        && !street.test((wx - baseX) * 16 + (wz - baseZ))) {
+                if (wx >= baseX && wx < baseX + 16 && wz >= baseZ && wz < baseZ + 16 && wy >= min && wy <= max) {
+                    if (!p.spansStreet() && street.test((wx-baseX)*16+wz-baseZ)) {
+                        if (p.walkway() && logic.settings().buildings.streetFacingFacilities) {
+                            for (int iy=Math.max(min,wy-2);iy<=Math.min(max,wy+2);iy++) {
+                                var old=chunk.getBlockState(pos.set(wx,iy,wz));
+                                if (old.is(block("citybuilder:side_ditch"))) {
+                                    var grate=block("citybuilder:side_ditch_grate").withPropertiesOf(old);
+                                    chunk.setBlockState(pos,grate,false);
+                                }
+                            }
+                        }
+                        return;
+                    }
                     if (p.walkway()) {
                         // A way in: on the ground at its own height, filled under, cleared over
                         for (int k = wy + 1; k <= Math.min(max, wy + 4); k++) {

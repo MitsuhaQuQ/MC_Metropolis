@@ -22,16 +22,100 @@ class StationPlazaTest {
         return StationPlaza.lay(template, 1000.5, -2000.5, Math.toRadians(30), -1, SITE, lines, CONFIG, 30.0);
     }
 
+    private static final CitySettings.Plazas LEGACY = new CitySettings.Plazas();
+    static { LEGACY.frontageLayout = false; }
+
+    private static StationPlaza legacy(StationPlaza.Template template, int lines) {
+        return StationPlaza.lay(template,1000.5,-2000.5,Math.toRadians(30),-1,SITE,lines,LEGACY,30.0);
+    }
+
     private static long buses(StationPlaza plaza) {
         return plaza.berths().stream().filter(b -> b.use() == StationPlaza.Use.BUS).count();
     }
 
     @Test
+    void passengerLayoutProvidesActualStraightBerths() {
+        for (var template : StationPlaza.Template.values()) {
+            var plaza=lay(template,2);
+            assertTrue(buses(plaza)>0);
+            for (var berth:plaza.berths()) {
+                StationPlaza.Loop loop=plaza.loops().get(berth.loop());
+                double s=berth.s1(), length=berth.s2()-s;
+                if (length<0) length+=loop.perimeter();
+                double[] a=loop.point(s), b=loop.point(s+length);
+                for (double d=0; d<length; d+=0.5) {
+                    double[] at=loop.point(s+d);
+                    double deviation=Math.hypot(at[0]-a[0]-(b[0]-a[0])*d/length,at[1]-a[1]-(b[1]-a[1])*d/length);
+                    assertTrue(deviation<0.3,template+" curved berth "+berth+" deviation "+deviation);
+                }
+            }
+        }
+    }
+
+    @Test
+    void aThroughStreetCannotBeReplacedByADetourThroughTheBusLoop() {
+        var original=StationPlaza.lay(StationPlaza.Template.ROTARY,0,0,0,1,SITE,2,CONFIG,24);
+        var ring=original.loops().get(0);
+        var road=new StreetSegment(-120,ring.v(),120,ring.v(),StreetClass.ARTERIAL,Era.MODERN,16,StreetStructure.GROUND);
+        assertTrue(StreetLayer.cutsAcross(original,road),"the original street crosses the turning island");
+        var square=original.frontageBay(List.of(road),(u,v)->true,CONFIG);
+        org.junit.jupiter.api.Assertions.assertNotNull(square);
+        assertEquals(road,square.curbStreet());
+        assertTrue(square.berths().stream().anyMatch(b->b.use()==StationPlaza.Use.BUS && b.s2()-b.s1()>=CONFIG.berth));
+        assertTrue(square.loops().isEmpty());
+        assertEquals(3,square.links().size(),"entry, stopping lane and exit");
+        for (var entry:square.links()) {
+            assertTrue((entry.v1()-road.z1())*(entry.v2()-road.z1())>0,"the driveway stops before the street centreline");
+        }
+    }
+
+    @Test
+    void smallStationDrivesThroughBetweenTwoStreets() {
+        var plain=lay(StationPlaza.Template.TURNING_CIRCLE,1);
+        double v=plain.forecourt().v2()+CONFIG.lane/2;
+        var plaza=StationPlaza.lay(StationPlaza.Template.TURNING_CIRCLE,0,0,0,1,SITE,1,CONFIG,16,0,
+                new double[]{0,1},3L,(u,w)->true,List.of(new StationPlaza.Entry(-32,v,1,0,7)));
+        assertTrue(plaza.loops().isEmpty());
+        assertEquals(1,buses(plaza));
+        var bus=plaza.berths().stream().filter(b->b.use()==StationPlaza.Use.BUS).findFirst().orElseThrow();
+        var kerb=plaza.links().get(-1-bus.loop());
+        assertEquals(kerb.v1(),kerb.v2(),1e-9);
+        for (var link:plaza.links()) {
+            for (double t=0;t<1;t+=0.05) {
+                var part=plaza.partAt(link.u1()+(link.u2()-link.u1())*t,link.v1()+(link.v2()-link.v1())*t);
+                assertTrue(part==StationPlaza.Part.ROAD || part==StationPlaza.Part.CROSSING);
+            }
+        }
+    }
+
+    @Test
+    void rejectedMouthKeepsTheOriginalStreetUntilARealAlternativeConnects() {
+        var plain=lay(StationPlaza.Template.TURNING_CIRCLE,1);
+        double v=plain.forecourt().v2()+CONFIG.lane/2;
+        for(int side : new int[]{-1,1}) {
+            var plaza=StationPlaza.lay(StationPlaza.Template.TURNING_CIRCLE,0,0,0,1,SITE,1,CONFIG,16,0,
+                    new double[]{0,1},3L,(u,w)->true,List.of(new StationPlaza.Entry(32*side,v,-side,0,7)));
+            assertTrue(plaza.loops().isEmpty());
+            var mouth=plaza.mouth();
+            var street=new StreetSegment(mouth[0],mouth[1],mouth[0],mouth[1]+30,
+                    StreetClass.ARTERIAL,Era.MODERN,16,StreetStructure.GROUND);
+            var wrong=new StreetSegment(mouth[0]+20,mouth[1],mouth[0]+20,mouth[1]+30,
+                    StreetClass.ARTERIAL,Era.MODERN,16,StreetStructure.GROUND);
+            var old=new StreetSegment(-5,v,5,v,StreetClass.STREET,Era.MODERN,6,StreetStructure.GROUND);
+            var roads=new java.util.ArrayList<>(List.of(street,old));
+            assertTrue(!StreetLayer.removeConnectedInterior(plaza,roads,Set.of(old),wrong));
+            assertEquals(List.of(street,old),roads);
+            assertTrue(StreetLayer.removeConnectedInterior(plaza,roads,Set.of(old),street));
+            assertEquals(List.of(street),roads);
+        }
+    }
+
+    @Test
     void templatesAreCompactAndSizedByTheTown() {
-        StationPlaza town = lay(StationPlaza.Template.TURNING_CIRCLE, 1);
-        StationPlaza city = lay(StationPlaza.Template.ROTARY, 1);
-        StationPlaza busy = lay(StationPlaza.Template.ROTARY, 3);
-        StationPlaza metropolis = lay(StationPlaza.Template.TERMINAL, 2);
+        StationPlaza town = legacy(StationPlaza.Template.TURNING_CIRCLE, 1);
+        StationPlaza city = legacy(StationPlaza.Template.ROTARY, 1);
+        StationPlaza busy = legacy(StationPlaza.Template.ROTARY, 3);
+        StationPlaza metropolis = legacy(StationPlaza.Template.TERMINAL, 2);
         assertEquals(1, buses(town));
         assertTrue(town.berths().stream().anyMatch(b -> b.use() == StationPlaza.Use.TAXI), "a taxi bay");
         assertEquals(CONFIG.cityBerths[0], buses(city));
@@ -49,7 +133,7 @@ class StationPlazaTest {
             for (StationPlaza.Loop loop : plaza.loops()) {
                 assertTrue(loop.most() < 2.7 * loop.least(), () -> "a long loop: " + loop.least() + " to " + loop.most());
             }
-            assertEquals(plaza.depth(), StationPlaza.depth(plaza.template(), CONFIG), 1e-9, "the depth the avenue was laid for");
+            assertEquals(plaza.depth(), StationPlaza.depth(plaza.template(), LEGACY), 1e-9, "the depth the avenue was laid for");
         }
     }
 
@@ -76,9 +160,13 @@ class StationPlazaTest {
      * off the middle line at a slant.
      */
     private static StationPlaza bounded(StationPlaza.Template template, long seed) {
-        double shift = StationPlaza.mouthShift(template, CONFIG, 0.9);
+        return bounded(template,seed,CONFIG);
+    }
+
+    private static StationPlaza bounded(StationPlaza.Template template,long seed,CitySettings.Plazas config) {
+        double shift = StationPlaza.mouthShift(template, config, 0.9);
         double angle = Math.toRadians(30);
-        return StationPlaza.lay(template, 1000.5, -2000.5, Math.toRadians(30), -1, SITE, 2, CONFIG, 30.0, shift,
+        return StationPlaza.lay(template, 1000.5, -2000.5, Math.toRadians(30), -1, SITE, 2, config, 30.0, shift,
                 new double[]{Math.sin(angle), Math.cos(angle)}, seed, StationPlazaTest::besideArterial);
     }
 
@@ -90,8 +178,8 @@ class StationPlazaTest {
     @Test
     void shapedByTheLandAndTheSeed() {
         for (StationPlaza.Template template : List.of(StationPlaza.Template.TURNING_CIRCLE, StationPlaza.Template.ROTARY)) {
-            StationPlaza a = bounded(template, 1L);
-            StationPlaza b = bounded(template, 2L);
+            StationPlaza a = bounded(template, 1L, LEGACY);
+            StationPlaza b = bounded(template, 2L, LEGACY);
             // The arterial bounds it: none of the square on it
             for (double u = a.from(); u <= a.to(); u += 0.5) {
                 for (double v = a.front(); v <= a.front() + a.depth(); v += 0.5) {
@@ -109,7 +197,7 @@ class StationPlazaTest {
             StationPlaza.Link throat = a.links().get(0);
             assertEquals(a.mouthU(), throat.u2(), 1e-9);
             assertTrue(Math.abs(throat.u2() - throat.u1()) > 3.0, template + " a straight throat");
-            assertTrue(a.land().area() < bounded(template, 1L).land().area() + 1, "the same land again");
+            assertTrue(a.land().area() < bounded(template, 1L, LEGACY).land().area() + 1, "the same land again");
         }
     }
 

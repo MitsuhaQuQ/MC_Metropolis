@@ -95,6 +95,15 @@ class StreetTerrainTest {
             degree.merge(Math.round(segment.x1() * 10) * 1_000_003L + Math.round(segment.z1() * 10), 1, Integer::sum);
             degree.merge(Math.round(segment.x2() * 10) * 1_000_003L + Math.round(segment.z2() * 10), 1, Integer::sum);
         }
+        // A low approach may end at a split on the toe road running under a viaduct.
+        // Require a vehicle street continuing in both directions at that exact junction.
+        java.util.Map<Long,Integer> toeEnds = new java.util.HashMap<>();
+        for (StreetSegment street : plan.segments()) {
+            if (street.streetClass() != StreetClass.STREET || street.width() != SETTINGS.streets.leveeRoad) continue;
+            for (double[] end : new double[][]{{street.x1(),street.z1()},{street.x2(),street.z2()}}) {
+                toeEnds.merge(Math.round(end[0]*10)*1_000_003L+Math.round(end[1]*10),1,Integer::sum);
+            }
+        }
         for (StreetSegment segment : arterials) {
             if (segment.streetClass() != StreetClass.ARTERIAL || segment.structure() == StreetStructure.BRIDGE) {
                 continue;
@@ -106,10 +115,23 @@ class StreetTerrainTest {
                 boolean across = Math.abs(segment.x2() - segment.x1()) > Math.abs(segment.z2() - segment.z1());
                 if (degree.get(Math.round(end[0] * 10) * 1_000_003L + Math.round(end[1] * 10)) == 1 && !onAnother && across) {
                     // The river's banks are 40 either side of x = 20000; the grid reads water to its nearest node
-                    assertTrue(Math.abs(end[0] - 20000) > 40 + 64, () -> "an arterial ends at the river: " + segment);
+                    long key = Math.round(end[0]*10)*1_000_003L+Math.round(end[1]*10);
+                    assertTrue(Math.abs(end[0] - 20000) > 40 + 64 || toeEnds.getOrDefault(key,0) >= 2 && onToeRoad(plan,end),
+                            () -> "an arterial ends at the river: " + segment);
                 }
             }
         }
+    }
+
+    private static boolean onToeRoad(StreetPlan plan, double[] end) {
+        for (Embankment bank : plan.embankments()) {
+            for (int i = 1; i < bank.footRoad().size(); i++) {
+                var a = bank.footRoad().get(i-1);
+                var b = bank.footRoad().get(i);
+                if (java.awt.geom.Line2D.ptSegDist(a[0], a[1], b[0], b[1], end[0], end[1]) < 0.1) return true;
+            }
+        }
+        return false;
     }
 
     @Test

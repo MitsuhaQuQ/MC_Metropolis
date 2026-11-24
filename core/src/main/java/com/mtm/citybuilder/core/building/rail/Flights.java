@@ -65,6 +65,15 @@ public final class Flights {
             return surface != Integer.MIN_VALUE;
         }
 
+        /** Shift a relative station model's floor, walls and stair wells to the world's Y datum together. */
+        public Flight raised(int dy) {
+            if (dy==0) return this;
+            Ground shifted=ground==null?null:(px,pz)->ground.at(px,pz)+dy;
+            int shiftedSurface = surface == Integer.MIN_VALUE || surface == Integer.MAX_VALUE ? surface : surface+dy;
+            return new Flight(x,dir,z0,z1,bottom+dy,top+dy,landingEvery,railings,escalator,clearFrom+dy,clearTop+dy,
+                    guardY==Integer.MIN_VALUE?guardY:guardY+dy,shifted,shiftedSurface,entrance);
+        }
+
         /** Blocks the flight runs along x, landings included. */
         public int run() {
             int steps = top - bottom;
@@ -83,6 +92,13 @@ public final class Flights {
     /** A stair flight's landings: one every this many steps for long ones. */
     public static int landingEvery(int steps) {
         return steps > 8 ? (steps + 1) / 2 : 0;
+    }
+
+    /** Oblique rows advance one whole voxel on the dominant axis. Two opposing flights can
+     * each extend up to sqrt(2) times their nominal length before reaching the common landing. */
+    static int landingGap(CrossSection section, int stairs, int escalator) {
+        if (section.platforms().stream().noneMatch(CrossSection.Platform::passengerSpace)) return 0;
+        return 2+(int)Math.ceil((Math.sqrt(2)-1)*(stairs+escalator));
     }
 
     /** The rise along the run: for each row, the standing level after it (a stair's y + 1, a landing's y). */
@@ -192,6 +208,22 @@ public final class Flights {
      */
     public static void place(Model m, RailPalette p, Flight f, String clearWith) {
         place(m, p, f, straightRows(f), f.ground, clearWith);
+    }
+
+    /** Each tread or landing's two ends and floor block Y in the finished station. */
+    public record Tread(int x0,int z0,int x1,int z1,int y,boolean landing) {}
+
+    public static List<Tread> treads(Flight flight, Curve curve, int datum) {
+        var rows=curvedRows(flight,curve).cells();
+        int[] heights=profile(flight);
+        boolean[] platforms=landings(flight);
+        List<Tread> result=new ArrayList<>(rows.size());
+        for (int i=0;i<rows.size();i++) {
+            var row=rows.get(i);
+            int[] a=row[0], b=row[row.length-1];
+            result.add(new Tread(a[0],a[1],b[0],b[1],datum+heights[i]-1,platforms[i]));
+        }
+        return result;
     }
 
     /** Places a flight on the structure laid on {@code c}, keeping its shape. */
@@ -385,16 +417,17 @@ public final class Flights {
 
     /** Railings on the upper floor round the hole the flight leaves in it, open where it arrives. */
     private static void guard(Model m, RailPalette p, int guardY, Rows rows) {
-        Set<Long> hole = new HashSet<>(), arrive = new HashSet<>();
+        Set<Long> hole = new HashSet<>(), passage = new HashSet<>();
         for (int[][] row : rows.cells()) {
             for (int[] c : row) {
+                passage.add(key(c[0], c[1]));
                 if (!solid(m, c[0], guardY - 1, c[1])) {
                     hole.add(key(c[0], c[1]));
                 }
             }
         }
         for (int[] c : rows.arrival()) {
-            arrive.add(key(c[0], c[1]));
+            passage.add(key(c[0], c[1]));
         }
         int[][] around = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
         for (int[][] row : rows.cells()) {
@@ -405,7 +438,9 @@ public final class Flights {
                 for (int[] d : around) {
                     int nx = c[0] + d[0], nz = c[1] + d[1];
                     long n = key(nx, nz);
-                    if (hole.contains(n) || arrive.contains(n)) {
+                    // The last tread already has a solid block at platform level. It is
+                    // still part of the passage, including where a diagonal row widens.
+                    if (passage.contains(n)) {
                         continue;
                     }
                     if (solid(m, nx, guardY - 1, nz) && !solid(m, nx, guardY, nz)) {

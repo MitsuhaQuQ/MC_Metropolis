@@ -46,7 +46,7 @@ public final class UndergroundStation implements BuriedStation, PlatformStorey {
     private final int floor1;
     private final int level;
     private final int stairRun;
-    private final int escalatorRun;
+    private final int escalatorReach;
     private final List<Integer> stairXs = new ArrayList<>();
 
     /**
@@ -74,8 +74,9 @@ public final class UndergroundStation implements BuriedStation, PlatformStorey {
         int steps = floor1 - level;  // from the platform (people at level + 1) to the concourse (floor1 + 1)
         int le = Flights.landingEvery(steps);
         stairRun = steps + (le > 0 ? 2 * ((steps - 1) / le) : 0);
-        escalatorRun = steps + 2;
-        int set = stairRun + escalatorRun + 1;
+        int escalatorRun = steps + 2;
+        escalatorReach = escalatorRun + Flights.landingGap(section, stairRun, escalatorRun);
+        int set = stairRun + escalatorReach + 1;
         int x0 = approach, x1 = approach + platformLength - 1;
         List<Integer> centres = platformLength >= 120
                 ? List.of(x0 + platformLength / 4, x0 + 3 * platformLength / 4) : List.of(x0 + platformLength / 2);
@@ -143,7 +144,7 @@ public final class UndergroundStation implements BuriedStation, PlatformStorey {
                 int[] w = ElevatedStation.well(pl);
                 links.add(new Storey.Placed(new Flights.Flight(sx, 1, w[0], w[1], level + 1, floor1 + 1,
                         Flights.landingEvery(floor1 - level), false, false, level + 1, floor1, floor1 + 1, null)));
-                links.add(new Storey.Placed(new Flights.Flight(arrive + escalatorRun, -1, w[0],
+                links.add(new Storey.Placed(new Flights.Flight(arrive + escalatorReach, -1, w[0],
                         w[0] + Flights.ESCALATOR_WIDTH - 1, level + 1, floor1 + 1, 0, false, true, level + 1, floor1,
                         floor1 + 1, null)));
             }
@@ -189,7 +190,7 @@ public final class UndergroundStation implements BuriedStation, PlatformStorey {
 
     private boolean inWell(int x) {
         for (int sx : stairXs) {
-            if (x >= sx - 1 && x <= sx + stairRun + escalatorRun + 1) {
+            if (x >= sx - 1 && x <= sx + stairRun + escalatorReach + 1) {
                 return true;
             }
         }

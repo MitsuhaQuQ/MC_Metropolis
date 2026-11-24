@@ -6,6 +6,19 @@ package com.mtm.citybuilder.core.building;
  * heights, footprints and roofs.
  */
 public final class BuildingSettings {
+    /** Prefer the measured castle keep when its whole site fits. */
+    public boolean plateauCastleKeep = true;
+    /** A two-storey main gate and wider approach on the full-size keep's court. */
+    public boolean largeCastleGate = true;
+    /** Build the surrounding baileys and moat sections at their planned levels. */
+    public boolean castleWards = true;
+    /** Validate the final raster footprint on narrow lots and refit rail-side wedges. */
+    public boolean usableFootprints = true;
+    /** Place civic and roadside facilities with their entrance frontage on a surveyed street edge. */
+    public boolean streetFacingFacilities = true;
+    /** Desired footprint depth of ordinary street buildings, before fitting it inside the actual plot. */
+    public double streetBuildingDepthScale = 1.2;
+
     /**
      * Storeys by district: entry k is the share of buildings of k + 1 storeys. Kyoto as a whole is 9% one storey, 68%
      * two, 18% three, 3.5% four or five, 1.4% six and more; within 500 m of Shijo-Karasuma the median is 3 and one in
@@ -27,7 +40,11 @@ public final class BuildingSettings {
 
     /** Storey heights: houses and flats, a shop's or office's ground floor, works. */
     public int storey = 3;
+    /** Extra height of the entrance storey in homes and apartment buildings. */
+    public int residentialGroundExtra = 1;
     public int shopFloor = 4;
+    /** Retail ground floors have room for the entrance and sign above the display windows. */
+    public int retailGroundExtra = 1;
     public int worksStorey = 6;
 
     /** Share of lots left unbuilt (car parks, gardens, empty land) outside downtown. */

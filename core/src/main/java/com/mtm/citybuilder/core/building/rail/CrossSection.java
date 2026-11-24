@@ -16,7 +16,10 @@ import java.util.List;
  */
 public final class CrossSection {
     /** A platform: z from {@code z0} to {@code z1}, with tracks along its low and/or high side. */
-    public record Platform(int z0, int z1, boolean trackLow, boolean trackHigh) {
+    public record Platform(int z0, int z1, boolean trackLow, boolean trackHigh, boolean passengerSpace) {
+        public Platform(int z0, int z1, boolean trackLow, boolean trackHigh) {
+            this(z0, z1, trackLow, trackHigh, false);
+        }
         public boolean island() {
             return trackLow && trackHigh;
         }
@@ -32,7 +35,25 @@ public final class CrossSection {
     private final int zMin;
     private final int zMax;
 
+    public static CrossSection mainStation(com.mtm.citybuilder.core.settlement.SettlementTier tier, boolean roomy) {
+        return switch (tier) {
+            case METROPOLIS -> new CrossSection("PTTPTTPTTP", roomy ? 14 : 8, roomy);
+            case CITY -> new CrossSection("PTTPTTP", roomy ? 13 : 7, roomy);
+            default -> new CrossSection("PTTP", roomy ? 12 : 6, roomy);
+        };
+    }
+
+    public static CrossSection localStation(boolean island, boolean interchange, boolean roomy) {
+        int width = roomy ? (interchange ? 13 : 12)
+                : island ? (interchange ? 13 : 11) : (interchange ? 11 : 9);
+        return new CrossSection(island ? "TPT" : "PTTP", width, roomy);
+    }
+
     public CrossSection(String layout, int platformWidth) {
+        this(layout, platformWidth, false);
+    }
+
+    private CrossSection(String layout, int platformWidth, boolean passengerSpace) {
         this.layout = layout.toUpperCase();
         if (!this.layout.matches("[TP]+") || !this.layout.contains("T") || this.layout.contains("PP")) {
             throw new IllegalArgumentException("cross-section " + layout);
@@ -74,7 +95,7 @@ public final class CrossSection {
         tracks = t.stream().mapToInt(v -> v + shift).toArray();
         platforms = new ArrayList<>();
         for (int[] q : p) {
-            platforms.add(new Platform(q[0] + shift, q[1] + shift, q[2] == 1, q[3] == 1));
+            platforms.add(new Platform(q[0] + shift, q[1] + shift, q[2] == 1, q[3] == 1, passengerSpace));
         }
         zMin = shift;
         zMax = end + shift;

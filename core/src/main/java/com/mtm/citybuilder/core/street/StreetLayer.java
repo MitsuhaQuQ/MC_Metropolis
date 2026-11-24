@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 
 /**
@@ -1565,15 +1566,18 @@ public final class StreetLayer {
         }
         List<double[]> mouths = new ArrayList<>();
         for (Front front : fronts) {
-            mouths.add(front.mouth(logic.settings().transit.mainWidth));
+            mouths.add(front.mouth(logic.settings().transit.mainWidth(settlement.tier())));
         }
         unoverlap(window, canals, segments, mouths);
         clearEstates(window, segments);
         snapEnds(segments);
         dropLooseBridges(segments);
+        if (config.continuousCarriageways) LeveeAccess.fit(terrain,config,embankments,urban,railways,segments);
         List<Promenade> promenades = formation == Formation.VILLAGE ? List.of()
                 : promenades(settlement, window, canals, segments, embankments);
         List<StationPlaza> plazas = plazas(fronts, railways, urban, segments, window);
+        // Endpoint snapping, toe roads and square approaches may introduce new canal crossings.
+        if (config.continuousCarriageways && !canals.isEmpty()) culverts(canals, segments);
         List<StationSite> sites = formation == Formation.VILLAGE ? List.of()
                 : sites(settlement, window, anchors, railways, urban, segments, fronts, plazas);
         List<List<double[]>> highSpeed = highSpeedCorridor(settlement, window, districts, anchors);
@@ -2040,7 +2044,7 @@ public final class StreetLayer {
      * goal, the square's template and depth.
      */
     private record Front(Anchor station, double heading, int side, StationPlaza.Template template, double depth,
-                         double shift) {
+                         double shift,List<StreetSegment> spur) {
         /** Where the avenue leaves the square: on its far edge, {@code shift} along the platforms off their middle. */
         double[] mouth(double siteWidth) {
             double out = 0.5 * siteWidth + depth;
@@ -2064,7 +2068,7 @@ public final class StreetLayer {
         // The avenue off the station's middle line, as often as not (Toyama's leaves the square at a corner)
         double shift = StationPlaza.mouthShift(template, logic.settings().plazas, Hash.unit(Hash.of(logic.seed(),
                 settlement.id(), Double.doubleToLongBits(station.x()) ^ 0x6d6f757468L)));
-        return new Front(station, heading, side, template, StationPlaza.depth(template, logic.settings().plazas), shift);
+        return new Front(station, heading, side, template, StationPlaza.depth(template, logic.settings().plazas), shift,new ArrayList<>());
     }
 
     /**
@@ -2155,77 +2159,341 @@ public final class StreetLayer {
                     }
                 }
             }
-            double[] mouth = front.mouth(transit.mainWidth);
-            double avenue = config.stationAvenueWidth;
-            double[] way = front.outward();
-            double ax = Math.cos(front.heading());
-            double az = Math.sin(front.heading());
-            double[] out = {0.0, 1.0};
-            for (StreetSegment g : segments) {
-                boolean atFirst = Math.hypot(g.x1() - mouth[0], g.z1() - mouth[1]) < 1.0;
-                boolean atSecond = Math.hypot(g.x2() - mouth[0], g.z2() - mouth[1]) < 1.0;
-                if (atFirst || atSecond) {
-                    avenue = Math.max(avenue, g.width());
-                    double dx = atFirst ? g.x2() - g.x1() : g.x1() - g.x2();
-                    double dz = atFirst ? g.z2() - g.z1() : g.z1() - g.z2();
-                    double length = Math.hypot(dx, dz);
-                    if (length > 1.0 && (dx * way[0] + dz * way[1]) > 0) {
-                        // In the square's frame: u along the platforms, v outward
-                        out = new double[]{(dx * ax + dz * az) / length, (dx * way[0] + dz * way[1]) / length};
+            double siteWidth=transit.mainWidth(window.extent.settlement().tier());
+            List<PlazaMouth> mouths=plazaMouths(front,siteWidth,segments);
+            StationPlaza first=null, accepted=null;
+            for (PlazaMouth mouth : mouths) {
+                var proposal=plazaAt(front,siteWidth,window,segments,lines,mouth);
+                if (first==null) first=proposal.square;
+                if (!logic.settings().plazas.frontageLayout) {
+                    segments.removeIf(proposal.inside::contains);
+                    prune(proposal.square,segments);
+                    accepted=proposal.square;
+                    break;
+                }
+                if (mouth.road!=null && removeConnectedInterior(proposal.square,segments,proposal.inside,mouth.road)) {
+                    accepted=proposal.square;
+                    break;
+                }
+            }
+            if (accepted==null && clearStationSpur(front.spur,segments)) {
+                List<StreetSegment> trial=new ArrayList<>(segments);
+                trial.addAll(front.spur);
+                var firstPiece=front.spur.get(0);
+                for (var mouth:plazaMouths(front,siteWidth,trial)) {
+                    if (mouth.road!=firstPiece) continue;
+                    var proposal=plazaAt(front,siteWidth,window,trial,lines,mouth);
+                    if (removeConnectedInterior(proposal.square,trial,proposal.inside,firstPiece)) {
+                        segments.clear();
+                        segments.addAll(trial);
+                        accepted=proposal.square;
                     }
+                    break;
                 }
             }
-            // The arterials passing along the station's front bound the square (not its own avenue); water too. The
-            // streets heading into the station (the town's roads drawn to it) end at the square's edge instead
-            double reach = 200.0;
-            List<StreetSegment> bounding = new ArrayList<>();
-            for (StreetSegment g : segments) {
-                boolean avenueEnd = Math.hypot(g.x1() - mouth[0], g.z1() - mouth[1]) < 1.0
-                        || Math.hypot(g.x2() - mouth[0], g.z2() - mouth[1]) < 1.0;
-                boolean along = Math.abs((g.x2() - g.x1()) * ax + (g.z2() - g.z1()) * az)
-                        > Math.cos(Math.toRadians(30)) * Math.max(1e-9, g.length());
-                if (!avenueEnd && along && (g.width() >= 10.0 || major(g.streetClass()))
-                        && Math.min(Math.hypot(g.x1() - station.x(), g.z1() - station.z()),
-                        Math.hypot(g.x2() - station.x(), g.z2() - station.z())) < reach + g.length()) {
-                    bounding.add(g);
-                }
+            if (accepted==null && first!=null) {
+                var square=first;
+                accepted=square.frontageBay(plazaStreets(square,segments,48),(u,v)->{
+                    double[] point=square.world(u,v);
+                    if (window.water(point[0],point[1])) return false;
+                    double water=terrain.waterLevel(point[0],point[1]);
+                    return !Double.isFinite(water) || water<=terrain.surfaceHeight((int)Math.floor(point[0]),(int)Math.floor(point[1]));
+                },logic.settings().plazas);
             }
-            double heading = front.heading();
-            int side = front.side();
-            StationPlaza.Free free = (u, v) -> {
-                double wx = station.x() + u * ax - side * v * az;
-                double wz = station.z() + u * az + side * v * ax;
-                if (window.water(wx, wz)) {
-                    return false;
-                }
-                for (StreetSegment g : bounding) {
-                    if (distanceToSegment(wx, wz, g) <= 0.5 * g.width() + 1.0) {
-                        return false;
-                    }
-                }
-                return true;
-            };
-            long squareSeed = Hash.of(logic.seed(), Double.doubleToLongBits(station.x()), Double.doubleToLongBits(station.z()));
-            StationPlaza first = StationPlaza.lay(front.template(), station.x(), station.z(), heading, side,
-                    transit.mainWidth, Math.max(1, lines), logic.settings().plazas, avenue, front.shift(), out,
-                    squareSeed, free);
-            // The square's land is its own: the streets in it end at its edge, and those cars use are joined to its
-            // loop (laid again with them)
-            java.util.Set<StreetSegment> inside = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
-            for (StreetSegment g : segments) {
-                if (first.contains(0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2()))) {
-                    inside.add(g);
-                }
-            }
-            List<StationPlaza.Entry> entries = entries(first, segments, inside, mouth, avenue);
-            StationPlaza square = entries.isEmpty() ? first : StationPlaza.lay(front.template(), station.x(), station.z(),
-                    heading, side, transit.mainWidth, Math.max(1, lines), logic.settings().plazas, avenue, front.shift(),
-                    out, squareSeed, free, entries);
-            plazas.add(square);
-            segments.removeIf(inside::contains);
-            prune(square, segments);
+            plazas.add(accepted!=null ? accepted : first.forecourtOnly());
         }
         return plazas;
+    }
+
+    private record PlazaMouth(StreetSegment road,double shift,double width,double du,double dv) {}
+    private record PlazaProposal(StationPlaza square,Set<StreetSegment> inside) {}
+
+    private static boolean clearStationSpur(List<StreetSegment> spur,List<StreetSegment> streets) {
+        if(spur.isEmpty()) return false;
+        var end=spur.get(spur.size()-1);
+        boolean joined=false;
+        for(var g:streets) {
+            if(!carried(g)) continue;
+            boolean receives=pointDistance(g,end.x2(),end.z2())<0.75;
+            joined|=receives;
+            for(var piece:spur) {
+                if(piece.structure()!=StreetStructure.GROUND) return false;
+                double margin=(g.width()+piece.width())/2;
+                if(Math.max(piece.x1(),piece.x2())+margin<Math.min(g.x1(),g.x2())
+                        ||Math.min(piece.x1(),piece.x2())-margin>Math.max(g.x1(),g.x2())
+                        ||Math.max(piece.z1(),piece.z2())+margin<Math.min(g.z1(),g.z2())
+                        ||Math.min(piece.z1(),piece.z2())-margin>Math.max(g.z1(),g.z2())) continue;
+                int steps=(int)Math.ceil(piece.length());
+                for(int i=0;i<=steps;i++) {
+                    double t=(double)i/steps;
+                    double x=piece.x1()+t*(piece.x2()-piece.x1()),z=piece.z1()+t*(piece.z2()-piece.z1());
+                    if(pointDistance(g,x,z)>margin) continue;
+                    if(!receives || Math.hypot(x-end.x2(),z-end.z2())>margin+1) return false;
+                }
+            }
+        }
+        return joined;
+    }
+
+    private List<PlazaMouth> plazaMouths(Front front,double siteWidth,List<StreetSegment> roads) {
+        double[] mouth=front.mouth(siteWidth), way=front.outward();
+        double ax=Math.cos(front.heading()), az=Math.sin(front.heading());
+        double width=config.stationAvenueWidth, du=0, dv=1;
+        List<PlazaMouth> options=new ArrayList<>();
+        for (StreetSegment g:roads) {
+            double dx=g.x2()-g.x1(), dz=g.z2()-g.z1(), len=g.length();
+            boolean first=Math.hypot(g.x1()-mouth[0],g.z1()-mouth[1])<1;
+            boolean last=Math.hypot(g.x2()-mouth[0],g.z2()-mouth[1])<1;
+            double forward=dx*way[0]+dz*way[1];
+            if (first || last) {
+                width=Math.max(width,g.width());
+                double sign=first?1:-1;
+                if (len>1 && sign*forward>0) {
+                    du=sign*(dx*ax+dz*az)/len;
+                    dv=sign*forward/len;
+                }
+            }
+            if (!logic.settings().plazas.frontageLayout || !carried(g) || g.structure()==StreetStructure.BRIDGE
+                    || len<1 || Math.abs(forward)<len*0.2) continue;
+            double t=((mouth[0]-g.x1())*way[0]+(mouth[1]-g.z1())*way[1])/forward;
+            if (t < -1e-8 || t > 1+1e-8 || (forward>0 ? 1-t : t)*len<3) continue;
+            double lateral=(g.x1()+t*dx-mouth[0])*ax+(g.z1()+t*dz-mouth[1])*az;
+            // Search along the station frontage if the intended junction cannot serve the stops.
+            double[] sizes=switch (front.template()) {
+                case ROTARY -> logic.settings().plazas.city;
+                case TERMINAL -> logic.settings().plazas.metropolis;
+                default -> logic.settings().plazas.town;
+            };
+            double shift=front.shift()+lateral;
+            if (Math.abs(shift)>sizes[0]/2+g.width()/2) continue;
+            options.add(new PlazaMouth(g,shift,g.width(),Math.signum(forward)*(dx*ax+dz*az)/len,Math.abs(forward)/len));
+        }
+        options.sort(java.util.Comparator.comparingInt((PlazaMouth m)->!major(m.road.streetClass()) ? 2
+                : Math.abs(m.shift-front.shift())<=m.width/2 ? 0 : 1)
+                .thenComparingDouble(m->Math.abs(m.shift-front.shift())));
+        if (options.isEmpty()) options.add(new PlazaMouth(null,front.shift(),width,du,dv));
+        return options;
+    }
+
+    private PlazaProposal plazaAt(Front front,double siteWidth,Window window,List<StreetSegment> segments,int lines,
+                                  PlazaMouth candidate) {
+        Anchor station=front.station();
+        double ax=Math.cos(front.heading()), az=Math.sin(front.heading());
+        double[] way=front.outward(), mouth=front.mouth(siteWidth);
+        double mouthU=candidate.shift, avenue=candidate.width;
+        mouth[0]+=(mouthU-front.shift())*ax;
+        mouth[1]+=(mouthU-front.shift())*az;
+        double[] out={candidate.du,candidate.dv};
+        StreetSegment approach=candidate.road;
+        // The arterials passing along the station's front bound the square (not its own avenue); water too. The
+        // streets heading into the station (the town's roads drawn to it) end at the square's edge instead
+        double reach = 200.0;
+        List<StreetSegment> bounding = new ArrayList<>();
+        for (StreetSegment g : segments) {
+            boolean avenueEnd = Math.hypot(g.x1() - mouth[0], g.z1() - mouth[1]) < 1.0
+                    || Math.hypot(g.x2() - mouth[0], g.z2() - mouth[1]) < 1.0;
+            boolean along = Math.abs((g.x2() - g.x1()) * ax + (g.z2() - g.z1()) * az)
+                    > Math.cos(Math.toRadians(30)) * Math.max(1e-9, g.length());
+            if (g != approach && !avenueEnd && along && (g.width() >= 10.0 || major(g.streetClass()))
+                    && Math.min(Math.hypot(g.x1() - station.x(), g.z1() - station.z()),
+                    Math.hypot(g.x2() - station.x(), g.z2() - station.z())) < reach + g.length()) {
+                bounding.add(g);
+            }
+        }
+        double heading = front.heading();
+        int side = front.side();
+        StationPlaza.Free free = (u, v) -> {
+            double wx = station.x() + u * ax - side * v * az;
+            double wz = station.z() + u * az + side * v * ax;
+            if (window.water(wx, wz)) {
+                return false;
+            }
+            for (StreetSegment g : bounding) {
+                if (distanceToSegment(wx, wz, g) <= 0.5 * g.width() + 1.0) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        long squareSeed = Hash.of(logic.seed(), Double.doubleToLongBits(station.x()), Double.doubleToLongBits(station.z()));
+        StationPlaza first = StationPlaza.lay(front.template(), station.x(), station.z(), heading, side,
+                siteWidth, Math.max(1, lines), logic.settings().plazas, avenue, mouthU, out,
+                squareSeed, free);
+        // The square's land is its own: the streets in it end at its edge, and those cars use are joined to its
+        // loop (laid again with them)
+        java.util.Set<StreetSegment> inside = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (StreetSegment g : segments) {
+            if (first.contains(0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2()))) {
+                inside.add(g);
+            }
+        }
+        if (logic.settings().plazas.frontageLayout) {
+            inside.remove(approach);
+            inside.removeIf(g -> (Math.hypot(g.x1()-mouth[0],g.z1()-mouth[1])<1
+                    && (g.x2()-mouth[0])*way[0]+(g.z2()-mouth[1])*way[1]>0)
+                    || (Math.hypot(g.x2()-mouth[0],g.z2()-mouth[1])<1
+                    && (g.x1()-mouth[0])*way[0]+(g.z1()-mouth[1])*way[1]>0));
+        }
+        List<StationPlaza.Entry> entries = entries(first, segments, inside, mouth, avenue);
+        StationPlaza square = entries.isEmpty() ? first : StationPlaza.lay(front.template(), station.x(), station.z(),
+                heading, side, siteWidth, Math.max(1, lines), logic.settings().plazas, avenue, mouthU,
+                out, squareSeed, free, entries);
+        return new PlazaProposal(square,inside);
+    }
+
+    /** Commit each group of cuts only when every external vehicle street reaches paved square carriageway. */
+    static boolean removeConnectedInterior(StationPlaza plaza, List<StreetSegment> roads,
+                                                Set<StreetSegment> candidates,StreetSegment approach) {
+        if (plaza.berths().isEmpty()) return false;
+        var first = plaza.berths().get(0);
+        var drive = plazaReachable(plaza,plaza.berthPoint(first,0),true);
+        var walk = plazaReachable(plaza,plaza.world(0,plaza.forecourt().v1()+1),false);
+        boolean avenueConnected = false;
+        for (var link : plaza.links()) {
+            if (Math.hypot(link.u2()-plaza.mouthU(),link.v2()-plaza.front()-plaza.depth()) > 0.5) continue;
+            double du=(link.u2()-link.u1())/link.length(), dv=(link.v2()-link.v1())/link.length();
+            avenueConnected = true;
+            for (int sign : new int[]{-1,1}) {
+                double offset=sign*link.width()*0.23;
+                double[] lane=plaza.world(link.u2()-2*du-offset*dv,link.v2()-2*dv+offset*du);
+                if (!drive.contains(blockKey(lane[0],lane[1]))) return false;
+                double[] outside=plaza.world(link.u2()+3*du-offset*dv,link.v2()+3*dv+offset*du);
+                if (pointDistance(approach,Math.floor(outside[0])+0.5,Math.floor(outside[1])+0.5)
+                        >= approach.width()/2-StationPlaza.walk(approach.width())) return false;
+            }
+        }
+        if (!avenueConnected) return false;
+        for (var bay : plaza.berths()) {
+            double halfLane = bay.loop() >= 0 ? plaza.loops().get(bay.loop()).lane()/2
+                    : plaza.links().get(-1-bay.loop()).width()/2-plaza.links().get(-1-bay.loop()).walk();
+            var stop = plaza.berthPoint(bay,0);
+            var waiting = plaza.berthPoint(bay,halfLane+1.5);
+            if (!drive.contains(blockKey(stop[0],stop[1])) || !walk.contains(blockKey(waiting[0],waiting[1]))) return false;
+        }
+        Set<Long> external = new java.util.HashSet<>();
+        Map<Long,List<StreetSegment>> neighbours = new HashMap<>();
+        for (StreetSegment road:roads) {
+            long a=nodeKey(road.x1(),road.z1()), b=nodeKey(road.x2(),road.z2());
+            if (candidates.contains(road)) {
+                neighbours.computeIfAbsent(a,k->new ArrayList<>()).add(road);
+                neighbours.computeIfAbsent(b,k->new ArrayList<>()).add(road);
+            } else if (road.streetClass()!=StreetClass.PATH && road.streetClass()!=StreetClass.LANE) {
+                external.add(a); external.add(b);
+            }
+        }
+        Set<StreetSegment> visited=java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        Set<StreetSegment> removed=java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (StreetSegment start:candidates) {
+            if (!visited.add(start)) continue;
+            List<StreetSegment> group=new ArrayList<>();
+            group.add(start);
+            boolean connected=true;
+            Set<Long> exits=new java.util.HashSet<>();
+            for (int i=0;i<group.size();i++) {
+                StreetSegment g=group.get(i);
+                if (major(g.streetClass()) || g.streetClass()==StreetClass.OLD_ROAD) connected=false;
+                for (int e=0;e<2;e++) {
+                    double x=e==0?g.x1():g.x2(), z=e==0?g.z1():g.z2();
+                    long node=nodeKey(x,z);
+                    if (g.structure()==StreetStructure.BRIDGE) connected=false;
+                    if (external.contains(node)) {
+                        exits.add(node);
+                        double nx=-(g.z2()-g.z1())/Math.max(1e-9,g.length());
+                        double nz=(g.x2()-g.x1())/Math.max(1e-9,g.length());
+                        for (int side=-1;side<=1;side++) {
+                            double offset=side*Math.min(2,g.width()/4);
+                            connected &= drive.contains(blockKey(x+nx*offset,z+nz*offset));
+                        }
+                    }
+                    for (var neighbour:neighbours.get(node)) if (visited.add(neighbour)) group.add(neighbour);
+                }
+            }
+            if (connected && exits.size()<2) removed.addAll(group);
+        }
+        for (StreetSegment road:plazaStreets(plaza,roads,2)) {
+            if (!removed.contains(road) && cutsAcross(plaza,road)) return false;
+        }
+        roads.removeIf(removed::contains);
+        return true;
+    }
+
+    private static List<StreetSegment> plazaStreets(StationPlaza square,List<StreetSegment> roads,double margin) {
+        double[] b=square.bounds();
+        List<StreetSegment> nearby=new ArrayList<>();
+        for(var road:roads) {
+            if(road.streetClass()==StreetClass.PATH) continue;
+            double reach=margin+road.width()/2;
+            if(Math.max(road.x1(),road.x2())+reach<b[0] || Math.min(road.x1(),road.x2())-reach>b[2]
+                    || Math.max(road.z1(),road.z2())+reach<b[1] || Math.min(road.z1(),road.z2())-reach>b[3]) continue;
+            nearby.add(road);
+        }
+        return nearby;
+    }
+
+    /** A retained road may meet the end of a connector. It may not pass through a
+     * turning island, run along a bay, or cross the middle of an access road. */
+    static boolean cutsAcross(StationPlaza square,StreetSegment road) {
+        double len=road.length();
+        if(len<0.1) return false;
+        double dx=(road.x2()-road.x1())/len,dz=(road.z2()-road.z1())/len;
+        for(int k=0,n=(int)Math.ceil(len);k<=n;k++) {
+            double t=len*k/n;
+            int half=(int)Math.ceil(road.width()/2);
+            for(int side=-half;side<=half;side++){
+                double off=Math.max(-road.width()/2,Math.min(road.width()/2,side));
+                double[] uv=square.local(road.x1()+t*dx-off*dz,road.z1()+t*dz+off*dx);
+                for(var loop:square.loops()) if(loop.radial(uv[0],uv[1])<=loop.lane()/2) return true;
+                for(var link:square.links()) {
+                    if(!link.carriage(uv[0],uv[1]))continue;
+                    double along=link.local(uv[0],uv[1])[0];
+                    double angle=square.worldHeading(link.u2()-link.u1(),link.v2()-link.v1());
+                    if(Math.abs(dx*Math.cos(angle)+dz*Math.sin(angle))<0.85
+                            || Math.min(along,link.length()-along)>road.width()/2+1) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    static boolean connectedCurb(StationPlaza plaza) {
+        var link=plaza.links().get(0);
+        double du=(link.u2()-link.u1())/link.length(),dv=(link.v2()-link.v1())/link.length();
+        var drive=plazaReachable(plaza,plaza.world(link.u2()-2*du,link.v2()-2*dv),true);
+        var walk=plazaReachable(plaza,plaza.world(0,plaza.forecourt().v1()+1),false);
+        for(var stop:plaza.berths()) {
+            var road=plaza.berthPoint(stop,0);
+            double half=stop.loop()>=0 ? plaza.loops().get(stop.loop()).lane()/2
+                    : plaza.links().get(-1-stop.loop()).width()/2-plaza.links().get(-1-stop.loop()).walk();
+            var kerb=plaza.berthPoint(stop,half+1.5);
+            if(!drive.contains(blockKey(road[0],road[1])) || !walk.contains(blockKey(kerb[0],kerb[1]))) return false;
+        }
+        return true;
+    }
+
+    private static long blockKey(double x,double z) {
+        return ((long)Math.floor(x)<<32) | ((long)Math.floor(z)&0xffffffffL);
+    }
+
+    /** Walk the planned world-aligned paving before deciding which existing streets can be replaced. */
+    private static Set<Long> plazaReachable(StationPlaza plaza,double[] start,boolean driving) {
+        Set<Long> seen = new java.util.HashSet<>(), connected = new java.util.HashSet<>();
+        var queue = new java.util.ArrayDeque<Long>();
+        queue.add(blockKey(start[0],start[1]));
+        while (!queue.isEmpty()) {
+            long key=queue.removeFirst();
+            if (!seen.add(key)) continue;
+            int x=(int)(key>>32), z=(int)key;
+            var part=plaza.part(x+0.5,z+0.5);
+            boolean allowed = part==StationPlaza.Part.CROSSING || (driving ? part==StationPlaza.Part.ROAD
+                    : part==StationPlaza.Part.PLAZA || part==StationPlaza.Part.SHELTER);
+            if (!allowed) continue;
+            connected.add(key);
+            queue.add(blockKey(x+1,z));
+            queue.add(blockKey(x-1,z));
+            queue.add(blockKey(x,z+1));
+            queue.add(blockKey(x,z-1));
+        }
+        return connected;
     }
 
     /** How far back a street left ending at a square is taken away, at most. */
@@ -3469,6 +3737,7 @@ public final class StreetLayer {
             }
         }
         int pieces = Math.max(1, (int) Math.ceil(bestDistance / config.step));
+        List<StreetSegment> approach = new ArrayList<>(pieces);
         for (int q = 0; q < pieces; q++) {
             double ax = x + (best[0] - x) * q / pieces;
             double az = z + (best[1] - z) * q / pieces;
@@ -3476,10 +3745,10 @@ public final class StreetLayer {
             double bz = z + (best[1] - z) * (q + 1) / pieces;
             Era era = window.old(0.5 * (ax + bx), 0.5 * (az + bz)) ? Era.TOWN : Era.MODERN;
             StreetSegment piece = sloped(window, ax, az, bx, bz, StreetClass.ARTERIAL, era, config.arterialWidth);
-            if (piece != null) {
-                segments.add(piece);
-            }
+            if (piece != null) approach.add(piece);
+            else if (config.continuousCarriageways) return false;
         }
+        segments.addAll(approach);
         return true;
     }
 
@@ -4261,7 +4530,7 @@ public final class StreetLayer {
      * paving (unless it would then run over water or across a canal on the ground). Streets on the ground only, not
      * lanes; a station avenue's first piece at its square's mouth stays.
      */
-    private static void unoverlap(Window window, List<Canal> canals, List<StreetSegment> segments, List<double[]> keep) {
+    private void unoverlap(Window window, List<Canal> canals, List<StreetSegment> segments, List<double[]> keep) {
         int n = segments.size();
         Integer[] order = new Integer[n];
         for (int k = 0; k < n; k++) {
@@ -4320,14 +4589,15 @@ public final class StreetLayer {
                 if (!along.isEmpty()) {
                     int samples = 0;
                     int covered = 0;
+                    java.util.Set<Integer> owners = new java.util.LinkedHashSet<>();
                     for (double t = 0.5; t < length; t += 1.0) {
                         double x = g.x1() + (g.x2() - g.x1()) * t / length;
                         double z = g.z1() + (g.z2() - g.z1()) * t / length;
                         samples++;
                         for (int q : along) {
                             StreetSegment h = segments.get(q);
-                            // A wider piece sharing an end with it: only where it lies over it, not on beyond its end
-                            if (sharesEnd(g, h)) {
+                            // An end cap can touch a piece further along the same road without replacing any of its length.
+                            if (config.continuousCarriageways || sharesEnd(g, h)) {
                                 double hx = h.x2() - h.x1();
                                 double hz = h.z2() - h.z1();
                                 double raw = ((x - h.x1()) * hx + (z - h.z1()) * hz) / Math.max(1e-9, hx * hx + hz * hz);
@@ -4336,16 +4606,17 @@ public final class StreetLayer {
                                 }
                             }
                             // Running its way: within the two pavings; across it, its middle within the wider paving
-                            double reach = wide.contains(q) ? 0.5 * h.width() - 0.5 : 0.5 * (h.width() + g.width()) - 0.5;
+                            double reach = config.continuousCarriageways || wide.contains(q) ? 0.5 * h.width() - 0.5 : 0.5 * (h.width() + g.width()) - 0.5;
                             if (distanceToSegment(x, z, h) < reach) {
                                 covered++;
+                                if (config.continuousCarriageways) owners.add(q);
                                 break;
                             }
                         }
                     }
-                    if (covered >= DOUBLE_COVER * samples) {
+                    if ((!config.continuousCarriageways || samples > 0) && covered >= DOUBLE_COVER * samples) {
                         gone[k] = true;
-                        cover.set(k, along);
+                        cover.set(k, config.continuousCarriageways ? List.copyOf(owners) : along);
                     }
                 }
             }
@@ -4375,6 +4646,7 @@ public final class StreetLayer {
             }
         }
         Map<Long, double[]> moved = new HashMap<>();
+        java.util.Set<Long> anchors = new java.util.HashSet<>();
         Map<Integer, List<double[]>> splits = new HashMap<>();
         for (int k = 0; k < n; k++) {
             if (!gone[k]) {
@@ -4416,6 +4688,14 @@ public final class StreetLayer {
                     to = new double[]{h.x1() + (h.x2() - h.x1()) * bestT, h.z1() + (h.z2() - h.z1()) * bestT};
                     splitAt = new double[]{bestT, to[0], to[1]};
                 }
+                // A previous join depends on this position. Keep the connector rather than shifting the
+                // common junction a second time and leaving its incoming street at the first position.
+                long target = nodeKey(to[0], to[1]);
+                if (config.continuousCarriageways && key != target
+                        && (anchors.contains(key) || moved.containsKey(target))) {
+                    gone[k] = false;
+                    continue;
+                }
                 // Not where a street meeting it would then run over water
                 boolean dry = true;
                 for (int q : byNode.getOrDefault(key, List.of())) {
@@ -4439,11 +4719,13 @@ public final class StreetLayer {
                     }
                 }
                 if (!dry) {
+                    if (config.continuousCarriageways) gone[k] = false;
                     continue;
                 }
                 if (splitAt != null) {
                     splits.computeIfAbsent(best, q -> new ArrayList<>()).add(splitAt);
                 }
+                if (config.continuousCarriageways) anchors.add(target);
                 moved.put(key, to);
             }
         }
@@ -6129,7 +6411,7 @@ public final class StreetLayer {
                 f++;
             }
             sites.add(new StationSite(StationSite.Kind.MAIN, anchor.x(), anchor.z(), fronts.get(f).heading(),
-                    transit.mainLength(settlement.tier()), transit.mainWidth, plazas.get(f).depth()));
+                    transit.mainLength(settlement.tier()), transit.mainWidth(settlement.tier()), plazas.get(f).depth()));
         }
         // The town lines' stations; an interchange gets a square
         for (UrbanLine line : urban) {
@@ -6147,7 +6429,7 @@ public final class StreetLayer {
                     interchange |= main.kind() == StationSite.Kind.MAIN && Math.hypot(main.x() - st[0], main.z() - st[1]) < 300;
                 }
                 sites.add(new StationSite(StationSite.Kind.TOWN_LINE, st[0], st[1], st.length > 3 ? st[3] : 0.0,
-                        transit.platformLength(settlement.tier()), transit.townLineWidth, interchange ? transit.interchangePlaza : 0.0));
+                        transit.platformLength(settlement.tier()), transit.localWidth(interchange || settlement.tier() == SettlementTier.METROPOLIS), interchange ? transit.interchangePlaza : 0.0));
             }
         }
         // The intercity lines' suburban stops, counted out from the main station
@@ -7399,7 +7681,7 @@ public final class StreetLayer {
             return;
         }
         // From the square's mouth straight out, then onto the network ahead of it, not back across the square
-        double[] mouth = front.mouth(logic.settings().transit.mainWidth);
+        double[] mouth = front.mouth(logic.settings().transit.mainWidth(extent.settlement().tier()));
         double[] out = front.outward();
         double approach = logic.settings().plazas.approach;
         double[] ahead = {mouth[0] + out[0] * approach, mouth[1] + out[1] * approach};
@@ -7464,6 +7746,8 @@ public final class StreetLayer {
         }
         // The station's own short way onto the network: out of the square's mouth toward it (at a slant of at most
         // 35 degrees off straight out), then to the network
+        // Frontage layouts establish their actual driveway later, after the street network
+        // is complete. A provisional spur here survives if the final entrance moves.
         double[] first = nodes.get(from);
         double straight = Math.min(approach, Math.max(0.0, (first[0] - mouth[0]) * out[0] + (first[1] - mouth[1]) * out[1]));
         double off = Math.atan2(-(first[0] - mouth[0]) * out[1] + (first[1] - mouth[1]) * out[0],
@@ -7471,8 +7755,9 @@ public final class StreetLayer {
         off = Math.max(-Math.toRadians(35), Math.min(Math.toRadians(35), off));
         double[] way = {out[0] * Math.cos(off) - out[1] * Math.sin(off), out[0] * Math.sin(off) + out[1] * Math.cos(off)};
         double[] bend = {mouth[0] + way[0] * straight, mouth[1] + way[1] * straight};
-        connect(mouth, bend, window, segments);
-        connect(bend, first, window, segments);
+        List<StreetSegment> destination=logic.settings().plazas.frontageLayout?front.spur:segments;
+        connect(mouth, bend, window, destination);
+        connect(bend, first, window, destination);
     }
 
     /** A straight piece of the station avenue, in steps, bridged over water. */

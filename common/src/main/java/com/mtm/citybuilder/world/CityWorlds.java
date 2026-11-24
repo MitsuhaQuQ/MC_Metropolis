@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.storage.LevelResource;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
@@ -66,7 +67,9 @@ public final class CityWorlds {
         Path plans = folder.resolve("plan");
         // In one SQLite database (the driver MTM_worldgen carries), the plan files of an older save read into it as
         // they are needed; a file per plan where no driver loads
-        PlanStore store = SqlitePlanStore.open(folder.resolve("citybuilder.db"), plans);
+        Path database = folder.resolve("citybuilder.db");
+        boolean existingPlans = Files.exists(database) || Files.isDirectory(plans);
+        PlanStore store = SqlitePlanStore.open(database, plans);
         if (store == null) {
             store = new FilePlanStore(plans);
             CityBuilder.LOGGER.info("Cities in {}: no SQLite driver, plans kept as files in {}", level.dimension().location(), plans);
@@ -76,7 +79,7 @@ public final class CityWorlds {
                 DATABASES.add((SqlitePlanStore) store);
             }
         }
-        CityLogic logic = CityLogic.forWorld(level.getSeed(), CitySettings.DEFAULT, terrain, store);
+        CityLogic logic = CityLogic.forWorld(level.getSeed(), CitySettings.forBuildingLayout(store, existingPlans), terrain, store);
         // The towns built as their function layer lays them out: quarters, lots' uses, the public buildings
         logic.buildings().useFunctions();
         return logic;

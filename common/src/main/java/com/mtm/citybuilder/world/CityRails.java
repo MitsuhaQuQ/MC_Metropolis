@@ -286,19 +286,22 @@ public final class CityRails {
      * The underground stations' entrances: a stair from each platform's level up beside the box to the street, a block
      * up a block along, the way over it opened to the sky.
      */
-    static void entrances(WorldGenLevel level, ChunkAccess chunk, BlockPos.MutableBlockPos pos, int top) {
+    static void entrances(WorldGenLevel level, ChunkAccess chunk, ChunkLayer.Column[] streets,
+                          ChunkLayer.Grades grades,BlockPos.MutableBlockPos pos, int top) {
         if (failed) {
             return;
         }
         double[] headings = new double[256];
         double[] rising = new double[256];
+        boolean[] supports = null;
         double[] steps;
         try {
             CityLogic logic = CityWorlds.of(level.getLevel());
             if (logic == null) {
                 return;
             }
-            steps = logic.chunks().rails().entrances(chunk.getPos().x, chunk.getPos().z, headings, rising);
+            if (logic.settings().transit.passengerSpace) supports=new boolean[256];
+            steps = logic.chunks().rails().entrances(chunk.getPos().x, chunk.getPos().z, headings, rising,supports);
         } catch (RuntimeException e) {
             failed = true;
             CityBuilder.LOGGER.error("City railways failed at chunk {}; no more railways are built this session", chunk.getPos(), e);
@@ -335,7 +338,13 @@ public final class CityRails {
                     chunk.setBlockState(pos.set(wx, y, wz), Blocks.STONE_BRICK_STAIRS.defaultBlockState()
                             .setValue(net.minecraft.world.level.block.StairBlock.FACING,
                                     net.minecraft.core.Direction.getNearest(Math.cos(h), 0.0, Math.sin(h))), false);
-                    for (int k = floor + 1; k < y; k++) {
+                    int c=x*16+z;
+                    boolean publicGround=streets!=null && streets[c].surface()!=ChunkLayer.Surface.NONE
+                            || grades!=null && grades.stationLawn()!=null && Double.isFinite(grades.stationLawn()[c]);
+                    // The soffit follows the steps. Short landings and occasional footings
+                    // carry the high flight, leaving the square and its sidewalks open below.
+                    int from=supports==null || y-floor<=3 || supports[c] && !publicGround ? floor+1 : y-1;
+                    for (int k = from; k < y; k++) {
                         chunk.setBlockState(pos.set(wx, k, wz), own("concrete_exposed", Blocks.SMOOTH_STONE), false);
                     }
                     for (int k = y + 1; k <= y + 3; k++) {

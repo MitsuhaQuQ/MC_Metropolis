@@ -16,6 +16,45 @@ public final class CitySettings {
 
     public static final CitySettings DEFAULT = new CitySettings();
 
+    /** Keep a dimension's parcel and station dimensions stable across generator upgrades. */
+    public static CitySettings forBuildingLayout(com.mtm.citybuilder.core.plan.PlanStore store, boolean existingPlans) {
+        String key = "layout/building_scale";
+        byte[] version = store.load(key);
+        if (version == null) {
+            version = new byte[]{(byte) (existingPlans ? 1 : 8)};
+            store.save(key, version);
+        }
+        CitySettings settings = new CitySettings();
+        if (version.length == 1 && version[0] == 1) {
+            settings.plots.minFrontage = 9.0;
+            settings.plots.frontageScale = 1.6;
+            settings.plots.depthScale = 1.2;
+            settings.buildings.streetBuildingDepthScale = 1.0;
+            settings.transit.mainWidth = 40.0;
+            settings.transit.townLineWidth = 14.0;
+            settings.transit.siteWidth = 20.0;
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 8)) {
+            throw new IllegalStateException("Unsupported saved building layout version");
+        }
+        settings.buildings.castleWards = version[0] >= 8;
+        settings.buildings.usableFootprints = version[0] >= 8;
+        settings.buildings.streetFacingFacilities = version[0] >= 8;
+        settings.plazas.frontageLayout = version[0] >= 8;
+        settings.transit.passengerSpace = version[0] >= 8;
+        settings.streets.continuousCarriageways = version[0] >= 8;
+        settings.buildings.largeCastleGate = version[0] >= 7;
+        settings.buildings.plateauCastleKeep = version[0] >= 6;
+        settings.plazas.lowerEntrance = version[0] >= 5;
+        if (version[0] < 4) {
+            settings.plazas.entranceApproach = false;
+            settings.buildings.retailGroundExtra = 0;
+        }
+        if (version[0] < 3) {
+            settings.buildings.residentialGroundExtra = 0;
+        }
+        return settings;
+    }
+
     /** Version of the planning algorithm a world plans with, fixed when the world is created. */
     public int planVersion = CURRENT_PLAN_VERSION;
     public General general = new General();
@@ -634,6 +673,18 @@ public final class CitySettings {
      * plan is the same whatever {@code build} says; {@code build} only tells the chunk layer how much of it to build.
      */
     public static final class Transit {
+        /** Size station land, platforms, stair wells and buried station boxes together. */
+        public boolean passengerSpace = true;
+
+        public double mainWidth(com.mtm.citybuilder.core.settlement.SettlementTier tier) {
+            return passengerSpace ? Math.max(mainWidth, 2 * com.mtm.citybuilder.core.building.rail.CrossSection.mainStation(tier, true).half() + 4) : mainWidth;
+        }
+
+        public double localWidth(boolean interchange) {
+            int wider = com.mtm.citybuilder.core.building.rail.CrossSection.localStation(false, interchange, true).half();
+            return passengerSpace ? Math.max(townLineWidth, 2 * wider + 4) : townLineWidth;
+        }
+
         /** What the chunk layer builds of the planned railways. */
         public enum Build {
             /** Nothing: the corridors, station sites and squares are only kept clear. */
@@ -671,9 +722,9 @@ public final class CitySettings {
         public double mainLength = 300.0;
         public double mainLengthCity = 240.0;
         public double mainLengthTown = 160.0;
-        public double mainWidth = 40.0;
-        public double townLineWidth = 14.0;
-        public double siteWidth = 20.0;
+        public double mainWidth = 64.0;
+        public double townLineWidth = 30.0;
+        public double siteWidth = 30.0;
         public double interchangePlaza = 30.0;
         /**
          * The intercity lines stop in the suburbs from {@code suburbanFirst} out from the main station, every
@@ -787,6 +838,8 @@ public final class CitySettings {
     }
 
     public static final class Streets {
+        /** Preserve the travelled centreline when removing overlaps and the crest under bank roads. */
+        public boolean continuousCarriageways = true;
         /** A metropolis is a planned capital where this share of its built land is flat, and its hash below the chance. */
         public double joriFlatShare = 0.7;
         public double joriChance = 0.5;
@@ -1172,15 +1225,15 @@ public final class CitySettings {
          * 0.15) to leave rooms of a real width inside; and none narrower than a house with a room in it.
          */
         public double wallAllowance = 1.7;
-        public double minFrontage = 9.0;
+        public double minFrontage = 10.0;
         /**
          * The measured frontages (Kyoto's, Kanazawa's) times this, and the depths times {@code depthScale}, for the
          * houses, shops and offices of the town (not works' and quays' land): a house as narrow as a real machiya,
          * its walls a block thick, is all wall and window in the game, and a street of them reads as fragments. The
          * measured shares hold; the lots are simply larger, the buildings on them whole.
          */
-        public double frontageScale = 1.6;
-        public double depthScale = 1.2;
+        public double frontageScale = 2.0;
+        public double depthScale = 1.45;
         /**
          * Land goes to the street whose edge is nearest, a wider street's edge counting this much nearer: its lots
          * run deeper, the front street (omotedori) taking the corners from the back streets.
@@ -1295,6 +1348,12 @@ public final class CitySettings {
      * network.
      */
     public static final class Plazas {
+        /** Lay straight stopping kerbs first and join them to verified street approaches. */
+        public boolean frontageLayout = true;
+        /** Grade the central pedestrian approach across the reserved station forecourt site. */
+        public boolean entranceApproach = true;
+        /** Connect high station concourses to a lower plaza when the approach can clear the street. */
+        public boolean lowerEntrance = true;
         public double lane = 7.0;
         public double walk = 4.0;
         public double berth = 15.0;

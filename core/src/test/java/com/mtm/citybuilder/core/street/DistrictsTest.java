@@ -159,7 +159,24 @@ class DistrictsTest {
                 Math.hypot(g.x2() - mouth[0], g.z2() - mouth[1]))).min().orElseThrow();
         double nearGate = avenue.stream().mapToDouble(g -> Math.min(Math.hypot(g.x1() - gate.x(), g.z1() - gate.z()),
                 Math.hypot(g.x2() - gate.x(), g.z2() - gate.z()))).min().orElseThrow();
-        assertTrue(nearStation < 1.0, () -> "the avenue starts at the station square's mouth: " + nearStation);
+        if(square.curbStreet()==null) assertTrue(nearStation < 1.0, () -> "the avenue starts at the station square's mouth: " + nearStation);
+        else {
+            // A kerbside station joins an existing street between its endpoints. Follow
+            // that actual street network to the avenue instead of looking for a spur.
+            var nearby=plan.segments().stream().filter(g->g.structure()!=StreetStructure.BRIDGE &&
+                    g.structure()!=StreetStructure.STAIRS && g.streetClass()!=StreetClass.PATH && g.streetClass()!=StreetClass.LANE &&
+                    java.awt.geom.Line2D.ptSegDist(g.x1(),g.z1(),g.x2(),g.z2(),mouth[0],mouth[1])<300).toList();
+            var seen=new java.util.HashSet<StreetSegment>();
+            var queue=new java.util.ArrayDeque<StreetSegment>();
+            queue.add(square.curbStreet());
+            while(!queue.isEmpty()) {
+                var g=queue.remove();
+                if(!seen.add(g)) continue;
+                for(var other:nearby) if(!seen.contains(other) && java.awt.geom.Line2D.linesIntersect(
+                        g.x1(),g.z1(),g.x2(),g.z2(),other.x1(),other.z1(),other.x2(),other.z2())) queue.add(other);
+            }
+            assertTrue(avenue.stream().anyMatch(seen::contains),"the street serving the bays connects to the avenue");
+        }
         assertTrue(nearGate < 200.0, () -> "the avenue reaches the gate: " + nearGate);
     }
 }

@@ -92,7 +92,7 @@ public final class RailChunks {
     private record Index(List<double[]> pieces, List<double[]> platforms, Map<Long, List<Integer>> byChunk,
                          Map<Long, List<Integer>> platformsByChunk, List<double[]> entrances,
                          Map<Long, List<Integer>> entrancesByChunk, RailStructures.Built structures,
-                         List<double[]> through, Map<Long, List<Integer>> throughByChunk) {
+                         List<double[]> through, Map<Long, List<Integer>> throughByChunk, List<int[]> runs) {
     }
 
     private final CityLogic logic;
@@ -105,7 +105,10 @@ public final class RailChunks {
 
     public RailChunks(CityLogic logic) {
         this.logic = logic;
+        this.corridors = new RailCorridors(logic);
     }
+
+    private final RailCorridors corridors;
 
     /** An intercity line's route indexed by chunk: its samples' pieces reaching each chunk, the distance to each. */
     private record Wild(com.mtm.citybuilder.core.rail.RailRoute route, Map<Long, int[]> byChunk, double[] along, double half) {
@@ -222,13 +225,30 @@ public final class RailChunks {
     }
 
     /** An intercity line's column, or null: outside the towns, or through a town where its own railway does not run. */
-    private Cell wildCell(List<Wild> near, long chunk, double cx, double cz, Settlement town) {
+    private record CorridorSlice(Wild railway,double from,double to) {}
+
+    private CorridorSlice corridorSlice(Wild w,double x,double z) {
+        double from=Double.NEGATIVE_INFINITY,to=Double.POSITIVE_INFINITY;
+        if (logic.settings().transit.passengerSpace) {
+            for (Settlement town : List.of(w.route.edge().a(),w.route.edge().b())) {
+                double reach=logic.maxExtentReach(town.tier())+32;
+                if (Math.abs(x-town.x())>reach || Math.abs(z-town.z())>reach) continue;
+                double[] cut=cutIn(w,town);
+                from=Math.max(from,cut[0]);
+                to=Math.min(to,cut[1]);
+            }
+        }
+        return new CorridorSlice(w,from,to);
+    }
+
+    private Cell wildCell(List<CorridorSlice> near, long chunk, double cx, double cz, Settlement town) {
         Wild best = null;
         int bestI = -1;
         double bestD = Double.POSITIVE_INFINITY;
         double bestT = 0;
         double bestAcross = 0;
-        for (Wild w : near) {
+        for (var slice : near) {
+            Wild w=slice.railway;
             com.mtm.citybuilder.core.rail.RailRoute r = w.route;
             for (int i : w.byChunk.get(chunk)) {
                 double ax = r.x(i - 1);
@@ -240,6 +260,8 @@ public final class RailChunks {
                     continue;
                 }
                 double t = Math.max(0.0, Math.min(1.0, ((cx - ax) * dx + (cz - az) * dz) / l2));
+                double along=w.along[i-1]+t*(w.along[i]-w.along[i-1]);
+                if (along<slice.from || along>slice.to) continue;
                 double d = Math.hypot(ax + dx * t - cx, az + dz * t - cz);
                 if (d < bestD) {
                     bestD = d;
@@ -299,11 +321,11 @@ public final class RailChunks {
         }
         // The intercity lines between the towns, outside their built land
         long chunk = key(chunkX, chunkZ);
-        List<Wild> near = new ArrayList<>();
+        List<CorridorSlice> near = new ArrayList<>();
         for (com.mtm.citybuilder.core.rail.RailEdge edge : edges(chunkX, chunkZ)) {
             Wild w = wild(edge);
             if (w != null && w.byChunk.containsKey(chunk)) {
-                near.add(w);
+                near.add(corridorSlice(w,minX+8,minZ+8));
             }
         }
         if (!near.isEmpty()) {
@@ -315,10 +337,10 @@ public final class RailChunks {
                     }
                     double cx = minX + x + 0.5;
                     double cz = minZ + z + 0.5;
-                    UrbanSample sample = logic.urban(cx, cz);
+                    UrbanSample sample = logic.settings().transit.passengerSpace ? null : logic.urban(cx, cz);
                     // In a town's built land only where the town's own railway does not take the line over
                     out[x * 16 + z] = wildCell(near, chunk, cx, cz,
-                            sample.owner() != null && sample.intensity() > built ? sample.owner() : null);
+                            sample != null && sample.intensity() > built ? sample.owner() : null);
                 }
             }
         }
@@ -345,6 +367,135 @@ public final class RailChunks {
         public String state(int i) {
             return states.get((int) (packed[i] >>> 24));
         }
+    }
+
+    /** Expected beds, independently projected from the station out along either end with a continuing line. */
+    public record StationEndCheck(boolean start, int track, List<double[]> columns) {}
+    public record StationCheck(boolean main, double x, double z, int[] tracks, List<StationEndCheck> ends, int hallFloor) {}
+
+    public StationCheck stationCheck(Settlement town, double x,double z, boolean main) {
+        Index index=index(town);
+        if(index==null) return null;
+        RailStructures.Station station=null;
+        double nearest=Double.POSITIVE_INFINITY;
+        for(var st:index.structures.stations) {
+            if(!st.built || !st.elevated || st.tracks==null || st.main!=main) continue;
+            var path=st.path();
+            double[] mid=path.point(path.length()/2);
+            double d=Math.hypot(x-mid[0],z-mid[1]);
+            if(d<nearest){nearest=d;station=st;}
+        }
+        if(station==null)return null;
+        var path=station.path();
+        var result=new ArrayList<StationEndCheck>();
+        for(boolean start:new boolean[]{true,false}){
+            var tip=path.point(start?0:path.length());
+            double tx=Math.cos(tip[2]),tz=Math.sin(tip[2]),sign=start?-1:1;
+            double half=station.half;
+            var lanes=new ArrayList<List<double[]>>();
+            for(int tc:station.tracks) lanes.add(new ArrayList<>());
+            boolean continues=false;
+            for(int s=-4;s<=18;s++){
+                double px=tip[0]+sign*s*tx,pz=tip[1]+sign*s*tz;
+                double best=2.5,bx=px,bz=pz,bed=station.level,rx=tx,rz=tz;
+                double[] approachPiece = null;
+                if(s>2){
+                    List<Integer> near=index.byChunk.getOrDefault(key((int)Math.floor(px/16),(int)Math.floor(pz/16)),List.of());
+                    boolean found=false;
+                    for(int id:near){
+                        if (id < station.firstApproachPiece || id >= station.endApproachPiece) continue;
+                        double[] g=index.pieces.get(id);
+                        double dx=g[2]-g[0],dz=g[3]-g[1],length=Math.hypot(dx,dz);
+                        if(length<0.01 || Math.abs(dx*tx+dz*tz)<length*0.92 || g[10]>0.5)continue;
+                        double t=((px-g[0])*dx+(pz-g[1])*dz)/(length*length);
+                        if(t<0 || t>1)continue;
+                        double gx=g[0]+t*dx,gz=g[1]+t*dz,gy=g[4]+t*(g[5]-g[4]),d=Math.hypot(gx-px,gz-pz);
+                        if(d>best || Math.abs(gy-station.level)>2+s/GRADE_RUN)continue;
+                        found=true;best=d;bx=gx;bz=gz;bed=gy;
+                        approachPiece = g;
+                        double orientation=Math.signum(dx*tx+dz*tz);
+                        rx=orientation*dx/length;rz=orientation*dz/length;
+                    }
+                    if(!found)break;
+                    continues=true;
+                }
+                double t=Math.max(0,(s-2)/(Math.max(24,half*4)-2));
+                t=t*t*(3-2*t);
+                for(int k=0;k<lanes.size();k++){
+                    double tc=station.tracks[k]*station.side;
+                    double offset=tc*(1-t)+Math.copySign(2.0,tc)*t;
+                    double wx = bx-rz*offset, wz = bz+rx*offset;
+                    double expected = bed;
+                    if (approachPiece != null) {
+                        // The curved throat rasterizes a whole column at its longitudinal midpoint.
+                        // Off-centre tracks can cross an integer grade one block before the centreline.
+                        double[] g = approachPiece;
+                        double vx = g[2]-g[0], vz = g[3]-g[1], length = Math.hypot(vx,vz);
+                        double projected = ((Math.floor(wx)+0.5-g[0])*vx+(Math.floor(wz)+0.5-g[1])*vz)/length;
+                        double midpoint = Math.floor(g[7]+projected)+0.5-g[7];
+                        expected = g[4]+Math.max(0, Math.min(1, midpoint/length))*(g[5]-g[4]);
+                    }
+                    lanes.get(k).add(new double[]{wx,Math.floor(expected),wz});
+                }
+            }
+            if(continues)for(int k=0;k<lanes.size();k++)result.add(new StationEndCheck(start,k,List.copyOf(lanes.get(k))));
+        }
+        double[] mid=path.point(path.length()/2);
+        return new StationCheck(station.main,mid[0],mid[1],station.tracks.clone(),List.copyOf(result),station.hallFloor);
+    }
+
+    public record StairSpace(double[] step,int width,int leftClear,int rightClear,List<double[]> bypass,
+                             List<com.mtm.citybuilder.core.building.rail.Flights.Tread> treads) {}
+    public record PassengerSpace(boolean interchange,double[] hall,List<StairSpace> stairs) {}
+
+    public PassengerSpace passengerSpace(Settlement town,double x,double z,boolean underground,boolean interchange) {
+        var idx=index(town);
+        if (idx==null)return null;
+        double nearest=Double.POSITIVE_INFINITY;
+        PassengerSpace found=null;
+        for(var st:underground?idx.structures.buried:idx.structures.stations) {
+            if(!st.built || st.circulation==null || st.interchange!=interchange)continue;
+            var mid=st.path().point(st.path().length()/2);
+            double distance=Math.hypot(mid[0]-x,mid[1]-z);
+            if(distance<nearest){nearest=distance;found=st.circulation;}
+        }
+        return found;
+    }
+
+    /** Independent line pairs whose physical envelopes overlap at a buried platform. */
+    public record BoxContact(double[] first, double[] second, boolean firstIsStation, boolean secondIsStation) {}
+    public List<BoxContact> stationContacts(Settlement town,double x,double z) {
+        Index index=index(town);
+        if(index==null) return List.of();
+        List<BoxContact> contacts=new ArrayList<>();
+        for(int i=0;i<index.runs.size();i++) for(int j=0;j<i;j++) {
+            int[] a=index.runs.get(i), b=index.runs.get(j);
+            BoxContact nearest=null;
+            double best=Double.POSITIVE_INFINITY;
+            for(int k=a[0];k<a[1];k++) {
+                double[] g=index.pieces.get(k);
+                if(g[10]<0.5)continue;
+                for(int m=b[0];m<b[1];m++) {
+                    double[] h=index.pieces.get(m);
+                    if(h[10]<0.5 || !stationPiece(g) && !stationPiece(h))continue;
+                    double[] at=contact(g,h,boxHalf(g,null)+boxHalf(h,null));
+                    if(at==null)continue;
+                    double[] p={g[0]+(g[2]-g[0])*at[0],g[4]+(g[5]-g[4])*at[0],g[1]+(g[3]-g[1])*at[0]};
+                    double[] q={h[0]+(h[2]-h[0])*at[1],h[4]+(h[5]-h[4])*at[1],h[1]+(h[3]-h[1])*at[1]};
+                    double distance=Math.hypot(p[0]-x,p[2]-z)+Math.hypot(q[0]-p[0],q[2]-p[2])*8;
+                    if(distance<best){best=distance;nearest=new BoxContact(p,q,stationPiece(g),stationPiece(h));}
+                }
+            }
+            if(nearest!=null)contacts.add(nearest);
+        }
+        return contacts;
+    }
+
+    /** Centreline samples of the route from a low plaza entrance to the concourse, with their walking surface Y. */
+    public List<double[]> lowerEntrance(Settlement town, double stationX, double stationZ) {
+        Index idx = index(town);
+        return idx == null ? List.of() : idx.structures.lowerEntries.getOrDefault(
+                key((int) Math.floor(stationX), (int) Math.floor(stationZ)), List.of());
     }
 
     /** The structures built whole over a chunk (see {@link Structure}). */
@@ -422,13 +573,7 @@ public final class RailChunks {
             }
             // A structure built whole (a viaduct, a station and its building), its columns and a margin round them
             int reach = (int) Math.ceil(margin);
-            for (int dx = -reach; dx <= reach; dx++) {
-                for (int dz = -reach; dz <= reach; dz++) {
-                    if (index.structures.taken((int) Math.floor(x) + dx, (int) Math.floor(z) + dz)) {
-                        return true;
-                    }
-                }
-            }
+            if (index.structures.takenWithin((int)Math.floor(x), (int)Math.floor(z), reach)) return true;
             // An intercity line passing through the town
             for (int p : index.throughByChunk.getOrDefault(key(cx, cz), List.of())) {
                 double[] g = index.through.get(p);
@@ -459,7 +604,7 @@ public final class RailChunks {
                 double dz = z - e[1];
                 double s = dx * e[2] + dz * e[3];
                 double lateral = dx * e[4] + dz * e[5];
-                if (s >= -margin && s <= ENTRANCE + margin && lateral >= -2.0 - margin && lateral <= 1.5 + margin) {
+                if (s >= -margin && s <= e[10] + margin && lateral >= -2.0 - margin && lateral <= 1.5 + margin) {
                     return true;
                 }
             }
@@ -571,6 +716,10 @@ public final class RailChunks {
      * down from a platform above it.
      */
     public double[] entrances(int chunkX, int chunkZ, double[] headings, double[] rising) {
+        return entrances(chunkX,chunkZ,headings,rising,null);
+    }
+
+    public double[] entrances(int chunkX, int chunkZ, double[] headings, double[] rising, boolean[] supports) {
         double[] out = new double[256];
         java.util.Arrays.fill(out, Double.NaN);
         double minX = chunkX * 16.0;
@@ -591,10 +740,11 @@ public final class RailChunks {
                         if (Double.isNaN(e[6])) {
                             continue;
                         }
-                        if (s >= 0 && s <= ENTRANCE && lateral >= -2.0 && lateral <= 1.5) {
+                        if (s >= 0 && s <= e[10] && lateral >= -2.0 && lateral <= 1.5) {
                             out[x * 16 + z] = Math.floor(e[6]) + 1 + e[8] * Math.floor(s);
                             headings[x * 16 + z] = Math.atan2(e[3], e[2]) + (e[8] < 0 ? Math.PI : 0.0);
                             rising[x * 16 + z] = e[8];
+                            if (supports!=null) supports[x*16+z]=Math.floorMod((int)Math.floor(s),8)==3 && lateral>=0;
                         } else if (s >= -1.0 && s < 3.0 && lateral < -2.0 && lateral >= -(e[7] - e[9] + 1.0)) {
                             // The passage out from the platform to the stair (its heading NaN: no step, a way)
                             out[x * 16 + z] = Math.floor(e[6]) + 2;
@@ -741,7 +891,16 @@ public final class RailChunks {
         List<List<double[]>> underLines = new ArrayList<>();
         List<double[]> underMiddles = new ArrayList<>();
         for (UrbanLine line : plan.urbanLines()) {
-            stretch(line.points(), DOUBLE, pieces, subways, flats);
+            int firstPiece = pieces.size();
+            List<double[]> ownFlats=flats;
+            if (logic.settings().transit.passengerSpace) {
+                ownFlats=new ArrayList<>();
+                for (var platform:line.platforms()) for (int i=1;i<platform.size();i++) {
+                    var a=platform.get(i-1); var b=platform.get(i);
+                    ownFlats.add(new double[]{a[0],a[1],b[0],b[1]});
+                }
+            }
+            stretch(line.points(), DOUBLE, pieces, subways, ownFlats);
             for (int s = 0; s < line.stations().size() && s < line.platforms().size(); s++) {
                 double[] st = line.stations().get(s);
                 boolean under = (int) st[2] == TransitMode.UNDERGROUND.ordinal();
@@ -756,10 +915,10 @@ public final class RailChunks {
                 }
                 if (under) {
                     underLines.add(pts);
-                    underMiddles.add(new double[]{st[0], st[1], st[3]});
+                    underMiddles.add(new double[]{st[0], st[1], st[3], firstPiece, pieces.size()});
                 } else {
                     aboveLines.add(pts);
-                    aboveMiddles.add(new double[]{st[0], st[1], st[3], STATION});
+                    aboveMiddles.add(new double[]{st[0], st[1], st[3], STATION, firstPiece, pieces.size()});
                 }
             }
         }
@@ -770,15 +929,34 @@ public final class RailChunks {
             }
         }
         int firstRailway = runsOf.get().size();
+        int firstIntercityPiece = pieces.size();
+        Map<Integer,EntryGrade> entries = new HashMap<>();
+        double throatLength = main != null && logic.settings().transit.passengerSpace
+                ? RailStructures.throatLength(com.mtm.citybuilder.core.building.rail.CrossSection.mainStation(plan.settlement().tier(), true).half()) : 0;
         for (CityRailway railway : plan.railways()) {
             // Double through a town even on a single-track branch: its stations' two platform tracks and the
             // passing loops a town's stretch needs (the viaduct as wide as the station it reaches)
-            stretch(main == null ? railway.line() : intoStation(railway.line(), main), DOUBLE, pieces, subways, flats);
+            int firstRun = runsOf.get().size();
+            stretch(main == null ? railway.line() : intoStation(railway.line(), main, throatLength), DOUBLE, pieces, subways, flats);
+            if (logic.settings().transit.passengerSpace && runsOf.get().size() > firstRun) {
+                var corridor=logic.railRoute(railway.edge());
+                int sample=railway.entry();
+                int[] range=runsOf.get().get(firstRun);
+                var start=pieces.get(range[0]);
+                if (corridor.exists() && sample>=0 && sample<corridor.samples()
+                        && Math.hypot(start[0]-corridor.x(sample),start[1]-corridor.z(sample))<1) {
+                    var entry=new EntryGrade(range[0],range[1],corridor.rail(sample),railway.edge().railClass()==RailClass.TRUNK);
+                    entries.put(range[0],entry);
+                    entry.connect(pieces);
+                }
+            }
         }
         if (main != null) {
-            mainLevel(pieces, runsOf.get(), firstRailway, main);
+            mainLevel(pieces, runsOf.get(), firstRailway, main, throatLength);
         }
-        separate(pieces, runsOf.get(), firstRailway, main);
+        separate(pieces, runsOf.get(), firstRailway, main, logic.settings().transit.passengerSpace);
+        if (main!=null && logic.settings().transit.passengerSpace) mainLevel(pieces,runsOf.get(),firstRailway,main,throatLength);
+        for (EntryGrade entry : entries.values()) entry.connect(pieces);
         List<int[]> runs = new ArrayList<>(runsOf.get());
         runsOf.get().clear();
         // The main station's platforms, where a line reaches it above ground
@@ -794,7 +972,7 @@ public final class RailChunks {
             mainNumber = aboveLines.size();
             platforms.add(new double[]{site.x() - ux, site.z() - uz, site.x() + ux, site.z() + uz, half, 0, mainNumber});
             aboveLines.add(List.of(new double[]{site.x() - ux, site.z() - uz}, new double[]{site.x() + ux, site.z() + uz}));
-            aboveMiddles.add(new double[]{site.x(), site.z(), site.heading(), half});
+            aboveMiddles.add(new double[]{site.x(), site.z(), site.heading(), half, firstIntercityPiece, pieces.size()});
             for (com.mtm.citybuilder.core.street.StationPlaza pz : plan.plazas()) {
                 if (Math.hypot(pz.x() - site.x(), pz.z() - site.z()) < 1.0) {
                     square = pz;
@@ -814,17 +992,24 @@ public final class RailChunks {
                 houseLength = Math.abs(square.building().u2() - square.building().u1());
                 houseDepth = Math.abs(square.building().v2() - square.building().v1());
             }
-            stations.add(new RailStructures.Station(aboveLines.get(k), levelAt(pieces, mid[0], mid[1]), isMain, side,
-                    houseLength, houseDepth));
+            RailStructures.Station station = new RailStructures.Station(aboveLines.get(k), stationLevel(pieces, mid),
+                    isMain, side, houseLength, houseDepth);
+            station.firstApproachPiece = (int) mid[4];
+            station.endApproachPiece = (int) mid[5];
+            station.square = isMain ? square : null;
+            station.interchange = interchange(plan, mid);
+            stations.add(station);
         }
         List<RailStructures.Station> buried = new ArrayList<>();
         for (int k = 0; k < underLines.size(); k++) {
             double[] mid = underMiddles.get(k);
-            buried.add(new RailStructures.Station(underLines.get(k), levelAt(pieces, mid[0], mid[1]), false, 1, 0, 0));
+            RailStructures.Station station = new RailStructures.Station(underLines.get(k), stationLevel(pieces, mid), false, 1, 0, 0);
+            station.interchange = interchange(plan, mid);
+            buried.add(station);
         }
         RailStructures.Built structures = logic.settings().transit.models
                 ? RailStructures.build(logic, plan.settlement().id(), plan.settlement().tier(), plots, plan, pieces,
-                runs, firstRailway, stations, buried)
+                runs, firstRailway, stations, buried, entries)
                 : new RailStructures.Built().done();
         for (int k = 0; k < buried.size(); k++) {
             if (buried.get(k).built) {
@@ -834,7 +1019,7 @@ public final class RailChunks {
             // out past the street it runs under (on its pavement's far side)
             double[] mid = underMiddles.get(k);
             double off = Math.max(STATION + 1.0, streetHalf(plan, mid[0], mid[1]) + 2.5);
-            stairs(entrances, mid[0], mid[1], mid[2], off, 1, STATION);
+            stairs(entrances, mid[0], mid[1], mid[2], off, 1, STATION, 0, buried.get(k).level);
         }
         for (int k = 0; k < stations.size(); k++) {
             RailStructures.Station st = stations.get(k);
@@ -848,7 +1033,9 @@ public final class RailChunks {
             // A stair down beside the line from each side platform's middle to the street: where the station is not
             // built whole, or its concourse is a mezzanine over a street (the library's stairs reach only that)
             if (!st.built || st.mezzanine) {
-                stairs(entrances, mid[0], mid[1], mid[2], half + 2.5, -1, half);
+                boolean lowDoor = st.square != null && structures.lowerEntries.containsKey(
+                        key((int) Math.floor(st.square.x()), (int) Math.floor(st.square.z())));
+                stairs(entrances, mid[0], mid[1], mid[2], half + 2.5, -1, half, lowDoor ? st.side : 0, st.level);
             }
         }
         Map<Long, List<Integer>> byChunk = new HashMap<>();
@@ -864,13 +1051,23 @@ public final class RailChunks {
         // Each entrance's foot at its platform's level: the bed of the piece nearest its station, a block up
         for (int k = 0; k < entrances.size(); k++) {
             double[] e = entrances.get(k);
-            double level = levelAt(pieces, e[0], e[1]);
-            entrances.set(k, new double[]{e[0], e[1], e[2], e[3], e[4], e[5], level, e[6], e[7], e[8]});
+            double level = logic.settings().transit.passengerSpace ? e[9] : levelAt(pieces, e[0], e[1]);
+            double length=ENTRANCE;
+            if (logic.settings().transit.passengerSpace && e[7]<0) {
+                // The upper entrance of a high station can outgrow the nominal 40-block
+                // flight. Continue until its last tread reaches the actual low ground.
+                while (length<ENTRANCE+128) {
+                    int wx=(int)Math.floor(e[0]+e[2]*length), wz=(int)Math.floor(e[1]+e[3]*length);
+                    if (Math.floor(level)+1-length<=logic.terrain().surfaceHeight(wx,wz)) break;
+                    length++;
+                }
+            }
+            entrances.set(k, new double[]{e[0], e[1], e[2], e[3], e[4], e[5], level, e[6], e[7], e[8],length});
         }
         Map<Long, List<Integer>> entrancesByChunk = new HashMap<>();
         for (int p = 0; p < entrances.size(); p++) {
             double[] e = entrances.get(p);
-            bucket(entrancesByChunk, p, e[0], e[1], e[0] + e[2] * ENTRANCE, e[1] + e[3] * ENTRANCE, 4.0);
+            bucket(entrancesByChunk, p, e[0], e[1], e[0] + e[2] * e[10], e[1] + e[3] * e[10], 4.0);
         }
         // The intercity lines passing through the town's built land (not ending here): kept clear as its own are
         List<double[]> through = through(plan);
@@ -880,10 +1077,17 @@ public final class RailChunks {
             bucket(throughByChunk, p, g[0], g[1], g[2], g[3], g[6] + 4.0);
         }
         return new Index(pieces, platforms, byChunk, platformsByChunk, entrances, entrancesByChunk, structures,
-                through, throughByChunk);
+                through, throughByChunk, runs);
     }
 
     /** The bed's level of the piece nearest a point. */
+    private double stationLevel(List<double[]> pieces, double[] mid) {
+        if (!logic.settings().transit.passengerSpace) return levelAt(pieces,mid[0],mid[1]);
+        // At a stacked interchange two station middles may coincide exactly in plan.
+        int from=(int)mid[mid.length-2], to=(int)mid[mid.length-1];
+        return levelAt(pieces.subList(from,to),mid[0],mid[1]);
+    }
+
     private static double levelAt(List<double[]> pieces, double x, double z) {
         double best = Double.POSITIVE_INFINITY;
         double level = Double.NaN;
@@ -962,6 +1166,28 @@ public final class RailChunks {
         return new double[]{Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
     }
 
+    record EntryGrade(int from,int to,double bed,boolean doubleTrack) {
+        /** The regional railway already has a fixed rail elevation. Carry that elevation
+         * into its town approach at the line's grade limit until the two profiles meet. */
+        void connect(List<double[]> pieces) {
+            double along=0;
+            double previous=bed;
+            for (int i=from;i<to;i++) {
+                double[] g=pieces.get(i);
+                along+=Math.hypot(g[2]-g[0],g[3]-g[1]);
+                double reach=along/GRADE_RUN;
+                double next=Math.max(bed-reach,Math.min(bed+reach,g[5]));
+                if (previous!=g[4] || next!=g[5]) {
+                    g[4]=previous;
+                    g[5]=next;
+                    if (previous<g[8]-3 && next<g[9]-3) g[10]=1;
+                    else if (previous>=g[8] || next>=g[9]) g[10]=0;
+                }
+                previous=next;
+            }
+        }
+    }
+
     /**
      * A line's way into the main station along its platforms: the plan's line ends at the station's middle from
      * whatever way it comes, so two lines met there in an X and the platforms ran straight while the tracks turned off
@@ -969,7 +1195,7 @@ public final class RailChunks {
      * from a point at least {@code 2 * length} short of the station, into the end of the platforms on the line's side,
      * and on along the axis to the station's middle. Each point keeps the way (mode) of the line's last point.
      */
-    static List<double[]> intoStation(List<double[]> line, StationSite main) {
+    static List<double[]> intoStation(List<double[]> line, StationSite main, double throatLength) {
         int n = line.size();
         if (n < 2) {
             return line;
@@ -980,7 +1206,9 @@ public final class RailChunks {
         }
         double ux = Math.cos(main.heading());
         double uz = Math.sin(main.heading());
-        double half = 0.5 * main.length();
+        // All routes entering at the same end share the straight fan of tracks before
+        // diverging, including the grades and the cross sections along this approach.
+        double half = 0.5 * main.length() + throatLength;
         // The side the line comes from: where it is a station's length out
         int k = n - 1;
         while (k > 0 && Math.hypot(line.get(k)[0] - main.x(), line.get(k)[1] - main.z()) < 2.0 * main.length()) {
@@ -1021,11 +1249,19 @@ public final class RailChunks {
      * A station's two stairs, one beside each side platform, from its middle ({x, z}, the line's heading {@code h}),
      * {@code off} out from the line: {x, z, ux, uz, nx, nz, off, rising, platform half}.
      */
-    private static void stairs(List<double[]> out, double x, double z, double h, double off, int rising, double half) {
+    private static boolean interchange(StreetPlan plan, double[] at) {
+        return plan.sites().stream().anyMatch(s -> s.kind() == StationSite.Kind.TOWN_LINE && s.plaza() > 0
+                && Math.hypot(s.x() - at[0], s.z() - at[1]) < 2);
+    }
+
+    private static void stairs(List<double[]> out, double x, double z, double h, double off, int rising, double half, int gallerySide, double bed) {
         for (int side : new int[]{1, -1}) {
             double nx = -Math.sin(h) * side;
             double nz = Math.cos(h) * side;
-            out.add(new double[]{x + nx * off, z + nz * off, Math.cos(h), Math.sin(h), nx, nz, off, rising, half});
+            // Leave the new side doorway and its connecting gallery clear of the street stair's solid back.
+            double shift = side == gallerySide ? 10 : 0;
+            out.add(new double[]{x + nx * off + shift * Math.cos(h), z + nz * off + shift * Math.sin(h),
+                    Math.cos(h), Math.sin(h), nx, nz, off, rising, half, bed});
         }
     }
 
@@ -1034,10 +1270,10 @@ public final class RailChunks {
      * its own side, and met the other with a step at the station's middle): the highest of theirs, each line's ramp
      * to it raised no steeper than 1 in {@link #GRADE_RUN}.
      */
-    private static void mainLevel(List<double[]> pieces, List<int[]> runs, int firstRailway, StationSite main) {
+    private static void mainLevel(List<double[]> pieces, List<int[]> runs, int firstRailway, StationSite main, double throatLength) {
         double ux = Math.cos(main.heading());
         double uz = Math.sin(main.heading());
-        double reachAlong = 0.5 * main.length() + 4.0;
+        double reachAlong = 0.5 * main.length() + throatLength + 4.0;
         double reachAcross = 0.5 * main.width() + 4.0;
         java.util.function.BiPredicate<Double, Double> in = (x, z) -> {
             double dx = x - main.x();
@@ -1111,7 +1347,7 @@ public final class RailChunks {
      * it runs in the ground), ramped no steeper than 1 in {@link #GRADE_RUN} either way, a station it reaches raised
      * whole and kept level.
      */
-    private static void separate(List<double[]> pieces, List<int[]> runs, int firstRailway, StationSite main) {
+    static void separate(List<double[]> pieces, List<int[]> runs, int firstRailway, StationSite main, boolean volumes) {
         for (int r = 1; r < runs.size(); r++) {
             int from = runs.get(r)[0];
             int to = runs.get(r)[1];
@@ -1144,7 +1380,8 @@ public final class RailChunks {
                 for (int q = 0; q < r; q++) {
                     for (int j = runs.get(q)[0]; j < runs.get(q)[1]; j++) {
                         double[] h = pieces.get(j);
-                        double[] tu = cross(g, h);
+                        boolean buried = volumes && (g[10] > 0.5 || h[10] > 0.5);
+                        double[] tu = volumes ? contact(g, h, boxHalf(g,r>=firstRailway?main:null) + boxHalf(h,q>=firstRailway?main:null)) : cross(g, h);
                         if (tu == null) {
                             continue;
                         }
@@ -1152,13 +1389,32 @@ public final class RailChunks {
                         if (main != null && r >= firstRailway && q >= firstRailway) {
                             double cx = g[0] + (g[2] - g[0]) * tu[0];
                             double cz = g[1] + (g[3] - g[1]) * tu[0];
-                            if (Math.hypot(cx - main.x(), cz - main.z()) < 2.0 * main.length() + 40.0) {
+                            if (!buried && Math.hypot(cx - main.x(), cz - main.z()) < 2.0 * main.length() + 40.0
+                                    && (!volumes || sameApproach(g, h, main, cx, cz))) {
                                 continue;
                             }
                         }
                         double mine = g[4] + (g[5] - g[4]) * tu[0];
                         double theirs = h[4] + (h[5] - h[4]) * tu[1];
                         boolean under = mine < g[8] + (g[9] - g[8]) * tu[0] - 4.0;
+                        if (volumes) {
+                            double gTop = g[10]>0.5 && stationPiece(g) ? 17 : 8;
+                            double hTop = h[10]>0.5 && stationPiece(h) ? 17 : 8;
+                            double gBottom = g[10] > 0.5 ? 2 : stationPiece(g) ? 9 : 4;
+                            double hBottom = h[10] > 0.5 ? 2 : stationPiece(h) ? 9 : 4;
+                            double ceiling = Math.min(h[4], h[5]) - hBottom - 1 - gTop;
+                            double floor = Math.max(h[4], h[5]) + hTop + 1 + gBottom;
+                            if (Math.max(g[4], g[5]) <= ceiling || Math.min(g[4], g[5]) >= floor) continue;
+                            if (g[10] > 0.5) {
+                                hi[i] = Math.min(hi[i], ceiling);
+                                hi[i + 1] = Math.min(hi[i + 1], ceiling);
+                            } else {
+                                lo[i] = Math.max(lo[i], floor);
+                                lo[i + 1] = Math.max(lo[i + 1], floor);
+                            }
+                            changed = true;
+                            continue;
+                        }
                         if (under ? theirs - mine >= STACKED - 1.0 : Math.abs(mine - theirs) >= OVER - 0.5) {
                             continue;
                         }
@@ -1234,6 +1490,50 @@ public final class RailChunks {
                 }
             }
         }
+    }
+
+    private static boolean stationPiece(double[] piece) {
+        return piece[11] > 0.5 || piece[12] > 0.5;
+    }
+
+    private static double boxHalf(double[] piece, StationSite main) {
+        // Includes the retaining walls at either side of the widest local interchange.
+        return stationPiece(piece) ? Math.max(main==null?18:main.width()/2+1, piece[6] + 1) : piece[6] + 1;
+    }
+
+    private static boolean sameApproach(double[] a, double[] b, StationSite main, double x, double z) {
+        double dx = x - main.x(), dz = z - main.z();
+        double tx = Math.cos(main.heading()), tz = Math.sin(main.heading());
+        if (Math.abs(-dx * tz + dz * tx) > main.width() * 0.5) return false;
+        for (double[] piece : new double[][]{a,b}) {
+            double px = piece[2] - piece[0], pz = piece[3] - piece[1];
+            if (Math.abs(px * tx + pz * tz) < 0.96 * Math.hypot(px,pz)) return false;
+        }
+        return true;
+    }
+
+    /** Closest parameters when the two structure envelopes touch, including corners, ends and parallel runs. */
+    static double[] contact(double[] a, double[] b, double reach) {
+        if (Math.max(a[0],a[2]) + reach < Math.min(b[0],b[2]) || Math.max(b[0],b[2]) + reach < Math.min(a[0],a[2])
+                || Math.max(a[1],a[3]) + reach < Math.min(b[1],b[3]) || Math.max(b[1],b[3]) + reach < Math.min(a[1],a[3])) return null;
+        double[] direct = cross(a,b);
+        if (direct != null) return direct;
+        double best = reach * reach;
+        double[] result = null;
+        for (int end = 0; end < 4; end++) {
+            boolean onA = end < 2;
+            double[] g = onA ? a : b, h = onA ? b : a;
+            int k = 2 * (end % 2);
+            double dx = h[2] - h[0], dz = h[3] - h[1];
+            double u = Math.max(0,Math.min(1, ((g[k]-h[0])*dx + (g[k+1]-h[1])*dz)/Math.max(1e-9,dx*dx+dz*dz)));
+            double ex=h[0]+u*dx-g[k], ez=h[1]+u*dz-g[k+1];
+            double d2=ex*ex+ez*ez;
+            if (d2 <= best) {
+                best=d2;
+                result = onA ? new double[]{end % 2,u} : new double[]{u,end % 2};
+            }
+        }
+        return result;
     }
 
     /** {t, u} where two pieces cross, strictly inside both, or null. */
@@ -1348,7 +1648,7 @@ public final class RailChunks {
             int mode = modes[k];
             double over = mode == TransitMode.ELEVATED.ordinal() ? CLEARANCE
                     : mode == TransitMode.STACKED.ordinal() ? CLEARANCE + STACKED
-                    : mode == TransitMode.UNDERGROUND.ordinal() ? -DEPTH : 0.0;
+                    : mode == TransitMode.UNDERGROUND.ordinal() ? -(logic.settings().transit.passengerSpace ? 19.0 : DEPTH) : 0.0;
             level[k] = Math.floor(ground[k]) + over;
             if (k > 0) {
                 along[k] = along[k - 1] + Math.hypot(p[0] - points.get(k - 1)[0], p[1] - points.get(k - 1)[1]);
@@ -1364,6 +1664,12 @@ public final class RailChunks {
                     flat[k] = true;
                     break;
                 }
+            }
+        }
+        if (logic.settings().transit.passengerSpace) {
+            for (int k=0;k<n;k++) {
+                if (flat[k] && (modes[k]==TransitMode.ELEVATED.ordinal() || modes[k]==TransitMode.STACKED.ordinal()))
+                    level[k]=Math.max(level[k],Math.floor(ground[k])+15);
             }
         }
         for (int k = 0; k < n; ) {
@@ -1463,6 +1769,9 @@ public final class RailChunks {
             if (sample.owner() != null) {
                 towns.add(sample.owner());
             }
+        }
+        if (logic.settings().transit.passengerSpace) {
+            towns.addAll(corridors.at(Math.floorDiv((int)minX,16),Math.floorDiv((int)minZ,16)));
         }
         return towns;
     }

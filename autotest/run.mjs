@@ -7,12 +7,19 @@
 // With --client the dev test client (fabric/run-client) is started too, once the server is up, for the cases that
 // look at the game through it; its window opens on the desktop.
 import { spawn } from 'node:child_process';
-import { createWriteStream, existsSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { copyFileSync, cpSync, realpathSync, createWriteStream, existsSync, readFileSync, rmSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, isAbsolute, sep } from 'node:path';
 import { ROOT, RUN, server } from './lib/server.mjs';
 import { CLIENT_ENDPOINT, client } from './lib/client.mjs';
 
-const WORLD = 'autotest';
+const replay = process.env.AUTOTEST_REPLAY;
+const baseline = process.env.AUTOTEST_BASELINE;
+if (replay && baseline) throw new Error('Select either a saved-chunk baseline or a plan replay');
+const WORLD = baseline ? 'autotest-baseline' : replay ? 'autotest-replay' : 'autotest';
+const layout = process.env.AUTOTEST_LAYOUT;
+if (layout !== undefined && !['1', '2', '3', '4', '5', '6', '7', '8'].includes(layout)) {
+  throw new Error('AUTOTEST_LAYOUT must be 1, 2, 3, 4, 5, 6, 7 or 8');
+}
 const ENDPOINT = join(RUN, 'testkit', 'endpoint-server.json');
 const LOG = join(RUN, 'logs', 'latest.log');
 const WITH_CLIENT = process.argv.includes('--client');
@@ -22,7 +29,19 @@ const KNOWN = [/No data fixer registered/, /Failed to bind to \/127\.0\.0\.1:888
   /ServletContextHandler/, /AbstractLifeCycle/, /BindException/, /Can't keep up/,
   /metropolis\/block\/BlockTurnstile/];
 
-function properties() {
+async function properties() {
+  let source;
+  const target = join(realpathSync(RUN), WORLD);
+  if (existsSync(target) && relative(target,realpathSync(target))!=='')
+    throw new Error('Disposable test world resolves outside its assigned directory');
+  if (replay || baseline) {
+    source = realpathSync(baseline || replay);
+    for (const within of [relative(target,source),relative(source,target)]) {
+      if (!isAbsolute(within) && within!=='..' && !within.startsWith('..'+sep))
+        throw new Error('Input and disposable world directories must be separate');
+    }
+    if (!existsSync(join(source, 'level.dat'))) throw new Error('Replay input has no level.dat');
+  }
   if (!existsSync(join(RUN, 'eula.txt'))) {
     throw new Error('fabric/run/eula.txt is missing: the Minecraft EULA must be accepted by the user first');
   }
@@ -30,7 +49,42 @@ function properties() {
     'level-type=mtm_worldgen\\:realistic', `level-seed=${process.env.AUTOTEST_SEED ?? '12345'}`, `level-name=${WORLD}`, 'online-mode=false',
     'enable-rcon=false', 'enable-query=false', 'server-ip=127.0.0.1', 'server-port=25566', 'spawn-protection=0',
     `view-distance=${WITH_CLIENT ? 8 : 4}`, 'simulation-distance=4', ''].join('\n'));
-  rmSync(join(RUN, WORLD), { recursive: true, force: true });
+  rmSync(target, { recursive: true, force: true });
+  if (source) {
+    if (baseline) {
+      const db=join(source,'citybuilder','citybuilder.db');
+      cpSync(source,target,{recursive:true,dereference:true,filter:path=>{
+        if ([join(source,'session.lock'),db,db+'-wal',db+'-shm'].includes(path)) return false;
+        const inside=relative(source,realpathSync(path));
+        if (isAbsolute(inside) || inside==='..' || inside.startsWith('..'+sep))
+          throw new Error('Baseline contains a link outside the supplied world: '+path);
+        return true;
+      }});
+    }
+    const plans = join(target, 'citybuilder');
+    mkdirSync(plans, { recursive: true });
+    copyFileSync(join(source, 'level.dat'), join(target, 'level.dat'));
+    const legacy = join(source, 'citybuilder', 'plan');
+    if (!baseline && existsSync(legacy)) cpSync(legacy, join(plans, 'plan'), { recursive: true });
+    const database = join(source, 'citybuilder', 'citybuilder.db');
+    if (existsSync(database)) {
+      const { DatabaseSync, backup } = await import('node:sqlite');
+      const original = new DatabaseSync(database, { readOnly: true });
+      const cloned = join(plans, 'citybuilder.db');
+      try { await backup(original, cloned); } finally { original.close(); }
+      if (layout !== undefined) {
+        const db = new DatabaseSync(cloned);
+        try {
+          db.prepare('INSERT OR REPLACE INTO plans(key,data) VALUES(?,?)').run('layout/building_scale', Buffer.from([Number(layout)]));
+        } finally { db.close(); }
+      }
+    }
+  }
+  if (layout !== undefined) {
+    const directory = join(RUN, WORLD, 'citybuilder', 'plan', 'layout');
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, 'building_scale.bin'), Buffer.from([Number(layout)]));
+  }
   rmSync(ENDPOINT, { force: true });
   rmSync(CLIENT_ENDPOINT, { force: true });
   mkdirSync(join(RUN, 'testkit'), { recursive: true });
@@ -68,8 +122,12 @@ async function stop(child, name, endpoint, ask, seconds) {
   let pid = null;
   try { pid = JSON.parse(readFileSync(endpoint, 'utf8')).pid; } catch { /* never started */ }
   try { await ask(); } catch { /* already gone */ }
-  if (!exited[name]) await new Promise((r) => { child.on('exit', r); setTimeout(r, seconds * 1000); });
-  if (pid) { try { process.kill(pid); } catch { /* exited */ } }
+  if (!exited[name]) await new Promise(resolve => {
+    const done=()=>{clearTimeout(timer);child.off('exit',done);resolve();};
+    const timer=setTimeout(done,seconds*1000);
+    child.once('exit',done);
+  });
+  if (!exited[name] && pid) { try { process.kill(pid); } catch { /* exited */ } }
 }
 
 function logErrors() {
@@ -78,30 +136,68 @@ function logErrors() {
     .filter((l) => /\/ERROR\]|Exception/.test(l) && !KNOWN.some((k) => k.test(l)));
 }
 
-properties();
+const started = new Date();
+const resultDir = join(ROOT,'autotest','test-results',started.toISOString().replace(/[:.]/g,'-')+'-'+process.pid);
+mkdirSync(resultDir,{recursive:true});
+const manifest = {started:started.toISOString(), args:process.argv.slice(2), layout:layout??null,
+  replay:replay??null, baseline:baseline??null, world:WORLD, client:WITH_CLIENT, seed:null, status:'starting'};
+const persist = () => writeFileSync(join(resultDir,'run.json'),JSON.stringify(manifest,null,2));
+persist();
+function archiveEvidence(directory, destination) {
+  if (!existsSync(directory)) return;
+  for (const file of readdirSync(directory,{withFileTypes:true})) {
+    const path=join(directory,file.name);
+    if (file.isDirectory()) archiveEvidence(path,join(destination,file.name));
+    else if (file.isFile() && /\.(json|png)$/.test(file.name) && statSync(path).mtimeMs>=started.getTime()) {
+      mkdirSync(destination,{recursive:true});
+      copyFileSync(path,join(destination,file.name));
+    }
+  }
+}
 const serverLog = join(RUN, 'autotest-server.log');
 const clientLog = join(ROOT, 'fabric', 'run-client', 'autotest-client.log');
-mkdirSync(join(ROOT, 'fabric', 'run-client'), { recursive: true });
-const serverProcess = gradle(':fabric:runServer', serverLog, 'server');
+let serverProcess = null;
 let clientProcess = null;
 let failed = false;
 try {
+  await properties();
+  mkdirSync(join(ROOT, 'fabric', 'run-client'), { recursive: true });
+  serverProcess = gradle(':fabric:runServer', serverLog, 'server');
   await waitFor(() => existsSync(ENDPOINT), 600, 'server', serverLog);
+  manifest.seed = (await server.worldInfo()).seed;
   if (WITH_CLIENT) {
     clientProcess = gradle(':fabric:runClient', clientLog, 'client');
     await waitFor(() => existsSync(CLIENT_ENDPOINT), 600, 'client', clientLog);
   }
-  const tests = spawn('npx', ['playwright', 'test', ...ARGS], { stdio: 'inherit', shell: true });
-  const code = await new Promise((r) => tests.on('exit', r));
+  const cli = join(ROOT, 'autotest', 'node_modules', '@playwright', 'test', 'cli.js');
+  manifest.status='testing';
+  persist();
+  const tests = spawn(process.execPath, [cli, 'test', ...ARGS], { stdio: 'inherit',
+    env:{...process.env,AUTOTEST_RESULT_DIR:resultDir} });
+  const code = await new Promise((resolve,reject) => {tests.once('error',reject);tests.once('exit',resolve);});
+  manifest.testExitCode=code;
   failed = code !== 0;
+} catch (error) {
+  failed = true;
+  manifest.error = String(error);
+  console.error(error);
 } finally {
   if (clientProcess) await stop(clientProcess, 'client', CLIENT_ENDPOINT, () => client.quit(), 30);
-  await stop(serverProcess, 'server', ENDPOINT, () => server.stop(), 60);
+  if (serverProcess) await stop(serverProcess, 'server', ENDPOINT, () => server.stop(), 60);
 }
-const errors = logErrors();
+const errors = serverProcess ? logErrors() : [];
 if (errors.length) {
   console.error(`The server logged ${errors.length} error(s):`);
   for (const e of errors.slice(0, 20)) console.error('  ' + e);
   failed = true;
 }
+archiveEvidence(join(ROOT,'build','debug'),join(resultDir,'evidence'));
+for (const [file,name] of [[serverLog,'server.log'],[clientLog,'client.log']]) {
+  if (existsSync(file) && statSync(file).mtimeMs>=started.getTime()) copyFileSync(file,join(resultDir,name));
+}
+manifest.status=failed?'failed':'passed';
+manifest.finished=new Date().toISOString();
+manifest.serverErrors=errors;
+persist();
+console.log('Run report: '+resultDir);
 process.exit(failed ? 1 : 0);

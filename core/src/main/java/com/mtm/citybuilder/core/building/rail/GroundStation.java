@@ -76,7 +76,8 @@ public final class GroundStation {
         if (house == House.BESIDE && section.layout().endsWith("T")) {
             int[] t = section.tracks();
             int in = t[t.length - 1] + StationParts.EDGE;
-            areas.add(new CrossSection.Platform(in, in + 3, true, false));
+            boolean roomy=section.platforms().stream().anyMatch(CrossSection.Platform::passengerSpace);
+            areas.add(new CrossSection.Platform(in, in + (roomy ? 11 : 3), true, false,roomy));
         }
         if (areas.isEmpty()) {
             throw new IllegalArgumentException("no platform in " + section.layout());
@@ -305,12 +306,16 @@ public final class GroundStation {
         return out;
     }
 
+    private int firstStorey() {
+        return section.platforms().stream().anyMatch(CrossSection.Platform::passengerSpace) ? 6 : STOREY;
+    }
+
     /** 橋上駅舎: the building over the tracks, reaching past them on both sides, stairs to the street at both ends. */
     private void over(Model m, int zLo, int zHi) {
         int[] oz = overZ();
         int z0 = oz[0], z1 = oz[1];
         int bx1 = bridgeX1();
-        bridgeBox(m, bridgeX, bx1, z0, z1, STOREY);
+        bridgeBox(m, bridgeX, bx1, z0, z1, firstStorey());
         // Pavement at the feet of the street stairs (the stairs are flights)
         for (int[] w : new int[][] {{z0 + 1, z0 + 3}, {z1 - 3, z1 - 1}}) {
             int foot = ground.at(bridgeX, (w[0] + w[1]) / 2);
@@ -336,7 +341,8 @@ public final class GroundStation {
         int hz0 = zHi + 2, hz1 = hz0 + houseDepth - 1;
         int centre = approach + platformLength / 2;
         int hx0 = centre - houseWidth / 2, hx1 = hx0 + houseWidth - 1;
-        int top = 1 + storeys * STOREY;
+        int first=firstStorey();
+        int top = 1 + first + (storeys-1) * STOREY;
         for (int x = hx0; x <= hx1; x++) {
             for (int z = hz0; z <= hz1; z++) {
                 for (int y = ground.at(x, z); y <= 0; y++) {
@@ -345,13 +351,13 @@ public final class GroundStation {
                 m.set(x, 1, z, p.walk());
                 for (int y = 2; y <= top; y++) {
                     boolean wall = x == hx0 || x == hx1 || z == hz0 || z == hz1;
-                    boolean floor = (y - 1) % STOREY == 0;
+                    boolean floor = y-1>=first && (y-1-first)%STOREY==0;
                     if (y == top) {
                         m.set(x, y, z, p.concrete());
                     } else if (floor) {
                         m.set(x, y, z, wall ? p.house() : p.walk());
                     } else if (wall) {
-                        int k = (y - 1) % STOREY;
+                        int k = y-1<first ? y-1 : (y-1-first)%STOREY;
                         boolean corner = (x == hx0 || x == hx1) && (z == hz0 || z == hz1);
                         boolean window = !corner && (k == 2 || k == 3)
                                 && ((z == hz0 || z == hz1) ? (x - hx0) % 3 != 0 : (z - hz0) % 3 != 0);

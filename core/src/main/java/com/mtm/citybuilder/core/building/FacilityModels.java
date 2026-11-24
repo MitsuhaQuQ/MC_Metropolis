@@ -2,8 +2,10 @@ package com.mtm.citybuilder.core.building;
 
 import com.mtm.citybuilder.core.CityLogic;
 import com.mtm.citybuilder.core.building.landmark.CityHall;
+import com.mtm.citybuilder.core.building.landmark.CastleAsset;
 import com.mtm.citybuilder.core.building.landmark.GasStation;
 import com.mtm.citybuilder.core.building.landmark.Hospital;
+import com.mtm.citybuilder.core.building.landmark.HimejiKeep;
 import com.mtm.citybuilder.core.building.landmark.Library;
 import com.mtm.citybuilder.core.building.landmark.ParkParts;
 import com.mtm.citybuilder.core.noise.Hash;
@@ -33,7 +35,16 @@ public final class FacilityModels {
      * a field) or its blocks only set into what is there (a park's trees, benches and lamps, each at its own ground).
      */
     public record Placed(Facility facility, Model model, int x, int y, int z, int minX, int minZ, int maxX, int maxZ,
-                         boolean grade, boolean walkway) {
+                         boolean grade, boolean walkway, boolean spansStreet, ModelFootprint footprint) {
+        public boolean occupiesColumn(int wx, int wz) {
+            return footprint == null || footprint.contains(wx - minX, wz - minZ);
+        }
+        public Placed(Facility f, Model m, int x, int y, int z, int x0, int z0, int x1, int z1, boolean grade, boolean walkway, boolean spansStreet) {
+            this(f, m, x, y, z, x0, z0, x1, z1, grade, walkway, spansStreet, null);
+        }
+        public Placed(Facility f, Model m, int x, int y, int z, int x0, int z0, int x1, int z1, boolean grade, boolean walkway) {
+            this(f, m, x, y, z, x0, z0, x1, z1, grade, walkway, false);
+        }
         public Placed(Facility facility, Model model, int x, int y, int z, int minX, int minZ, int maxX, int maxZ, boolean grade) {
             this(facility, model, x, y, z, minX, minZ, maxX, maxZ, grade, false);
         }
@@ -45,7 +56,11 @@ public final class FacilityModels {
 
         /** Whether a column lies within the footprint's bounds, a margin round them. */
         public boolean covers(double wx, double wz, double margin) {
-            return wx >= minX - margin && wx < maxX + 1 + margin && wz >= minZ - margin && wz < maxZ + 1 + margin;
+            if (wx < minX-margin || wx >= maxX+1+margin || wz < minZ-margin || wz >= maxZ+1+margin) return false;
+            if (footprint==null) return true;
+            int x=(int)Math.floor(wx),z=(int)Math.floor(wz),r=(int)Math.ceil(margin);
+            for(int i=x-r;i<=x+r;i++) for(int j=z-r;j<=z+r;j++) if(occupiesColumn(i,j)) return true;
+            return false;
         }
     }
 
@@ -53,6 +68,7 @@ public final class FacilityModels {
 
     private final CityLogic logic;
     private final Map<Long, List<Placed>> towns = new HashMap<>();
+    private final Map<Long,List<Placed>> spansByChunk = new HashMap<>();
 
     public FacilityModels(CityLogic logic) {
         this.logic = logic;
@@ -68,10 +84,42 @@ public final class FacilityModels {
         }
         List<Placed> placed = place(town);
         synchronized (towns) {
-            towns.putIfAbsent(town.id(), placed);
+            if (towns.putIfAbsent(town.id(), placed)==null) {
+                for (Placed p : placed) {
+                    if (!p.spansStreet()) continue;
+                    for (int x=p.minX()>>4;x<=p.maxX()>>4;x++) for(int z=p.minZ()>>4;z<=p.maxZ()>>4;z++) {
+                        long key=((long)x<<32)^(z&0xffffffffL);
+                        var spans=new ArrayList<>(spansByChunk.getOrDefault(key,List.of()));
+                        spans.add(p);
+                        spansByChunk.put(key,List.copyOf(spans));
+                    }
+                }
+            }
             return towns.get(town.id());
         }
     }
+
+    /** Already planned structural spans that a neighbouring chunk's street cleanup may encounter. */
+    public List<Placed> streetSpans(int chunkX,int chunkZ) {
+        if (!logic.settings().buildings.castleWards) return List.of();
+        // A saved gate may already stand in a neighbouring chunk on the first decoration
+        // after a server restart. Rebuild its town's span index in that case.
+        int x=chunkX*16, z=chunkZ*16;
+        for (int[] offset : CHUNK_SAMPLES) {
+            var owner=logic.urban(x+offset[0],z+offset[1]).owner();
+            if (owner==null) continue;
+            synchronized (towns) {
+                if (towns.containsKey(owner.id())) continue;
+            }
+            var castle=logic.chunks().castle(owner);
+            if (castle!=null && castle.intersects(x,z,x+16,z+16)) town(owner);
+        }
+        synchronized (towns) {
+            return spansByChunk.getOrDefault(((long)chunkX<<32)^(chunkZ&0xffffffffL),List.of());
+        }
+    }
+
+    private static final int[][] CHUNK_SAMPLES={{8,8},{0,0},{16,0},{0,16},{16,16}};
 
     /** The placed models reaching into a chunk, of the towns owning its middle and corners. */
     public List<Placed> near(int chunkX, int chunkZ) {
@@ -79,7 +127,7 @@ public final class FacilityModels {
         java.util.Set<Long> seen = new java.util.HashSet<>();
         double x0 = chunkX * 16.0;
         double z0 = chunkZ * 16.0;
-        for (double[] p : new double[][]{{8, 8}, {0, 0}, {16, 0}, {0, 16}, {16, 16}}) {
+        for (int[] p : CHUNK_SAMPLES) {
             Settlement owner = logic.urban(x0 + p[0], z0 + p[1]).owner();
             if (owner == null || !seen.add(owner.id())) {
                 continue;
@@ -148,11 +196,13 @@ public final class FacilityModels {
                     int d = (int) Math.floor(Math.min(130, alongX ? site[4] : site[3])) - 6;
                     if (w >= 60 && d >= 50) {
                         int storeys = f.kind() == Facility.Kind.ELEMENTARY_SCHOOL ? 3 : 4;
-                        Placed p = fit(f, List.of(new com.mtm.citybuilder.core.building.landmark.School(w, d, storeys,
-                                (int) (f.id() ^ (f.id() >>> 32))).build()), site, plots);
+                        List<Model> schools=List.of(new com.mtm.citybuilder.core.building.landmark.School(w,d,storeys,
+                                (int)(f.id() ^ (f.id() >>> 32))).build());
+                        if (streetFacing(f,schools,functions,plots,out)) continue;
+                        Placed p = fit(f, schools, site, plots);
                         if (p != null) {
                             out.add(p);
-                            access(p, (int) site[0], plots, out);
+                            if (!access(p, (int) site[0], plots, out) && logic.settings().buildings.streetFacingFacilities) out.remove(p);
                         }
                     }
                 }
@@ -162,6 +212,7 @@ public final class FacilityModels {
             if (candidates.isEmpty()) {
                 continue;
             }
+            if (f.kind() != Facility.Kind.POCKET_PARK && streetFacing(f,candidates,functions,plots,out)) continue;
             double[] site = f.kind().area() ? areaSite(functions, plots, f) : lotSite(functions, plots, f);
             if (site == null) {
                 continue;
@@ -169,10 +220,45 @@ public final class FacilityModels {
             Placed p = fit(f, candidates, site, plots);
             if (p != null) {
                 out.add(p);
-                access(p, (int) site[0], plots, out);
+                if (!access(p, (int) site[0], plots, out) && logic.settings().buildings.streetFacingFacilities) out.remove(p);
             }
         }
         return List.copyOf(out);
+    }
+
+    private boolean streetFacing(Facility f, List<Model> candidates, TownFunctions functions, TownPlots plots, List<Placed> out) {
+        if (!logic.settings().buildings.streetFacingFacilities) return false;
+        var town = plots.settlement();
+        var plan = logic.streetPlan(town);
+        var rails = logic.chunks().rails();
+        double reach = f.kind().area() ? Math.max(40, f.radius()*1.8 + 24)
+                : f.kind()==Facility.Kind.FIRE_STATION ? 36 : 30;
+        StreetFrontage.Land allowed = (x,z) -> (f.kind().area() ? functions.contains(f,x,z)
+                : Math.hypot(x-f.x(),z-f.z())<=reach && functions.facilityAt(x,z)==null && !plots.onStreet(x,z))
+                && !plots.inCanal(x,z) && !rails.near(town,x,z,4) && !wet(plan,x,z);
+        StreetFrontage.Land accessible=(x,z)->{
+            Facility other=functions.facilityAt(x,z);
+            return (other==null || other.id()==f.id()) && !plots.inCanal(x,z) && !wet(plan,x,z)
+                    && !rails.near(town,x,z,1);
+        };
+        var result = StreetFrontage.fit(f,plots,plan,candidates,allowed,accessible,reach);
+        if (result==null) return false;
+        Model m = result.model();
+        int cx=(int)Math.floor(result.curbX()+result.normalX()), cz=(int)Math.floor(result.curbZ()+result.normalZ());
+        var grades=logic.chunks().grades(cx>>4,cz>>4);
+        double roadLevel=grades.level()[(cx&15)*16+(cz&15)];
+        int y=Double.isFinite(roadLevel)?(int)Math.floor(roadLevel+0.5):ground(cx,cz,cx,cz);
+        out.add(new Placed(f,m,0,y,0,m.minX(),m.minZ(),m.maxX(),m.maxZ(),true,false,false,result.footprint()));
+        Model path=new Model();
+        for (double back=-1; back<=result.gap()+1; back+=0.5) {
+            for (double side=-1.5;side<=1.5;side+=0.5) {
+                int x=(int)Math.floor(result.curbX()-result.normalX()*back+result.normalZ()*side);
+                int z=(int)Math.floor(result.curbZ()-result.normalZ()*back-result.normalX()*side);
+                path.set(x,y,z,"citybuilder:sidewalk_granite");
+            }
+        }
+        out.add(new Placed(f,path,0,0,0,path.minX(),path.minZ(),path.maxX(),path.maxZ(),false,true));
+        return true;
     }
 
     /** The models a facility could be, the largest first; none for the kinds not generated whole. */
@@ -294,6 +380,11 @@ public final class FacilityModels {
      * along z}; null where there is none.
      */
     private static double[] site(Ground in, TownPlots plots, double cx, double cz, double half) {
+        return site(in, plots, cx, cz, half, 0, 0);
+    }
+
+    private static double[] site(Ground in, TownPlots plots, double cx, double cz, double half,
+                                 int minWidth, int minDepth) {
         double step = 2.0;
         int n = (int) Math.ceil(2 * half / step);
         double x0 = cx - half;
@@ -316,6 +407,7 @@ public final class FacilityModels {
                     int r = i - 1;
                     double w = (r - l + 1) * step;
                     double d = height * step;
+                    if (!(w - 2 >= minWidth && d - 2 >= minDepth || w - 2 >= minDepth && d - 2 >= minWidth)) continue;
                     double score = w * d * (Math.min(w, d) >= 16 ? 1.0 : 0.1);
                     if (height > 0 && score > bestScore) {
                         bestScore = score;
@@ -413,14 +505,28 @@ public final class FacilityModels {
             }
         }
         com.mtm.citybuilder.core.chunk.RailChunks rails = logic.chunks().rails();
-        Ground land = (x, z) -> functions.contains(f, x, z) && !rails.near(x, z, 3.0);
+        var castle = f.kind() == Facility.Kind.CASTLE_PARK ? logic.chunks().castle(town) : null;
+        Ground land = (x, z) -> {
+            if (!functions.contains(f, x, z) || rails.near(x, z, 3.0)) return false;
+            var cell = castle == null ? null : castle.at(x, z);
+            return cell == null || !cell.moat();
+        };
         List<double[]> reserved = new ArrayList<>();
         Ground open = (x, z) -> land.test(x, z) && walkDistance(walk, x, z) > 2.0 && !in(reserved, x, z, 2.0)
                 && land.test(x + 3, z) && land.test(x - 3, z) && land.test(x, z + 3) && land.test(x, z - 3);
         Facility.Kind kind = f.kind();
         // The graded pieces, the largest first: a castle's honmaru on its stone walls in the middle
-        if (kind == Facility.Kind.CASTLE_PARK && holdsCastle(town, functions, f)) {
-            graded(f, open, plots, half, 24, 24, 48, 40, reserved, out, (w, d) -> ParkParts.honmaru(w, d, seed));
+        if (kind == Facility.Kind.CASTLE_PARK) {
+            boolean keep = functions.facilities().stream().anyMatch(site -> site.kind() == Facility.Kind.CASTLE_KEEP);
+            Ground upperCourt = castle == null ? open : (x, z) -> castle.inUpperCourt(x,z) && open.test(x,z);
+            if (!(keep && logic.settings().buildings.plateauCastleKeep
+                    && castleCourt(f, upperCourt, land, plots, walk, half, seed, true, true, reserved, out))) {
+                castleCourt(f, upperCourt, land, plots, walk, half, seed, keep, false, reserved, out);
+            }
+        }
+        if (castle != null) {
+            castleGates(f, town, castle, plots, reserved, out);
+            perimeterBuildings(f, town, castle, open, (x,z) -> land.test(x,z) && !plots.onStreet(x,z), walk, reserved, out);
         }
         if (kind == Facility.Kind.SPORTS_PARK) {
             graded(f, open, plots, half, 30, 20, 70, 48, reserved, out, (w, d) -> ParkParts.field(w, d));
@@ -591,7 +697,7 @@ public final class FacilityModels {
      * out (the way its front faces) to the first street within 80, at the building's ground; none where no street is
      * met. Graded, so no lot's building stands on it.
      */
-    private void access(Placed p, int front, TownPlots plots, List<Placed> out) {
+    private boolean access(Placed p, int front, TownPlots plots, List<Placed> out) {
         int[] d = DIRS[front];
         int mx = (p.minX() + p.maxX()) / 2;
         int mz = (p.minZ() + p.maxZ()) / 2;
@@ -604,32 +710,343 @@ public final class FacilityModels {
                 break;
             }
         }
-        if (length <= 0) {
-            return;
-        }
+        if (length <= 0) return length == 0;
+        if (logic.settings().buildings.streetFacingFacilities && length > 8) return false;
         // From the building's ground down (or up) to the ground at the street, evenly: each block at its own height,
         // in world coordinates (laid by the chunk on the ground there, not on a graded pad)
         Model path = new Model();
         int end = ground(sx + d[0] * (length - 1), sz + d[1] * (length - 1), sx + d[0] * (length - 1), sz + d[1] * (length - 1));
+        if (logic.settings().buildings.streetFacingFacilities && Math.abs(end-p.y())>length) return false;
         for (int t = 0; t < length; t++) {
             int y = (int) Math.round(p.y() + (end - p.y()) * (t + 0.5) / length);
             for (int k = -2; k <= 1; k++) {
                 int x = sx + (d[0] != 0 ? d[0] * t : k);
                 int z = sz + (d[1] != 0 ? d[1] * t : k);
+                if (logic.settings().buildings.streetFacingFacilities) {
+                    Facility other=logic.functions().town(plots.settlement()).facilityAt(x+0.5,z+0.5);
+                    if (other!=null && other.id()!=p.facility().id() || plots.inCanal(x+0.5,z+0.5)
+                            || wet(logic.streetPlan(plots.settlement()),x+0.5,z+0.5)) return false;
+                }
                 path.set(x, y, z, "citybuilder:sidewalk_granite");
             }
         }
         out.add(new Placed(p.facility(), path, 0, 0, 0, path.minX(), path.minZ(), path.maxX(), path.maxZ(), false, true));
+        return true;
     }
 
-    /** Whether a castle park's block holds the castle itself (its honmaru there; the rest of its grounds park). */
-    private boolean holdsCastle(Settlement town, TownFunctions functions, Facility f) {
-        for (com.mtm.citybuilder.core.street.Anchor a : logic.streetPlan(town).anchors()) {
-            if (a.kind() == com.mtm.citybuilder.core.street.Anchor.Kind.CASTLE && functions.contains(f, a.x(), a.z())) {
+    private void castleGates(Facility park, Settlement town, com.mtm.citybuilder.core.chunk.CastleTerrain castle,
+                             TownPlots plots, List<double[]> reserved, List<Placed> out) {
+        for (var crossing : castle.crossings(logic.streetPlan(town).segments())) {
+            double nx = crossing.inwardX(), nz = crossing.inwardZ();
+            Model gate = new com.mtm.citybuilder.core.building.temple.Gate(25, 7, 9, 12,
+                    com.mtm.citybuilder.core.building.temple.RoofType.GABLE, 0, 1, 3, 1, 0, 0, 0, 0, 0,
+                    com.mtm.citybuilder.core.building.temple.GateStyle.PLAIN, 0,
+                    com.mtm.citybuilder.core.building.temple.TemplePalette.NATURAL).build();
+            for (double r = crossing.moatWidth() * 0.5 + gate.depth() * 0.5; r < crossing.moatWidth() + 36; r += 2) {
+                double cx = crossing.x() + r * nx, cz = crossing.z() + r * nz;
+                var ground = castle.at(cx, cz);
+                if (ground == null || ground.moat() || !plots.onStreet(cx, cz)) continue;
+                boolean occupied=false;
+                for (Placed placed:out) if (placed.grade() && placed.covers(cx,cz,14)) { occupied=true; break; }
+                if (occupied) continue;
+                boolean supported = true;
+                for (int sign : new int[]{-1, 1}) {
+                    var foot = castle.at(cx + sign * nz * 10, cz - sign * nx * 10);
+                    supported &= foot != null && !foot.moat() && Math.abs(foot.ground() - ground.ground()) <= 1;
+                }
+                if (!supported) continue;
+                var axis = new com.mtm.citybuilder.core.building.rail.Path() {
+                    public double length() { return gate.width(); }
+                    public double[] point(double at) {
+                        double along = at - length() * 0.5;
+                        return new double[]{cx + along * nz, cz - along * nx, Math.atan2(-nx, nz)};
+                    }
+                };
+                var curve = com.mtm.citybuilder.core.building.rail.Curve.along(axis,
+                        0.5 * (gate.minZ() + gate.maxZ() + 1), gate.minX());
+                Model placed = curve.applyBand(gate, null);
+                out.add(new Placed(park, placed, 0, (int) Math.floor(ground.crossing()) + 1, 0,
+                        placed.minX(), placed.minZ(), placed.maxX(), placed.maxZ(), false, false, true));
+                reserved.add(new double[]{placed.minX(), placed.minZ(), placed.maxX(), placed.maxZ()});
+                break;
+            }
+        }
+    }
+
+    /** Try the inside corners for turrets, and the long edge following each for covered galleries. */
+    private void perimeterBuildings(Facility park, Settlement town, com.mtm.citybuilder.core.chunk.CastleTerrain castle,
+                                   Ground open, Ground galleryLand, List<double[]> walks, List<double[]> reserved, List<Placed> out) {
+        for (var moat : logic.streetPlan(town).moats()) {
+            var ring = moat.ring();
+            int firstPart = out.size();
+            int turrets = 0, galleries = 0;
+            for (int i = 0; i < ring.size(); i++) {
+                double[] a = ring.get(i), b = ring.get((i + 1) % ring.size());
+                if (a[2] <= 0 || b[2] <= 0) continue;
+                double dx = b[0] - a[0], dz = b[1] - a[1], length = Math.hypot(dx, dz);
+                if (length < 1) continue;
+                dx /= length;
+                dz /= length;
+                double side = (park.x() - a[0]) * -dz + (park.z() - a[1]) * dx >= 0 ? 1 : -1;
+                int turn = Math.floorMod((int) Math.round(Math.atan2(dz,dx) / (Math.PI * 0.5)),4);
+                if (turrets < 3) {
+                    CastleAsset[] towers = {CastleAsset.EAST, CastleAsset.SOUTHEAST, CastleAsset.SOUTHWEST, CastleAsset.SMALL};
+                    for (int k = 0; k < towers.length; k++) {
+                        var tower = towers[(i + k) % towers.length];
+                        if (placeWallBuilding(park, castle, tower, turn, a, dx, dz, side,
+                                Math.min(length / 3, 30), open, List.of(), reserved, out)) { turrets++; break; }
+                    }
+                }
+                if (galleries == 0 && length >= 83) {
+                    for (var gallery : new CastleAsset[]{CastleAsset.WEST_GALLERY, CastleAsset.WATARI}) {
+                        for (double fraction : new double[]{0.5, 0.375, 0.625, 0.25, 0.75}) {
+                            if (placeWallBuilding(park, castle, gallery, turn, a, dx, dz, side,
+                                    length * fraction, (x,z) -> galleryLand.test(x,z) && !in(reserved,x,z,2), walks, reserved, out)) {
+                                galleries++;
+                                break;
+                            }
+                        }
+                        if (galleries > 0) break;
+                    }
+                }
+            }
+            if (galleries == 0) {
+                for (int i=firstPart; i<out.size(); i++) {
+                    Placed tower=out.get(i);
+                    if (tower.footprint() != null && attachGallery(park,tower,castle,galleryLand,walks,reserved,out)) break;
+                }
+            }
+        }
+    }
+
+    private static boolean attachGallery(Facility park, Placed tower, com.mtm.citybuilder.core.chunk.CastleTerrain castle,
+                                         Ground land, List<double[]> walks, List<double[]> reserved, List<Placed> out) {
+        CastleAsset wing = CastleAsset.WATARI_WING;
+        for (int turn=0; turn<4; turn++) {
+            var footprint = wing.footprint(turn);
+            int w=footprint.width(), d=footprint.depth();
+            for (int shift : new int[]{0,-4,4,-8,8}) {
+                int x0 = switch(turn) {
+                    case 0 -> tower.minX()-w;
+                    case 2 -> tower.maxX()+1;
+                    default -> (tower.minX()+tower.maxX()+1-w)/2+shift;
+                };
+                int z0 = switch(turn) {
+                    case 1 -> tower.minZ()-d;
+                    case 3 -> tower.maxZ()+1;
+                    default -> (tower.minZ()+tower.maxZ()+1-d)/2+shift;
+                };
+                boolean fits=true, touches=false;
+                int inwardX = turn==0 ? 1 : turn==2 ? -1 : 0;
+                int inwardZ = turn==1 ? 1 : turn==3 ? -1 : 0;
+                for (int x=0; x<w && fits; x++) for (int z=0; z<d && fits; z++) {
+                    if (!footprint.contains(x,z)) continue;
+                    int wx=x0+x, wz=z0+z;
+                    var cell=castle.at(wx+0.5,wz+0.5);
+                    fits=cell!=null && !cell.moat() && cell.ground()==tower.y() && land.test(wx+0.5,wz+0.5)
+                            && !in(reserved,wx+0.5,wz+0.5,0);
+                    touches |= tower.footprint().contains(wx+inwardX-tower.minX(),wz+inwardZ-tower.minZ());
+                }
+                if (!fits || !touches) continue;
+                Model model=wing.rotated(turn);
+                boolean spansWalk = openGalleryPassage(model, footprint, x0, z0, walks);
+                out.add(new Placed(park,model,x0-model.minX(),tower.y(),z0-model.minZ(),
+                        x0,z0,x0+w-1,z0+d-1,true,false,spansWalk,footprint));
+                reserved.add(new double[]{x0,z0,x0+w-1,z0+d-1});
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean placeWallBuilding(Facility park, com.mtm.citybuilder.core.chunk.CastleTerrain castle,
+                                             CastleAsset asset, int turn, double[] a, double dx, double dz,
+                                             double side, double along, Ground open, List<double[]> walks, List<double[]> reserved, List<Placed> out) {
+        var footprint = asset.footprint(turn);
+        int w = footprint.width(), d = footprint.depth();
+        double normalReach = (Math.abs(dz) * w + Math.abs(dx) * d) / 2;
+        for (int offset = 0; offset <= 32; offset += 8) {
+            double back = a[2] * 0.5 + normalReach + 4 + offset;
+            int x0 = (int) Math.floor(a[0] + dx * along - dz * side * back - w * 0.5);
+            int z0 = (int) Math.floor(a[1] + dz * along + dx * side * back - d * 0.5);
+            var centre = castle.at(x0 + w * 0.5, z0 + d * 0.5);
+            if (centre == null || centre.moat()) continue;
+            boolean fits = true;
+            for (int x = x0; x < x0 + w && fits; x++) {
+                for (int z = z0; z < z0 + d && fits; z++) {
+                    if (!footprint.contains(x - x0, z - z0)) continue;
+                    var cell = castle.at(x + 0.5, z + 0.5);
+                    fits = cell != null && !cell.moat() && cell.ground() == centre.ground() && open.test(x + 0.5, z + 0.5);
+                }
+            }
+            if (!fits) continue;
+            Model m = asset.rotated(turn);
+            boolean spansWalk = openGalleryPassage(m, footprint, x0, z0, walks);
+            out.add(new Placed(park, m, x0 - m.minX(), centre.ground(), z0 - m.minZ(), x0, z0,
+                    x0 + w - 1, z0 + d - 1, true, false, spansWalk, footprint));
+            reserved.add(new double[]{x0,z0,x0 + w - 1,z0 + d - 1});
+            return true;
+        }
+        return false;
+    }
+
+    /** Preserve an existing walk through the stone base below a gallery. */
+    private static boolean openGalleryPassage(Model model, ModelFootprint footprint, int x0, int z0, List<double[]> walks) {
+        if (walks.isEmpty()) return false;
+        boolean intersects = false;
+        for (int x = 0; x < footprint.width(); x++) {
+            for (int z = 0; z < footprint.depth(); z++) {
+                if (!footprint.contains(x, z) || walkDistance(walks, x0+x+0.5, z0+z+0.5) > 0.5) continue;
+                int mx = model.minX() + x, mz = model.minZ() + z;
+                model.set(mx, 0, mz, "minecraft:gravel");
+                for (int y = 1; y <= 4; y++) model.set(mx, y, mz, "minecraft:air");
+                model.set(mx, 5, mz, "minecraft:stone_bricks");
+                intersects = true;
+            }
+        }
+        return intersects;
+    }
+
+    private boolean castleCourt(Facility f, Ground open, Ground land, TownPlots plots, List<double[]> walks,
+                             double half, long seed, boolean keep, boolean himeji, List<double[]> reserved, List<Placed> out) {
+        // First try the ground around the castle anchor, then the rest of the park.
+        for (double reach : new double[]{Math.min(half, 56), half}) {
+            double[] site = logic.settings().buildings.castleWards
+                    ? site(open, plots, f.x(), f.z(), reach, himeji ? HimejiKeep.width() + 8 : 18,
+                            himeji ? HimejiKeep.depth() + 22 : 16)
+                    : site(open, plots, f.x(), f.z(), reach);
+            if (site == null) {
+                continue;
+            }
+            int gateSide = -1;
+            int shortest = Integer.MAX_VALUE;
+            int width = 0, depth = 0, gateX = 0, gateZ = 0;
+            for (int side = 0; side < 4; side++) {
+                boolean alongX = side % 2 == 0;
+                int w = (int) Math.min(himeji ? HimejiKeep.width() + 10 : 54, alongX ? site[3] : site[4]);
+                int d = (int) Math.min(himeji ? HimejiKeep.depth() + 24 : 48, alongX ? site[4] : site[3]);
+                if (w < (himeji ? HimejiKeep.width() + 8 : 18) || d < (himeji ? HimejiKeep.depth() + 22 : 16)) {
+                    continue;
+                }
+                int dx = DIRS[side][0], dz = DIRS[side][1];
+                int minX = (int) Math.floor(site[1] - (alongX ? w : d) * 0.5);
+                int minZ = (int) Math.floor(site[2] - (alongX ? d : w) * 0.5);
+                // After rotating the south-facing gate, its middle stair in world coordinates.
+                int x = minX + switch (side) {
+                    case 0 -> w - 1 - w / 2;
+                    case 1 -> d - 1;
+                    case 2 -> w / 2;
+                    default -> 0;
+                };
+                int z = minZ + switch (side) {
+                    case 1 -> w - 1 - w / 2;
+                    case 2 -> d - 1;
+                    case 3 -> w / 2;
+                    default -> 0;
+                };
+                int length = 0;
+                while (length < 80 && length < shortest) {
+                    double cx = x + dx * (length + 1) + 0.5, cz = z + dz * (length + 1) + 0.5;
+                    if (walkDistance(walks, cx, cz) <= 0 || plots.onStreet(cx, cz)) {
+                        int endX = (int) Math.floor(cx), endZ = (int) Math.floor(cz);
+                        int pad = parkGround(f, plots, minX, minZ, minX + (alongX ? w : d) - 1, minZ + (alongX ? d : w) - 1);
+                        if (Math.abs(parkGround(f, plots, endX, endZ, endX, endZ) - pad) > length + 1) {
+                            break;
+                        }
+                        gateSide = side;
+                        shortest = length;
+                        width = w;
+                        depth = d;
+                        gateX = x;
+                        gateZ = z;
+                        break;
+                    }
+                    if (!land.test(cx, cz) || !land.test(cx + dz, cz + dx) || !land.test(cx - dz, cz - dx)) {
+                        break;
+                    }
+                    length++;
+                }
+            }
+            if (gateSide < 0) {
+                continue;
+            }
+            int lowerGateEave = 0;
+            if (himeji && logic.settings().buildings.largeCastleGate) {
+                lowerGateEave = logic.settings().buildings.castleWards ? 9 : 8;
+            }
+            Model court = ParkParts.honmaru(width, depth, seed, keep, himeji, lowerGateEave).rotated(gateSide - 2);
+            int minX = (int) Math.floor(site[1] - court.width() * 0.5);
+            int minZ = (int) Math.floor(site[2] - court.depth() * 0.5);
+            int maxX = minX + court.width() - 1, maxZ = minZ + court.depth() - 1;
+            int y = parkGround(f, plots, minX, minZ, maxX, maxZ);
+            out.add(new Placed(f, court, minX - court.minX(), y, minZ - court.minZ(), minX, minZ, maxX, maxZ, true));
+            reserved.add(new double[]{minX, minZ, maxX, maxZ});
+            int dx = DIRS[gateSide][0], dz = DIRS[gateSide][1];
+            int endX = gateX + dx * (shortest + 1), endZ = gateZ + dz * (shortest + 1);
+            int endY = parkGround(f, plots, endX, endZ, endX, endZ);
+            Model path = new Model();
+            for (int t = 1; t <= shortest; t++) {
+                int level = y + (int) Math.round((double) (endY - y) * t / (shortest + 1));
+                for (int offset = -1; offset <= 1; offset++) {
+                    path.set(gateX + dx * t + dz * offset, level, gateZ + dz * t + dx * offset, "minecraft:gravel");
+                }
+            }
+            if (path.size() > 0) {
+                out.add(new Placed(f, path, 0, 0, 0, path.minX(), path.minZ(), path.maxX(), path.maxZ(), false, true));
+                reserved.add(new double[]{path.minX(), path.minZ(), path.maxX(), path.maxZ()});
+            }
+            if (logic.settings().buildings.castleWards) {
+                connectBaileyGates(f,plots,minX,minZ,maxX,maxZ,gateX+dx*2,gateZ+dz*2,reserved,out);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private void connectBaileyGates(Facility park, TownPlots plots, int x0,int z0,int x1,int z1,
+                                    int doorX,int doorZ,List<double[]> reserved,List<Placed> out) {
+        var town=plots.settlement();
+        var castle=logic.chunks().castle(town);
+        if(castle==null)return;
+        Map<Long,Boolean> free=new HashMap<>();
+        CastleWalks.Clear clear=(x,z)->free.computeIfAbsent(((long)x<<32) ^ (z&0xffffffffL), unused -> {
+            if (x>=x0-1 && x<=x1+1 && z>=z0-1 && z<=z1+1) return false;
+            for(int[] d:new int[][]{{1,1},{1,-1},{-1,1},{-1,-1}}){
+                double px=x+d[0]+0.5,pz=z+d[1]+0.5;
+                if(!castle.inUpperCourt(px,pz) || logic.chunks().rails().near(town,px,pz,2))return false;
+            }
+            return true;
+        });
+        Model paths=new Model();
+        for(var crossing:castle.crossings(logic.streetPlan(town).segments())){
+            if(!crossing.inner())continue;
+            for(double offset=crossing.moatWidth()/2+3;offset<crossing.moatWidth()+64;offset+=1){
+                int x=(int)Math.floor(crossing.x()+offset*crossing.inwardX());
+                int z=(int)Math.floor(crossing.z()+offset*crossing.inwardZ());
+                var landing=castle.at(x+0.5,z+0.5);
+                if(landing==null || landing.moat() || Math.abs(landing.crossing()-landing.ground())>0.25
+                        || !clear.at(x,z)||!plots.onStreet(x+0.5,z+0.5)) continue;
+                var route=CastleWalks.route(x,z,doorX,doorZ,clear);
+                if(route.isEmpty())continue;
+                for(int[] point:route){
+                    for(int ix=point[0]-1;ix<=point[0]+1;ix++) for(int iz=point[1]-1;iz<=point[1]+1;iz++){
+                        var surface=castle.at(ix+0.5,iz+0.5);
+                        if(surface!=null && !surface.moat())paths.set(ix,surface.ground(),iz,"minecraft:gravel");
+                    }
+                }
+                for (int i=0; i<route.size(); ) {
+                    int j=i;
+                    while(j+1<route.size() && (route.get(j+1)[0]==route.get(i)[0] || route.get(j+1)[1]==route.get(i)[1])) j++;
+                    int[] a=route.get(i), b=route.get(j);
+                    reserved.add(new double[]{Math.min(a[0],b[0])-1,Math.min(a[1],b[1])-1,
+                            Math.max(a[0],b[0])+1,Math.max(a[1],b[1])+1});
+                    i=j+1;
+                }
+                break;
+            }
+        }
+        if(paths.size()>0)out.add(new Placed(park,paths,0,0,0,paths.minX(),paths.minZ(),paths.maxX(),paths.maxZ(),
+                false,true,false,ModelFootprint.of(paths)));
     }
 
     /** A part of a size made for a width and depth. */
@@ -664,7 +1081,7 @@ public final class FacilityModels {
         int md = m.maxZ() - m.minZ() + 1;
         int minX = (int) Math.floor(site[1] - 0.5 * mw);
         int minZ = (int) Math.floor(site[2] - 0.5 * md);
-        int y = ground(minX, minZ, minX + mw - 1, minZ + md - 1);
+        int y = parkGround(f, plots, minX, minZ, minX + mw - 1, minZ + md - 1);
         out.add(new Placed(f, m, minX - m.minX(), y, minZ - m.minZ(), minX, minZ, minX + mw - 1, minZ + md - 1, true));
         reserved.add(new double[]{minX, minZ, minX + mw - 1, minZ + md - 1});
     }
@@ -742,6 +1159,8 @@ public final class FacilityModels {
         if (!Double.isNaN(g.level()[c])) {
             return null;
         }
+        var cell = g.castleAt(c);
+        if (cell != null) return cell.moat() ? null : cell.ground();
         int h = (int) Math.floor(logic.terrain().surfaceHeight(x, z));
         if (!Double.isNaN(g.bank()[c])) {
             return (int) Math.floor(g.bank()[c]);
@@ -752,6 +1171,15 @@ public final class FacilityModels {
             h = Math.max((int) Math.floor(l - o), Math.min((int) Math.floor(l + o), h));
         }
         return h;
+    }
+
+    private int parkGround(Facility facility, TownPlots plots, int x0, int z0, int x1, int z1) {
+        if (facility.kind() == Facility.Kind.CASTLE_PARK) {
+            var castle = logic.chunks().castle(plots.settlement());
+            var cell = castle == null ? null : castle.at((x0 + x1 + 1) * 0.5, (z0 + z1 + 1) * 0.5);
+            if (cell != null) return cell.ground();
+        }
+        return ground(x0, z0, x1, z1);
     }
 
     /** The ground a model stands on: the middle of nine samples of the terrain over its footprint. */

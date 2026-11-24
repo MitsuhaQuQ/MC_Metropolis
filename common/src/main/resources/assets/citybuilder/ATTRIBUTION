@@ -58,3 +58,11 @@ sizes.
 OpenStreetMap (OpenStreetMap contributors, ODbL 1.0): streets and buildings of Kyoto, Kanazawa, Takayama,
 Hida-Furukawa, Shimoda, Karuizawa, Nikko, Himeji and Tokyo, measured by the cityMap and osmStats tools and
 tools/assets/osm_buildings.py for the street network's and the buildings' targets.
+
+Himeji Castle keep (himeji_keep): 3D City Model (Project PLATEAU), Himeji City, FY2023.
+https://www.geospatial.jp/ckan/dataset/plateau-28201-himeji-shi-2023
+CityGML building bldg_7b639b68-9776-4747-b144-19cf05cc27b2.
+Adaptation by City Builder: aligned to the block grid, voxelized at 1 m, assigned Minecraft materials.
+Source terms: Project PLATEAU Site Policy, section 3 (copyright).
+
+The Himeji Castle turrets (east, southeast, southwest and small), connecting turret and Nishinomaru gallery use the same FY2023 Himeji dataset and adaptations as the keep above. Their individual CityGML building IDs are listed in tools/assets/plateau_voxel.py.

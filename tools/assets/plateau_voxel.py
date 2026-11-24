@@ -1582,6 +1582,23 @@ def nbt_compound_list(payloads):
     return bytes([10 if payloads else 0]) + struct.pack(">i", len(payloads)) + b"".join(payloads)
 
 
+def write_block_layers(path, blocks, size):
+    """The same oriented voxels as the NBT, in the palette/row format read by the plain-Java city generator."""
+    width, height, depth = size
+    layers = [[bytearray(b"." * width) for _ in range(depth)] for _ in range(height)]
+    palette = {}
+    for (x, y, z), (name, props) in sorted(blocks.items(), key=lambda item: (item[0][1], item[0][2], item[0][0])):
+        state = name if ":" in name else "minecraft:" + name
+        if props:
+            state += "[" + ",".join(f"{key}={value}" for key, value in sorted(props.items())) + "]"
+        index = palette.setdefault(state, len(palette))
+        layers[y][z][x] = ord("A") + index
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump({"palette": list(palette), "layers": [[row.decode("ascii") for row in layer] for layer in layers]},
+                  fh, indent=1)
+        fh.write("\n")
+
+
 def write_nbt(path, blocks, size):
     states, index = [], {}
     entries = []
@@ -2130,6 +2147,8 @@ def _build_one(out, gid, slug, name, pal, row, bc, textured):
         LANDMARK_FIXES[slug](blocks)
     size = tuple(max(v[i] for v in blocks) + 1 for i in range(3))
     write_nbt(os.path.join(out, slug + ".nbt"), blocks, size)
+    if slug.startswith("himeji_"):
+        write_block_layers(os.path.join(out, slug + ".json"), blocks, size)
     view = blocks
     for _ in range(PREVIEW_TURN.get(slug, 0)):  # quarter turns, clockwise seen from above, for the preview only
         sz_ = max(v[2] for v in view) + 1

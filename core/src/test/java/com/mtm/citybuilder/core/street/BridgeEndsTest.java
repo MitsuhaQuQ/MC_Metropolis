@@ -174,6 +174,14 @@ class BridgeEndsTest {
                         double u = throat.u2() + du * a - dv * c * sign;
                         double v = throat.v2() + dv * a + du * c * sign;
                         double[] w = plaza.world(u, v);
+                        if (plaza.curbStreet()!=null && a>0) {
+                            var g=plaza.curbStreet();
+                            double[] mouth=plaza.mouth();
+                            double gx=(g.x2()-g.x1())/g.length(),gz=(g.z2()-g.z1())/g.length();
+                            double heading=plaza.worldHeading(du,dv);
+                            double direction=Math.signum(gx*Math.cos(heading)+gz*Math.sin(heading));
+                            w=new double[]{mouth[0]+direction*(a*gx-sign*c*gz),mouth[1]+direction*(a*gz+sign*c*gx)};
+                        }
                         int bx = (int) Math.floor(w[0]);
                         int bz = (int) Math.floor(w[1]);
                         com.mtm.citybuilder.core.chunk.ChunkLayer.Column column = chunks.columns(Math.floorDiv(bx, 16),
@@ -183,6 +191,7 @@ class BridgeEndsTest {
                                 ? part == StationPlaza.Part.ROAD || part == StationPlaza.Part.CROSSING
                                 : column.surface() == com.mtm.citybuilder.core.chunk.ChunkLayer.Surface.ARTERIAL
                                 || column.surface() == com.mtm.citybuilder.core.chunk.ChunkLayer.Surface.BOULEVARD
+                                || column.surface() == com.mtm.citybuilder.core.chunk.ChunkLayer.Surface.OLD_ROAD
                                 || column.surface() == com.mtm.citybuilder.core.chunk.ChunkLayer.Surface.STREET;
                         if (!driven && broken.size() < 10) {
                             broken.add(bx + " " + bz + " (" + a + " along, " + c * sign + " across): " + column.surface() + " " + part);

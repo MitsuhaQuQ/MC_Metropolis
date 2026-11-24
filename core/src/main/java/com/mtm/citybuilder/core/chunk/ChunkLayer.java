@@ -278,9 +278,17 @@ public final class ChunkLayer {
         if (column.junction) {
             return column.carriageway ? new Mark(Paving.ASPHALT, 0, 0, true) : new Mark(Paving.SIDEWALK, 0, 0);
         }
-        double width = column.width;
-        double half = 0.5 * width;
-        double walk = walk(width);
+        double width=column.width, sidewalk=walk(width), divider=median(column.surface,width);
+        return markedRoad(column,sidewalk,divider,laneCount(width/2-sidewalk,divider));
+    }
+
+    private static int laneCount(double carriage,double divider) {
+        return Math.max(1,divider>0 ? (int)Math.floor((carriage-divider/2)/3) : (int)Math.round(carriage/3.25));
+    }
+
+    private static Mark markedRoad(Column column,double walk,double divider,double lanes) {
+        double width=column.width;
+        double half=width/2;
         double carriage = half - walk;
         // Where the kerb crosses the block at an angle: cut along it, not stepped a block at a time
         if (walk > 0 && column.plaza == null) {
@@ -293,15 +301,15 @@ public final class ChunkLayer {
             return new Mark(Paving.SIDEWALK, 0, 0);
         }
         List<Line> lines = new ArrayList<>();
-        double divider = median(column.surface, width);
-        if (divider > 0) {
+
+        if (divider > 0.5) {
             // A boulevard's planted median, or the raised divider of a road four lanes each way
             double median = 0.5 * divider;
             if (Math.abs(column.across) < median) {
                 return new Mark(column.bridge || column.surface != Surface.BOULEVARD ? Paving.SIDEWALK : Paving.MEDIAN, 0, 0);
             }
             double side = carriage - median;
-            int lanes = Math.max(1, (int) Math.floor(side / 3.0));
+
             for (int sign : new int[]{1, -1}) {
                 lines.add(new Line(sign * (median + 0.5), Paving.WHITE_LINE, false));
                 lines.add(new Line(sign * (carriage - 0.5), Paving.WHITE_LINE, false));
@@ -314,13 +322,13 @@ public final class ChunkLayer {
         } else if (walk > 0) {
             lines.add(new Line(0.0, Paving.WHITE_LINE, false));
         }
-        if (walk > 0 && divider == 0) {
+        if (walk > 0 && divider <= 0.5) {
             lines.add(new Line(carriage - 0.5, Paving.WHITE_LINE, false));
             lines.add(new Line(-(carriage - 0.5), Paving.WHITE_LINE, false));
         }
-        if (carriage >= 5.0 && divider == 0) {
+        if (lanes > 1 && divider <= 0.5) {
             // Lanes about 3.25 wide each way, dashed lines between them: two on an arterial, three on an avenue
-            int lanes = Math.max(1, (int) Math.round(carriage / 3.25));
+
             for (int k = 1; k < lanes; k++) {
                 lines.add(new Line(carriage * k / lanes, Paving.WHITE_LINE, true));
                 lines.add(new Line(-carriage * k / lanes, Paving.WHITE_LINE, true));
@@ -661,7 +669,7 @@ public final class ChunkLayer {
     private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links,
                          Map<Long, List<double[]>> canals, Map<Long, List<StationPlaza>> plazas,
                          Map<Long, List<Stop>> stops, Map<Long, Double> heights, boolean[][] round,
-                         Map<Long, List<double[]>> banks, double[][][] interior, int[] street) {
+                         Map<Long, List<double[]>> banks, double[][][] interior, int[] street, List<double[]> curbBounds, Map<Integer,List<Taper>> tapers, CastleTerrain castle) {
         /**
          * Whether a column lies on a piece's paving: within half its width of its line and, past an end, only where
          * that end is round (a bend's outside); a square end stops at the end's line.
@@ -699,6 +707,72 @@ public final class ChunkLayer {
         }
     }
 
+    /** Width changes follow the straight-through arm only. Distances carry over the planner's short pieces. */
+    record Taper(double narrow, Surface endSurface, double offset, boolean reverse) {
+        double sidewalk(double width,double full) {
+            double start=marked(endSurface) ? walk(narrow) : 1;
+            return start+(walk(full)-start)*(width-narrow)/(full-narrow);
+        }
+        Mark paint(Column road,double full) {
+            double fraction=(road.width-narrow)/(full-narrow);
+            double endMedian=median(endSurface,narrow), startMedian=median(road.surface,full);
+            double divider=endMedian+(startMedian-endMedian)*fraction;
+            double sw=sidewalk(road.width,full);
+            double narrowWalk=marked(endSurface)?walk(narrow):1;
+            double first=laneCount(narrow/2-narrowWalk,endMedian);
+            double last=laneCount(full/2-walk(full),startMedian);
+            return markedRoad(road,sw,divider,first+(last-first)*fraction);
+        }
+        double width(double station, double length, double full) {
+            double distance = offset + (reverse ? length - station : station);
+            return Math.min(full, narrow + Math.max(0, distance) / 3);
+        }
+    }
+
+    static Map<Integer,List<Taper>> streetTapers(List<StreetSegment> roads) {
+        Map<Long,List<Integer>> ends = new HashMap<>();
+        for (int p = 0; p < roads.size(); p++) {
+            StreetSegment g = roads.get(p);
+            if (surface(g).ordinal() < Surface.STREET.ordinal() || g.structure() == StreetStructure.STAIRS) continue;
+            ends.computeIfAbsent(point(g.x1(),g.z1()), ignored -> new ArrayList<>()).add(2*p);
+            ends.computeIfAbsent(point(g.x2(),g.z2()), ignored -> new ArrayList<>()).add(2*p+1);
+        }
+        int[] straight = new int[roads.size()*2];
+        java.util.Arrays.fill(straight,-1);
+        for (var junction : ends.values()) for (int arm : junction) {
+            var g = roads.get(arm/2);
+            double dir = arm%2==0 ? 1 : -1;
+            double best = Math.cos(Math.toRadians(30));
+            for(int other : junction) {
+                if(other/2==arm/2) continue;
+                var next=roads.get(other/2);
+                double cosine = -dir*(other%2==0?1:-1)*((g.x2()-g.x1())*(next.x2()-next.x1())
+                        +(g.z2()-g.z1())*(next.z2()-next.z1())) / Math.max(1e-9,g.length()*next.length());
+                if(cosine>best) {best=cosine; straight[arm]=other;}
+            }
+        }
+        Map<Integer,List<Taper>> tapers = new HashMap<>();
+        for (int arm=0;arm<straight.length;arm++) {
+            int neighbour=straight[arm];
+            if(neighbour<0 || straight[neighbour]!=arm) continue;
+            var narrow=roads.get(neighbour/2);
+            var wide=roads.get(arm/2);
+            if(!marked(surface(wide)) || narrow.width()>=wide.width()) continue;
+            int next=arm;
+            double distance=0;
+            while(next>=0) {
+                var g=roads.get(next/2);
+                if(!marked(surface(g)) || g.width()<=narrow.width()+distance/3 || g.length()<0.01) break;
+                tapers.computeIfAbsent(next/2,ignored->new ArrayList<>())
+                        .add(new Taper(narrow.width(),surface(narrow),distance,next%2!=0));
+                distance+=g.length();
+                int mate=straight[next^1];
+                if(mate<0 || straight[mate]!=(next^1) || mate==arm) break;
+                next=mate;
+            }
+        }
+        return tapers;
+    }
     private static final int INDEXES = 16;
 
     private final CityLogic logic;
@@ -753,7 +827,7 @@ public final class ChunkLayer {
                 StreetSegment g = index.segments.get(p);
                 Surface surface = surface(g);
                 boolean bridge = g.structure() == StreetStructure.BRIDGE;
-                double half = 0.5 * Math.max(1.0, g.width());
+                List<Taper> tapers=index.tapers.get(p);
                 double length = Math.max(1e-9, g.length());
                 double ux = (g.x2() - g.x1()) / length;
                 double uz = (g.z2() - g.z1()) / length;
@@ -763,6 +837,16 @@ public final class ChunkLayer {
                         double cx = minX + x + 0.5;
                         double cz = minZ + z + 0.5;
                         double d = distance(g, cx, cz);
+                        double width=g.width();
+                        Taper active=null;
+                        if(tapers!=null) {
+                            double station=Math.max(0,Math.min(length,(cx-g.x1())*ux+(cz-g.z1())*uz));
+                            for(Taper taper:tapers) {
+                                double local=taper.width(station,length,g.width());
+                                if(local<width) {width=local; active=taper;}
+                            }
+                        }
+                        double half=width/2;
                         if (d > half || !index.covers(p, cx, cz)) {
                             continue;
                         }
@@ -790,7 +874,7 @@ public final class ChunkLayer {
                             } else if (firstIndex[level][c] != index || !index.sameStreet(first[level][c], p)) {
                                 junction[level][c] = true;
                             }
-                            if (d <= half - walk(g.width())) {
+                            if (d <= half - (active==null ? walk(width) : active.sidewalk(width,g.width()))) {
                                 carriage[level][c] = true;
                             }
                         }
@@ -809,7 +893,8 @@ public final class ChunkLayer {
                             }
                             double along = cx * ux + cz * uz;
                             double deck = bridge ? Math.max(index.deck[p], old.bridge ? old.deck : Double.NEGATIVE_INFINITY) : Double.NaN;
-                            columns[x * 16 + z] = new Column(surface, bridge, deck, across, heading, along, g.width());
+                            Column road = new Column(surface, bridge, deck, across, heading, along, width);
+                            columns[c] = active==null ? road : road.withStop(active.paint(road,g.width()));
                         }
                     }
                 }
@@ -837,7 +922,7 @@ public final class ChunkLayer {
         for (int c = 0; c < 256; c++) {
             Column column = columns[c];
             int level = column.bridge ? 1 : 0;
-            if (!marked(column.surface) || column.junction || column.plaza != null
+            if (!marked(column.surface) || column.junction || column.plaza != null || !meet[level][c]
                     || !(carriage[level][c] || asphalt[level][c])) {
                 continue;
             }
@@ -903,7 +988,8 @@ public final class ChunkLayer {
                     Column column = columns[c];
                     if (kind != 0 && !column.bridge) {
                         columns[c] = new Column(column.surface, false, column.deck, column.across, column.heading,
-                                column.along, column.width, column.junction, column.carriageway, kind);
+                                column.along, column.width, column.junction, column.carriageway, kind,
+                                column.pathUnder, column.plaza, column.stop);
                     }
                 }
             }
@@ -918,19 +1004,62 @@ public final class ChunkLayer {
                     if (part == StationPlaza.Part.NONE || columns[x * 16 + z].bridge) {
                         continue;
                     }
+                    if (logic.settings().plazas.frontageLayout && part == StationPlaza.Part.BUILDING
+                            && columns[x * 16 + z].surface.ordinal() >= Surface.STREET.ordinal()) continue;
+                    if (part == StationPlaza.Part.BUILDING && logic.settings().plazas.entranceApproach) {
+                        Paving surface = Math.abs(plaza.local(cx, cz)[0]) <= 3.5 ? Paving.SIDEWALK : Paving.MEDIAN;
+                        columns[x * 16 + z] = Column.plaza(new Mark(surface, 0, 0));
+                        continue;
+                    }
                     // The streets in its land end at its edge (the plan cut them there or joined them to its loop):
                     // only its own carriageways are laid over one that reaches in, its pavements and islands not (the
                     // avenue's first blocks past the mouth, where the land runs a block beyond the throat's end, would
                     // else be cut off from the throat by a strip of paving)
                     Surface there = columns[x * 16 + z].surface;
                     boolean ownRoad = part == StationPlaza.Part.ROAD || part == StationPlaza.Part.CROSSING;
+                    if(plaza.curbStreet()!=null && ownRoad && there!=Surface.NONE && there!=Surface.PATH) {
+                        // The driveway ends in the near lane. Open the kerb there without
+                        // stamping its edge lines, divider or stops across the through road.
+                        var original=mark(columns[x*16+z]).paving();
+                        if(original==Paving.CURB || original==Paving.SIDEWALK || original==Paving.DITCH
+                                || original==Paving.DITCH_GRATE || original==Paving.DRAIN) {
+                            columns[x*16+z]=Column.plaza(new Mark(Paving.ASPHALT,0,0,true));
+                        }
+                        continue;
+                    }
                     if (!ownRoad && part != StationPlaza.Part.BUILDING && (there == Surface.STREET
                             || there == Surface.OLD_ROAD || there == Surface.ARTERIAL || there == Surface.BOULEVARD)) {
+                        if (logic.settings().plazas.frontageLayout) {
+                            var route = plaza.pedestrianRoute(cx,cz);
+                            if (part == StationPlaza.Part.SHELTER && mark(columns[x*16+z]).paving()==Paving.SIDEWALK) {
+                                columns[x*16+z] = Column.plaza(new Mark(Paving.SHELTER,0,0));
+                            } else if (route != null) {
+                                var existing = mark(columns[x*16+z]);
+                                var uv = plaza.local(cx,cz);
+                                Mark crossing = switch (existing.paving()) {
+                                    case ASPHALT, WHITE_LINE, YELLOW_LINE, PAINT, MANHOLE, DRAIN ->
+                                            new Mark(Math.floorMod((long)Math.floor(route.across(uv[0],uv[1])),2)==0
+                                                    ? Paving.PAINT : Paving.ASPHALT,0,0,existing.low());
+                                    default -> new Mark(Paving.SIDEWALK,0,0);
+                                };
+                                columns[x*16+z] = Column.plaza(crossing);
+                            }
+                        }
                         continue;
                     }
                     columns[x * 16 + z] = part == StationPlaza.Part.BUILDING ? Column.EMPTY
                             : Column.plaza(plazaMark(plaza, cx, cz));
                 }
+            }
+        }
+        // Park paths and back lanes stop at the moat. Only a street leading to a bridgehead spans it.
+        for (Settlement town : towns(minX, minZ)) {
+            CastleTerrain castle = index(town).castle;
+            if (castle == null || !castle.intersects(minX,minZ,minX + 16,minZ + 16)) continue;
+            for (int i = 0; i < 256; i++) {
+                if (columns[i].surface != Surface.PATH && columns[i].surface != Surface.LANE) continue;
+                var cell = castle.at(minX + i / 16 + 0.5,minZ + i % 16 + 0.5);
+                if (cell != null && cell.moat()) columns[i] = Column.EMPTY;
             }
         }
         return columns;
@@ -1023,6 +1152,19 @@ public final class ChunkLayer {
             double[] a = plaza.world(onLink.u1(), onLink.v1());
             double across = (wx - a[0]) * -Math.sin(heading) + (wz - a[1]) * Math.cos(heading);
             double along = wx * Math.cos(heading) + wz * Math.sin(heading);
+            if (plaza.curbStreet()!=null) {
+                // Mark bay ends on the stopping lane only; the entry and exit have no
+                // centreline to continue onto the main carriageway.
+                int index=-1-plaza.links().indexOf(onLink);
+                double s=onLink.local(u,v)[0];
+                for (var bay:plaza.berths()) if (bay.loop()==index) {
+                    var colour=bay.use()==StationPlaza.Use.TAXI ? Paving.YELLOW_LINE : Paving.WHITE_LINE;
+                    var lines=List.of(new Line(-bay.s1(),colour,false),new Line(-bay.s2(),colour,false));
+                    Mark stripe=draw(lines,-s,heading+Math.PI/2,0,true);
+                    if (stripe.paving()!=Paving.ASPHALT) return stripe;
+                }
+                return new Mark(Paving.ASPHALT,0,0,true);
+            }
             // Past a throat's median nose, as the avenue it runs on into: marked as a street of its width
             if (onLink.median() <= 0 || onLink.local(u, v)[0] > onLink.length() - (onLink.walk() + 4.0)) {
                 Mark mark = mark(new Column(Surface.ARTERIAL, false, Double.NaN, across, heading, along, onLink.width()));
@@ -1160,7 +1302,23 @@ public final class ChunkLayer {
             java.util.Collections.sort(grounds);
             double middle = grounds.isEmpty() ? Double.POSITIVE_INFINITY : grounds.get(grounds.size() / 2);
             double ends = Math.min(groundHeight(mouth[0], mouth[1]), groundHeight(door[0], door[1]));
-            return Math.floor(Math.min(ends, middle)) + 0.5;
+            double grade = Math.floor(Math.min(ends, middle)) + 0.5;
+            if (!logic.settings().plazas.frontageLayout) return grade;
+            // Paving over shallow water fills up to its surface. Choose that minimum once
+            // for all connected paving, before fixing the grades of the adjoining streets.
+            double[] bounds = p.bounds();
+            for (int x = (int)Math.floor(bounds[0]); x <= Math.floor(bounds[2]); x++) {
+                for (int z = (int)Math.floor(bounds[1]); z <= Math.floor(bounds[3]); z++) {
+                    if (!p.contains(x+0.5, z+0.5)) continue;
+                    double water = logic.terrain().waterLevel(x+0.5, z+0.5);
+                    if (!Double.isFinite(water) || Math.floor(water)+0.5 <= grade) continue;
+                    var part = p.part(x+0.5, z+0.5);
+                    if (part != StationPlaza.Part.ISLAND && part != StationPlaza.Part.NONE) {
+                        grade = Math.floor(water)+0.5;
+                    }
+                }
+            }
+            return grade;
         });
     }
 
@@ -1283,7 +1441,9 @@ public final class ChunkLayer {
      * unit vector towards its centre line, for the slopes laid on the verge), x-major as {@link #columns}.
      */
     public record Grades(double[] level, double[] verge, double[] outside, double[] bank, int[] bankKind,
-                         boolean[] wall, double[] towardX, double[] towardZ) {
+                         boolean[] wall, double[] towardX, double[] towardZ, CastleTerrain.Cell[] castle,
+                         double[] stationLawn) {
+        public CastleTerrain.Cell castleAt(int c) { return castle == null ? null : castle[c]; }
     }
 
     /**
@@ -1351,6 +1511,10 @@ public final class ChunkLayer {
         // Each street's level weighted by how near its centre line runs: where pieces meet (a bend, a junction) the
         // level passes from one to the next without a step, instead of jumping where the nearest changes
         double[] weight = new double[256];
+        double[] trunkGrade=new double[256],trunkFade=new double[256],trunkDistance=new double[256];
+        int[] trunkRank=new int[256];
+        java.util.Arrays.fill(trunkDistance,Double.POSITIVE_INFINITY);
+        double[] stationLawn = null;
         double[] weighted = new double[256];
         boolean[] wall = new boolean[256];
         double[] towardX = new double[256];
@@ -1366,6 +1530,19 @@ public final class ChunkLayer {
             List<Integer> pieces = index.byChunk.get(key(chunkX, chunkZ));
             if (pieces == null) {
                 continue;
+            }
+            // Priority grading is local to the retained approaches of a station pull-out.
+            // At other intersections (especially the road below a levee) keep their joint grade.
+            double[] approach = new double[256];
+            for (double[] b : index.curbBounds) {
+                if (minX + 16 < b[0] - 96 || minZ + 16 < b[1] - 96
+                        || minX > b[2] + 96 || minZ > b[3] + 96) continue;
+                for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) {
+                    double wx = minX + x + 0.5, wz = minZ + z + 0.5;
+                    double distance = Math.max(Math.max(b[0] - wx, wx - b[2]), Math.max(b[1] - wz, wz - b[3]));
+                    int c = x * 16 + z;
+                    approach[c] = Math.max(approach[c], Math.min(1, (96 - distance) / 32));
+                }
             }
             for (int p : pieces) {
                 StreetSegment g = index.segments.get(p);
@@ -1383,6 +1560,12 @@ public final class ChunkLayer {
                     }
                 }
                 double half = 0.5 * Math.max(1.0, g.width());
+                int rank=!logic.settings().streets.continuousCarriageways ? 0 : switch(g.streetClass()) {
+                    case BOULEVARD -> 3;
+                    case ARTERIAL -> 2;
+                    case COLLECTOR -> 1;
+                    default -> 0;
+                };
                 double dx = g.x2() - g.x1();
                 double dz = g.z2() - g.z1();
                 double length2 = Math.max(1e-9, dx * dx + dz * dz);
@@ -1395,6 +1578,16 @@ public final class ChunkLayer {
                         int c = x * 16 + z;
                         double at = inner == null ? h1 + (h2 - h1) * t : along(t, h1, h2, inner, hs);
                         boolean covered = index.covers(p, cx, cz);
+                        // A lower side street must not cut a trench into a running lane.
+                        // Keep the main street's cross section level, then blend into the
+                        // side street over the pavement and verge on the way out.
+                        if(rank>0 && approach[c]>0 && d<half+VERGE && covered &&
+                                (rank>trunkRank[c] || rank==trunkRank[c] && d<trunkDistance[c])) {
+                            trunkRank[c]=rank;
+                            trunkDistance[c]=d;
+                            trunkGrade[c]=at;
+                            trunkFade[c]=approach[c]*Math.min(1,(half+VERGE-d)/(VERGE+walk(g.width())));
+                        }
                         if (d <= half && covered) {
                             double w = 1.0 / ((d + 0.5) * (d + 0.5));
                             weight[c] += w;
@@ -1454,6 +1647,10 @@ public final class ChunkLayer {
         for (int c = 0; c < 256; c++) {
             if (weight[c] > 0) {
                 level[c] = weighted[c] / weight[c];
+                level[c] += trunkFade[c]*(trunkGrade[c]-level[c]);
+                if (config.continuousCarriageways && bankKind[c] == BANK_CREST) {
+                    level[c] = Math.max(level[c], bank[c]);
+                }
                 verge[c] = Double.NaN;
             }
             if (!Double.isNaN(bank[c])) {
@@ -1472,21 +1669,83 @@ public final class ChunkLayer {
         for (Settlement town : towns(minX, minZ)) {
             for (StationPlaza plaza : index(town).plazas.getOrDefault(key(chunkX, chunkZ), List.of())) {
                 double plazaLevel = plazaLevel(plaza);
+                var pad = plaza.building();
+                double[] hallDoor = plaza.world(0,pad.v1());
+                double streetAtDoor = logic.settings().plazas.frontageLayout
+                        ? streetLevel(index(town),hallDoor[0],hallDoor[1]) : Double.NaN;
                 for (int x = 0; x < 16; x++) {
                     for (int z = 0; z < 16; z++) {
                         StationPlaza.Part part = plaza.part(minX + x + 0.5, minZ + z + 0.5);
-                        if (part != StationPlaza.Part.NONE && part != StationPlaza.Part.BUILDING) {
+                        boolean approach = part == StationPlaza.Part.BUILDING
+                                && logic.settings().plazas.entranceApproach;
+                        if (approach || part != StationPlaza.Part.NONE && part != StationPlaza.Part.BUILDING) {
                             int c = x * 16 + z;
+                            if (logic.settings().plazas.frontageLayout && approach && weight[c]>0) continue;
                             level[c] = plazaLevel;
+                            if (approach) {
+                                double[] uv = plaza.local(minX + x + 0.5, minZ + z + 0.5);
+                                double[] foot = plaza.world(uv[0], pad.v1());
+                                double t = (pad.v2() - uv[1]) / (pad.v2() - pad.v1());
+                                double inner = groundHeight(foot[0],foot[1]);
+                                if (Double.isFinite(streetAtDoor)) {
+                                    inner = Math.max(streetAtDoor-1, Math.min(streetAtDoor+1,inner));
+                                }
+                                level[c] += t * (inner - plazaLevel);
+                                // Retained streets crossing the frontage stay at their own grade;
+                                // blend the exposed shoulders down to that grade before the kerb.
+                                if (logic.settings().plazas.frontageLayout && Double.isFinite(verge[c])
+                                        && Double.isFinite(outside[c])) {
+                                    double rise = Math.max(0,outside[c])/4;
+                                    level[c] = Math.max(verge[c]-rise, Math.min(verge[c]+rise,level[c]));
+                                }
+                            }
                             verge[c] = Double.NaN;
                             outside[c] = Double.NaN;
                             bank[c] = Double.NaN;
+                        } else if (part==StationPlaza.Part.NONE && Double.isFinite(streetAtDoor)) {
+                            // The shaped frontage continues into the first few unpaved blocks
+                            // behind the facade, meeting the natural slope instead of exposing a cut.
+                            int c=x*16+z;
+                            double[] uv=plaza.local(minX+x+0.5,minZ+z+0.5);
+                            double beyond=pad.v1()-uv[1];
+                            if (beyond<=0 || beyond>8 || uv[0]<pad.u1() || uv[0]>pad.u2()
+                                    || weight[c]>0 || Double.isFinite(bank[c])) continue;
+                            double[] foot=plaza.world(uv[0],pad.v1());
+                            double inner=Math.max(streetAtDoor-1, Math.min(streetAtDoor+1,groundHeight(foot[0],foot[1])));
+                            double natural=groundHeight(minX+x+0.5,minZ+z+0.5);
+                            if (Double.isFinite(verge[c]) && Double.isFinite(outside[c])) {
+                                inner=Math.max(verge[c]-outside[c]/4,Math.min(verge[c]+outside[c]/4,inner));
+                                natural=Math.max(verge[c]-outside[c],Math.min(verge[c]+outside[c],natural));
+                            }
+                            if (stationLawn==null) {
+                                stationLawn=new double[256];
+                                java.util.Arrays.fill(stationLawn,Double.NaN);
+                            }
+                            stationLawn[c]=inner+(natural-inner)*beyond/8;
                         }
                     }
                 }
             }
         }
-        return new Grades(level, verge, outside, bank, bankKind, wall, towardX, towardZ);
+        CastleTerrain.Cell[] castleCells = null;
+        for (Settlement town : towns(minX, minZ)) {
+            CastleTerrain castle = index(town).castle;
+            if (castle == null || !castle.intersects(minX, minZ, minX + 16, minZ + 16)) continue;
+            if (castleCells == null) castleCells = new CastleTerrain.Cell[256];
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    int c = x * 16 + z;
+                    var cell = castle.at(minX + x + 0.5, minZ + z + 0.5);
+                    if (cell == null) continue;
+                    castleCells[c] = cell;
+                    if (!Double.isNaN(level[c])) level[c] = cell.crossing();
+                    verge[c] = Double.NaN;
+                    outside[c] = Double.NaN;
+                    bank[c] = Double.NaN;
+                }
+            }
+        }
+        return new Grades(level, verge, outside, bank, bankKind, wall, towardX, towardZ, castleCells,stationLawn);
     }
 
     /**
@@ -1528,9 +1787,9 @@ public final class ChunkLayer {
         if (rise < 1.0) {
             return null;
         }
-        double run = config.leveeSlope * rise;
+        double run = b.length >= 16 ? b[14] + t * (b[15]-b[14]) : config.leveeSlope * rise;
         if (s <= half + run) {
-            return new double[]{crest - (s - half) / config.leveeSlope, BANK_SLOPE};
+            return new double[]{crest - (s - half) * rise / Math.max(1e-6,run), BANK_SLOPE};
         }
         if (s <= half + run + config.leveeRoad) {
             return new double[]{ground, BANK_ROAD};
@@ -1693,6 +1952,8 @@ public final class ChunkLayer {
         // Junctions within one another's paving though no piece joins them (a street ending beside a junction rather
         // than on it, a bank road passing a bridge's end) are one junction to the ramps: else the paving there is laid
         // at two unrelated heights, a bank road's crest through a bridge approach's ramp
+        Map<Long,Integer> connectedEdges = new HashMap<>();
+        links.forEach((node, edges) -> connectedEdges.put(node,edges.size()));
         Map<Long, List<Long>> buckets = new HashMap<>();
         for (Map.Entry<Long, double[]> n : nodes.entrySet()) {
             buckets.computeIfAbsent(key(Math.floorDiv((int) Math.floor(n.getValue()[0]), 16),
@@ -1718,13 +1979,16 @@ public final class ChunkLayer {
                 }
             }
         }
-        squares(index, nodes, links, reach, ramp);
+        List<Long> gradeAnchors=new ArrayList<>();
+        squares(index, nodes, links, reach, ramp,gradeAnchors);
         // {height, node, lift over the node's ground}, the highest first. What is carried along the streets is the
         // lift, falling 1 in leveeRamp: on flat land the street then rises 1 in leveeRamp to the crest or deck, and
         // where the land falls away from a bridge landing on high ground the lift still dies out, instead of the
         // height being carried out over the low land
         java.util.PriorityQueue<double[]> open = new java.util.PriorityQueue<>((u, v) -> Double.compare(v[0], u[0]));
+        java.util.PriorityQueue<double[]> crestApproaches = new java.util.PriorityQueue<>(open.comparator());
         Map<Long, Double> best = new HashMap<>();
+        List<Long> crestNodes = new ArrayList<>();
         for (Map.Entry<Long, double[]> n : nodes.entrySet()) {
             double[] at = n.getValue();
             double seed = crest(index, at[0], at[1], 1.5);
@@ -1738,6 +2002,13 @@ public final class ChunkLayer {
             // Nothing more than bridgeRampMax over what it stands on starts a ramp: a crest raised to the top of a steep
             // bank, or a deck high over a valley, is left to its last piece rather than carried out over low land. A
             // bridge's end behind a levee stands on the levee: its deck is measured from the crest
+            if (logic.settings().streets.continuousCarriageways && !Double.isNaN(seed)) {
+                index.heights.merge(n.getKey(), seed, Math::max);
+                if (seed - ground <= most) {
+                    crestApproaches.add(new double[]{seed,n.getKey()});
+                    crestNodes.add(n.getKey());
+                }
+            }
             if (!Double.isNaN(seed) && seed - ground > most) {
                 seed = Double.NaN;
             }
@@ -1777,6 +2048,67 @@ public final class ChunkLayer {
                 open.add(new double[]{carried, next, lift});
             }
         }
+        // A crest can already be level with the natural ground at the junction, while the
+        // approach immediately beyond drops into a hollow. Limit the road's absolute slope
+        // from that fixed junction until it meets the ground again.
+        for (long junction : gradeAnchors) {
+            crestApproaches.add(new double[]{index.heights.get(junction), junction});
+        }
+        // Through roads stay in place beside a curbside plaza. If a new frontage
+        // raises a junction, carry its grade along the whole approach, including
+        // intermediate main-road nodes outside the pedestrian paving.
+        Set<StationPlaza> curbside=new java.util.HashSet<>();
+        for(var list:index.plazas.values()) for(var square:list) if(square.curbStreet()!=null) curbside.add(square);
+        for(var square:curbside) {
+            double[] b=square.bounds();
+            double datum=plazaLevel(square);
+            for(var g:index.segments) {
+                if(!ramped(g) || g.streetClass()!=StreetClass.BOULEVARD && g.streetClass()!=StreetClass.ARTERIAL) continue;
+                double margin=2*g.width();
+                if(Math.max(g.x1(),g.x2())<b[0]-margin || Math.min(g.x1(),g.x2())>b[2]+margin ||
+                        Math.max(g.z1(),g.z2())<b[1]-margin || Math.min(g.z1(),g.z2())>b[3]+margin) continue;
+                for(long node:new long[]{point(g.x1(),g.z1()),point(g.x2(),g.z2())}) {
+                    double[] pos=nodes.get(node);
+                    if(pos==null) continue;
+                    double h=nodeHeight(index,pos[0],pos[1]);
+                    crestApproaches.add(new double[]{Math.min(datum,h),node});
+                }
+            }
+        }
+        // Carry a crest lifted by a bridge down its connected streets. Overlapping
+        // pavements by themselves do not connect a bank-top road to the road at its foot.
+        var liftedCrests = new java.util.PriorityQueue<double[]>(open.comparator());
+        for(long node:crestNodes) liftedCrests.add(new double[]{index.heights.get(node),node});
+        Set<Long> lifted=new java.util.HashSet<>();
+        while(!liftedCrests.isEmpty()) {
+            var here=liftedCrests.remove();
+            long node=(long)here[1];
+            if(!lifted.add(node)) continue;
+            index.heights.merge(node,here[0],Math::max);
+            for(int i=0;i<connectedEdges.getOrDefault(node,0);i++) {
+                var edge=links.get(node).get(i);
+                long next=(long)edge[0];
+                double height=here[0]-edge[1]/ramp;
+                var at=nodes.get(next);
+                if(!lifted.contains(next) && height>groundHeight(at[0],at[1])) {
+                    liftedCrests.add(new double[]{height,next});
+                }
+            }
+        }
+        Set<Long> graded = new java.util.HashSet<>();
+        while (!crestApproaches.isEmpty()) {
+            double[] here = crestApproaches.remove();
+            long node = (long)here[1];
+            if (!graded.add(node)) continue;
+            index.heights.merge(node, here[0], Math::max);
+            for (double[] edge : links.getOrDefault(node, List.of())) {
+                long next = (long)edge[0];
+                if (graded.contains(next)) continue;
+                double[] at = nodes.get(next);
+                double target = here[0] - edge[1] / ramp;
+                if (target > groundHeight(at[0], at[1])) crestApproaches.add(new double[]{target, next});
+            }
+        }
     }
 
     /**
@@ -1787,7 +2119,7 @@ public final class ChunkLayer {
      * the square stands over the ground the ramps carry its height out ({@link #ramps}: its junctions are presets).
      */
     private void squares(Index index, Map<Long, double[]> nodes, Map<Long, List<double[]>> links, Map<Long, Double> reach,
-                         double ramp) {
+                         double ramp,List<Long> gradeAnchors) {
         java.util.Set<StationPlaza> plazas = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         for (List<StationPlaza> list : index.plazas.values()) {
             plazas.addAll(list);
@@ -1807,6 +2139,7 @@ public final class ChunkLayer {
                 }
                 if (onSquare(plaza, at[0], at[1], r)) {
                     fixed.merge(n.getKey(), level, Math::min);
+                    if(plaza.curbStreet()!=null) gradeAnchors.add(n.getKey());
                 }
             }
             // A street running past the square, its paving at its edge: at its level along it, both ends of the piece
@@ -1844,6 +2177,7 @@ public final class ChunkLayer {
                     long key = point(q[0], q[1]);
                     if (nodes.containsKey(key)) {
                         fixed.merge(key, level, Math::min);
+                        if(plaza.curbStreet()!=null) gradeAnchors.add(key);
                     }
                 }
             }
@@ -2002,6 +2336,11 @@ public final class ChunkLayer {
     /** How far from a chunk over water the banks' towns are looked for: wider than the rivers towns bridge. */
     private static final double WATER_REACH = 512.0;
 
+    /** The terrain shared by the castle park's buildings and the chunk earthworks. */
+    public CastleTerrain castle(Settlement town) {
+        return index(town).castle;
+    }
+
     private Index index(Settlement town) {
         synchronized (indexes) {
             Index index = indexes.get(town.id());
@@ -2132,6 +2471,9 @@ public final class ChunkLayer {
         Map<Long, List<StationPlaza>> plazas = new HashMap<>();
         for (StationPlaza plaza : logic.settings().streets.plazaPaving ? plan.plazas() : List.<StationPlaza>of()) {
             double[] b = plaza.bounds();
+            if (logic.settings().plazas.frontageLayout) {
+                b[0]-=8; b[1]-=8; b[2]+=8; b[3]+=8;
+            }
             for (int cx = Math.floorDiv((int) Math.floor(b[0]), 16); cx <= Math.floorDiv((int) Math.floor(b[2]), 16); cx++) {
                 for (int cz = Math.floorDiv((int) Math.floor(b[1]), 16); cz <= Math.floorDiv((int) Math.floor(b[3]), 16); cz++) {
                     plazas.computeIfAbsent(key(cx, cz), q -> new ArrayList<>()).add(plaza);
@@ -2164,6 +2506,13 @@ public final class ChunkLayer {
                     continue;
                 }
                 double[] piece = {a[0], a[1], b[0], b[1], a[2], b[2], nx / n, nz / n, a[5], b[5], a[6], b[6], e.road(), e.land()};
+                if (!e.footRoad().isEmpty()) {
+                    piece = java.util.Arrays.copyOf(piece,16);
+                    piece[14] = logic.settings().streets.leveeSlope * Math.max(0,a[2]-a[5]);
+                    piece[15] = logic.settings().streets.leveeSlope * Math.max(0,b[2]-b[5]);
+                    piece[8] = e.footRoad().get(k-1)[2];
+                    piece[9] = e.footRoad().get(k)[2];
+                }
                 for (int cx = Math.floorDiv((int) Math.floor(Math.min(a[0], b[0]) - reach), 16); cx <= Math.floorDiv((int) Math.floor(Math.max(a[0], b[0]) + reach), 16); cx++) {
                     for (int cz = Math.floorDiv((int) Math.floor(Math.min(a[1], b[1]) - reach), 16); cz <= Math.floorDiv((int) Math.floor(Math.max(a[1], b[1]) + reach), 16); cz++) {
                         banks.computeIfAbsent(key(cx, cz), q -> new ArrayList<>()).add(piece);
@@ -2173,7 +2522,11 @@ public final class ChunkLayer {
         }
         Map<Long, Double> heights = new java.util.concurrent.ConcurrentHashMap<>();
         Index index = new Index(byChunk, segments, deck, links, canals, plazas, stops, heights, round(segments, links), banks,
-                interior(segments, byChunk), streets(links));
+                interior(segments, byChunk), streets(links),
+                plan.plazas().stream().filter(square -> square.curbStreet() != null).map(StationPlaza::bounds).toList(),
+                logic.settings().streets.continuousCarriageways ? streetTapers(segments) : Map.of(),
+                logic.settings().buildings.castleWards && !plan.moats().isEmpty()
+                        ? new CastleTerrain(plan.moats(), logic.terrain(), plan.water()) : null);
         // A street leaving a bridge starts at its deck
         for (int p = 0; p < segments.size(); p++) {
             StreetSegment g = segments.get(p);

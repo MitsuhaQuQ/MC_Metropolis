@@ -400,8 +400,9 @@ public final class ExtentLayer {
         Arrays.fill(owner, -1);
         int baseX = regionX * cells;
         int baseZ = regionZ * cells;
-        // Extents are independent of each other: compute those not cached yet in parallel
-        List<CityExtent> extents = around.parallelStream().map(below::extent).toList();
+        // An extent already parallelizes its terrain rows. Resolve cached neighbouring
+        // extents on the requesting thread so waiting on another region cannot exhaust the pool.
+        List<CityExtent> extents = around.stream().map(below::extent).toList();
         for (int s = 0; s < around.size(); s++) {
             CityExtent extent = extents.get(s);
             int fromI = Math.max(0, extent.originX() - baseX);

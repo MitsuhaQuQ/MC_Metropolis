@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** A town's railways (L5): its own lines and stations, and the roads along lines at grade. */
 class TransitTest {
@@ -178,19 +179,32 @@ class TransitTest {
                 "the square along the platforms, as deep as the site says");
         // The avenue leaves its mouth outward (at a slant of at most 35 degrees), as wide as the throat
         double[] mouth = square.mouth();
-        StreetSegment out = plan.segments().stream().filter(g -> Math.hypot(g.x1() - mouth[0], g.z1() - mouth[1]) < 1.0)
-                .findFirst().orElseThrow();
-        double[] l = square.local(out.x2(), out.z2());
-        double rise = l[1] - square.front() - square.depth();
-        assertTrue(rise > 0 && Math.abs(l[0] - square.mouthU()) <= Math.tan(Math.toRadians(35.5)) * rise,
-                "the avenue out of the mouth");
+        if (square.curbStreet()!=null) {
+            assertTrue(plan.segments().contains(square.curbStreet()));
+            assertTrue(square.berths().stream().anyMatch(b->b.use()==StationPlaza.Use.BUS));
+            assertEquals(3,square.links().size());
+            for (var at : List.of(square.links().get(0),square.links().get(2))) {
+                double[] end=at==square.links().get(0)?square.world(at.u1(),at.v1()):square.world(at.u2(),at.v2());
+                assertTrue(plan.segments().stream().anyMatch(g->g.width()==square.curbStreet().width() &&
+                        java.awt.geom.Line2D.ptSegDist(g.x1(),g.z1(),g.x2(),g.z2(),end[0],end[1])
+                        <=g.width()/2-StationPlaza.walk(g.width())),"both tapers meet a real traffic lane");
+            }
+        } else {
+            StreetSegment out = plan.segments().stream().filter(g -> Math.hypot(g.x1() - mouth[0], g.z1() - mouth[1]) < 1.0)
+                    .findFirst().orElseThrow();
+            double[] l = square.local(out.x2(), out.z2());
+            double rise = l[1] - square.front() - square.depth();
+            assertTrue(rise > 0 && Math.abs(l[0] - square.mouthU()) <= Math.tan(Math.toRadians(35.5)) * rise,
+                    "the avenue out of the mouth");
+        }
         // No bus stop inside it (and no lot: the plot layer leaves out what plazaAt finds)
         for (StationSite site : plan.sites()) {
             if (site.kind() == StationSite.Kind.BUS) {
                 assertTrue(!square.contains(site.x(), site.z()), "a bus stop in the station square");
             }
         }
-        double[] middle = square.world(0.5 * (square.from() + square.to()), square.front() + 0.5 * square.depth());
+        double[] middle = square.curbStreet()==null ? square.world(0.5 * (square.from() + square.to()), square.front() + 0.5 * square.depth())
+                : square.berthPoint(square.berths().get(0),0);
         assertTrue(plan.plazaAt(middle[0], middle[1]) == square, "the square found where it lies");
     }
 

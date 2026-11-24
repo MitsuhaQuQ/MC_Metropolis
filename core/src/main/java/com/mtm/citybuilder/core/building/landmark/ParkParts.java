@@ -1,6 +1,11 @@
 package com.mtm.citybuilder.core.building.landmark;
 
+import com.mtm.citybuilder.core.building.temple.Gate;
+import com.mtm.citybuilder.core.building.temple.GateStyle;
 import com.mtm.citybuilder.core.building.temple.Model;
+import com.mtm.citybuilder.core.building.temple.CastleTurret;
+import com.mtm.citybuilder.core.building.temple.RoofType;
+import com.mtm.citybuilder.core.building.temple.TemplePalette;
 import com.mtm.citybuilder.core.noise.Hash;
 
 /**
@@ -465,43 +470,68 @@ public final class ParkParts {
         return m;
     }
 
-    /**
-     * A castle's honmaru (本丸) over {@code width} by {@code depth}, its front to the south: a platform three blocks
-     * high on stone walls (野面積み, rough stones, their foot a little wider), gravel over its top, stone steps up the
-     * middle of its front, pines at its corners; its middle left open for the keep.
-     */
+    /** A castle court with its gate to the south, built up behind two flights of stone steps. */
     public static Model honmaru(int width, int depth, long seed) {
+        return honmaru(width, depth, seed, false);
+    }
+
+    public static Model honmaru(int width, int depth, long seed, boolean keep) {
+        return honmaru(width, depth, seed, keep, false);
+    }
+
+    public static Model honmaru(int width, int depth, long seed, boolean keep, boolean himeji) {
+        return honmaru(width, depth, seed, keep, himeji, himeji ? 9 : 0);
+    }
+
+    public static Model honmaru(int width, int depth, long seed, boolean keep, boolean himeji, int lowerGateEave) {
+        boolean largeGate = lowerGateEave > 0;
         Model m = new Model();
-        int high = 3;
+        int mid = width / 2;
+        int upperEnd = himeji ? depth - 13 : depth / 2;
+        int inset = 2;
+        int upperHeight = himeji ? 4 : Math.min(7, depth / 7 + 2);
+        int lowerHeight = 2;
         for (int x = 0; x < width; x++) {
             for (int z = 0; z < depth; z++) {
-                boolean rim = x == 0 || z == 0 || x == width - 1 || z == depth - 1;
-                for (int y = 0; y < high; y++) {
-                    m.set(x, y, z, rim ? (Hash.unit(Hash.of(seed, x * 31 + y, z)) < 0.6 ? "citybuilder:stone_rubble"
-                            : "minecraft:cobblestone") : "minecraft:dirt");
+                boolean upper = x >= inset && x < width - inset && z >= inset && z <= upperEnd;
+                int top = upper ? upperHeight : lowerHeight;
+                boolean steps = false;
+                if (Math.abs(x - mid) <= (largeGate ? 3 : 2)) {
+                    if (upper && upperEnd - z < upperHeight - lowerHeight) {
+                        top = lowerHeight + 1 + upperEnd - z;
+                        steps = true;
+                    } else if (depth - z <= lowerHeight) {
+                        top = depth - z;
+                        steps = true;
+                    }
                 }
-                m.set(x, high, z, rim ? "citybuilder:stone_rubble" : "minecraft:gravel");
+                boolean wall = x == 0 || z == 0 || x == width - 1 || z == depth - 1
+                        || upper && (x == inset || x == width - inset - 1 || z == inset || z == upperEnd);
+                for (int y = 0; y <= top; y++) {
+                    String stone = Hash.unit(Hash.of(seed, x * 31 + y, z)) < 0.6
+                            ? "citybuilder:stone_rubble" : "minecraft:cobblestone";
+                    m.set(x, y, z, wall || steps ? stone : "minecraft:dirt");
+                }
+                m.set(x, top, z, steps ? "minecraft:stone_brick_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]"
+                        : wall ? "citybuilder:stone_rubble" : "minecraft:gravel");
             }
         }
-        // The steps up the front's middle, out from it
-        int mid = width / 2;
-        for (int k = 0; k < high; k++) {
-            for (int x = mid - 2; x <= mid + 2; x++) {
-                m.set(x, high - k, depth + k, "minecraft:stone_brick_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]");
-                for (int y = 0; y < high - k; y++) {
-                    m.set(x, y, depth + k, "minecraft:stone_bricks");
-                }
-            }
+        Gate gateDesign = largeGate
+                ? new Gate(21, 7, 12, 15, RoofType.IRIMOYA, 2, 1, 3, 1, 25, 9, lowerGateEave, 1, 0,
+                        GateStyle.PLAIN, 0, TemplePalette.NATURAL)
+                : new Gate(11, 5, 5, 7, RoofType.GABLE, 0, 1, 3, 1, 0, 0, 0, 0, 0,
+                        GateStyle.PLAIN, 0, TemplePalette.NATURAL);
+        Model gate = gateDesign.build();
+        m.place(gate, mid - gate.width() / 2, lowerHeight + 1, upperEnd + 1, true);
+
+        if (himeji) {
+            HimejiKeep.place(m, (width - HimejiKeep.width()) / 2, upperHeight + 1, 4);
+            return m;
         }
-        // Pines at its corners
-        for (int[] c : new int[][]{{2, 2}, {width - 3, 2}, {2, depth - 3}, {width - 3, depth - 3}}) {
-            Model pine = tree(Tree.PINE, Hash.of(seed, c[0], c[1]));
-            pine.forEach((x, y, z, st) -> {
-                if (y >= 1) {
-                    m.setIfAbsent(x + c[0], y + high, z + c[1], st);
-                }
-            });
-        }
+        // A turret at the back of the upper court, with another tier where the town has a keep.
+        int radius = keep && width >= 24 && depth >= 24 ? 5 : 3;
+        Model turret = CastleTurret.build(radius, keep ? 2 : 1);
+        m.place(turret, inset, upperHeight + 1, inset, true);
         return m;
     }
 }

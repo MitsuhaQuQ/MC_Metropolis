@@ -18,6 +18,48 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The civic and roadside generators: a city hall, a hospital, a library, a filling station. */
 class CivicTest {
+    @Test
+    void mainCastleGateClearsTheWholeSevenBlockApproach() {
+        int width = 65, depth = 68;
+        Model court = ParkParts.honmaru(width, depth, 11, true, true);
+        int floor = 2;
+        int start = depth - 12;
+        for (int x = width / 2 - 3; x <= width / 2 + 3; x++) {
+            for (int z = start; z < start + 9; z++) {
+                for (int y = floor + 1; y <= floor + 6; y++) {
+                    assertTrue(!court.has(x, y, z), "blocked main gate at " + x + " " + y + " " + z);
+                }
+            }
+        }
+    }
+
+    @Test
+    void himejiKeepIncludesTheOriginalBaseAndRoof() {
+        Model keep = new Model();
+        HimejiKeep.place(keep, 0, 0, 0);
+        assertEquals(55, keep.width());
+        assertEquals(44, keep.depth());
+        assertEquals(43, keep.maxY());
+        assertEquals(20282, keep.size());
+        assertEquals("minecraft:stone_bricks", keep.get(24, 0, 1));
+        assertEquals("minecraft:white_concrete", keep.get(40, 20, 2));
+        assertTrue(keep.get(30, 42, 28).startsWith("minecraft:deepslate_tile_stairs"));
+    }
+
+    @Test
+    void castleCourtHasTwoWalkableTerracesAndAnOptionalKeep() {
+        for (boolean keep : List.of(false, true)) {
+            Model court = ParkParts.honmaru(30, 26, 11, keep);
+            assertEquals(30, court.width());
+            assertEquals(26, court.depth());
+            assertEquals("minecraft:gravel", court.get(22, 2, 20));
+            assertEquals("minecraft:gravel", court.get(22, 5, 8));
+            assertTrue(court.get(15, 1, 25).contains("stairs"));
+            assertTrue(court.get(15, 3, 13).contains("stairs"));
+        }
+        assertTrue(ParkParts.honmaru(30, 26, 11, true).maxY() > ParkParts.honmaru(30, 26, 11, false).maxY());
+    }
+
     private static List<Model> all() {
         return List.of(new CityHall(48, 22, 8, 22, 3).build(), new CityHall(30, 16, 5, 0, 5).build(),
                 new Hospital(50, 8, 2).build(), new Hospital(34, 5, 6).build(), new Library(44, 30, 4).build(),

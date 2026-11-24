@@ -26,6 +26,36 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** The chunk layer: columns read off the street plans. */
 class ChunkLayerTest {
     @Test
+    void aLaneDropContinuesAcrossShortPiecesAndIgnoresTheSideStreet() {
+        var era = com.mtm.citybuilder.core.street.Era.MODERN;
+        var roads = List.of(
+                new StreetSegment(-40,0,0,0,StreetClass.OLD_ROAD,era,8),
+                new StreetSegment(0,0,16,0,StreetClass.ARTERIAL,era,24),
+                new StreetSegment(32,0,16,0,StreetClass.ARTERIAL,era,24),
+                new StreetSegment(32,0,80,0,StreetClass.ARTERIAL,era,24),
+                new StreetSegment(0,-20,0,0,StreetClass.STREET,era,6));
+        var tapers = ChunkLayer.streetTapers(roads);
+        assertEquals(java.util.Set.of(1,2,3), tapers.keySet());
+        for (int x=0; x<=60; x++) {
+            int piece = x<16 ? 1 : x<32 ? 2 : 3;
+            var road = roads.get(piece);
+            double station = Math.abs(x-road.x1());
+            assertEquals(Math.min(24,8+x/3.0),
+                    tapers.get(piece).get(0).width(station,road.length(),road.width()),1e-8);
+        }
+        // On both sides the last dashed divider meets the edge line rather
+        // than disappearing in the middle of a still drivable lane.
+        var taper=tapers.get(1).get(0);
+        for(int side : new int[]{-1,1}) for(double width : new double[]{14,16,20,24}) {
+            double fraction=(width-8)/16;
+            double carriage=width/2-taper.sidewalk(width,24);
+            double divider=side*carriage/(1+fraction);
+            var road=new ChunkLayer.Column(ChunkLayer.Surface.ARTERIAL,false,Double.NaN,divider,0,2,width);
+            assertEquals(ChunkLayer.Paving.WHITE_LINE,taper.paint(road,24).paving());
+        }
+    }
+
+    @Test
     void columnsUnderStreetsArePavedAndBridgesHaveLevelDecks() throws Exception {
         CityLogic logic = new CityLogic(3L, CitySettings.DEFAULT, new SyntheticTerrain(0.0, 20000, 80, Landform.PLAINS));
         Settlement city = null;

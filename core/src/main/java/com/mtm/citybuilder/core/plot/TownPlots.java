@@ -75,8 +75,8 @@ public final class TownPlots {
     /** The street each lot faces, as it runs past the middle of its frontage, by chain, side and index. */
     private final Map<Long, Object[]> lotStreets = new java.util.concurrent.ConcurrentHashMap<>();
 
-    /** The footpaths' pieces, which front no lots. */
-    private final List<StreetSegment> paths = new ArrayList<>();
+    /** Paving under a point, including footpaths. Lot searches have a much wider search radius. */
+    private final Map<Long,List<StreetSegment>> streetFootprints = new HashMap<>();
 
     /** Each footpath's bounds widened by its open land: {minX, minZ, maxX, maxZ}. */
     private final double[][] footpathBounds;
@@ -114,19 +114,23 @@ public final class TownPlots {
             }
         }
         for (StreetSegment g : plan.segments()) {
-            if (g.streetClass() == com.mtm.citybuilder.core.street.StreetClass.PATH) {
-                paths.add(g);
-                continue;
-            }
-            if (g.structure() != StreetStructure.BRIDGE && g.structure() != StreetStructure.LEVEL_CROSSING && g.length() > 1e-6) {
+            if (g.streetClass() != com.mtm.citybuilder.core.street.StreetClass.PATH) {
+                if (g.structure()==StreetStructure.BRIDGE || g.structure()==StreetStructure.LEVEL_CROSSING || g.length()<=1e-6) continue;
                 pieces.add(g);
             }
+            double half=g.width()*0.5;
+            int x0=(int)Math.floor((Math.min(g.x1(),g.x2())-half)/CELL);
+            int x1=(int)Math.floor((Math.max(g.x1(),g.x2())+half)/CELL);
+            int z0=(int)Math.floor((Math.min(g.z1(),g.z2())-half)/CELL);
+            int z1=(int)Math.floor((Math.max(g.z1(),g.z2())+half)/CELL);
+            for (int x=x0;x<=x1;x++) for (int z=z0;z<=z1;z++)
+                streetFootprints.computeIfAbsent(((long)x<<32)^(z&0xffffffffL),k->new ArrayList<>()).add(g);
         }
         double deepest = 0.0;
         // (The works' and quays' lots reach further, by their own reach: see works)
         for (double[] range : new double[][]{config.central, config.stationFront, config.oldTown, config.residential,
                 config.lane}) {
-            deepest = Math.max(deepest, range[6]);
+            deepest = Math.max(deepest, range[6] * config.depthScale);
         }
         double widest = 0.0;
         for (StreetSegment g : pieces) {
@@ -1189,23 +1193,13 @@ public final class TownPlots {
 
     /** Whether a position lies on one of the town's streets (lots front), between its edges. */
     public boolean onStreet(double x, double z) {
-        for (StreetSegment g : paths) {
+        long key=((long)Math.floor(x/CELL)<<32)^((long)Math.floor(z/CELL)&0xffffffffL);
+        for (StreetSegment g : streetFootprints.getOrDefault(key,List.of())) {
             double dx = g.x2() - g.x1();
             double dz = g.z2() - g.z1();
-            double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
-            if (Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z) < 0.5 * g.width()) {
-                return true;
-            }
-        }
-        int[] near = cells.get(((long) Math.floor(x / CELL) << 32) ^ ((long) Math.floor(z / CELL) & 0xFFFFFFFFL));
-        if (near == null) {
-            return false;
-        }
-        for (int p : near) {
-            StreetSegment g = pieces.get(p);
-            double dx = g.x2() - g.x1();
-            double dz = g.z2() - g.z1();
-            double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / (dx * dx + dz * dz)));
+            double length2=dx*dx+dz*dz;
+            if (g.streetClass()==com.mtm.citybuilder.core.street.StreetClass.PATH) length2=Math.max(1e-9,length2);
+            double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / length2));
             if (Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z) < 0.5 * g.width()) {
                 return true;
             }

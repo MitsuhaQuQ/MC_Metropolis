@@ -44,6 +44,7 @@ public final class Viaduct {
     private final Ground ground;
     private final List<Spans.Span> spans;
     private final java.util.function.IntFunction<int[]> bentColumns;
+    private final java.util.function.BiPredicate<Integer,Integer> trafficBelow;
 
     /** The sizes of a viaduct; everything but the length and level has a default. */
     public static final class Builder {
@@ -60,6 +61,7 @@ public final class Viaduct {
         private boolean catenary = true;
         private RailPalette palette = RailPalette.CONCRETE;
         private java.util.function.IntFunction<int[]> bentColumns;
+        private java.util.function.BiPredicate<Integer,Integer> trafficBelow;
         private Ground ground = Ground.FLAT;
 
         public Builder(Deck deck, int length, int level) {
@@ -133,6 +135,12 @@ public final class Viaduct {
             return this;
         }
 
+        /** Vehicle lanes under a portal must stay open below its cap beam. */
+        public Builder trafficBelow(java.util.function.BiPredicate<Integer,Integer> trafficBelow) {
+            this.trafficBelow=trafficBelow;
+            return this;
+        }
+
         public Builder soundWall(boolean soundWall) {
             this.soundWall = soundWall;
             return this;
@@ -186,6 +194,7 @@ public final class Viaduct {
         this.p = b.palette;
         this.ground = b.ground;
         this.bentColumns = b.bentColumns;
+        this.trafficBelow = b.trafficBelow;
         if (length < 2) {
             throw new IllegalArgumentException("length " + length);
         }
@@ -500,7 +509,7 @@ public final class Viaduct {
             }
         }
         // A tie beam halfway up a tall rigid frame
-        if (cz.length >= 2 && capTop - lowest >= 9) {
+        if (cz.length >= 2 && capTop - lowest >= 9 && !spansTraffic(x0,pl,cz[0],cz[cz.length-1])) {
             int y = (lowest + capTop) / 2;
             for (int dx = 0; dx < pl; dx++) {
                 for (int z = cz[0]; z <= cz[cz.length - 1]; z++) {
@@ -517,6 +526,14 @@ public final class Viaduct {
                 }
             }
         }
+    }
+
+    private boolean spansTraffic(int x0,int length,int lo,int hi) {
+        if (trafficBelow==null) return false;
+        for (int x=x0;x<x0+length;x++) for(int z=lo;z<=hi;z++) {
+            if (trafficBelow.test(x,z)) return true;
+        }
+        return false;
     }
 
     /** z of each column of a bent. */

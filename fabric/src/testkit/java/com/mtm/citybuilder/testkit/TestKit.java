@@ -33,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -72,7 +73,9 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/command", this::command);
             route(http, "/generate", this::generate);
             route(http, "/blocks", this::blocks);
+            route(http, "/column-profile", this::columnProfile);
             route(http, "/tick", this::tick);
+            route(http, "/world-info", (q,body) -> Map.of("seed",Long.toString(overworld().getSeed())));
             route(http, "/plan-around", this::planAround);
             route(http, "/street", this::street);
             route(http, "/canal", this::canal);
@@ -80,10 +83,79 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/airport", this::airport);
             route(http, "/facilities", this::facilities);
             route(http, "/rail", this::rail);
+            route(http, "/rail-boundaries", (q,body) -> {
+                var logic=com.mtm.citybuilder.world.CityWorlds.of(overworld());
+                var town=logic==null ? null : logic.urban(Double.parseDouble(q.get("x")),Double.parseDouble(q.get("z"))).owner();
+                List<Object> boundaries=new ArrayList<>();
+                if (town!=null) for (var railway : logic.streetPlan(town).railways()) {
+                    var route=logic.railRoute(railway.edge());
+                    int entry=railway.entry(), outside=entry+(railway.edge().a().id()==town.id()?1:-1);
+                    if (!route.exists() || entry<0 || entry>=route.samples() || outside<0 || outside>=route.samples()
+                            || railway.line().size()<2) continue;
+                    double x=route.x(entry), z=route.z(entry);
+                    var inside=railway.line().get(1);
+                    boundaries.add(Map.of("x",x,"z",z,"bed",route.rail(entry),"ground",route.ground(entry),
+                            "outside",Math.atan2(z-route.z(outside),x-route.x(outside)),
+                            "inside",Math.atan2(inside[1]-z,inside[0]-x),"kind",route.kind(entry).name(),
+                            "trunk",railway.edge().railClass()==com.mtm.citybuilder.core.rail.RailClass.TRUNK));
+                }
+                return Map.of("boundaries",boundaries);
+            });
             route(http, "/plot", this::plot);
             route(http, "/road", this::road);
             route(http, "/roads-near", this::roadsNear);
             route(http, "/station", this::station);
+            route(http, "/castle-without-keep", (q,body) -> {
+                double x=Double.parseDouble(q.get("x")),z=Double.parseDouble(q.get("z"));
+                var logic=com.mtm.citybuilder.world.CityWorlds.of(overworld());
+                if(logic==null)return Map.of("found",false);
+                var towns=new ArrayList<>(logic.settlements(x-48000,z-48000,x+48000,z+48000,
+                        com.mtm.citybuilder.core.settlement.SettlementTier.TOWN));
+                towns.sort(java.util.Comparator.comparingDouble(t->Math.hypot(t.x()-x,t.z()-z)));
+                var streets=new com.mtm.citybuilder.core.street.StreetLayer(logic);
+                for(var town:towns){
+                    long seed=com.mtm.citybuilder.core.noise.Hash.of(logic.seed()^0xF0C7L,town.id());
+                    if(com.mtm.citybuilder.core.noise.Hash.unit(com.mtm.citybuilder.core.noise.Hash.of(seed^0x1A4D3L,1))
+                            < logic.settings().functions.castleKeep)continue;
+                    if(streets.formation(town)!=com.mtm.citybuilder.core.street.Formation.CASTLE_TOWN)continue;
+                    var functions=logic.functions().town(town);
+                    if (functions.facilities().stream().anyMatch(f->f.kind()==com.mtm.citybuilder.core.function.Facility.Kind.CASTLE_KEEP)) continue;
+                    for (var park : functions.facilities()) {
+                        if (park.kind()!=com.mtm.citybuilder.core.function.Facility.Kind.CASTLE_PARK) continue;
+                        var extent = logic.extent(town);
+                        for (double[] point : List.of(new double[]{park.x(),park.z()},
+                                new double[]{extent.coreX(),extent.coreZ()})) {
+                            var owner = logic.urban(point[0],point[1]).owner();
+                            if (owner!=null && owner.id()==town.id()) return Map.of("found",true,"x",point[0],"z",point[1]);
+                        }
+                    }
+                }
+                return Map.of("found",false);
+            });
+            route(http, "/castle", this::castle);
+            route(http, "/rail-lots", this::railLots);
+            route(http, "/passenger-space", (q,body) -> {
+                double x=Double.parseDouble(q.get("x")),z=Double.parseDouble(q.get("z"));
+                var logic=com.mtm.citybuilder.world.CityWorlds.of(overworld());
+                var town=logic==null?null:logic.urban(x,z).owner();
+                var check=town==null?null:logic.chunks().rails().passengerSpace(town,x,z,
+                        Boolean.parseBoolean(q.get("underground")),Boolean.parseBoolean(q.get("interchange")));
+                return check==null?Map.of("found",false):Map.of("found",true,"space",check);
+            });
+            route(http, "/station-contacts", (q,body) -> {
+                double x=Double.parseDouble(q.get("x")),z=Double.parseDouble(q.get("z"));
+                var logic=com.mtm.citybuilder.world.CityWorlds.of(overworld());
+                var town=logic==null?null:logic.urban(x,z).owner();
+                return Map.of("contacts",town==null?List.of():logic.chunks().rails().stationContacts(town,x,z));
+            });
+            route(http, "/station-ends", (q,body) -> {
+                double x=Double.parseDouble(q.get("x")), z=Double.parseDouble(q.get("z"));
+                var logic=com.mtm.citybuilder.world.CityWorlds.of(overworld());
+                if(logic==null || logic.urban(x,z).owner()==null) return Map.of("found",false);
+                var check=logic.chunks().rails().stationCheck(logic.urban(x,z).owner(),x,z,"main".equals(q.get("kind")));
+                return check==null?Map.of("found",false):Map.of("found",true,"station",check);
+            });
+            route(http, "/walk-route", (query, body) -> onThread(() -> WalkingCheck.route(overworld(),query)));
             route(http, "/stop-line", this::stopLine);
             route(http, "/stop", this::stop);
             http.start();
@@ -231,6 +303,55 @@ public final class TestKit implements DedicatedServerModInitializer {
         result.put("seconds", (System.currentTimeMillis() - start) / 1000.0);
         result.put("slowestTickMs", slowest);
         return result;
+    }
+
+    /** A loaded column, including partial-block collision bounds in world Y. */
+    private Object columnProfile(Map<String, String> query, String body) {
+        int x = Integer.parseInt(query.get("x"));
+        int z = Integer.parseInt(query.get("z"));
+        int low = Integer.parseInt(query.get("low"));
+        int high = Integer.parseInt(query.get("high"));
+        ServerLevel level = overworld();
+        if (low < level.getMinBuildHeight() || high >= level.getMaxBuildHeight() || high < low || (long) high - low >= 64) {
+            throw new IllegalArgumentException("expected 1 to 64 blocks within world height");
+        }
+        return onThread(() -> {
+            LevelChunk chunk = level.getChunkSource().getChunkNow(x >> 4, z >> 4);
+            if (chunk == null) {
+                return Map.of("loaded", false);
+            }
+            List<Object> blocks = new ArrayList<>();
+            for (int y = low; y <= high; y++) {
+                BlockPos pos = new BlockPos(x, y, z);
+                BlockState state = chunk.getBlockState(pos);
+                var collision = state.getCollisionShape(level, pos);
+                Map<String, Object> row = new HashMap<>();
+                row.put("y", y);
+                row.put("id", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+                row.put("state", state.toString());
+                if (!collision.isEmpty()) {
+                    row.put("bottom", y + collision.min(net.minecraft.core.Direction.Axis.Y));
+                    row.put("top", y + collision.max(net.minecraft.core.Direction.Axis.Y));
+                }
+                blocks.add(row);
+            }
+            Map<String,Object> result = new LinkedHashMap<>(Map.of("loaded", true, "x", x, "z", z, "blocks", blocks));
+            if ("1".equals(query.get("streetPlan"))) {
+                var logic = com.mtm.citybuilder.world.CityWorlds.of(level);
+                if (logic != null) {
+                    int cell = (x & 15) * 16 + (z & 15);
+                    var columns = logic.chunks().columns(x >> 4, z >> 4);
+                    var grades = logic.chunks().grades(x >> 4, z >> 4);
+                    result.put("street", columns[cell].surface().name());
+                    result.put("bridge", columns[cell].bridge());
+                    if (Double.isFinite(grades.level()[cell])) result.put("grade", grades.level()[cell]);
+                    if (columns[cell].bridge()) result.put("deck", columns[cell].deck());
+                    var water = logic.terrain().waterLevel(x+0.5, z+0.5);
+                    if (Double.isFinite(water)) result.put("water", water);
+                }
+            }
+            return result;
+        });
     }
 
     /**
@@ -685,6 +806,44 @@ public final class TestKit implements DedicatedServerModInitializer {
             m.put("maxX", p.maxX());
             m.put("maxZ", p.maxZ());
             m.put("ground", p.y());
+            if (p.spansStreet()) m.put("castlePart", "GATE");
+            if (p.footprint() != null && p.footprint().template() != null) m.put("castlePart", p.footprint().template());
+            if (p.spansStreet() && !p.grade() && p.footprint()==null) {
+                List<Object> crown=new ArrayList<>();
+                int cx=Math.floorDiv(p.minX()+p.maxX(),2), cz=Math.floorDiv(p.minZ()+p.maxZ(),2);
+                for (int dx=-3;dx<=3;dx++) for (int dz=-3;dz<=3;dz++) {
+                    for (int y=p.model().maxY();y>=p.model().minY();y--) {
+                        String block=p.model().get(cx+dx-p.x(),y,cz+dz-p.z());
+                        if (block==null || !block.contains("deepslate_tile")) continue;
+                        crown.add(Map.of("x",cx+dx,"y",y+p.y(),"z",cz+dz,"id",block.split("\\[",2)[0]));
+                        break;
+                    }
+                }
+                m.put("crown",crown);
+            }
+            if (p.facility().kind()==com.mtm.citybuilder.core.function.Facility.Kind.CASTLE_PARK && p.grade()
+                    && p.footprint()==null && !p.walkway()) {
+                int[] highest={-1,0,0,0};
+                p.model().forEach((bx,by,bz,state)->{
+                    if(!state.startsWith("minecraft:stone_brick_stairs") || by<highest[0]) return;
+                    if(by>highest[0]) {highest[0]=by;highest[1]=0;highest[2]=0;highest[3]=0;}
+                    highest[1]+=bx;highest[2]+=bz;highest[3]++;
+                });
+                if(highest[3]>0)m.put("upperLanding",new int[]{p.x()+Math.round((float)highest[1]/highest[3]),
+                        p.y()+highest[0]+1,p.z()+Math.round((float)highest[2]/highest[3])});
+            }
+            m.put("id", Long.toString(p.facility().id()));
+            m.put("path", p.path());
+            m.put("aligned",p.grade() && p.footprint()!=null && p.footprint().template()==null);
+            if (p.footprint()!=null && p.footprint().template()==null && p.grade()) {
+                List<int[]> doors=new ArrayList<>();
+                p.model().forEach((mx,my,mz,state)->{
+                    if (my<=4 && state.contains("_door") && !state.contains("trapdoor") && !state.contains("upper"))
+                        doors.add(new int[]{mx+p.x(),my+p.y(),mz+p.z()});
+                });
+                m.put("doors",doors);
+            }
+            m.put("modelHeight", p.model().maxY() - p.model().minY() + 1);
             m.put("grade", p.grade());
             out.add(m);
         }
@@ -738,6 +897,7 @@ public final class TestKit implements DedicatedServerModInitializer {
         com.mtm.citybuilder.core.plot.Plot p = plots.at(x, z);
         Map<String, Object> out = new java.util.LinkedHashMap<>();
         out.put("found", true);
+        out.put("onStreet",plots.onStreet(x,z));
         out.put("town", town.tier().name());
         if (p == null) {
             out.put("plot", "street");
@@ -752,11 +912,20 @@ public final class TestKit implements DedicatedServerModInitializer {
         out.put("frontage", Math.round(p.frontage() * 10) / 10.0);
         com.mtm.citybuilder.core.function.Facility f = logic.functions().town(town).facilityAt(x, z);
         out.put("facility", f == null ? null : f.kind().name());
-        com.mtm.citybuilder.core.building.Building b = logic.buildings().building(plots, p);
+        var fit = logic.buildings().siteFit(plots,p);
+        out.put("refit",fit.relocated());
+        out.put("railClipped",fit.railClipped());
+        out.put("clippedBody",fit.clippedBody());
+        com.mtm.citybuilder.core.building.Building b = fit.building();
         if (b != null) {
             out.put("type", b.type().name());
             out.put("storeys", b.storeys());
             out.put("buildingFrontage", Math.round((b.to() - b.from()) * 10) / 10.0);
+            out.put("buildingId", Long.toString(b.id()));
+            out.put("floorY", b.base());
+            out.put("alongBuilding", new double[]{b.tx(), b.tz()});
+            out.put("intoBuilding", new double[]{b.nx(), b.nz()});
+            out.put("groundStorey", b.ground());
             out.put("buildingDepth", Math.round((b.back() - b.front()) * 10) / 10.0);
             out.put("front", Math.round(b.front() * 10) / 10.0);
         }
@@ -802,6 +971,78 @@ public final class TestKit implements DedicatedServerModInitializer {
      * station's middle), heading of the platforms and outward (toward the avenue), in degrees, depth, along, middle:
      * the square's middle, loop: the first loop's middle, mouth, ground at the middle once loaded}.
      */
+    private Object railLots(Map<String,String> q,String body) {
+        double x=Double.parseDouble(q.get("x")),z=Double.parseDouble(q.get("z"));
+        var logic=com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if(logic==null)return Map.of("found",false);
+        var town=logic.urban(x,z).owner();
+        if(town==null)return Map.of("found",false);
+        var plots=logic.plots().town(town);
+        var plan=logic.streetPlan(town);
+        List<double[]> locations=new ArrayList<>();
+        for(var line:plan.urbanLines()) for(var p:line.points()) {
+            if((int)p[2]==com.mtm.citybuilder.core.street.TransitMode.ELEVATED.ordinal())locations.add(p);
+        }
+        locations.sort(java.util.Comparator.comparingDouble(p->Math.hypot(p[0]-x,p[1]-z)));
+        var seen=new java.util.HashSet<Long>();
+        List<Object> sites=new ArrayList<>();
+        for(var centre:locations) {
+            for(int dx=-22;dx<=22;dx+=4) for(int dz=-22;dz<=22;dz+=4) {
+                var lot=plots.at(centre[0]+dx,centre[1]+dz);
+                if(lot==null||lot.row()!=0||!seen.add(lot.id()))continue;
+                var fit=logic.buildings().siteFit(plots,lot);
+                if(!fit.railClipped()||!fit.relocated()||fit.building()==null)continue;
+                var b=fit.building();
+                double[] front={b.ox()+b.nx()*b.front(),b.oz()+b.nz()*b.front()};
+                sites.add(Map.of("id",Long.toString(b.id()),"front",front,"along",new double[]{b.tx(),b.tz()},
+                        "inward",new double[]{b.nx(),b.nz()},"width",b.width(),"depth",b.depth(),"base",b.base(),
+                        "rail",new double[]{centre[0],centre[1]},"original",new double[]{lot.frontage(),lot.maxDepth()}));
+                if(sites.size()>=4)return Map.of("found",true,"sites",sites);
+            }
+        }
+        return Map.of("found",!sites.isEmpty(),"sites",sites);
+    }
+
+    private Object castle(Map<String, String> query, String body) {
+        var logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if (logic == null) return Map.of("found", false);
+        var town = logic.urban(Double.parseDouble(query.get("x")), Double.parseDouble(query.get("z"))).owner();
+        if (town == null) return Map.of("found", false);
+        var terrain = logic.chunks().castle(town);
+        if (terrain == null) return Map.of("found", false);
+        var plan = logic.streetPlan(town);
+        List<Object> bridges = new ArrayList<>();
+        for (var gate : terrain.crossings(plan.segments())) {
+            var at = terrain.at(gate.x(), gate.z());
+            if (at == null || !at.moat()) continue;
+            bridges.add(Map.of("x",gate.x(),"z",gate.z(),"nx",gate.inwardX(),"nz",gate.inwardZ(),
+                    "width",gate.moatWidth(),"road",gate.roadWidth(),"ground",at.ground(),"deck",at.crossing(),
+                    "wet",at.water() != null,"inner",gate.inner()));
+        }
+        List<int[][]> seams = new ArrayList<>();
+        for (var moat : plan.moats()) {
+            for (boolean alongX : List.of(true,false)) {
+                search: for (var point : moat.ring()) {
+                    if (point[2] <= 0) continue;
+                    int radius = (int)Math.ceil(point[2]/2)+2;
+                    for (int offset = -radius; offset <= radius; offset++) {
+                        int x = (int)Math.floor(point[0]), z = (int)Math.floor(point[1]);
+                        if (alongX) { x = Math.floorDiv(x+8,16)*16; z += offset; }
+                        else { z = Math.floorDiv(z+8,16)*16; x += offset; }
+                        int px = x-(alongX?1:0), pz = z-(alongX?0:1);
+                        var a=terrain.at(px+0.5,pz+0.5);
+                        var b=terrain.at(x+0.5,z+0.5);
+                        if (a==null || b==null || a.surface()!=com.mtm.citybuilder.core.chunk.CastleTerrain.Surface.MASONRY
+                                || b.surface()!=a.surface() || Math.abs(a.ground()-b.ground())>1) continue;
+                        seams.add(new int[][]{{px,a.ground(),pz},{x,b.ground(),z}});
+                        break search;
+                    }
+                }
+            }
+        }
+        return Map.of("found",true,"rings",plan.moats().size(),"bridges",bridges,"seams",seams);
+    }
+
     private Object station(Map<String, String> query, String body) {
         double x = Double.parseDouble(query.get("x"));
         double z = Double.parseDouble(query.get("z"));
@@ -819,8 +1060,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             return Map.of("found", false);
         }
         double[] middle = best.world(0.5 * (best.from() + best.to()), best.front() + 0.5 * best.depth());
-        com.mtm.citybuilder.core.street.StationPlaza.Loop first = best.loops().get(0);
-        double[] loop = best.world(first.u(), first.v());
+        double[] loop = best.loops().isEmpty() ? middle : best.world(best.loops().get(0).u(), best.loops().get(0).v());
         double[] mouth = best.mouth();
         Map<String, Object> found = new java.util.LinkedHashMap<>();
         found.put("found", true);
@@ -831,8 +1071,58 @@ public final class TestKit implements DedicatedServerModInitializer {
         found.put("outward", Math.toDegrees(best.worldHeading(0, 1)));
         found.put("depth", best.depth());
         found.put("along", best.to() - best.from());
+        found.put("lowerEntrance", logic.chunks().rails().lowerEntrance(logic.urban(x, z).owner(), best.x(), best.z()));
+        found.put("entryInner", best.world(0, best.building().v1()));
+        found.put("entryOuter", best.world(0, best.building().v2()));
         found.put("middle", java.util.List.of(middle[0], middle[1]));
         found.put("loop", java.util.List.of(loop[0], loop[1]));
+        List<Object> bays = new ArrayList<>();
+        for (var bay : best.berths()) {
+            double halfLane;
+            if (bay.loop() >= 0) halfLane = best.loops().get(bay.loop()).lane()/2;
+            else {
+                var link=best.links().get(-1-bay.loop());
+                halfLane=link.width()/2-link.walk();
+            }
+            bays.add(Map.of("use",bay.use().name(),"road",best.berthPoint(bay,halfLane*0.44),
+                    "walk",best.berthPoint(bay,halfLane+1.5),"length",bay.s2()-bay.s1()));
+        }
+        found.put("bays",bays);
+        List<double[]> starts=new ArrayList<>();
+        if (best.curbStreet()!=null) {
+            var g=best.curbStreet();
+            double dx=(g.x2()-g.x1())/g.length(), dz=(g.z2()-g.z1())/g.length();
+            double t=(mouth[0]-g.x1())*dx+(mouth[1]-g.z1())*dz;
+            double cx=g.x1()+t*dx,cz=g.z1()+t*dz;
+            double offset=(g.width()/2-com.mtm.citybuilder.core.street.StationPlaza.walk(g.width()))/2;
+            List<List<double[]>> lanes=new ArrayList<>();
+            double low=Math.max(0,t-12), high=Math.min(g.length(),t+12);
+            if (best.loops().isEmpty()) {
+                var first=best.links().get(0);
+                double[] in=best.world(first.u1(),first.v1());
+                double t0=(in[0]-g.x1())*dx+(in[1]-g.z1())*dz;
+                low=Math.min(t0,t)-3;
+                high=Math.max(t0,t)+3;
+            }
+            for(int sign:new int[]{-1,1}) {
+                double start=sign<0?low:high;
+                starts.add(new double[]{g.x1()+start*dx-sign*offset*dz,g.z1()+start*dz+sign*offset*dx});
+                List<double[]> lane=new ArrayList<>();
+                for(double d=low;d<=high;d+=0.5)
+                    lane.add(new double[]{g.x1()+d*dx-sign*offset*dz,g.z1()+d*dz+sign*offset*dx});
+                lanes.add(lane);
+            }
+            found.put("curbLanes",lanes);
+            found.put("junction",new double[]{cx,cz});
+            found.put("driveways",best.loops().isEmpty()?2:1);
+            found.put("roadsideLayout",best.loops().isEmpty()?"PULL_OUT":"LOOP");
+        } else for(var link:best.links()) {
+            if(Math.hypot(link.u2()-best.mouthU(),link.v2()-best.front()-best.depth())>0.5) continue;
+            double du=(link.u2()-link.u1())/link.length(),dv=(link.v2()-link.v1())/link.length();
+            double offset=Math.max(1,link.width()*0.23);
+            for(int sign:new int[]{-1,1}) starts.add(best.world(link.u2()+3*du-sign*offset*dv,link.v2()+3*dv+sign*offset*du));
+        }
+        found.put("driveStarts",starts);
         found.put("mouth", java.util.List.of(mouth[0], mouth[1]));
         int mx = (int) Math.floor(middle[0]);
         int mz = (int) Math.floor(middle[1]);

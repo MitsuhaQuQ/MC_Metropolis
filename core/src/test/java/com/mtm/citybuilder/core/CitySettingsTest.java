@@ -9,6 +9,46 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CitySettingsTest {
     @Test
+    void buildingLayoutStaysWithTheSavedPlans() {
+        for (boolean existingPlans : new boolean[]{false, true}) {
+            var store = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+            CitySettings first = CitySettings.forBuildingLayout(store, existingPlans);
+            assertEquals(existingPlans ? 1.6 : 2.0, first.plots.frontageScale);
+            assertEquals(existingPlans ? 1.2 : 1.45, first.plots.depthScale);
+            assertEquals(existingPlans ? 40 : 64, first.transit.mainWidth);
+            assertEquals(existingPlans ? 0 : 1, first.buildings.residentialGroundExtra);
+            assertEquals(!existingPlans, first.plazas.entranceApproach);
+            assertEquals(!existingPlans, first.plazas.lowerEntrance);
+            assertEquals(!existingPlans, first.buildings.plateauCastleKeep);
+            assertEquals(existingPlans ? 0 : 1, first.buildings.retailGroundExtra);
+            assertEquals(first.toJson(), CitySettings.forBuildingLayout(store, !existingPlans).toJson());
+        }
+        var firstKeep = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+        firstKeep.save("layout/building_scale", new byte[]{6});
+        CitySettings olderKeep = CitySettings.forBuildingLayout(firstKeep, true);
+        assertTrue(olderKeep.buildings.plateauCastleKeep);
+        assertFalse(olderKeep.buildings.largeCastleGate);
+        var previous = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+        previous.save("layout/building_scale", new byte[]{2});
+        CitySettings second = CitySettings.forBuildingLayout(previous, true);
+        assertEquals(2.0, second.plots.frontageScale);
+        assertEquals(0, second.buildings.residentialGroundExtra);
+        assertFalse(second.plazas.entranceApproach);
+        var third = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+        third.save("layout/building_scale", new byte[]{3});
+        CitySettings residential = CitySettings.forBuildingLayout(third, true);
+        assertEquals(1, residential.buildings.residentialGroundExtra);
+        assertFalse(residential.plazas.entranceApproach);
+        assertEquals(0, residential.buildings.retailGroundExtra);
+        var fourth = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+        fourth.save("layout/building_scale", new byte[]{4});
+        CitySettings retail = CitySettings.forBuildingLayout(fourth, true);
+        assertTrue(retail.plazas.entranceApproach);
+        assertFalse(retail.plazas.lowerEntrance);
+        assertEquals(1, retail.buildings.retailGroundExtra);
+    }
+
+    @Test
     void defaultsAreValid() {
         assertTrue(CitySettings.DEFAULT.validate().isEmpty(), CitySettings.DEFAULT.validate().toString());
     }

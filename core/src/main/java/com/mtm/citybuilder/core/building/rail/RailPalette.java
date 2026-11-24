@@ -79,6 +79,15 @@ public record RailPalette(String concrete, String concreteSlab, String steel, St
         };
     }
 
+    /** Natural stone in a buried station can be replaced by the biome's dirt and ore veins
+     * after its box is built. Use dressed versions for the public floors and the structure. */
+    public RailPalette stationFinish() {
+        if (this!=WEATHERED) return this;
+        return new RailPalette(m("stone_bricks"),concreteSlab,steel,ballast,road,m("polished_andesite"),
+                m("polished_andesite_stairs"),rail,m("polished_andesite"),tactile,edge,roof,glass,light,
+                pole,house,parapet,railing,barrier,barrierClear,bearing,joint,drain,pipe);
+    }
+
     // States
 
     static String slab(String id, boolean top) {

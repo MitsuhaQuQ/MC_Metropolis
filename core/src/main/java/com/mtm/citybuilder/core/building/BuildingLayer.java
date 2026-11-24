@@ -9,10 +9,10 @@ import com.mtm.citybuilder.core.street.District;
 import com.mtm.citybuilder.core.street.StreetClass;
 
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * L8, first version: a building on each lot, generated, Japanese (Kyoto prototype). A building is a pure function of
@@ -346,9 +346,9 @@ public final class BuildingLayer {
 
     private final CityLogic logic;
     private final BuildingSettings config;
-    private final Map<Long, Optional<Building>> cache = new LinkedHashMap<>(1024, 0.75f, true) {
+    private final Map<Long, SiteFit> cache = new LinkedHashMap<>(1024, 0.75f, true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<Long, Optional<Building>> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<Long, SiteFit> eldest) {
             return size() > CACHE;
         }
     };
@@ -407,19 +407,46 @@ public final class BuildingLayer {
 
     /** The building on a lot, null where none stands (a street, a block's interior, a remnant, a vacant lot). */
     public Building building(TownPlots plots, Plot plot) {
+        return siteFit(plots,plot).building();
+    }
+
+    public record SiteFit(Building building, boolean railClipped, boolean relocated, boolean clippedBody) {}
+    private static final SiteFit EMPTY_SITE = new SiteFit(null,false,false,false);
+
+    public SiteFit siteFit(TownPlots plots, Plot plot) {
         if (plot == null || plot.interior() || plot.remnant() || plot.use() == Plot.Use.STATION) {
-            return null;
+            return EMPTY_SITE;
         }
         synchronized (cache) {
-            Optional<Building> known = cache.get(plot.id());
+            SiteFit known = cache.get(plot.id());
             if (known != null) {
-                return known.orElse(null);
+                return known;
             }
         }
         // Beside a railway built through the town the lot is cut back to its bed: Japanese towns build right up to
         // the tracks (a viaduct's piers, a line's fence), so a lot it crosses keeps what lies clear of it
         Plot fitted = facilities == null ? plot : clearOfRails(plots, plot);
         Building building = fitted == null ? null : make(plots, fitted);
+        boolean unusable = logic.settings().buildings.usableFootprints && building != null && !hasRoom(plots, building);
+        boolean refit = logic.settings().buildings.usableFootprints && plot.row() == 0 && (fitted != plot || unusable);
+        if (unusable) building = null;
+        building = checkSite(plots, plot, building);
+        boolean relocated=false;
+        if (refit && building == null) {
+            for (Plot candidate : frontageCandidates(plots, plot)) {
+                Building trial = make(plots, candidate);
+                if (trial == null || !hasRoom(plots, trial)) continue;
+                building = checkSite(plots, candidate, trial);
+                if (building != null) { relocated=true; break; }
+            }
+        }
+        SiteFit result=new SiteFit(building,fitted!=plot,relocated,unusable);
+        synchronized (cache) { cache.put(plot.id(), result); }
+        return result;
+    }
+
+    private Building checkSite(TownPlots plots, Plot plot, Building building) {
+
         if (building != null && overWater(building)) {
             // On a stream the planning cannot see (the plans know the rivers, not every brook): no building in it
             building = null;
@@ -459,10 +486,70 @@ public final class BuildingLayer {
             // the lot left a yard
             building = null;
         }
-        synchronized (cache) {
-            cache.put(plot.id(), Optional.ofNullable(building));
-        }
         return building;
+    }
+
+    /** Check an actual room-sized square in the voxel footprint, after masking by the lot. */
+    private static boolean hasRoom(TownPlots plots, Building b) {
+        int side = switch (b.type()) {
+            case OFFICE, APARTMENT, WORKS -> 5;
+            default -> 4;
+        };
+        double back = b.hasWing() ? Math.max(b.back(), b.wingBack()) : b.back();
+        double halfDepth = (back - b.front()) * 0.5;
+        double middle = b.front() + halfDepth;
+        double cx = b.ox() + b.nx() * middle, cz = b.oz() + b.nz() * middle;
+        double rx = Math.abs(b.tx()) * b.width() * 0.5 + Math.abs(b.nx()) * halfDepth;
+        double rz = Math.abs(b.tz()) * b.width() * 0.5 + Math.abs(b.nz()) * halfDepth;
+        int x0 = (int)Math.floor(cx-rx), x1 = (int)Math.floor(cx+rx);
+        int z0 = (int)Math.floor(cz-rz), z1 = (int)Math.floor(cz+rz);
+        // A square exists wherever at least 'side' adjacent columns each have 'side' consecutive
+        // occupied cells ending on the same row. This also finds rooms off-centre on clipped lots.
+        int[] depth = new int[x1-x0+1];
+        for (int z = z0; z <= z1; z++) {
+            int width = 0;
+            for (int x = x0; x <= x1; x++) {
+                double[] local = b.local(x+0.5, z+0.5);
+                Plot owner = b.covers(local[0], local[1]) ? plots.at(x+0.5, z+0.5) : null;
+                boolean occupied = owner != null && owner.id() == b.id() && !owner.interior() && !owner.remnant();
+                int i = x-x0;
+                depth[i] = occupied ? depth[i]+1 : 0;
+                width = depth[i] >= side ? width+1 : 0;
+                if (width >= side) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Rectangles reachable directly from the frontage, tried largest first on a wedge or rail-clipped lot. */
+    private List<Plot> frontageCandidates(TownPlots plots, Plot plot) {
+        int n = (int)Math.ceil(plot.frontage()/2);
+        if (n < 3) return List.of();
+        double step = plot.frontage()/n;
+        double[] clear = new double[n];
+        var rails = logic.chunks().rails();
+        for (int i=0; i<n; i++) {
+            for (double d=1; d<plot.maxDepth(); d+=2) {
+                double[] p = at(plots, plot, plot.start()+(i+0.5)*step,d);
+                Plot own = plots.at(p[0],p[1]);
+                if (own == null || own.id()!=plot.id() || rails.near(plots.settlement(),p[0],p[1],RAIL_GAP+1)) break;
+                clear[i]=Math.min(d+1,plot.maxDepth());
+            }
+        }
+        List<Plot> candidates = new ArrayList<>();
+        for (int i=0; i<n; i++) {
+            if (clear[i]<6) continue;
+            int lo=i, hi=i;
+            while (lo>0 && clear[lo-1]>=clear[i]) lo--;
+            while (hi+1<n && clear[hi+1]>=clear[i]) hi++;
+            if (i>lo && clear[i-1]==clear[i]) continue;
+            double start=plot.start()+lo*step, end=plot.start()+(hi+1)*step;
+            if (end-start<6) continue;
+            candidates.add(new Plot(plot.id(),plot.chain(),plot.side(),plot.index(),start,end,plot.along(),plot.depth(),
+                    clear[i],plot.district(),plot.street(),plot.streetWidth(),plot.heading(),false,false,0,plot.use(),false));
+        }
+        candidates.sort(java.util.Comparator.comparingDouble((Plot p)->p.frontage()*p.maxDepth()).reversed());
+        return candidates;
     }
 
     /** How deep a lot cut back by a railway must still run, along a stretch of its frontage, to be built on. */
@@ -949,6 +1036,10 @@ public final class BuildingLayer {
             sideGap = Math.max(sideGap, Math.min(2.0, Math.max(0.0, 0.5 * (plot.frontage() - 7.0))));
             width = Math.floor(plot.frontage() - 2.0 * sideGap);
         }
+        if (type == Building.Type.HOUSE || type == Building.Type.MACHIYA || type == Building.Type.SHOP
+                || type == Building.Type.APARTMENT || type == Building.Type.OFFICE) {
+            depth *= config.streetBuildingDepthScale;
+        }
         depth = Math.floor(Math.min(depth, plot.maxDepth() - front - backGap));
         // The lot as it really runs back (a corner's, or one whose back another street's lot or a back lot takes, is
         // shallower than its nominal depth): the building only as deep as the lot reaches all along its frontage, else
@@ -1058,7 +1149,9 @@ public final class BuildingLayer {
         boolean corner = chamferLeft > 0 || chamferRight > 0;
 
         int ground = switch (type) {
-            case SHOP, OFFICE, KURA -> config.shopFloor;
+            case HOUSE, APARTMENT -> config.storey + config.residentialGroundExtra;
+            case SHOP -> config.shopFloor + config.retailGroundExtra;
+            case OFFICE, KURA -> config.shopFloor;
             case WORKS -> config.worksStorey;
             default -> config.storey;
         };
@@ -1181,6 +1274,9 @@ public final class BuildingLayer {
         } else {
             door = Math.floor(0.5 * width) + 0.5;
         }
+        if (config.usableFootprints) {
+            door = frontageDoor(plots, plot, ox, oz, p[2], p[3], nx, nz, width, front, door);
+        }
 
         // An annex behind a house of two storeys or more (下屋): one storey, a lean-to roof falling away from the house,
         // along one side, making the plan an L
@@ -1222,6 +1318,28 @@ public final class BuildingLayer {
                 age(type, quarter, project, standalone, Hash.unit(Hash.of(h, 87))), plot.streetWidth(), java.util.List.of());
         // A plant's equipment, over the lot as it is (its outline is not the frame's rectangle)
         return program != null && program.plant() ? made.withEquipment(layOut(made, plots, plot)) : made;
+    }
+
+    /** A metre-wide door can fall between the two nearest voxel centres on a diagonal facade. */
+    private static double frontageDoor(TownPlots plots, Plot plot, double ox, double oz, double tx, double tz,
+                                      double nx, double nz, double width, double front, double preferred) {
+        double cx=ox+nx*(front+0.5), cz=oz+nz*(front+0.5);
+        double rx=Math.abs(tx)*width/2+0.5, rz=Math.abs(tz)*width/2+0.5;
+        double nearest=Double.POSITIVE_INFINITY, door=preferred;
+        for (int x=(int)Math.floor(cx-rx);x<=Math.floor(cx+rx);x++) {
+            for (int z=(int)Math.floor(cz-rz);z<=Math.floor(cz+rz);z++) {
+                double dx=x+0.5-ox, dz=z+0.5-oz;
+                double u=dx*tx+dz*tz+width/2, v=dx*nx+dz*nz;
+                double d=Math.abs(u-preferred);
+                if (u<1 || u>width-1 || v<front || v>=front+1 || d>=nearest) continue;
+                Plot own=plots.at(x+0.5,z+0.5);
+                if (own==null || own.id()!=plot.id() || own.remnant() || own.interior()) continue;
+                if (d<0.5) return preferred;
+                nearest=d;
+                door=u;
+            }
+        }
+        return door;
     }
 
     /**

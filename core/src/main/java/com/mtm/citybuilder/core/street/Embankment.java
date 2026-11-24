@@ -15,9 +15,13 @@ import java.util.List;
  * @param land   how far from the centre line the embankment reaches inland at most: the road's half width, the back
  *               slope and the road at its foot
  */
-public record Embankment(List<double[]> points, double road, double land) {
+public record Embankment(List<double[]> points, double road, double land, List<double[]> footRoad) {
+    public Embankment(List<double[]> points, double road, double land) {
+        this(points,road,land,List.of());
+    }
     public Embankment {
         points = List.copyOf(points);
+        footRoad = List.copyOf(footRoad);
     }
 
     /** The centre line's x, z and crest height, and the rest, as {@link #points}. */

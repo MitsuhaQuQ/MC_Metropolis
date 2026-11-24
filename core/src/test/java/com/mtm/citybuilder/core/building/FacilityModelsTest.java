@@ -40,6 +40,9 @@ class FacilityModelsTest {
             sites.merge(f.kind(), 1, Integer::sum);
         }
         Map<Facility.Kind, Integer> built = new EnumMap<>(Facility.Kind.class);
+        assertTrue(placed.stream().anyMatch(p -> p.facility().kind() == Facility.Kind.CASTLE_PARK && p.grade()
+                && p.model().maxY() >= 48 && Math.min(p.model().width(), p.model().depth()) >= 63),
+                "castle town's upper court and keep must actually be placed");
         for (FacilityModels.Placed p : placed) {
             if (p.path()) {
                 continue;
@@ -52,6 +55,7 @@ class FacilityModelsTest {
                     p.maxX(), p.maxZ(), p.y(), p.model().size());
             for (int x = p.minX(); x <= p.maxX(); x += 2) {
                 for (int z = p.minZ(); z <= p.maxZ(); z += 2) {
+                    if (!p.occupiesColumn(x,z)) continue;
                     int fx = x;
                     int fz = z;
                     // A lot's off the streets; an area's on its block (its lanes taken over)

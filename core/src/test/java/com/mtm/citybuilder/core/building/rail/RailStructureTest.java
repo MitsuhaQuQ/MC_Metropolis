@@ -17,6 +17,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Every structure is built over a sweep of sizes, sections and terrain: nothing in them is a fixed size. */
 class RailStructureTest {
     private static final RailPalette P = RailPalette.CONCRETE;
+
+    @Test
+    void aRoadThroughAPortalKeepsTheCapAndClearsTheIntermediateTie() {
+        var builder=Viaduct.builder(Viaduct.Deck.RAIL,90,18).columns(2).tracks(2);
+        var viaduct=builder.build();
+        Model ordinary=viaduct.build();
+        Model portal=builder.trafficBelow((x,z)->z==0).build().build();
+        int sample=viaduct.bents().get(0);
+        boolean removedTie=false;
+        for(int y=1;y<10;y++) {
+            if (ordinary.has(sample,y,0) && !portal.has(sample,y,0)) removedTie=true;
+        }
+        assertTrue(removedTie);
+        for(int y=10;y<=18;y++) assertEquals(ordinary.get(sample,y,0),portal.get(sample,y,0));
+    }
     /** A valley: the ground falls 6 blocks to the middle of a 160-block stretch and rises again. */
     private static final Ground VALLEY = Ground.profile(new int[][] {{0, 0}, {80, -6}, {160, 0}});
     private static final Ground SLOPE = Ground.profile(new int[][] {{-40, 3}, {200, -4}});

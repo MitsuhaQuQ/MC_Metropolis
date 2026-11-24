@@ -1,5 +1,5 @@
 // The test client's TestKit interface: endpoint-client.json in the client's run directory gives the port and token
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './server.mjs';
 
@@ -24,7 +24,15 @@ export const client = {
   state: () => call('/state'),
   join: (address = '127.0.0.1:25566') => call('/join', { address }),
   look: (yaw, pitch) => call('/look', { yaw, pitch }),
-  screenshot: (file) => call('/screenshot', { file }),
+  screenshot: async (file) => {
+    const view=await call('/screenshot',{file});
+    const iris=join(RUN_CLIENT,'config','iris.properties');
+    if(view.irisInstalled && existsSync(iris)) {
+      view.shaderOptions=readFileSync(iris,'utf8').split(/\r?\n/).filter(line=>/^(enableShaders|shaderPack)=/.test(line));
+    }
+    writeFileSync(file+'.json',JSON.stringify(view,null,2));
+    return view;
+  },
   map: (query = {}) => call('/map', query),
   quit: () => call('/quit'),
 };

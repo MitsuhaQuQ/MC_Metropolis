@@ -44,7 +44,13 @@ import java.util.List;
 public record StationPlaza(Template template, double x, double z, double heading, int side, double front, double depth,
                            double from, double to, double mouthU, Rect building, Rect forecourt, Land land,
                            List<Loop> loops, List<Link> links, List<Berth> berths, List<Rect> taxiPools,
-                           List<Crossing> crossings) {
+                           List<Crossing> crossings, StreetSegment curbStreet) {
+    public StationPlaza(Template template,double x,double z,double heading,int side,double front,double depth,
+                        double from,double to,double mouthU,Rect building,Rect forecourt,Land land,List<Loop> loops,
+                        List<Link> links,List<Berth> berths,List<Rect> taxiPools,List<Crossing> crossings) {
+        this(template,x,z,heading,side,front,depth,from,to,mouthU,building,forecourt,land,loops,links,berths,
+                taxiPools,crossings,null);
+    }
     public StationPlaza {
         loops = List.copyOf(loops);
         links = List.copyOf(links);
@@ -294,7 +300,8 @@ public record StationPlaza(Template template, double x, double z, double heading
     }
 
     /** A berth: a stretch of a loop's outer lane, from arc length {@code s1} to {@code s2} round it. */
-    public record Berth(Use use, int loop, double s1, double s2) {
+    public record Berth(Use use, int loop, double s1, double s2, boolean straight) {
+        public Berth(Use use, int loop, double s1, double s2) { this(use,loop,s1,s2,false); }
         /** Whether an arc length round a loop of this perimeter lies within the berth, give or take a margin. */
         public boolean holds(double s, double perimeter, double margin) {
             double a = s1 - margin;
@@ -308,7 +315,10 @@ public record StationPlaza(Template template, double x, double z, double heading
      * A zebra crossing: a rectangle of the frame, the traffic over it along {@code u} or else along {@code v}; or, on a
      * link (not null), the stretch of its carriageway from {@code from} to {@code to} along it.
      */
-    public record Crossing(Rect area, boolean alongU, Link link, double from, double to) {
+    public record Crossing(Rect area, boolean alongU, Link link, double from, double to, boolean pedestrianRoute) {
+        public Crossing(Rect area, boolean alongU, Link link, double from, double to) {
+            this(area, alongU, link, from, to, false);
+        }
         public Crossing(Rect area, boolean alongU) {
             this(area, alongU, null, 0.0, 0.0);
         }
@@ -355,6 +365,139 @@ public record StationPlaza(Template template, double x, double z, double heading
         return world(mouthU, front + depth);
     }
 
+    /** Keep the station entrance and all surrounding streets if no vehicle approach fits. */
+    StationPlaza forecourtOnly() {
+        Land entrance=trim(land,building,forecourt,List.of(),List.of(),0);
+        return new StationPlaza(template,x,z,heading,side,front,forecourt.v2-front,forecourt.u1,forecourt.u2,
+                mouthU,building,forecourt,entrance,List.of(),List.of(),List.of(),List.of(),List.of());
+    }
+
+    private static double roadDistance(StreetSegment road,double x,double z) {
+        double dx=road.x2()-road.x1(), dz=road.z2()-road.z1();
+        double t=Math.max(0,Math.min(1,((x-road.x1())*dx+(z-road.z1())*dz)/Math.max(1e-9,dx*dx+dz*dz)));
+        return Math.hypot(x-road.x1()-t*dx,z-road.z1()-t*dz);
+    }
+
+    private record BaySite(StreetSegment road,double u,double v,double du,double dv,double score) {}
+
+    /** A constrained frontage can take a one-way pull-out alongside the existing street.
+     * The two tapers meet the same near lane, with all stopping space behind the kerb. */
+    StationPlaza frontageBay(List<StreetSegment> roads,Free dry,CitySettings.Plazas config) {
+        List<BaySite> sites=new ArrayList<>();
+        for(var road:roads) {
+            if(road.structure()!=StreetStructure.GROUND || road.width()<6 || road.length()<2) continue;
+            double[] a=local(road.x1(),road.z1()), b=local(road.x2(),road.z2());
+            double du=(b[0]-a[0])/road.length(), dv=(b[1]-a[1])/road.length();
+            if(Math.abs(du)<0.45) continue;
+            for(double d=0;d<road.length();d++) {
+                double u=a[0]+d*du,v=a[1]+d*dv;
+                if(u<Math.min(from,building.u1-config.berth-6) || u>Math.max(to,building.u2+config.berth+6)
+                        || v<forecourt.v1 || v>front+depth) continue;
+                double sign=side*(dv*(-u)-du*(forecourt.v1-v))>=0?1:-1;
+                sites.add(new BaySite(road,u,v,du*sign,dv*sign,Math.hypot(u,v-forecourt.v2)));
+            }
+        }
+        sites.sort(java.util.Comparator.comparingDouble(BaySite::score));
+        // On a short frontage the bus retains its full berth. One passenger car can
+        // load in a six-metre bay, with a gap at each marked end.
+        for(boolean extendedSearch:new boolean[]{false,true})
+        for(double[] cars:new double[][]{{config.berth,config.taxiBay},{6,6},{6,0},{0,0}}) for(var site:sites) {
+            boolean close=site.u>=building.u1-config.berth-6 && site.u<=building.u2+config.berth+6 && site.v<=forecourt.v2+32;
+            if(extendedSearch==close) continue;
+            double nu=side*site.dv,nv=-side*site.du;
+            double outer=site.road.width()/2+3, inner=site.road.width()/2-walk(site.road.width())-1.5;
+            double length=config.berth+2+(cars[0]>0?cars[0]+1:0)+(cars[1]>0?cars[1]+1:0);
+            double taper=Math.max(8,1.75*(outer-inner)),half=length/2;
+            List<Link> links=new ArrayList<>();
+            double u=site.u+outer*nu,v=site.v+outer*nv;
+            links.add(new Link(site.u-(half+taper)*site.du+inner*nu,site.v-(half+taper)*site.dv+inner*nv,
+                    u-half*site.du,v-half*site.dv,4,0,0));
+            links.add(new Link(u-half*site.du,v-half*site.dv,u+half*site.du,v+half*site.dv,6,1,0));
+            links.add(new Link(u+half*site.du,v+half*site.dv,site.u+(half+taper)*site.du+inner*nu,
+                    site.v+(half+taper)*site.dv+inner*nv,4,0,0));
+            if (!clearBay(site,roads,dry,links,half+taper)) continue;
+            List<Berth> stops=new ArrayList<>();
+            double s=1;
+            stops.add(new Berth(Use.BUS,-2,s,s+config.berth,true)); s+=config.berth+1;
+            if(cars[0]>0){stops.add(new Berth(Use.DROP_OFF,-2,s,s+cars[0],true));s+=cars[0]+1;}
+            if(cars[1]>0) stops.add(new Berth(Use.TAXI,-2,s,s+cars[1],true));
+            double wu=u+4*nu,wv=v+4*nv,aisle=forecourt.v1+1;
+            List<Crossing> walks=List.of(walkBetween(0,aisle,wu,aisle,false),walkBetween(wu,aisle,wu,wv,true));
+            double minU=building.u1,maxU=building.u2,minV=front,maxV=forecourt.v2;
+            for(var link:links) {
+                minU=Math.min(minU,Math.min(link.u1,link.u2)-8);
+                maxU=Math.max(maxU,Math.max(link.u1,link.u2)+8);
+                minV=Math.min(minV,Math.min(link.v1,link.v2)-8);
+                maxV=Math.max(maxV,Math.max(link.v1,link.v2)+8);
+            }
+            int u0=(int)Math.floor(minU)-2,u1=(int)Math.ceil(maxU)+2;
+            int v0=(int)Math.floor(minV)-2,v1=(int)Math.ceil(maxV)+2;
+            Land ground=new Land(u0,v0,u1-u0,v1-v0,new BitSet());
+            for(int i=0;i<ground.width;i++) for(int j=0;j<ground.height;j++) {
+                double pu=u0+i+0.5,pv=v0+j+0.5;
+                boolean used=building.contains(pu,pv)||forecourt.contains(pu,pv);
+                for(var walk:walks) used|=walk.contains(pu,pv);
+                for(var link:links) {
+                    var at=link.local(pu,pv);
+                    used|=at[0]>=-1 && at[0]<=link.length()+1 && Math.abs(at[1])<=link.width()/2+CANOPY;
+                }
+                if(used) ground.cells.set(i*ground.height+j);
+            }
+            Link exit=links.get(2);
+            var result=new StationPlaza(template,x,z,heading,side,front,exit.v2-front,u0,u1,exit.u2,
+                    building,forecourt,ground,List.of(),links,stops,List.of(),walks,site.road);
+            if(StreetLayer.connectedCurb(result)) return result;
+        }
+        return null;
+    }
+
+    private boolean clearBay(BaySite site,List<StreetSegment> roads,Free dry,List<Link> links,double reach) {
+        double tx=(site.road.x2()-site.road.x1())/site.road.length(),tz=(site.road.z2()-site.road.z1())/site.road.length();
+        for(double s=-reach;s<=reach;s+=1) {
+            var axis=world(site.u+s*site.du,site.v+s*site.dv);
+            boolean supported=false;
+            for(var road:roads) {
+                boolean aligned=Math.abs(tx*(road.x2()-road.x1())+tz*(road.z2()-road.z1()))>0.98*road.length();
+                double distance=roadDistance(road,axis[0],axis[1]);
+                if(!aligned && distance<=road.width()/2+3) return false;
+                supported|=aligned && road.width()==site.road.width() && distance<1;
+            }
+            if(!supported) return false;
+        }
+        for(var link:links) {
+            double du=(link.u2-link.u1)/link.length(),dv=(link.v2-link.v1)/link.length();
+            for(double s=0;s<=link.length();s++) for(double c=-2;c<=5;c++) {
+                double u=link.u1+s*du+c*side*dv,v=link.v1+s*dv-c*side*du;
+                if(v<front || building.contains(u,v)) return false;
+                var q=world(u,v);
+                boolean roadway=false;
+                for(var road:roads) {
+                    if(roadDistance(road,q[0],q[1])>road.width()/2+0.5) continue;
+                    double along=Math.abs(tx*(road.x2()-road.x1())+tz*(road.z2()-road.z1()));
+                    if(along<0.98*road.length() || road.width()!=site.road.width()) return false;
+                    double[] a=local(road.x1(),road.z1());
+                    if(Math.abs((a[0]-site.u)*site.dv-(a[1]-site.v)*site.du)>1.5) return false;
+                    roadway=true;
+                }
+                if(!roadway && !dry.free(u,v)) return false;
+            }
+        }
+        return true;
+    }
+
+    /** Midpoint of a stop, displaced towards its waiting pavement from the lane centre. */
+    public double[] berthPoint(Berth bay, double outward) {
+        double at = (bay.s1+bay.s2)*0.5;
+        if (bay.loop >= 0) {
+            double[] p = loops.get(bay.loop).point(at);
+            return world(p[0]+outward*p[2], p[1]+outward*p[3]);
+        }
+        Link link = links.get(-1-bay.loop);
+        double du=(link.u2-link.u1)/link.length(), dv=(link.v2-link.v1)/link.length();
+        double normal=curbStreet!=null ? side : Math.signum(du);
+        return world(link.u1+at*du+normal*outward*dv, link.v1+at*dv-normal*outward*du);
+    }
+
     /** Whether a position lies in the square (its building's land included). */
     public boolean contains(double wx, double wz) {
         double[] l = local(wx, wz);
@@ -382,6 +525,19 @@ public record StationPlaza(Template template, double x, double z, double heading
         return partAt(l[0], l[1]);
     }
 
+    /** A route from the forecourt to a waiting area may cross a street retained inside the plaza. */
+    public Crossing pedestrianRoute(double wx, double wz) {
+        double[] local = local(wx,wz);
+        return pedestrianRouteAt(local[0], local[1]);
+    }
+
+    private Crossing pedestrianRouteAt(double u,double v) {
+        for (Crossing crossing : crossings) {
+            if (crossing.pedestrianRoute && crossing.contains(u,v)) return crossing;
+        }
+        return null;
+    }
+
     /** What a position of the square's frame is. */
     public Part partAt(double u, double v) {
         if (!land.contains(u, v)) {
@@ -393,7 +549,7 @@ public record StationPlaza(Template template, double x, double z, double heading
         // A throat's median, on through the loop's carriageway to its island
         for (Link link : links) {
             if (link.onMedian(u, v)) {
-                return Part.ISLAND;
+                return pedestrianRouteAt(u,v)!=null ? Part.PLAZA : Part.ISLAND;
             }
         }
         boolean road = false;
@@ -406,11 +562,13 @@ public record StationPlaza(Template template, double x, double z, double heading
         if (road) {
             for (Crossing crossing : crossings) {
                 if (crossing.contains(u, v)) {
+                    if (crossing.pedestrianRoute && berthLane(u,v)) continue;
                     return Part.CROSSING;
                 }
             }
             return Part.ROAD;
         }
+        boolean onWalk = pedestrianRouteAt(u,v)!=null;
         for (Loop loop : loops) {
             if (loop.radial(u, v) < -0.5 * loop.lane) {
                 for (Rect pool : taxiPools) {
@@ -418,10 +576,19 @@ public record StationPlaza(Template template, double x, double z, double heading
                         return Part.TAXI_POOL;
                     }
                 }
-                return Part.ISLAND;
+                return onWalk ? Part.PLAZA : Part.ISLAND;
             }
         }
         // The canopy along the berths, beside the kerb (not along the drop-off)
+        for (Berth bay : berths) {
+            if (!bay.straight || bay.loop<0 || bay.use==Use.DROP_OFF) continue;
+            Loop loop=loops.get(bay.loop);
+            double[] a=loop.point(bay.s1), b=loop.point(bay.s2);
+            double dx=b[0]-a[0], dz=b[1]-a[1], len=Math.hypot(dx,dz);
+            double along=((u-a[0])*dx+(v-a[1])*dz)/len;
+            double out=((u-a[0])*dz-(v-a[1])*dx)/len;
+            if (along>=0 && along<=len && out>loop.lane/2 && out<=loop.lane/2+CANOPY) return Part.SHELTER;
+        }
         boolean near = forecourt.contains(u, v) || v < forecourt.v2();
         for (int k = 0; k < loops.size(); k++) {
             Loop loop = loops.get(k);
@@ -437,12 +604,39 @@ public record StationPlaza(Template template, double x, double z, double heading
                 }
             }
         }
+        for (Berth berth : berths) {
+            if (berth.loop>=0) continue;
+            Link bay=links.get(-1-berth.loop);
+            double[] local=bay.local(u,v);
+            double offset=Math.abs(local[1])-(0.5*bay.width-bay.walk);
+            double normal=curbStreet!=null?side:Math.signum(bay.u2-bay.u1);
+            if (local[1]*normal<=0 && offset>0 && offset<=CANOPY && local[0]>=berth.s1 && local[0]<=berth.s2) return Part.SHELTER;
+        }
         for (Link link : links) {
             double[] l = link.local(u, v);
             near |= l[0] >= -3.0 && l[0] <= link.length() + 3.0 && Math.abs(l[1]) <= 0.5 * link.width + 3.0;
         }
         // Land the roads and their pavements do not need: planted, as the corners of a real square are
-        return near ? Part.PLAZA : Part.ISLAND;
+        return near || onWalk ? Part.PLAZA : Part.ISLAND;
+    }
+
+    private boolean berthLane(double u, double v) {
+        for (Berth berth : berths) {
+            if (berth.loop < 0) continue;
+            Loop loop = loops.get(berth.loop);
+            if (berth.straight) {
+                double[] a=loop.point(berth.s1), b=loop.point(berth.s2);
+                double dx=b[0]-a[0], dv=b[1]-a[1], length=Math.hypot(dx,dv);
+                if (length>0) {
+                    double along=((u-a[0])*dx+(v-a[1])*dv)/length;
+                    double across=Math.abs((u-a[0])*dv-(v-a[1])*dx)/length;
+                    if (along>=-1 && along<=length+1 && across<=loop.lane/2+0.5) return true;
+                }
+            }
+            if (Math.abs(loop.radial(u,v)) <= loop.lane/2 &&
+                    berth.holds(loop.arc(u,v),loop.perimeter(),1.0)) return true;
+        }
+        return false;
     }
 
     /** The pavement either side of a street of a width, as the chunk layer paves a marked street. */
@@ -515,8 +709,9 @@ public record StationPlaza(Template template, double x, double z, double heading
         double median = config.median;
         double front = 0.5 * siteWidth;
         // The throat: a lane each way either side of the median at least, as wide as the avenue
-        double throat = Math.max(avenue, 2 * walk + 2 * lane + median);
+        double throat = config.frontageLayout ? avenue : Math.max(avenue, 2 * walk + 2 * lane + median);
         double throatWalk = walk(throat);
+        if (config.frontageLayout) median=Math.min(median,Math.max(0,throat-2*throatWalk-6));
         double[] sizes = switch (template) {
             case TURNING_CIRCLE -> config.town;
             case ROTARY -> config.city;
@@ -536,7 +731,7 @@ public record StationPlaza(Template template, double x, double z, double heading
         switch (template) {
             case TURNING_CIRCLE -> {
                 buses = 1;
-                Stadium s = stadium(0.0, near, sizes[3], 0.5 * config.taxiBay, config.taxiBay, buses, berth, clear);
+                Stadium s = stadium(config.frontageLayout, 0.0, near, sizes[3], 0.5 * config.taxiBay, config.taxiBay, buses, berth, clear);
                 stadia.add(s);
                 end = s.v + s.radius + 0.5 * lane + walk;
                 high = Math.max(s.half + s.radius + 0.5 * lane + walk, 0.5 * sizes[0] + walk);
@@ -544,7 +739,7 @@ public record StationPlaza(Template template, double x, double z, double heading
             }
             case ROTARY -> {
                 buses = Math.max(config.cityBerths[0], Math.min(config.cityBerths[1], 2 + 2 * lines));
-                Stadium s = stadium(0.0, near, sizes[3], berth, 2 * berth, buses, berth, clear);
+                Stadium s = stadium(config.frontageLayout, 0.0, near, sizes[3], berth, 2 * berth, buses, berth, clear);
                 stadia.add(s);
                 end = s.v + s.radius + 0.5 * lane + walk;
                 high = Math.max(s.half + s.radius + 0.5 * lane + walk, 0.5 * sizes[0] + walk);
@@ -554,8 +749,8 @@ public record StationPlaza(Template template, double x, double z, double heading
                 buses = Math.max(config.metropolisBerths[0], Math.min(config.metropolisBerths[1], 4 + 2 * lines));
                 double inner = 2 * lane + median;
                 double innerClear = 0.5 * inner + 1.0;
-                Stadium bus = stadium(0.0, near, sizes[4], 0.0, 0.0, buses, berth, innerClear);
-                Stadium car = stadium(0.0, near, sizes[3], berth, 2 * berth, 0, berth, innerClear);
+                Stadium bus = stadium(config.frontageLayout, 0.0, near, sizes[4], 0.0, 0.0, buses, berth, innerClear);
+                Stadium car = stadium(config.frontageLayout, 0.0, near, sizes[3], berth, 2 * berth, 0, berth, innerClear);
                 double busReach = bus.half + bus.radius + 0.5 * lane;
                 double carReach = car.half + car.radius + 0.5 * lane;
                 bus = new Stadium(-(0.5 * config.gap + busReach), bus.v, bus.half, bus.radius);
@@ -576,20 +771,27 @@ public record StationPlaza(Template template, double x, double z, double heading
         int v0 = (int) Math.floor(front);
         int v1 = (int) Math.ceil(front + (end - front));
         Land land = land(u0, v0, u1 - u0, v1 - v0, building, forecourt, free);
+        if (config.frontageLayout && template == Template.TURNING_CIRCLE && !entries.isEmpty()) {
+            StationPlaza through = throughSquare(x,z,heading,side,front,end,mouthU,building,forecourt,
+                    land,entries,out,throat,config);
+            if (through != null) return through;
+        }
         long random = Hash.mix(seed ^ 0x5374617469L);
         List<Loop> loops = new ArrayList<>();
         // On the land the streets leave, else over them; bent by the seed, else (last) the plain stadium
-        for (int pass = 0; pass < 3; pass++) {
+        for (int pass = 0; pass < (config.frontageLayout ? 1 : 3); pass++) {
             boolean bend = pass < 2;
             loops.clear();
-            boolean fits = land.contains(mouthU, end - 0.5);
+            boolean fits = config.frontageLayout || land.contains(mouthU, end - 0.5);
             for (int k = 0; k < stadia.size() && fits; k++) {
                 Stadium s = stadia.get(k);
                 double shiftU = template == Template.TERMINAL || !bend ? 0.0
                         : 0.4 * mouthU + (Hash.unit(Hash.of(random, k, 1)) - 0.5) * 0.15 * s.radius;
+                if (config.frontageLayout) shiftU = template == Template.TERMINAL ? 0 : 0.25 * mouthU;
                 double towardU = template == Template.TERMINAL ? 0.0 : mouthU - (s.u + shiftU);
                 double towardV = template == Template.TERMINAL ? 1.0 : end - s.v;
-                Loop loop = shape(s, s.u + shiftU, lane, walk, Math.atan2(towardV, towardU), Hash.of(random, k), land,
+                Loop loop = config.frontageLayout ? frontageLoop(s, s.u + shiftU, lane, walk, out, entries, land)
+                        : shape(s, s.u + shiftU, lane, walk, Math.atan2(towardV, towardU), Hash.of(random, k), land,
                         forecourt.v2(), template == Template.TERMINAL ? 0.0 : 0.25, bend);
                 if (loop == null) {
                     fits = false;
@@ -600,15 +802,22 @@ public record StationPlaza(Template template, double x, double z, double heading
             if (fits) {
                 break;
             }
-            land = land(u0, v0, u1 - u0, v1 - v0, building, forecourt, (u, v) -> true);
+            if (config.frontageLayout) loops.clear();
+            else land = land(u0, v0, u1 - u0, v1 - v0, building, forecourt, (u, v) -> true);
         }
         List<Link> links = new ArrayList<>();
         List<Berth> berths = new ArrayList<>();
         List<Rect> pools = new ArrayList<>();
         List<Crossing> crossings = new ArrayList<>();
+        if (config.frontageLayout && loops.isEmpty()) {
+            // No room to turn here: retain the streets and the pedestrian forecourt.
+            land = trim(land, building, forecourt, loops, links, 0);
+            return new StationPlaza(template, x,z,heading,side,front,end-front,low,high,mouthU,building,forecourt,
+                    land,loops,links,berths,pools,crossings);
+        }
         switch (template) {
             case TURNING_CIRCLE, ROTARY -> {
-                Loop loop = throat(loops.get(0), mouthU, end, out, throat, throatWalk, median, walk, links, crossings);
+                Loop loop = throat(loops.get(0), mouthU, end, out, throat, throatWalk, median, walk, links, crossings,config.frontageLayout);
                 loops.set(0, loop);
                 double slant = slant(loop, links.get(links.size() - 1));
                 double gap = clear / slant;
@@ -662,6 +871,28 @@ public record StationPlaza(Template template, double x, double z, double heading
         if (!entries.isEmpty()) {
             land = join(entries, land, loops, links, crossings, berths, building, forecourt, walk);
         }
+        if (config.frontageLayout) {
+            int busLoop = 0;
+            List<Berth> curvedStops=new ArrayList<>();
+            for(Berth b:berths) if(b.use!=Use.BUS && !straightKerb(loops.get(b.loop),b.s1,b.s2-b.s1))curvedStops.add(b);
+            berths.removeIf(b -> b.use==Use.BUS || curvedStops.contains(b));
+            int before=berths.size();
+            reserveStraightBerths(berths,busLoop,loops.get(busLoop),links,1,berth,Use.BUS);
+            int placed=berths.size()-before;
+            for(Berth b:curvedStops) reserveStraightBerths(berths,b.loop,loops.get(b.loop),links,1,b.s2-b.s1,b.use);
+            reserveStraightBerths(berths,busLoop,loops.get(busLoop),links,buses-placed,berth,Use.BUS);
+            for (Berth bay : berths) {
+                if (bay.loop < 0) continue;
+                Loop loop = loops.get(bay.loop);
+                double[] at = loop.point((bay.s1+bay.s2)*0.5);
+                double u = at[0]+at[2]*(loop.lane/2+CANOPY/2);
+                double v = at[1]+at[3]*(loop.lane/2+CANOPY/2);
+                double aisle = Math.min(forecourt.v2()-2, v);
+                crossings.add(walkBetween(0, forecourt.v1(), 0, aisle, true));
+                crossings.add(walkBetween(0, aisle, u, aisle, false));
+                crossings.add(walkBetween(u, aisle, u, v, true));
+            }
+        }
         // Every link on its land (a throat leaving at a slant runs over the land's corner by the mouth)
         land = cover(land, links);
         land = trim(land, building, forecourt, loops, links, 0.5 * lane + walk + CANOPY + 2.0);
@@ -677,6 +908,12 @@ public record StationPlaza(Template template, double x, double z, double heading
         }
         return new StationPlaza(template, x, z, heading, side, front, end - front, fromU, toU, mouthU, building,
                 forecourt, land, loops, links, berths, pools, crossings);
+    }
+
+    private static Crossing walkBetween(double u1,double v1,double u2,double v2, boolean alongU) {
+        double half = 1.5;
+        return new Crossing(new Rect(Math.min(u1,u2)-half,Math.min(v1,v2)-half,
+                Math.max(u1,u2)+half,Math.max(v1,v2)+half),alongU,null,0,0,true);
     }
 
     /** The land grown by a few blocks round and taking in every block of the links. */
@@ -993,6 +1230,157 @@ public record StationPlaza(Template template, double x, double z, double heading
         return Loop.of(cu, s.v, lane, r, 0.0);
     }
 
+    /** A small station with two usable approaches can stop buses along its front and let them drive on. */
+    private static StationPlaza throughSquare(double x, double z, double heading, int side, double front, double end,
+                                             double mouth, Rect building, Rect forecourt, Land land, List<Entry> entries,
+                                             double[] out, double avenueWidth, CitySettings.Plazas config) {
+        double lane=config.lane, walk=config.walk;
+        double v=forecourt.v2()+lane*0.5;
+        double half=0.5*(config.berth+config.taxiBay)+9.0;
+        for (Entry entry:entries) {
+            if (Math.abs(entry.u-mouth)<half || Math.abs(entry.du)<0.45 || entry.width<5) continue;
+            double dir=entry.u<0?1:-1;
+            double[] a={entry.u,entry.v}, b={-dir*half,v}, c={dir*half,v};
+            double lead=Math.min(10,(end-v)*0.4);
+            double[] d={mouth-out[0]*lead,end-out[1]*lead}, e={mouth,end};
+            List<double[]> vertices=List.of(a,b,c,d,e);
+            List<double[]> path=new ArrayList<>();
+            path.add(a);
+            int bayStart=0;
+            for (int i=1;i<vertices.size()-1;i++) {
+                double[] before=vertices.get(i-1), corner=vertices.get(i), after=vertices.get(i+1);
+                double l=Math.hypot(corner[0]-before[0],corner[1]-before[1]);
+                double r=Math.hypot(after[0]-corner[0],after[1]-corner[1]);
+                if (l<1 || r<1) break;
+                double cut=Math.min(6,0.35*Math.min(l,r));
+                double ax=corner[0]+(before[0]-corner[0])*cut/l, az=corner[1]+(before[1]-corner[1])*cut/l;
+                double bx=corner[0]+(after[0]-corner[0])*cut/r, bz=corner[1]+(after[1]-corner[1])*cut/r;
+                for (int j=0;j<=4;j++) {
+                    double t=j/4.0,f=1-t;
+                    path.add(new double[]{f*f*ax+2*f*t*corner[0]+t*t*bx,f*f*az+2*f*t*corner[1]+t*t*bz});
+                }
+                if (i==1) bayStart=path.size()-1;
+            }
+            if (path.size()!=16) continue;
+            path.add(e);
+            List<Link> links=new ArrayList<>();
+            boolean fits=true;
+            for (int k=1;k<path.size() && fits;k++) {
+                double[] u=path.get(k-1),w=path.get(k);
+                double width=k==path.size()-1?avenueWidth:k==1?entry.width:lane+2*walk;
+                double pavement=k==1||k==path.size()-1?walk(width):walk;
+                Link link=new Link(u[0],u[1],w[0],w[1],width,pavement,0);
+                double length=link.length();
+                if(length<0.1){fits=false;break;}
+                double du=(w[0]-u[0])/length,dv=(w[1]-u[1])/length;
+                for(double t=0.5;t<length && fits;t+=0.5) {
+                    for(double off:new double[]{-0.5*width+0.5,0,0.5*width-0.5}) {
+                        double pu=u[0]+du*t-dv*off,pv=u[1]+dv*t+du*off;
+                        if (building.contains(pu,pv) || !land.contains(pu,pv) && k!=path.size()-1) {fits=false;break;}
+                    }
+                }
+                links.add(link);
+            }
+            if (!fits || links.get(bayStart).length()<config.berth+config.taxiBay+1) continue;
+            int id=-1-bayStart;
+            List<Berth> berths=List.of(new Berth(Use.BUS,id,0.5,0.5+config.berth),
+                    new Berth(Use.TAXI,id,1+config.berth,1+config.berth+config.taxiBay));
+            Land covered=trim(cover(land,links),building,forecourt,List.of(),links,lane/2+walk+CANOPY+2);
+            return new StationPlaza(Template.TURNING_CIRCLE,x,z,heading,side,front,end-front,covered.u0,
+                    covered.u0+covered.width,mouth,building,forecourt,covered,List.of(),links,berths,List.of(),List.of());
+        }
+        return null;
+    }
+
+    /** A rounded trapezoid: a straight stop face at the station, and a far face following the incoming streets. */
+    private static Loop frontageLoop(Stadium s, double cu, double lane, double walk, double[] out,
+                                     List<Entry> entries, Land land) {
+        double direction = out[0] / Math.max(0.35, out[1]);
+        if (!entries.isEmpty()) {
+            Entry nearest = entries.get(0);
+            direction += Math.max(-0.45,Math.min(0.45,(nearest.u-cu)/(3*s.radius)));
+        }
+        for (double scale : new double[]{1,.85,.7,.55,.45,.35,.3}) {
+          for (double depthScale : new double[]{1,.85,.7,.55}) {
+            double w=(s.half+s.radius)*scale, h=s.radius*depthScale-1.5;
+            double cv=s.v-s.radius+h;
+            double r=Math.min(9,Math.min(w,h)*0.48);
+            if (h<=lane/2+4 || w<=lane/2+5) continue;
+            double skew=Math.max(-w*.24,Math.min(w*.24,direction*h*.75));
+            double[][] corners={{-w+r,-h+r},{w-r,-h+r},{.82*w-r+skew,h-r},{-.82*w+r+skew,h-r}};
+            double[] radii=new double[ROUND];
+            for (int k=0;k<ROUND;k++) {
+                double theta=FIRST+2*Math.PI*k/ROUND, dx=Math.cos(theta), dz=Math.sin(theta);
+                double lo=0, hi=2*(w+h);
+                for (int step=0;step<16;step++) {
+                    double t=(lo+hi)*.5;
+                    if (onRoundedQuad(corners,r,t*dx,t*dz)) lo=t; else hi=t;
+                }
+                radii[k]=lo;
+            }
+            Loop base=Loop.of(cu,cv,lane,radii,0);
+            double[] arc=base.arcs();
+            for(int step=0;step<=Math.ceil(land.width/2.0);step++){
+                double offset=((step+1)/2)*4*(step%2==0?-1:1);
+                double centre=cu+offset;
+                if (centre-w<land.u0 || centre+w>land.u0+land.width) continue;
+                Loop loop=new Loop(centre,cv,lane,radii,arc,0);
+                boolean fits=true;
+                for (double at=0;fits && at<loop.perimeter();at+=1) {
+                    double[] p=loop.point(at);
+                    for (double distance:new double[]{-lane/2,0,lane/2+walk-0.5})
+                        if (!land.contains(p[0]+p[2]*distance,p[1]+p[3]*distance)) { fits=false; break; }
+                }
+                if (fits) return loop;
+            }
+          }
+        }
+        return null;
+    }
+
+    private static boolean onRoundedQuad(double[][] corners,double radius,double x,double z) {
+        boolean inside=true;
+        double best=Double.POSITIVE_INFINITY;
+        double[] a=corners[corners.length-1];
+        for (double[] b:corners) {
+            double dx=b[0]-a[0],dz=b[1]-a[1],px=x-a[0],pz=z-a[1];
+            if (dx*pz-dz*px<0) inside=false;
+            double t=Math.max(0,Math.min(1,(px*dx+pz*dz)/(dx*dx+dz*dz)));
+            double ex=px-t*dx, ez=pz-t*dz;
+            best=Math.min(best,ex*ex+ez*ez);
+            a=b;
+        }
+        return inside || best<=radius*radius;
+    }
+
+    private static boolean straightKerb(Loop loop,double start,double length) {
+        if(length<=0)return false;
+        double[] a=loop.point(start), b=loop.point(start+length);
+        for(double d=0.5;d<length;d+=0.5){
+            double[] p=loop.point(start+d);
+            if(Math.hypot(p[0]-a[0]-(b[0]-a[0])*d/length,p[1]-a[1]-(b[1]-a[1])*d/length)>0.22)return false;
+        }
+        return true;
+    }
+
+    private static void reserveStraightBerths(List<Berth> berths,int index,Loop loop,List<Link> links,int count,
+                                              double length,Use use) {
+        double perimeter=loop.perimeter();
+        for (double s=-length/2;count>0 && s<perimeter-length/2;s+=0.5) {
+            if(!straightKerb(loop,s,length))continue;
+            boolean free=true;
+            for(double d=0;free && d<=length;d+=0.5){
+                double[] p=loop.point(s+d);
+                for(Link link:links) if(link.contains(p[0],p[1])) {free=false;break;}
+                for(Berth other:berths) if(other.loop==index && other.holds(s+d,perimeter,0.5)) {free=false;break;}
+            }
+            if(free){
+                berths.add(new Berth(use,index,s,s+length,true));
+                count--;s+=length;
+            }
+        }
+    }
+
     /** A stadium's radius at a direction {c, s} from its middle: straights {@code 2 half} long, ends of a radius. */
     private static double stadiumRadius(double half, double radius, double c, double s) {
         double ac = Math.abs(c);
@@ -1009,7 +1397,7 @@ public record StationPlaza(Template template, double x, double z, double heading
      * mouth; returns the loop with the arc length where the throat leaves it.
      */
     private static Loop throat(Loop loop, double mouthU, double end, double[] out, double width, double throatWalk,
-                               double median, double walk, List<Link> links, List<Crossing> crossings) {
+                               double median, double walk, List<Link> links, List<Crossing> crossings, boolean streetAligned) {
         double du = -out[0];
         double dv = -out[1];
         double length = Math.hypot(du, dv);
@@ -1017,6 +1405,24 @@ public record StationPlaza(Template template, double x, double z, double heading
         dv /= length;
         double island = -(0.5 * loop.lane + 0.5);
         double t = march(loop, mouthU, end, du, dv, island);
+        if (Double.isNaN(t) && streetAligned) {
+            // Keep the last stretch on the avenue's bearing even when the usable land is on one side.
+            double lead=0.5*width+6;
+            double ju=mouthU+du*lead, jv=end+dv*lead;
+            double pu=loop.u-ju,pv=loop.v-jv,n=Math.hypot(pu,pv);
+            if(n>1e-6) {
+                pu/=n; pv/=n;
+                double start=march(loop,ju,jv,pu,pv,island);
+                double at=march(loop,ju,jv,pu,pv,0);
+                if(Double.isFinite(start) && Double.isFinite(at)) {
+                    Link inside=new Link(ju+pu*start,jv+pv*start,ju-pu,jv-pv,width,throatWalk,median);
+                    Link outside=new Link(ju+du,jv+dv,mouthU,end,width,throatWalk,0);
+                    links.add(inside);links.add(outside);
+                    crossings.add(new Crossing(null,false,outside,outside.length()-Math.max(2,walk),outside.length()));
+                    return loop.withThroat(loop.arc(ju+pu*at,jv+pv*at));
+                }
+            }
+        }
         if (Double.isNaN(t)) {
             du = loop.u - mouthU;
             dv = loop.v - end;
@@ -1060,11 +1466,16 @@ public record StationPlaza(Template template, double x, double z, double heading
      * straight's middle, and room round it, from {@code taken} in front of the building out of the throat's
      * {@code clear}, for {@code buses} berths.
      */
-    private static Stadium stadium(double u, double near, double radius, double middle, double taken, int buses,
+    private static Stadium stadium(boolean frontageLayout, double u, double near, double radius, double middle, double taken, int buses,
                                    double berth, double clear) {
         double half = Math.max(middle, clear);
         while (capacity(half, radius, taken, berth, clear) < buses) {
             half += 1.0;
+        }
+        if (frontageLayout) {
+            double straight = (taken + buses * berth + 2 * clear + 12) / 4;
+            half = Math.max(half, straight - radius * 0.45);
+            if (buses == 1) half = Math.max(half,middle + berth + 4 - radius * 0.45);
         }
         return new Stadium(u, near + radius, half, radius);
     }

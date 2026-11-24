@@ -106,7 +106,21 @@ public final class TestKitClient implements ClientModInitializer {
                     try (NativeImage image = Screenshot.takeScreenshot(minecraft.getMainRenderTarget())) {
                         Files.createDirectories(file.getParent());
                         image.writeToFile(file);
-                        return Map.of("file", file.toString(), "width", image.getWidth(), "height", image.getHeight());
+                        Map<String,Object> view=new HashMap<>();
+                        view.put("file",file.toString());
+                        view.put("width",image.getWidth());
+                        view.put("height",image.getHeight());
+                        view.put("fov",minecraft.options.fov().get());
+                        view.put("resourcePacks",minecraft.getResourcePackRepository().getSelectedIds());
+                        view.put("irisInstalled",net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("iris"));
+                        if (minecraft.player!=null && minecraft.level!=null) {
+                            view.put("x",minecraft.player.getX()); view.put("feetY",minecraft.player.getY());
+                            view.put("eyeY",minecraft.player.getEyeY()); view.put("z",minecraft.player.getZ());
+                            view.put("yaw",minecraft.player.getYRot()); view.put("pitch",minecraft.player.getXRot());
+                            view.put("dayTime",minecraft.level.getDayTime());
+                            view.put("raining",minecraft.level.isRaining()); view.put("thundering",minecraft.level.isThundering());
+                        }
+                        return view;
                     } catch (IOException e) {
                         throw new IllegalStateException(e);
                     }

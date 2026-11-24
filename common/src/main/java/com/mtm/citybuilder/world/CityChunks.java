@@ -625,6 +625,27 @@ public final class CityChunks {
         };
     }
 
+    private static void castleGround(ChunkAccess chunk, BlockPos.MutableBlockPos pos, int x, int z,
+                                     com.mtm.citybuilder.core.chunk.CastleTerrain.Cell cell) {
+        int low = chunk.getMinBuildHeight(), high = chunk.getMaxBuildHeight() - 1;
+        int target = Math.max(low + 1, Math.min(high, cell.ground()));
+        int old = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x & 15, z & 15);
+        BlockState face = switch (cell.surface()) {
+            case LAWN -> Blocks.GRASS_BLOCK.defaultBlockState();
+            case MASONRY -> Blocks.STONE_BRICKS.defaultBlockState();
+            case BED -> Blocks.GRAVEL.defaultBlockState();
+        };
+        BlockState fill = cell.moat() ? Blocks.STONE_BRICKS.defaultBlockState() : Blocks.DIRT.defaultBlockState();
+        for (int y = Math.max(low, Math.min(old - 1, target - 2)); y < target; y++)
+            chunk.setBlockState(pos.set(x, y, z), fill, false);
+        chunk.setBlockState(pos.set(x, target, z), face, false);
+        int water = cell.water() == null ? target : Math.min(high, cell.water());
+        for (int y = target + 1; y <= water; y++)
+            chunk.setBlockState(pos.set(x, y, z), Blocks.WATER.defaultBlockState(), false);
+        for (int y = water + 1; y <= Math.min(high, old + 1); y++)
+            chunk.setBlockState(pos.set(x, y, z), Blocks.AIR.defaultBlockState(), false);
+    }
+
     /** Before decoration: paving on the ground, decks over water, headroom cleared; the airports graded and paved. */
     public static void pave(WorldGenLevel level, ChunkAccess chunk) {
         ChunkLayer.Column[] columns = columns(level, chunk);
@@ -645,12 +666,23 @@ public final class CityChunks {
                     airport(chunk, airports[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
                     continue;
                 }
+                var castle = grades == null ? null : grades.castleAt(x * 16 + z);
+                if (castle != null) castleGround(chunk, pos, baseX + x, baseZ + z, castle);
                 if (roads != null && roads[x * 16 + z] != null) {
                     road(chunk, roads[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
                     continue;
                 }
                 ChunkLayer.Column column = columns[x * 16 + z];
                 BlockState block = paving(column);
+                if (castle != null && castle.moat() && block != null && !column.bridge()) {
+                    // The crossing is a deck. Ordinary street fill would dam the moat underneath it.
+                    int deck = (int) Math.floor(castle.crossing());
+                    if (deck >= chunk.getMinBuildHeight() + 1 && deck < top) {
+                        chunk.setBlockState(pos.set(baseX + x, deck - 1, baseZ + z), Blocks.DARK_OAK_LOG.defaultBlockState(), false);
+                        chunk.setBlockState(pos.set(baseX + x, deck, baseZ + z), Blocks.SPRUCE_PLANKS.defaultBlockState(), false);
+                    }
+                    continue;
+                }
                 if (block != null && block.is(Blocks.DIRT_PATH)) {
                     block = walkPaving(level, baseX + x, baseZ + z, block);
                 }
@@ -659,6 +691,8 @@ public final class CityChunks {
                         dig(chunk, column, baseX + x, baseZ + z, x, z, pos, top);
                     } else if (grades != null && !Double.isNaN(grades.bank()[x * 16 + z])) {
                         bank(chunk, grades.bank()[x * 16 + z], grades.bankKind()[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
+                    } else if (grades != null && grades.stationLawn()!=null && Double.isFinite(grades.stationLawn()[x*16+z])) {
+                        bank(chunk, grades.stationLawn()[x*16+z], ChunkLayer.BANK_SLOPE, baseX+x,baseZ+z,x,z,pos,top);
                     } else if (grades != null && !Double.isNaN(grades.verge()[x * 16 + z])) {
                         verge(chunk, grades.verge()[x * 16 + z], grades.outside()[x * 16 + z], grades.wall()[x * 16 + z],
                                 grades.towardX()[x * 16 + z], grades.towardZ()[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
@@ -672,6 +706,9 @@ public final class CityChunks {
                     // A street's column with no level of its own (past a bridge piece's end, off its deck): the
                     // level of the street round it, so it does not sink to the ground among its neighbours
                     planned = around(grades.level(), x, z);
+                }
+                if (castle != null && column.surface() == ChunkLayer.Surface.PATH && !castle.moat()) {
+                    planned = castle.ground() + 0.5;
                 }
                 // A footpath on an embankment (the riverside promenade on its terrace) at the embankment's level
                 if (grades != null && column.surface() == ChunkLayer.Surface.PATH && !Double.isNaN(grades.bank()[x * 16 + z])) {
@@ -788,7 +825,7 @@ public final class CityChunks {
         // The railways through the town, after its streets: viaducts over them, level crossings giving way to them
         CityRails.lay(level, chunk, columns, pos, top);
         CityRails.structures(level, chunk, pos, top);
-        CityRails.entrances(level, chunk, pos, top);
+        CityRails.entrances(level, chunk, columns, grades, pos, top);
         // The fields round the towns and on their empty edge lots
         CityFarms.lay(level, chunk, columns, pos, top);
         CityLots.lay(level, chunk, columns, pos, top);
@@ -1104,9 +1141,12 @@ public final class CityChunks {
                 } catch (RuntimeException e) {
                     return;
                 }
-                clearOver(chunk, columns, rails, built);
+                var facilities=logic.buildings().facilities();
+                var spans=facilities==null?java.util.List.<com.mtm.citybuilder.core.building.FacilityModels.Placed>of()
+                        :facilities.streetSpans(cx+dx,cz+dz);
+                clearOver(chunk, columns, rails, built,spans);
                 try {
-                    clearOverRoads(chunk, logic.chunks().roads(cx + dx, cz + dz, columns));
+                    clearOverRoads(chunk, logic.chunks().roads(cx + dx, cz + dz, columns),spans);
                 } catch (RuntimeException e) {
                     return;
                 }
@@ -1115,7 +1155,8 @@ public final class CityChunks {
     }
 
     /** Whatever grew over an intercity road on the ground or a bridge, a bridge's parapets kept; not in a tunnel. */
-    private static void clearOverRoads(ChunkAccess chunk, RoadChunks.Cell[] cells) {
+    private static void clearOverRoads(ChunkAccess chunk, RoadChunks.Cell[] cells,
+                                       java.util.List<com.mtm.citybuilder.core.building.FacilityModels.Placed> spans) {
         if (cells == null) {
             return;
         }
@@ -1132,7 +1173,7 @@ public final class CityChunks {
             int z = baseZ + c % 16;
             for (int y = cell.level() + (cell.parapet() ? 2 : 1); y <= Math.min(max, cell.level() + CLEAR_REACH); y++) {
                 BlockState state = chunk.getBlockState(pos.set(x, y, z));
-                if (!state.isAir() && state.getFluidState().isEmpty()) {
+                if (!state.isAir() && state.getFluidState().isEmpty() && !spanBlock(spans,x,y,z,state)) {
                     chunk.setBlockState(pos, Blocks.AIR.defaultBlockState(), false);
                 }
             }
@@ -1140,7 +1181,8 @@ public final class CityChunks {
     }
 
     private static void clearOver(ChunkAccess chunk, ChunkLayer.Column[] columns,
-                                  com.mtm.citybuilder.core.chunk.RailChunks.Cell[] rails, boolean[] built) {
+                                  com.mtm.citybuilder.core.chunk.RailChunks.Cell[] rails, boolean[] built,
+                                  java.util.List<com.mtm.citybuilder.core.building.FacilityModels.Placed> spans) {
         int baseX = chunk.getPos().getMinBlockX();
         int baseZ = chunk.getPos().getMinBlockZ();
         int max = chunk.getMaxBuildHeight() - 1;
@@ -1173,11 +1215,22 @@ public final class CityChunks {
                 // A bridge's parapet stands on the paving: kept
                 for (int y = paved + (ChunkLayer.parapet(column) || ChunkLayer.railing(column) ? 2 : 1); y <= high; y++) {
                     BlockState state = chunk.getBlockState(pos.set(baseX + x, y, baseZ + z));
-                    if (!state.isAir() && state.getFluidState().isEmpty() && !furniture(state)) {
+                    if (!state.isAir() && state.getFluidState().isEmpty() && !furniture(state)
+                            && !spanBlock(spans,baseX+x,y,baseZ+z,state)) {
                         chunk.setBlockState(pos, Blocks.AIR.defaultBlockState(), false);
                     }
                 }
             }
         }
+    }
+
+    private static boolean spanBlock(java.util.List<com.mtm.citybuilder.core.building.FacilityModels.Placed> spans,
+                                     int x,int y,int z,BlockState actual) {
+        for (var span : spans) {
+            if (x<span.minX() || x>span.maxX() || z<span.minZ() || z>span.maxZ()) continue;
+            String expected=span.model().get(x-span.x(),y-span.y(),z-span.z());
+            if (expected!=null && actual.is(CityBuildings.parsed(expected).getBlock())) return true;
+        }
+        return false;
     }
 }

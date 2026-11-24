@@ -484,8 +484,26 @@ public final class TownFunctions {
         double z0 = az - reach * cell;
         java.util.BitSet seen = new java.util.BitSet(n * n);
         java.util.ArrayDeque<int[]> open = new java.util.ArrayDeque<>();
-        open.add(new int[]{reach, reach});
-        seen.set(reach * n + reach);
+        // A gate road may end at the castle anchor. Start on the nearest usable grounds beside it.
+        int[] start = null;
+        int best = Integer.MAX_VALUE;
+        for (int i = -2; i <= 2; i++) {
+            for (int j = -2; j <= 2; j++) {
+                double x = ax + (i + 0.5) * cell;
+                double z = az + (j + 0.5) * cell;
+                int distance = i * i + j * j;
+                if (distance < best && plan.districts().at(x, z) == District.GROUNDS
+                        && !plan.water().water(x, z) && !plots.onStreet(x, z)) {
+                    start = new int[]{reach + i, reach + j};
+                    best = distance;
+                }
+            }
+        }
+        if (start == null) {
+            return null;
+        }
+        open.add(start);
+        seen.set(start[0] * n + start[1]);
         int count = 0;
         int i0 = n, j0 = n, i1 = -1, j1 = -1;
         java.util.List<int[]> cells = new ArrayList<>();

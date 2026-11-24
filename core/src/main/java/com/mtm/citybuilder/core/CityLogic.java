@@ -349,6 +349,11 @@ public final class CityLogic {
         return settlements.settlement(tier, cellX, cellZ);
     }
 
+    /** L3 search bound for features owned by a settlement of this tier. */
+    public double maxExtentReach(SettlementTier tier) {
+        return extentLayer.maxReach(tier);
+    }
+
     /** L3: the built-up extent of a settlement. */
     public CityExtent extent(Settlement settlement) {
         synchronized (extents) {

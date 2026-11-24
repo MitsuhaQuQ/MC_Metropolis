@@ -30,7 +30,7 @@ public final class ElevatedStation {
     private final int floor;
     private final int stairRun;
     private final int stairX;
-    private final int escalatorRun;
+    private final int escalatorReach;
     private final Viaduct viaduct;
 
     /**
@@ -57,19 +57,20 @@ public final class ElevatedStation {
             throw new IllegalArgumentException("deck " + level + " too low over the ground at " + floor);
         }
         stairRun = steps + (landing(steps) > 0 ? 2 * ((steps - 1) / landing(steps)) : 0);
-        escalatorRun = steps + 2;
+        int escalatorRun = steps + 2;
+        escalatorReach = escalatorRun + Flights.landingGap(section, stairRun, escalatorRun);
         // Stairs, then in line beyond their top the escalator well coming up the other way to the same landing
-        this.concourseLength = Math.max(stairRun + escalatorRun + 8,
+        this.concourseLength = Math.max(stairRun + escalatorReach + 8,
                 concourseLength > 0 ? concourseLength : Math.max(16, Math.min(40, platformLength / 4)));
         int c0 = centre - this.concourseLength / 2;
         stairX = c0 + 3;
         this.canopyLength = Math.min(platformLength, canopyLength > 0 ? canopyLength : platformLength - 6);
         List<int[]> clear = new ArrayList<>(keepClear);
-        clear.add(new int[] {stairX - 1, stairX + stairRun + escalatorRun + 2});
+        clear.add(new int[] {stairX - 1, stairX + stairRun + escalatorReach + 2});
         viaduct = Viaduct.builder(Viaduct.Deck.RAIL, platformLength + 2 * approach, level)
                 .width(2 * section.half() + 1).spans(limits).keepClear(clear).columns(2)
                 .trackCentres(section.tracks()).palette(p).ground(ground).build();
-        if (stairX + stairRun + escalatorRun > approach + platformLength) {
+        if (stairX + stairRun + escalatorReach > approach + platformLength) {
             throw new IllegalArgumentException("platform too short for the stairs: " + platformLength);
         }
     }
@@ -137,7 +138,7 @@ public final class ElevatedStation {
             out.add(new Flights.Flight(stairX, 1, w[0], w[1], floor + 1, level + 1, landing(level - floor), false,
                     false, floor + 1, roof - 1, level + 1, null));
             int[] e = {w[0], w[0] + Flights.ESCALATOR_WIDTH - 1};
-            out.add(new Flights.Flight(arrive + escalatorRun, -1, e[0], e[1], floor + 1, level + 1, 0, false, true,
+            out.add(new Flights.Flight(arrive + escalatorReach, -1, e[0], e[1], floor + 1, level + 1, 0, false, true,
                     floor + 1, roof - 1, level + 1, null));
         }
         return out;
@@ -145,6 +146,14 @@ public final class ElevatedStation {
 
     /** z of a platform's stair well: the middle of an island (3 wide on wide ones), the back of a side platform. */
     static int[] well(CrossSection.Platform pl) {
+        if (pl.passengerSpace()) {
+            // A diagonal tread can widen by one column where it shifts sideways. Reserve
+            // that column as well as the guard and a two-block passage on each side.
+            int width = Math.min(5, pl.width() - 8);
+            int start = pl.island() ? Math.floorDiv(pl.z0() + pl.z1() - width + 1, 2)
+                    : pl.trackLow() ? pl.z1() - width - 3 : pl.z0() + 4;
+            return new int[]{start, start + width - 1};
+        }
         if (pl.island()) {
             int c = (pl.z0() + pl.z1()) / 2;
             return pl.width() >= 11 ? new int[] {c - 1, c + 1} : new int[] {c - 1, c};
@@ -177,9 +186,10 @@ public final class ElevatedStation {
                 for (int x = x0; x <= x1; x++) {  // a fence along the back
                     m.set(x, level + 1, back, RailPalette.bars(p.rail(), true));
                 }
-                colZ = pl.trackLow() ? pl.z1() - 1 : pl.z0() + 1;
+                colZ = pl.passengerSpace() ? back : pl.trackLow() ? pl.z1()-1 : pl.z0()+1;
             }
-            StationParts.canopy(m, p, cx0, cx1, pl.z0() - (pl.trackLow() ? 1 : 0), pl.z1() + (pl.trackHigh() ? 1 : 0),
+            StationParts.canopy(m, p, cx0, cx1, pl.z0() - (pl.trackLow() || pl.passengerSpace() ? 1 : 0),
+                    pl.z1() + (pl.trackHigh() || pl.passengerSpace() ? 1 : 0),
                     level, colZ);
         }
         concourse(m);
