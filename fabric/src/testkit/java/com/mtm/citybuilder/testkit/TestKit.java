@@ -82,6 +82,8 @@ public final class TestKit implements DedicatedServerModInitializer {
             route(http, "/embankment", this::embankment);
             route(http, "/airport", this::airport);
             route(http, "/facilities", this::facilities);
+            route(http, "/facility-steps", this::facilitySteps);
+            route(http, "/stations", this::stations);
             route(http, "/rail", this::rail);
             route(http, "/rail-boundaries", (q,body) -> {
                 var logic=com.mtm.citybuilder.world.CityWorlds.of(overworld());
@@ -848,6 +850,74 @@ public final class TestKit implements DedicatedServerModInitializer {
             out.add(m);
         }
         return Map.of("found", true, "placed", out);
+    }
+
+    /**
+     * How a public building's way in meets its street, as built: for each block of the walkway (of the facility with
+     * {@code id} in the town owning x, z) beside a street column, the top of what stands there against the street's
+     * top next to it ({walkX, walkZ, walkTop, streetX, streetZ, streetTop}); only in loaded chunks. {found, pairs,
+     * largest difference}.
+     */
+    private Object facilitySteps(Map<String, String> query, String body) {
+        double x = Double.parseDouble(query.get("x"));
+        double z = Double.parseDouble(query.get("z"));
+        String id = query.get("id");
+        ServerLevel level = overworld();
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(level);
+        if (logic == null || logic.urban(x, z).owner() == null || logic.buildings().facilities() == null) {
+            return Map.of("found", false);
+        }
+        var placed = logic.buildings().facilities().town(logic.urban(x, z).owner());
+        return onThread(() -> {
+            List<Object> pairs = new ArrayList<>();
+            double[] largest = {0.0};
+            for (var p : placed) {
+                if (!p.walkway() || !Long.toString(p.facility().id()).equals(id)) continue;
+                p.model().forEach((mx, my, mz, state) -> {
+                    int wx = mx + p.x(), wy = my + p.y(), wz = mz + p.z();
+                    if (street(logic, wx, wz)) return;
+                    for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                        int sx = wx + d[0], sz = wz + d[1];
+                        if (!street(logic, sx, sz)) continue;
+                        Double a = top(level, wx, wy, wz), b = top(level, sx, wy, sz);
+                        if (a == null || b == null) continue;
+                        largest[0] = Math.max(largest[0], Math.abs(a - b));
+                        pairs.add(new double[]{wx, wz, a, sx, sz, b});
+                    }
+                });
+            }
+            return Map.of("found", true, "pairs", pairs, "largest", largest[0]);
+        });
+    }
+
+    /** The above-ground stations of the town owning x, z, nearest first: {x, z, level, main, built, elevated, mezzanine, mezzanineExits}. */
+    private Object stations(Map<String, String> query, String body) {
+        double x = Double.parseDouble(query.get("x"));
+        double z = Double.parseDouble(query.get("z"));
+        com.mtm.citybuilder.core.CityLogic logic = com.mtm.citybuilder.world.CityWorlds.of(overworld());
+        if (logic == null || logic.urban(x, z).owner() == null) {
+            return Map.of("found", false);
+        }
+        var list = new ArrayList<>(logic.chunks().rails().stations(logic.urban(x, z).owner()));
+        list.sort(java.util.Comparator.comparingDouble(st -> Math.hypot(st.x() - x, st.z() - z)));
+        return Map.of("found", true, "stations", list);
+    }
+
+    private static boolean street(com.mtm.citybuilder.core.CityLogic logic, int x, int z) {
+        var columns = logic.chunks().columns(x >> 4, z >> 4);
+        return columns[(x & 15) * 16 + (z & 15)].surface() != com.mtm.citybuilder.core.chunk.ChunkLayer.Surface.NONE;
+    }
+
+    /** The top of the highest block one can stand on within four of y, null where the chunk is not loaded. */
+    private static Double top(ServerLevel level, int x, int y, int z) {
+        LevelChunk chunk = level.getChunkSource().getChunkNow(x >> 4, z >> 4);
+        if (chunk == null) return null;
+        for (int k = y + 4; k >= y - 4; k--) {
+            BlockPos pos = new BlockPos(x, k, z);
+            var shape = chunk.getBlockState(pos).getCollisionShape(level, pos);
+            if (!shape.isEmpty()) return k + shape.max(net.minecraft.core.Direction.Axis.Y);
+        }
+        return null;
     }
 
     /**

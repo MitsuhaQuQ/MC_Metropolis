@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 11)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 12)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,9 +33,13 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 11)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 12)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
+        settings.buildings.facilityAtStreetLevel = version[0] >= 12;
+        settings.transit.mezzanineExits = version[0] >= 12;
+        settings.transit.portalOverRails = version[0] >= 12;
+        settings.buildings.turretsOnGround = version[0] >= 12;
         settings.buildings.fillDowntown = version[0] >= 11;
         if (version[0] < 11) {
             settings.plots.parcelFrontage = 0.0;
@@ -682,6 +686,13 @@ public final class CitySettings {
     public static final class Transit {
         /** Size station land, platforms, stair wells and buried station boxes together. */
         public boolean passengerSpace = true;
+        /**
+         * A mezzanine concourse over a street reached by stairs out of its ends down along the line, not by a stair
+         * hung outside the viaduct from each platform (layouts before 12).
+         */
+        public boolean mezzanineExits = true;
+        /** A viaduct over another line keeps its piers off the other's bed: portal frames along it, spans across it. */
+        public boolean portalOverRails = true;
 
         public double mainWidth(com.mtm.citybuilder.core.settlement.SettlementTier tier) {
             return passengerSpace ? Math.max(mainWidth, 2 * com.mtm.citybuilder.core.building.rail.CrossSection.mainStation(tier, true).half() + 4) : mainWidth;

@@ -47,6 +47,31 @@ public enum CastleAsset {
     }
 
     public Model rotated(int quarterTurns) { return template().rotated(quarterTurns); }
+
+    private Model grounded;
+
+    /**
+     * The part standing on the ground, not on its surveyed stone base: its ground layer kept (its footprint as before),
+     * everything from its first plastered wall up set down straight on it, the base between left out (a turret or
+     * gallery stands on a castle's stone walls at their edge; in the middle of a bailey it rose on a block of stone).
+     */
+    public synchronized Model onGround(int quarterTurns) {
+        if (grounded == null) {
+            Model t = template();
+            int[] wall = {Integer.MAX_VALUE};
+            t.forEach((x, y, z, state) -> {
+                if (state.startsWith("minecraft:white_concrete") && y < wall[0]) wall[0] = y;
+            });
+            Model m = new Model();
+            int cut = wall[0] == Integer.MAX_VALUE ? 1 : wall[0];
+            t.forEach((x, y, z, state) -> {
+                if (y == t.minY()) m.set(x, y, z, state);
+                else if (y >= cut) m.set(x, y - cut + t.minY() + 1, z, state);
+            });
+            grounded = m;
+        }
+        return grounded.rotated(quarterTurns);
+    }
     public int width() { return template().width(); }
     public int depth() { return template().depth(); }
 

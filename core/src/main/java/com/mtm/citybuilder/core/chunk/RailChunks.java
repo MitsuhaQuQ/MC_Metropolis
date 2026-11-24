@@ -369,6 +369,22 @@ public final class RailChunks {
         }
     }
 
+    /** A town's above-ground stations as built: their middle, whether built whole, elevated, a mezzanine and with its own stairs. */
+    public record StationSummary(double x, double z, double level, boolean main, boolean built, boolean elevated,
+                                 boolean mezzanine, boolean mezzanineExits) {}
+
+    public List<StationSummary> stations(Settlement town) {
+        Index index = index(town);
+        List<StationSummary> out = new ArrayList<>();
+        if (index == null) return out;
+        for (var st : index.structures.stations) {
+            double[] mid = st.line.get(st.line.size() / 2);
+            out.add(new StationSummary(mid[0], mid[1], st.level, st.main, st.built, st.elevated, st.mezzanine,
+                    st.mezzanineExits));
+        }
+        return out;
+    }
+
     /** Expected beds, independently projected from the station out along either end with a continuing line. */
     public record StationEndCheck(boolean start, int track, List<double[]> columns) {}
     public record StationCheck(boolean main, double x, double z, int[] tracks, List<StationEndCheck> ends, int hallFloor) {}
@@ -1042,8 +1058,8 @@ public final class RailChunks {
                 }
             }
             // A stair down beside the line from each side platform's middle to the street: where the station is not
-            // built whole, or its concourse is a mezzanine over a street (the library's stairs reach only that)
-            if (!st.built || st.mezzanine) {
+            // built whole, or its concourse is a mezzanine over a street with no stairs of its own down to the ground
+            if (!st.built || st.mezzanine && !st.mezzanineExits) {
                 boolean lowDoor = st.square != null && structures.lowerEntries.containsKey(
                         key((int) Math.floor(st.square.x()), (int) Math.floor(st.square.z())));
                 stairs(entrances, mid[0], mid[1], mid[2], half + 2.5, -1, half, lowDoor ? st.side : 0, st.level);

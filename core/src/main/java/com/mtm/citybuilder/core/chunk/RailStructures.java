@@ -58,6 +58,8 @@ final class RailStructures {
         boolean built;
         /** Whether its concourse is a mezzanine over a street (the street's stairs up to the platforms its own). */
         boolean mezzanine;
+        /** Whether its mezzanine has its own stairs down from an end to the ground (no stairs needed beside the line). */
+        boolean mezzanineExits;
         boolean interchange;
         com.mtm.citybuilder.core.street.StationPlaza square;
         double half;
@@ -155,6 +157,8 @@ final class RailStructures {
      */
     static final class Streets {
         private final Map<Long, List<com.mtm.citybuilder.core.street.StreetSegment>> cells = new HashMap<>();
+        /** The town's railways at or over the ground, for a viaduct over another line ({@link RailBeds}); null for none. */
+        RailBeds beds;
 
         Streets(com.mtm.citybuilder.core.street.StreetPlan plan) {
             for (com.mtm.citybuilder.core.street.StreetSegment g : plan.segments()) {
@@ -270,6 +274,9 @@ final class RailStructures {
                        int intercity, List<Station> stations, List<Station> buried, Map<Integer,RailChunks.EntryGrade> entries) {
         Built out = new Built();
         Streets streets = new Streets(plan);
+        if (logic.settings().transit.portalOverRails) {
+            streets.beds = new RailBeds(pieces);
+        }
         for (int k = 0; k < buried.size(); k++) {
             Station st = buried.get(k);
             try {
@@ -396,6 +403,61 @@ final class RailStructures {
     }
 
     /**
+     * The town's railways at or over the ground (its pieces, {x1, z1, x2, z2, level1, level2, half, along1, ground1,
+     * ground2, under}) by 32-block cells, to tell where a viaduct passes over another line: its piers keep off the
+     * other's bed (a portal frame over a line along it, a span over one across it), not standing on its ballast.
+     */
+    static final class RailBeds {
+        private final Map<Long, List<double[]>> cells = new HashMap<>();
+
+        RailBeds(List<double[]> pieces) {
+            for (double[] g : pieces) {
+                // A subway well under the ground keeps nothing off it
+                boolean deep = g[4] < g[8] - 8 && g[5] < g[9] - 8;
+                if (deep) {
+                    continue;
+                }
+                double reach = g[6] + 2.0;
+                int x0 = (int) Math.floor((Math.min(g[0], g[2]) - reach) / 32);
+                int x1 = (int) Math.floor((Math.max(g[0], g[2]) + reach) / 32);
+                int z0 = (int) Math.floor((Math.min(g[1], g[3]) - reach) / 32);
+                int z1 = (int) Math.floor((Math.max(g[1], g[3]) + reach) / 32);
+                for (int i = x0; i <= x1; i++) {
+                    for (int j = z0; j <= z1; j++) {
+                        cells.computeIfAbsent(key(i, j), k -> new ArrayList<>()).add(g);
+                    }
+                }
+            }
+        }
+
+        /**
+         * The bed of a line well under {@code level} (six blocks or more) covering a point, a block's margin round it:
+         * {its direction's cosine against {@code heading}'s, absolute}; -1 where none does.
+         */
+        double under(double x, double z, double level, double heading) {
+            double best = -1;
+            for (double[] g : cells.getOrDefault(key((int) Math.floor(x / 32), (int) Math.floor(z / 32)), List.of())) {
+                double dx = g[2] - g[0];
+                double dz = g[3] - g[1];
+                double l2 = dx * dx + dz * dz;
+                if (l2 < 1e-9) {
+                    continue;
+                }
+                double t = Math.max(0, Math.min(1, ((x - g[0]) * dx + (z - g[1]) * dz) / l2));
+                if (Math.hypot(g[0] + dx * t - x, g[1] + dz * t - z) > g[6] + 1.0) {
+                    continue;
+                }
+                if (g[4] + (g[5] - g[4]) * t > level - 6) {
+                    continue;
+                }
+                double l = Math.sqrt(l2);
+                best = Math.max(best, Math.abs((dx * Math.cos(heading) + dz * Math.sin(heading)) / l));
+            }
+            return best;
+        }
+    }
+
+    /**
      * The stretches along a straight structure laid on a curve, [from, to) in its x, where streets cross under it: no
      * pier there (sampled across its width every two blocks; a street it runs along keeps its piers in the median).
      */
@@ -492,6 +554,88 @@ final class RailStructures {
             List<int[]> clear = streetsUnder(streets, curve, length, section.half());
             ElevatedStation es = new ElevatedStation(section, platform, level, APPROACH, Spans.Limits.RAIL, clear, 0, 0,
                     p, ground);
+            if (overStreet && logic.settings().transit.mezzanineExits) {
+                // The mezzanine reached from the ground by stairs out of its ends, down along the line (not by a stair
+                // hung outside the viaduct from each platform); an end whose stairs would come down on a road has none
+                boolean[] ends = {true, true};
+                for (int attempt = 0; attempt < 3; attempt++) {
+                    ElevatedStation trial;
+                    try {
+                        trial = new ElevatedStation(section, platform, level, APPROACH, Spans.Limits.RAIL,
+                                clear, 0, 0, p, ground, real, ends[0], ends[1]);
+                    } catch (IllegalArgumentException e) {
+                        break;
+                    }
+                    int[] runs = trial.exitRuns();
+                    int[] cx = trial.concourseX();
+                    boolean changed = false;
+                    for (int e = 0; e < 2; e++) {
+                        if (!ends[e] || runs[e] == 0) {
+                            changed |= ends[e];
+                            ends[e] = false;
+                            continue;
+                        }
+                        int dir = e == 0 ? -1 : 1;
+                        int end = e == 0 ? cx[0] : cx[1];
+                        boolean onRoad = false;
+                        for (int k = 1; k <= runs[e] + 1 && !onRoad; k++) {
+                            for (int z = -2; z <= 2 && !onRoad; z++) {
+                                double[] q = curve.place(end + dir * k + 0.5, z + 0.5);
+                                onRoad = streets.paved(q[0], q[1]);
+                            }
+                        }
+                        if (onRoad) {
+                            ends[e] = false;
+                            changed = true;
+                        }
+                    }
+                    if (!changed) {
+                        if (ends[0] || ends[1]) {
+                            es = trial;
+                            st.mezzanineExits = true;
+                        } else {
+                            // Both ends over the road (the line along a street's middle): out of the sides instead,
+                            // a footbridge over the street to beyond its paving and stairs down beside it
+                            int[] reach = new int[2], dir = new int[2];
+                            int centre = trial.concourseMiddle(), sideHalf = section.half();
+                            int drop = trial.concourseFloor() - groundMid + 4;
+                            for (int s = 0; s < 2; s++) {
+                                int sign = s == 0 ? -1 : 1;
+                                for (int r = 3; r <= 40 && reach[s] == 0; r++) {
+                                    boolean clearBand = true;
+                                    for (int k = r - 2; k <= r && clearBand; k++) {
+                                        for (int x = centre - 1; x <= centre + 1 && clearBand; x++) {
+                                            double[] q = curve.place(x + 0.5, sign * (sideHalf + k) + 0.5);
+                                            clearBand = !streets.paved(q[0], q[1]);
+                                        }
+                                    }
+                                    if (!clearBand) continue;
+                                    for (int d : new int[]{1, -1}) {
+                                        boolean free = true;
+                                        for (int k = 1; k <= drop && free; k++) {
+                                            for (int b = r - 3; b <= r + 1 && free; b++) {
+                                                double[] q = curve.place(centre + d * (1 + k) + 0.5, sign * (sideHalf + b) + 0.5);
+                                                free = !streets.paved(q[0], q[1]);
+                                            }
+                                        }
+                                        if (free) {
+                                            reach[s] = r;
+                                            dir[s] = d;
+                                            break;
+                                        }
+                                    }
+                                    if (reach[s] == 0) break;
+                                }
+                            }
+                            if (dir[0] != 0 || dir[1] != 0) {
+                                es = trial.sideExits(reach, dir);
+                                st.mezzanineExits = true;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
             st.hallFloor=es.concourseFloor();
             st.elevated=true;
             st.circulation=passengerSpace(curve,es.flights(),es.concourseFloor(),0,section,
@@ -1015,23 +1159,28 @@ final class RailStructures {
      * is within reach).
      */
     private static int[] portal(Streets streets, Curve curve, int x, int columns) {
+        return portal((bx, bz) -> paved(streets, curve, bx, bz), x, columns);
+    }
+
+    /** As {@link #portal(Streets, Curve, int, int)}, where a column may not stand as {@code blocked} says. */
+    private static int[] portal(java.util.function.BiPredicate<Integer, Integer> blocked, int x, int columns) {
         int[] usual = columns == 1 ? new int[]{-1, 0, 1} : new int[]{-4, -3, 2, 3};
-        boolean blocked = false;
+        boolean any = false;
         for (int z : usual) {
-            blocked |= paved(streets, curve, x, z);
+            any |= blocked.test(x, z);
         }
-        if (!blocked) {
+        if (!any) {
             return null;
         }
         int left = Integer.MIN_VALUE;
         for (int c = -1; c >= -PORTAL_REACH && left == Integer.MIN_VALUE; c--) {
-            if (!paved(streets, curve, x, c - 1) && !paved(streets, curve, x, c)) {
+            if (!blocked.test(x, c - 1) && !blocked.test(x, c)) {
                 left = c;
             }
         }
         int right = Integer.MIN_VALUE;
         for (int c = 1; c <= PORTAL_REACH && right == Integer.MIN_VALUE; c++) {
-            if (!paved(streets, curve, x, c - 1) && !paved(streets, curve, x, c)) {
+            if (!blocked.test(x, c - 1) && !blocked.test(x, c)) {
                 right = c;
             }
         }
@@ -1100,6 +1249,40 @@ final class RailStructures {
         double u = Hash.unit(Hash.of(h, 4));
         RailPalette p = palette(h);
         List<int[]> clear = streetsUnder(streets, curve, length, 5);
+        // Over another line well below (layout 12): a span over one crossing under it, a portal frame's columns either
+        // side of one running along under it, never a pier on its bed
+        RailBeds beds = streets.beds;
+        java.util.function.BiPredicate<Integer, Integer> alongBed = (bx, bz) -> {
+            if (beds == null) return false;
+            int at = Math.max(0, Math.min(length, bx));
+            for (double ox = -1.0; ox <= 1.0; ox += 0.5) {
+                for (double oz = -0.5; oz <= 0.5; oz += 0.5) {
+                    double[] q = curve.place(bx + ox + 0.5, bz + oz + 0.5);
+                    if (beds.under(q[0], q[1], rail[at], q[2]) >= 0.7) return true;
+                }
+            }
+            return false;
+        };
+        if (beds != null) {
+            int start = -1;
+            for (int x = 0; x <= length; x++) {
+                boolean across = false;
+                for (int z = -5; z <= 5 && !across; z += 2) {
+                    double[] q = curve.place(x + 0.5, z + 0.5);
+                    double c = beds.under(q[0], q[1], rail[x], q[2]);
+                    across = c >= 0 && c < 0.7;
+                }
+                if (across && start < 0) {
+                    start = Math.max(0, x - 1);
+                } else if (!across && start >= 0) {
+                    clear.add(new int[]{start, x + 1});
+                    start = -1;
+                }
+            }
+            if (start >= 0) {
+                clear.add(new int[]{start, length + 1});
+            }
+        }
         // Along a street (its middle over the paving a fifth of the way or more): one column a bent, in its median
         int onStreet = 0;
         for (int x = 0; x <= length; x += 2) {
@@ -1113,7 +1296,7 @@ final class RailStructures {
         for (int x = 0; x <= length && !roadUnder; x += 2) {
             for (int z = -5; z <= 5 && !roadUnder; z += 2) {
                 double[] q = curve.place(x + 0.5, z + 0.5);
-                roadUnder = streets.paved(q[0], q[1]) && !streets.across(q[0], q[1], q[2]);
+                roadUnder = streets.paved(q[0], q[1]) && !streets.across(q[0], q[1], q[2]) || alongBed.test(x, z);
             }
         }
         Model straight;
@@ -1123,7 +1306,8 @@ final class RailStructures {
             straight = Viaduct.builder(Viaduct.Deck.RAIL, length, datum).tracks(2).columns(columns)
                     .soundWall(Hash.unit(Hash.of(h, 8)) < 0.25).keepClear(clear).palette(p).ground(terrain)
                     .trafficBelow(logic.settings().streets.continuousCarriageways ? (x,z)->paved(streets,curve,x,z) : null)
-                    .bentColumns(x -> portal(streets, curve, x, columns)).build().build();
+                    .bentColumns(x -> portal((bx, bz) -> paved(streets, curve, bx, bz) || alongBed.test(bx, bz), x, columns))
+                    .build().build();
         } else if (old && u < 0.2) {
             straight = new BrickViaduct(length, datum, 8 + (int) (Hash.unit(Hash.of(h, 5)) * 4), clear, 2, true,
                     Hash.of(h, 6), p, terrain).build();

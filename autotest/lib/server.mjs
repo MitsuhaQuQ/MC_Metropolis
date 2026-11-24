@@ -59,6 +59,10 @@ export const server = {
   /** The airport nearest a point within 40 km, as this world sited it: {found, kind, x, z, heading, length, width, elevation, threshold, apron}. */
   airport: (x, z) => call('/airport', { x, z }),
   facilities: (x, z) => call('/facilities', { x, z }),
+  /** How a public building's way in meets its street, as built: {found, pairs, largest}. */
+  facilitySteps: (x, z, id) => call('/facility-steps', { x, z, id }),
+  /** The above-ground stations of the town owning a point, nearest first. */
+  stations: (x, z) => call('/stations', { x, z }),
   rail: (x, z, kind) => call('/rail', { x, z, kind }),
   railBoundaries: (x,z) => call('/rail-boundaries',{x,z}),
   plot: (x, z) => call('/plot', { x, z }),

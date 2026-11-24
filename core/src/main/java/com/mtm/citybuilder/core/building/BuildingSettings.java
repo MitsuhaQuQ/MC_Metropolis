@@ -25,6 +25,10 @@ public final class BuildingSettings {
      * on the back lot, not out by the street over the lot in front (where it found no room and the lot stood empty).
      */
     public boolean fillDowntown = true;
+    /** A castle's turrets and galleries in its baileys stand on the ground, not on their surveyed stone bases. */
+    public boolean turretsOnGround = true;
+    /** A public building facing its street stands with its forecourt level with the pavement, not a block over it. */
+    public boolean facilityAtStreetLevel = true;
     /** Validate the final raster footprint on narrow lots and refit rail-side wedges. */
     public boolean usableFootprints = true;
     /** Place civic and roadside facilities with their entrance frontage on a surveyed street edge. */

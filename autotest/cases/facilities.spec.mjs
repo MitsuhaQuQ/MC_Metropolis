@@ -81,4 +81,20 @@ test('public buildings stand on their sites', async ({}, testInfo) => {
     }
   }
   expect(seen.has('CITY_HALL')).toBe(true);
+  // The ways in from the street, as built: level with the pavement beside them (within half a block; layouts before
+  // 12 stood a block over it)
+  const ids = [...new Set(f.placed.filter((p) => !PARKS.includes(p.kind) && p.grade).map((p) => p.id))].slice(0, 8);
+  let checked = 0;
+  for (const id of ids) {
+    const p = f.placed.find((q) => q.id === id && q.grade);
+    await server.generate(p.minX - 24, p.minZ - 24, p.maxX + 24, p.maxZ + 24);
+    const steps = await server.facilitySteps(TOWN.x, TOWN.z, id);
+    if (!steps.found || steps.pairs.length === 0) continue;
+    checked++;
+    console.log('way in', p.kind, id, 'pairs', steps.pairs.length, 'largest step', steps.largest);
+    if ((process.env.AUTOTEST_LAYOUT ?? '12') === '12') {
+      expect(steps.largest, `${p.kind} ${id}: ${JSON.stringify(steps.pairs.slice(0, 4))}`).toBeLessThanOrEqual(0.5 + 1e-6);
+    }
+  }
+  expect(checked).toBeGreaterThan(0);
 });

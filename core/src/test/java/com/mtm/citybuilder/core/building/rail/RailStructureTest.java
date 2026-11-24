@@ -846,6 +846,56 @@ class RailStructureTest {
     }
 
     @Test
+    void aMezzanineIsReachedByItsOwnStairs() {
+        // A concourse raised over a street (its floor at 6 within 24 of the middle), the ground round it at 0
+        int platform = 120, approach = 6, centre = approach + platform / 2;
+        Ground raised = (x, z) -> Math.abs(x - centre) <= 24 ? 6 : 0;
+        CrossSection section = new CrossSection("TPT", 11);
+        int h = section.half();
+        // Out of its ends: a step down a block out along the line each, the last a step over the ground
+        ElevatedStation ends = new ElevatedStation(section, platform, 14, approach, Spans.Limits.RAIL, List.of(), 0, 0,
+                P, raised, Ground.FLAT, true, true);
+        assertEquals(6, ends.concourseFloor());
+        int[] runs = ends.exitRuns();
+        int[] cx = ends.concourseX();
+        Model m = ends.build();
+        for (int side = 0; side < 2; side++) {
+            assertTrue(runs[side] > 0, "end " + side);
+            int dir = side == 0 ? -1 : 1, end = side == 0 ? cx[0] : cx[1];
+            assertFalse(m.has(end, 7, 0) && !m.get(end, 7, 0).equals("minecraft:air"), "door at end " + side);
+            for (int k = 1; k <= runs[side]; k++) {
+                int x = end + dir * k, tread = 6 - k + 1;
+                assertTrue(m.get(x, tread, 0).contains("stairs"), "tread " + k + " at end " + side + ": " + m.get(x, tread, 0));
+                for (int y = tread + 1; y <= tread + 2; y++) {
+                    assertTrue(!m.has(x, y, 0) || m.get(x, y, 0).equals("minecraft:air"), "headroom " + k);
+                }
+            }
+            assertEquals(1, 6 - runs[side] + 1, "the last tread a step over the ground");
+        }
+        // Out of its sides where its ends stand over the road: a footbridge over the street, stairs down beside it
+        ElevatedStation sides = new ElevatedStation(section, platform, 14, approach, Spans.Limits.RAIL, List.of(), 0, 0,
+                P, raised, Ground.FLAT, false, false).sideExits(new int[]{8, 8}, new int[]{1, -1});
+        Model s = sides.build();
+        int mid = sides.concourseMiddle();
+        for (int side = 0; side < 2; side++) {
+            int sign = side == 0 ? -1 : 1, dir = side == 0 ? 1 : -1;
+            for (int y = 7; y <= 8; y++) {
+                assertTrue(!s.has(mid, y, sign * h) || s.get(mid, y, sign * h).equals("minecraft:air"), "side door " + side);
+            }
+            for (int r = 1; r <= 8; r++) {
+                assertEquals(P.walk(), s.get(mid, 6, sign * (h + r)), "bridge at " + r);
+            }
+            int last = -1;
+            for (int k = 1; ; k++) {
+                String b = s.get(mid + dir * (1 + k), 6 - k + 1, sign * (h + 7));
+                if (b == null || !b.contains("stairs")) break;
+                last = 6 - k + 1;
+            }
+            assertEquals(1, last, "side " + side + "'s stairs reach a step over the ground");
+        }
+    }
+
+    @Test
     void escalatorWellsAreLeftEmpty() {
         ElevatedStation st = new ElevatedStation(new CrossSection("TPT", 11), 160, 9, 6, Spans.Limits.RAIL,
                 List.of(), 0, 0, P, Ground.FLAT);

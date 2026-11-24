@@ -278,7 +278,11 @@ public final class FacilityModels {
         int cx=(int)Math.floor(result.curbX()+result.normalX()), cz=(int)Math.floor(result.curbZ()+result.normalZ());
         var grades=logic.chunks().grades(cx>>4,cz>>4);
         double roadLevel=grades.level()[(cx&15)*16+(cz&15)];
-        int y=Double.isFinite(roadLevel)?(int)Math.floor(roadLevel+0.5):ground(cx,cz,cx,cz);
+        // The street's top is half a block over its level (the chunk layer lays it so); the model's ground block (its
+        // paving) at y tops out at y + 1: at the level's floor it meets the pavement within half a block (layouts
+        // before 12 put it a block higher wherever the street's top fell on a whole block)
+        int y=!Double.isFinite(roadLevel)?ground(cx,cz,cx,cz)
+                :logic.settings().buildings.facilityAtStreetLevel?(int)Math.floor(roadLevel):(int)Math.floor(roadLevel+0.5);
         out.add(new Placed(f,m,0,y,0,m.minX(),m.minZ(),m.maxX(),m.maxZ(),true,false,false,result.footprint()));
         Model path=new Model();
         for (double back=-1; back<=result.gap()+1; back+=0.5) {
@@ -810,6 +814,8 @@ public final class FacilityModels {
     /** Try the inside corners for turrets, and the long edge following each for covered galleries. */
     private void perimeterBuildings(Facility park, Settlement town, com.mtm.citybuilder.core.chunk.CastleTerrain castle,
                                    Ground open, Ground galleryLand, List<double[]> walks, List<double[]> reserved, List<Placed> out) {
+        // Layout 12: the turrets and galleries in the baileys stand on the ground, not on their surveyed stone bases
+        boolean grounded = logic.settings().buildings.turretsOnGround;
         for (var moat : logic.streetPlan(town).moats()) {
             var ring = moat.ring();
             int firstPart = out.size();
@@ -828,14 +834,15 @@ public final class FacilityModels {
                     for (int k = 0; k < towers.length; k++) {
                         var tower = towers[(i + k) % towers.length];
                         if (placeWallBuilding(park, castle, tower, turn, a, dx, dz, side,
-                                Math.min(length / 3, 30), open, List.of(), reserved, out)) { turrets++; break; }
+                                Math.min(length / 3, 30), open, List.of(), reserved, out, grounded)) { turrets++; break; }
                     }
                 }
                 if (galleries == 0 && length >= 83) {
                     for (var gallery : new CastleAsset[]{CastleAsset.WEST_GALLERY, CastleAsset.WATARI}) {
                         for (double fraction : new double[]{0.5, 0.375, 0.625, 0.25, 0.75}) {
                             if (placeWallBuilding(park, castle, gallery, turn, a, dx, dz, side,
-                                    length * fraction, (x,z) -> galleryLand.test(x,z) && !in(reserved,x,z,2), walks, reserved, out)) {
+                                    length * fraction, (x,z) -> galleryLand.test(x,z) && !in(reserved,x,z,2), walks, reserved, out,
+                                    grounded)) {
                                 galleries++;
                                 break;
                             }
@@ -847,14 +854,15 @@ public final class FacilityModels {
             if (galleries == 0) {
                 for (int i=firstPart; i<out.size(); i++) {
                     Placed tower=out.get(i);
-                    if (tower.footprint() != null && attachGallery(park,tower,castle,galleryLand,walks,reserved,out)) break;
+                    if (tower.footprint() != null && attachGallery(park,tower,castle,galleryLand,walks,reserved,out,grounded)) break;
                 }
             }
         }
     }
 
     private static boolean attachGallery(Facility park, Placed tower, com.mtm.citybuilder.core.chunk.CastleTerrain castle,
-                                         Ground land, List<double[]> walks, List<double[]> reserved, List<Placed> out) {
+                                         Ground land, List<double[]> walks, List<double[]> reserved, List<Placed> out,
+                                         boolean grounded) {
         CastleAsset wing = CastleAsset.WATARI_WING;
         for (int turn=0; turn<4; turn++) {
             var footprint = wing.footprint(turn);
@@ -882,7 +890,7 @@ public final class FacilityModels {
                     touches |= tower.footprint().contains(wx+inwardX-tower.minX(),wz+inwardZ-tower.minZ());
                 }
                 if (!fits || !touches) continue;
-                Model model=wing.rotated(turn);
+                Model model=grounded ? wing.onGround(turn) : wing.rotated(turn);
                 boolean spansWalk = openGalleryPassage(model, footprint, x0, z0, walks);
                 out.add(new Placed(park,model,x0-model.minX(),tower.y(),z0-model.minZ(),
                         x0,z0,x0+w-1,z0+d-1,true,false,spansWalk,footprint));
@@ -895,7 +903,8 @@ public final class FacilityModels {
 
     private static boolean placeWallBuilding(Facility park, com.mtm.citybuilder.core.chunk.CastleTerrain castle,
                                              CastleAsset asset, int turn, double[] a, double dx, double dz,
-                                             double side, double along, Ground open, List<double[]> walks, List<double[]> reserved, List<Placed> out) {
+                                             double side, double along, Ground open, List<double[]> walks, List<double[]> reserved, List<Placed> out,
+                                             boolean grounded) {
         var footprint = asset.footprint(turn);
         int w = footprint.width(), d = footprint.depth();
         double normalReach = (Math.abs(dz) * w + Math.abs(dx) * d) / 2;
@@ -914,7 +923,7 @@ public final class FacilityModels {
                 }
             }
             if (!fits) continue;
-            Model m = asset.rotated(turn);
+            Model m = grounded ? asset.onGround(turn) : asset.rotated(turn);
             boolean spansWalk = openGalleryPassage(m, footprint, x0, z0, walks);
             out.add(new Placed(park, m, x0 - m.minX(), centre.ground(), z0 - m.minZ(), x0, z0,
                     x0 + w - 1, z0 + d - 1, true, false, spansWalk, footprint));
