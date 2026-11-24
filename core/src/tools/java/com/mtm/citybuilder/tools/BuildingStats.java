@@ -49,6 +49,11 @@ final class BuildingStats {
         Map<String, long[]> whyNone = new TreeMap<>();
         // Within 2 km: each district's lot land, built on and as yard
         Map<District, long[]> lotLand = new EnumMap<>(District.class);
+        // Within 2 km, the merged parcels, the ordinary central lots and the old town's lots along the street:
+        // {land, built, floors}, by lot id its storeys (0 without a building), and the lots without one
+        long[][] downtown = new long[3][3];
+        List<Map<Long, Integer>> downtownLots = List.of(new java.util.HashMap<>(), new java.util.HashMap<>(), new java.util.HashMap<>());
+        List<Map<Long, Object[]>> downtownEmpty = List.of(new java.util.HashMap<>(), new java.util.HashMap<>(), new java.util.HashMap<>());
         long[][] ringUse = new long[ringEdges.length - 1][uses.length];
         com.mtm.citybuilder.core.function.TownFunctions functions = logic.functions().town(plots.settlement());
         for (double x = centerX - half; x < centerX + half; x += step) {
@@ -92,6 +97,19 @@ final class BuildingStats {
                     ringUse[ring][use]++;
                     if (d < 2000 && plot != null && (use == 6 || use == 7)) {
                         lotLand.computeIfAbsent(plot.district(), k -> new long[2])[use == 7 ? 0 : 1]++;
+                    }
+                }
+                if (d < 2000 && plot != null && !plot.interior() && !plot.remnant() && (plot.use() == Plot.Use.PARCEL
+                        || plot.use() == null && (plot.district() == District.CENTRAL || plot.district() == District.OLD_TOWN))) {
+                    int k = plot.use() == Plot.Use.PARCEL ? 0 : plot.district() == District.CENTRAL ? 1 : 2;
+                    downtown[k][0]++;
+                    downtownLots.get(k).put(plot.id(), b == null ? 0 : b.storeys());
+                    if (b == null) {
+                        downtownEmpty.get(k).putIfAbsent(plot.id(), new Object[]{plots, plot});
+                    }
+                    if (b != null && BuildingLayer.inside(b, plot, x, z)) {
+                        downtown[k][1]++;
+                        downtown[k][2] += b.storeys();
                     }
                 }
                 if (b == null || !BuildingLayer.inside(b, plot, x, z)) {
@@ -139,6 +157,31 @@ final class BuildingStats {
             long[] v = e.getValue();
             System.out.printf("    %-14s built %4.0f%%  of %.2f km2%n", e.getKey(), 100.0 * v[0] / Math.max(1, v[0] + v[1]),
                     (v[0] + v[1]) * step * step / 1e6);
+        }
+
+        System.out.println("  within 2 km, downtown lots (net: built share of the lots' land, floor area ratio on it):");
+        String[] downtownNames = {"merged parcels", "central lots", "old town lots"};
+        for (int k = 0; k < 3; k++) {
+            long[] v = downtown[k];
+            Map<Long, Integer> lots = downtownLots.get(k);
+            if (lots.isEmpty()) {
+                continue;
+            }
+            long empty = lots.values().stream().filter(st -> st == 0).count();
+            List<Integer> storeys = lots.values().stream().filter(st -> st > 0).sorted().toList();
+            System.out.printf("    %-15s %5d lots, %.3f km2, %.0f m2 a lot; built %3.0f%%, FAR %.2f; %d without a building (%.0f%%);"
+                            + " storeys p25/p50/p75/max %s%n",
+                    downtownNames[k], lots.size(), v[0] * step * step / 1e6, (double) v[0] * step * step / lots.size(),
+                    100.0 * v[1] / Math.max(1, v[0]), (double) v[2] / Math.max(1, v[0]), empty, 100.0 * empty / lots.size(),
+                    storeys.isEmpty() ? "-" : storeys.get(storeys.size() / 4) + "/" + storeys.get(storeys.size() / 2) + "/"
+                            + storeys.get(storeys.size() * 3 / 4) + "/" + storeys.get(storeys.size() - 1));
+            Map<String, Integer> why = new TreeMap<>();
+            for (Object[] e : downtownEmpty.get(k).values()) {
+                Plot plot = (Plot) e[1];
+                String reason = layer.whyEmpty((com.mtm.citybuilder.core.plot.TownPlots) e[0], plot);
+                why.merge(reason + (plot.frontage() < 8 ? " (front<8)" : ""), 1, Integer::sum);
+            }
+            System.out.println("      without a building: " + why);
         }
 
         List<Seen> all = new ArrayList<>(seen.values());

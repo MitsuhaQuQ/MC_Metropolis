@@ -146,14 +146,32 @@ public final class FacilityModels {
      * it (the rest of its block is built up as usual).
      */
     public boolean excludes(Settlement town, double x, double z) {
+        return exclusion(town, x, z) != null;
+    }
+
+    /**
+     * What keeps a lot's building off a position, null where nothing does: "park" (a park's land), "walkway" (a public
+     * building's way to its street), "footprint" (its model), "margin" (the few blocks kept clear round it).
+     */
+    public String exclusion(Settlement town, double x, double z) {
+        String why = null;
         for (Placed m : town(town)) {
-            if ((m.grade || m.walkway) && m.covers(x, z, m.walkway ? 1 : 3)) {
-                return true;
+            if (m.walkway && m.covers(x, z, 1)) {
+                return "walkway";
             }
+            if (m.grade && m.covers(x, z, 3)) {
+                if (m.covers(x, z, 0)) {
+                    return "footprint";
+                }
+                why = "margin";
+            }
+        }
+        if (why != null) {
+            return why;
         }
         // A park's land: no building on it (a school's block keeps its lots round the school's own ground)
         Facility f = logic.functions().town(town).facilityAt(x, z);
-        return f != null && PARKS.contains(f.kind());
+        return f != null && PARKS.contains(f.kind()) ? "park" : null;
     }
 
     /** The schools, laid out to their blocks. */

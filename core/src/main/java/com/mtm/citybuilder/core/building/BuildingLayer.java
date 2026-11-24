@@ -428,7 +428,8 @@ public final class BuildingLayer {
         Plot fitted = facilities == null ? plot : clearOfRails(plots, plot);
         Building building = fitted == null ? null : make(plots, fitted);
         boolean unusable = logic.settings().buildings.usableFootprints && building != null && !hasRoom(plots, building);
-        boolean refit = logic.settings().buildings.usableFootprints && plot.row() == 0 && (fitted != plot || unusable);
+        boolean fill = fillsDowntown(plot);
+        boolean refit = logic.settings().buildings.usableFootprints && plot.row() == 0 && (fitted != plot || unusable || fill);
         if (unusable) building = null;
         building = checkSite(plots, plot, building);
         boolean relocated=false;
@@ -445,19 +446,61 @@ public final class BuildingLayer {
         return result;
     }
 
-    private Building checkSite(TownPlots plots, Plot plot, Building building) {
+    /**
+     * Why a lot stands without a building (for the statistics): the first of the steps of {@link #siteFit} that left
+     * it so, null where it has one.
+     */
+    public String whyEmpty(TownPlots plots, Plot plot) {
+        if (plot == null || plot.interior() || plot.remnant() || plot.use() == Plot.Use.STATION) {
+            return "not a lot";
+        }
+        if (building(plots, plot) != null) {
+            return null;
+        }
+        Plot fitted = facilities == null ? plot : clearOfRails(plots, plot);
+        if (fitted == null) {
+            return "railway";
+        }
+        Building made = make(plots, fitted);
+        if (made == null) {
+            return fitted != plot ? "railway, small" : vacant(plots, fitted, false) ? "vacant" : "small";
+        }
+        if (logic.settings().buildings.usableFootprints && !hasRoom(plots, made)) {
+            return "no room";
+        }
+        String why = checkReason(plots, fitted, made);
+        if ("facility".equals(why)) {
+            // Which kind of exclusion, over how much of the building
+            Map<String, Integer> kinds = new java.util.TreeMap<>();
+            double[][] points = outline(plots, fitted, made);
+            for (double[] c : points) {
+                String k = facilities.exclusion(plots.settlement(), c[0], c[1]);
+                if (k != null) {
+                    kinds.merge(k, 1, Integer::sum);
+                }
+            }
+            String most = kinds.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse("?");
+            int total = kinds.values().stream().mapToInt(Integer::intValue).sum();
+            return "facility " + most + (total * 2 > points.length ? " most" : " some");
+        }
+        return why == null ? "refit" : why;
+    }
 
-        if (building != null && overWater(building)) {
+    private Building checkSite(TownPlots plots, Plot plot, Building building) {
+        return building == null || checkReason(plots, plot, building) != null ? null : building;
+    }
+
+    private String checkReason(TownPlots plots, Plot plot, Building building) {
+        if (overWater(building)) {
             // On a stream the planning cannot see (the plans know the rivers, not every brook): no building in it
-            building = null;
+            return "water";
         }
         FacilityModels models = facilities;
-        if (building != null && models != null) {
+        if (models != null) {
             // Over a public building's footprint, or near it: none of the lot's own
             for (double[] c : outline(plots, plot, building)) {
                 if (models.excludes(plots.settlement(), c[0], c[1])) {
-                    building = null;
-                    break;
+                    return "facility";
                 }
             }
         }
@@ -470,23 +513,21 @@ public final class BuildingLayer {
             double deep = building.back() - building.front();
             int na = Math.max(1, (int) Math.ceil(length / 2.5));
             int nd = Math.max(1, (int) Math.ceil(deep / 2.5));
-            search:
             for (int i = 0; i <= na; i++) {
                 for (int j = 0; j <= nd; j++) {
                     double[] c = at(plots, plot, building.from() + length * i / na, building.front() + deep * j / nd);
                     if (rails.near(town, c[0], c[1], RAIL_GAP)) {
-                        building = null;
-                        break search;
+                        return "railway";
                     }
                 }
             }
         }
-        if (building != null && crossesFootpath(plots, building)) {
+        if (crossesFootpath(plots, building)) {
             // A footpath's open land runs across the lot, laid after the lots were cut: no building is split by it,
             // the lot left a yard
-            building = null;
+            return "footpath";
         }
-        return building;
+        return null;
     }
 
     /** Check an actual room-sized square in the voxel footprint, after masking by the lot. */
@@ -521,8 +562,17 @@ public final class BuildingLayer {
         return false;
     }
 
+    /** Whether a lot is downtown's or the old town's, to be built on wherever part of it can be ({@link BuildingSettings#fillDowntown}). */
+    private boolean fillsDowntown(Plot plot) {
+        return config.fillDowntown && facilities != null && plot.row() == 0 && (plot.use() == Plot.Use.PARCEL
+                || plot.use() == null && (plot.district() == District.CENTRAL || plot.district() == District.STATION_FRONT
+                || plot.district() == District.OLD_TOWN));
+    }
+
     /** Rectangles reachable directly from the frontage, tried largest first on a wedge or rail-clipped lot. */
     private List<Plot> frontageCandidates(TownPlots plots, Plot plot) {
+        // Downtown a park's land and a public building's ground and way end a column too
+        boolean fill = fillsDowntown(plot);
         int n = (int)Math.ceil(plot.frontage()/2);
         if (n < 3) return List.of();
         double step = plot.frontage()/n;
@@ -533,6 +583,7 @@ public final class BuildingLayer {
                 double[] p = at(plots, plot, plot.start()+(i+0.5)*step,d);
                 Plot own = plots.at(p[0],p[1]);
                 if (own == null || own.id()!=plot.id() || rails.near(plots.settlement(),p[0],p[1],RAIL_GAP+1)) break;
+                if (fill && facilities.excludes(plots.settlement(), p[0], p[1])) break;
                 clear[i]=Math.min(d+1,plot.maxDepth());
             }
         }
@@ -754,6 +805,48 @@ public final class BuildingLayer {
         return shares.length - 1;
     }
 
+    /**
+     * Whether a lot is left empty: a few anywhere but downtown, and towards the town's edge the lots thin out (fields,
+     * yards, plots left empty), more the thinner the town: from {@code config.fringe} of urban intensity down to the
+     * built land's edge, up to {@code config.fringeVacant}.
+     */
+    /**
+     * How far back from the street's edge a back lot begins: the nearest of where it is first met behind three
+     * points across its frontage.
+     */
+    private static double nearEdge(TownPlots plots, Plot plot) {
+        double near = plot.maxDepth();
+        for (int k = 0; k < 3; k++) {
+            double a = plot.start() + 1.0 + (plot.frontage() - 2.0) * k / 2.0;
+            for (double d = 0.5; d < near; d += 1.0) {
+                double[] c = at(plots, plot, a, d);
+                Plot there = plots.at(c[0], c[1]);
+                if (there != null && there.id() == plot.id() && !there.pole()) {
+                    near = Math.floor(d);
+                    break;
+                }
+            }
+        }
+        return near >= plot.maxDepth() ? 0.0 : near;
+    }
+
+    private boolean vacant(TownPlots plots, Plot plot, boolean project) {
+        District district = plot.district();
+        boolean downtown = district == District.CENTRAL || district == District.STATION_FRONT;
+        if (downtown || project || config.fillDowntown && district == District.OLD_TOWN) {
+            // Downtown and in the old town every lot is built
+            return false;
+        }
+        double vacant = config.vacant;
+        double[] mid = plots.lotCentre(plot.chain(), plot.side(), Math.max(0, Math.min(plot.index(),
+                plots.lotCount(plot.chain(), plot.side()) - 1)));
+        double intensity = logic.urban(mid[0], mid[1]).intensity();
+        double built = logic.settings().streets.builtIntensity;
+        double fade = (config.fringe - intensity) / Math.max(1e-6, config.fringe - built);
+        vacant += Math.max(0.0, Math.min(1.0, fade)) * config.fringeVacant;
+        return Hash.unit(Hash.of(logic.seed() ^ 0xB111D1A6L, plot.id())) < vacant;
+    }
+
     private Building make(TownPlots plots, Plot plot) {
         long h = Hash.of(logic.seed() ^ 0xB111D1A6L, plot.id());
         District district = plot.district();
@@ -768,18 +861,7 @@ public final class BuildingLayer {
             group = Hash.of(chainSide, Math.floorDiv(plot.index() + offset, config.projectRun));
             project = Hash.unit(group) < config.projects;
         }
-        // Towards the town's edge the lots thin out (fields, yards, plots left empty), more the thinner the town:
-        // from {@code config.fringe} of urban intensity down to the built land's edge, up to {@code config.fringeVacant}
-        double vacant = config.vacant;
-        if (!downtown) {
-            double[] mid = plots.lotCentre(plot.chain(), plot.side(), Math.max(0, Math.min(plot.index(),
-                    plots.lotCount(plot.chain(), plot.side()) - 1)));
-            double intensity = logic.urban(mid[0], mid[1]).intensity();
-            double built = logic.settings().streets.builtIntensity;
-            double fade = (config.fringe - intensity) / Math.max(1e-6, config.fringe - built);
-            vacant += Math.max(0.0, Math.min(1.0, fade)) * config.fringeVacant;
-        }
-        if (!downtown && !project && Hash.unit(h) < vacant) {
+        if (vacant(plots, plot, project)) {
             return null;
         }
         double[] shares = switch (district) {
@@ -790,6 +872,11 @@ public final class BuildingLayer {
             default -> config.storeysResidential;
         };
         int storeys = 1 + draw(shares, Hash.unit(Hash.of(h, 1)));
+        if (config.fillDowntown && plot.use() == Plot.Use.PARCEL) {
+            // A merged parcel is for a mid-rise block of offices or flats (Tokyo's Chuo: a median nine storeys), as
+            // high as its street then allows
+            storeys = Math.max(storeys, 4);
+        }
         boolean industrial = district == District.INDUSTRIAL || district == District.PORT;
         Building.Type type;
         if (industrial) {
@@ -958,6 +1045,10 @@ public final class BuildingLayer {
                 depth = plot.maxDepth();
             }
         }
+        // A back lot's building stands on the back lot, behind the lots in front of it, not out by the street; its
+        // height still as its street allows (the slant line from the lots in front)
+        double behind = config.fillDowntown && plot.row() > 0 ? nearEdge(plots, plot) : 0.0;
+        front += behind;
         if (program != null && program.plant()) {
             // The plant's building, set back from the gate, its equipment round it
             // A share of the lot, the rest for the equipment
@@ -1174,7 +1265,7 @@ public final class BuildingLayer {
         // The road slant line: the walls no higher than its factor times the far edge of the street, both sides set
         // back alike; two storeys are always allowed. Flats and offices drawn taller keep up to two storeys more, set
         // back behind a terrace
-        double allowed = config.slant * (plot.streetWidth() + 2.0 * front);
+        double allowed = config.slant * (plot.streetWidth() + 2.0 * (front - behind));
         int cap = Math.max(2, 1 + (int) Math.floor((allowed - ground) / upper) + (corner ? 1 : 0));
         int step = storeys;
         double stepBack = 0.0;

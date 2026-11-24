@@ -424,7 +424,10 @@ public final class TownPlots {
                         int group = config.parcelGroup[0] + (int) Math.floor(Hash.unit(Hash.mix(hash))
                                 * (config.parcelGroup[1] - config.parcelGroup[0] + 1));
                         int last = k;
-                        while (last + 1 < kind.size() && last + 1 < k + group && kind.get(last + 1) == District.CENTRAL) {
+                        // No longer along the street than one building can front: a parcel of four lots a hundred metres
+                        // long, one block on it, stood mostly empty
+                        while (last + 1 < kind.size() && last + 1 < k + group && kind.get(last + 1) == District.CENTRAL
+                                && (config.parcelFrontage <= 0 || at.get(last + 2) - at.get(k) <= config.parcelFrontage)) {
                             last++;
                         }
                         // The cuts between them taken out: one lot, as deep as the deepest

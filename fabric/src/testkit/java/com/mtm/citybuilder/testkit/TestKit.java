@@ -904,6 +904,8 @@ public final class TestKit implements DedicatedServerModInitializer {
             return out;
         }
         out.put("plot", p.interior() ? "interior" : p.remnant() ? "remnant" : p.row() > 0 ? "back" : "front");
+        out.put("lotId", Long.toString(p.id()));
+        out.put("row", p.row());
         out.put("use", p.use() == null ? null : p.use().name());
         out.put("district", p.district().name());
         out.put("street", p.street().name());
@@ -930,6 +932,7 @@ public final class TestKit implements DedicatedServerModInitializer {
             out.put("front", Math.round(b.front() * 10) / 10.0);
         }
         out.put("covered", logic.buildings().at(x, z) != null);
+        out.put("empty", logic.buildings().whyEmpty(plots, p));
         return out;
     }
 

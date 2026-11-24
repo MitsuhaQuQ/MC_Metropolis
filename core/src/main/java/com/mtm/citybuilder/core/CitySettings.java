@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 10)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 11)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,8 +33,12 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 10)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 11)) {
             throw new IllegalStateException("Unsupported saved building layout version");
+        }
+        settings.buildings.fillDowntown = version[0] >= 11;
+        if (version[0] < 11) {
+            settings.plots.parcelFrontage = 0.0;
         }
         settings.buildings.terracedBaileys = version[0] >= 10;
         settings.buildings.batteredKeep = version[0] >= 10;
@@ -1292,6 +1296,8 @@ public final class CitySettings {
         public double backFlats = 0.18;
         public double parcelChance = 0.4;
         public int[] parcelGroup = {2, 4};
+        /** The most a parcel runs along its street, metres; 0 for no limit (layouts before 11). */
+        public double parcelFrontage = 40.0;
     }
 
     /**

@@ -16,6 +16,15 @@ public final class BuildingSettings {
     public boolean terracedBaileys = true;
     /** The full-size keep's base spreads at its foot (扇の勾配) and a flight of steps climbs to its door. */
     public boolean batteredKeep = true;
+    /**
+     * No lot downtown (central, station front, a metropolis's merged parcels) stands empty while part of it could be
+     * built on: a building that would cross a park's edge, a public building's ground or its way, or a railway, or
+     * that does not fit the lot's shape, is fitted to the largest stretch of the frontage clear of them instead; the
+     * old town's lots likewise, none of them left vacant. Merged parcels run no longer than
+     * {@code plots.parcelFrontage} and rise four storeys or more, as their street allows; a back lot's building stands
+     * on the back lot, not out by the street over the lot in front (where it found no room and the lot stood empty).
+     */
+    public boolean fillDowntown = true;
     /** Validate the final raster footprint on narrow lots and refit rail-side wedges. */
     public boolean usableFootprints = true;
     /** Place civic and roadside facilities with their entrance frontage on a surveyed street edge. */

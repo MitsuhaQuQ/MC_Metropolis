@@ -23,6 +23,8 @@ class CitySettingsTest {
             assertEquals(!existingPlans, first.plots.followStreetEdges);
             assertEquals(!existingPlans, first.buildings.terracedBaileys);
             assertEquals(!existingPlans, first.buildings.batteredKeep);
+            assertEquals(!existingPlans, first.buildings.fillDowntown);
+            assertEquals(existingPlans ? 0.0 : 40.0, first.plots.parcelFrontage);
             assertEquals(existingPlans ? 0 : 1, first.buildings.retailGroundExtra);
             assertEquals(first.toJson(), CitySettings.forBuildingLayout(store, !existingPlans).toJson());
         }
@@ -32,6 +34,11 @@ class CitySettingsTest {
         var flatBaileys = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
         flatBaileys.save("layout/building_scale", new byte[]{9});
         assertFalse(CitySettings.forBuildingLayout(flatBaileys,true).buildings.terracedBaileys);
+        var sparseDowntown = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+        sparseDowntown.save("layout/building_scale", new byte[]{10});
+        assertFalse(CitySettings.forBuildingLayout(sparseDowntown,true).buildings.fillDowntown);
+        assertEquals(0.0, CitySettings.forBuildingLayout(sparseDowntown,true).plots.parcelFrontage);
+        assertTrue(CitySettings.forBuildingLayout(sparseDowntown,true).buildings.batteredKeep);
         var firstKeep = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
         firstKeep.save("layout/building_scale", new byte[]{6});
         CitySettings olderKeep = CitySettings.forBuildingLayout(firstKeep, true);
