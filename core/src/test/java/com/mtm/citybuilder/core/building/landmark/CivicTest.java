@@ -62,6 +62,19 @@ class CivicTest {
             assertTrue(!court.has(x, top + 1, z) && !court.has(x, top + 2, z), "headroom at " + x);
         }
         assertEquals("citybuilder:stone_ashlar", court.get(mid, ky + ParkParts.KEEP_DOOR_FLOOR, z));
+        // The flight is covered: a plastered outer wall beside each step and a roof over it
+        for (int x = mid + 2; x <= mid + 1 + ParkParts.KEEP_DOOR_FLOOR; x++) {
+            int top = ky;
+            while (court.has(x, top + 1, z)) top++;
+            assertEquals("citybuilder:plaster_white", court.get(x, top + 1, face + 4), "gallery wall at " + x);
+            assertTrue(court.get(x, top + 4, z).startsWith("minecraft:deepslate_tile"), "gallery roof at " + x);
+        }
+        // and entered by a turret at its foot, open to the flight, roofed in tiles
+        int turretX = mid + 2 + ParkParts.KEEP_DOOR_FLOOR;
+        assertEquals("minecraft:air", court.get(turretX, ky + 1, z), "turret open to the flight");
+        boolean roofed = false;
+        for (int y = ky + 9; y <= ky + 16; y++) roofed |= court.has(turretX + ParkParts.ENTRANCE_RADIUS, y, z + 2);
+        assertTrue(roofed, "entrance turret roof");
         for (int y = 1; y <= 2; y++) {
             assertEquals("minecraft:air", court.get(mid, ky + ParkParts.KEEP_DOOR_FLOOR + y, face), "door");
         }

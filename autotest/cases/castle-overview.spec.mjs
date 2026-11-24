@@ -73,10 +73,12 @@ test('castle site overview', async ({}, info) => {
   // The keep's battered base and its flight, from the court before it
   {
     const [lx,ly,lz]=landing;
-    const dx=Math.sign(lx-cx)||0, dz=Math.sign(lz-cz)||0;
-    const x=lx+dx*26+dz*14, z=lz+dz*26-dx*14;
+    // Out from the keep's front (the axis the landing lies off the keep's middle along), a little to one side
+    const alongZ=Math.abs(lz-cz)>Math.abs(lx-cx);
+    const dx=alongZ?0:Math.sign(lx-cx), dz=alongZ?Math.sign(lz-cz):0;
+    const x=lx+dx*16+dz*10, z=lz+dz*16+dx*10;
     const yaw=Math.atan2(-(lx-x),(lz-z))*180/Math.PI;
-    await photograph(out,info,'keep-front',x,ly-6,z,yaw,-8);
+    await photograph(out,info,'keep-front',x,ly+10,z,yaw,32);
   }
   // A terrace's stone wall and its plastered wall, from the lower terrace in front of it
   let wall=null;

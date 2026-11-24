@@ -477,12 +477,18 @@ public final class ParkParts {
     /** The keep's first storey's floor over the upper court, where its door opens. */
     static final int KEEP_DOOR_FLOOR = 12;
 
+    /** The entrance turret's half width (付櫓, at the foot of the keep's flight). */
+    static final int ENTRANCE_RADIUS = 3;
+
     /**
      * The keep's stone base battered and climbed: round its upright masonry a foot of stone that flares out
      * {@link #KEEP_BATTER} blocks, high by the face and falling away on a concave curve; and up its front, along the
      * face, a flight of stone steps three wide from the upper court to a landing at the first storey's floor, with a
-     * door cut through the wall there. In the court's frame: the keep's corner at (kx, ky, kz), its front to +z, the
-     * upper court between x0 and x1 and up to z1.
+     * door cut through the wall there. The flight is not bare: it runs inside a covered gallery (渡櫓: a stone base,
+     * white plaster walls with slit windows, a tiled roof stepping up with it), entered by a small two-storey turret
+     * (付櫓) at its foot whose door faces the court, as the keep of Himeji is entered through its small gates and
+     * turrets. In the court's frame: the keep's corner at (kx, ky, kz), its front to +z, the upper court between x0
+     * and x1 and up to z1.
      */
     static void keepBase(Model m, int kx, int ky, int kz, int x0, int x1, int z1) {
         Model keep = CastleAsset.KEEP.template();
@@ -502,12 +508,18 @@ public final class ParkParts {
         }
         int stairZ0 = face + 1, stairZ1 = face + 3;
         int stairX0 = mid - 1, stairX1 = mid + 1 + KEEP_DOOR_FLOOR;
+        // The gallery round the flight (its outer wall a block out, its west end wall a block past the landing)
+        // and the entrance turret east of its foot
+        int galleryX0 = stairX0 - 1, galleryZ1 = stairZ1 + 1;
+        int turretX0 = stairX1 + 1, turretX1 = turretX0 + 2 * ENTRANCE_RADIUS;
+        int turretZ0 = stairZ0, turretZ1 = turretZ0 + 2 * ENTRANCE_RADIUS;
         String stone = "minecraft:stone_bricks";
         for (int x = x0 + 1; x < x1; x++) {
             for (int z = 1; z < z1; z++) {
                 int lx = x - kx, lz = z - kz;
                 if (lx >= 0 && lx < kw && lz >= 0 && lz < kd && foot[lx][lz]) continue;
-                if (x >= stairX0 && x <= stairX1 && z >= stairZ0 && z <= stairZ1) continue;
+                if (x >= galleryX0 && x <= stairX1 && z >= stairZ0 && z <= galleryZ1 + 1) continue;
+                if (x >= turretX0 - 1 && x <= turretX1 + 1 && z >= turretZ0 && z <= turretZ1 + 1) continue;
                 double d = Double.MAX_VALUE;
                 for (int dx = -KEEP_BATTER; dx <= KEEP_BATTER; dx++) {
                     for (int dz = -KEEP_BATTER; dz <= KEEP_BATTER; dz++) {
@@ -529,6 +541,33 @@ public final class ParkParts {
                         : "minecraft:stone_stairs[facing=west,half=bottom,shape=straight,waterlogged=false]");
                 for (int y = top + 1; y <= top + 3; y++) m.remove(x, ky + y, z);
             }
+        }
+        // The gallery: its outer wall and west end on a stone base to the step's level, plastered three high with a
+        // slit window every third block, a tiled roof over it a block above the headroom, stepping with the flight
+        String plaster = "citybuilder:plaster_white", tile = "minecraft:deepslate_tiles";
+        for (int x = galleryX0; x <= stairX1; x++) {
+            int top = x <= mid + 1 ? KEEP_DOOR_FLOOR : KEEP_DOOR_FLOOR - (x - mid - 1);
+            for (int z = stairZ0; z <= galleryZ1; z++) {
+                boolean outer = z == galleryZ1 || x == galleryX0;
+                if (outer) {
+                    for (int y = 0; y <= top; y++) m.set(x, ky + y, z, stone);
+                    for (int y = top + 1; y <= top + 3; y++) {
+                        m.set(x, ky + y, z, y == top + 2 && z == galleryZ1 && Math.floorMod(x, 3) == 0
+                                ? "minecraft:dark_oak_fence" : plaster);
+                    }
+                }
+                m.set(x, ky + top + 4, z, tile);
+            }
+            m.set(x, ky + top + 4, galleryZ1 + 1, "minecraft:deepslate_tile_slab[type=bottom,waterlogged=false]");
+        }
+        // The entrance turret: two storeys on the upper court, its door facing the court (+z), open on its west
+        // side to the flight's foot
+        Model turret = new Model();
+        com.mtm.citybuilder.core.building.temple.CastleTurret.build(ENTRANCE_RADIUS, 2).forEach((x, y, z, state) ->
+                turret.set(x, y, z, state.equals("minecraft:white_terracotta") ? plaster : state));
+        m.place(turret, turretX0, ky - 1, turretZ0, true);
+        for (int z = stairZ0; z <= stairZ1; z++) {
+            for (int y = 0; y <= 2; y++) m.set(turretX0, ky + y, z, "minecraft:air");
         }
         // The door: through the wall at the first storey, its sill the floor
         for (int x = mid - 1; x <= mid + 1; x++) {
