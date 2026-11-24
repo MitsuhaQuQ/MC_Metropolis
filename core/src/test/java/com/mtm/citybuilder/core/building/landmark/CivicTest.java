@@ -48,36 +48,34 @@ class CivicTest {
             assertTrue(h > 0 && h < previous, "batter at " + d + ": " + h);
             previous = h;
         }
-        // The flight rises a block a step from the court to the landing before the door, which opens on the floor
-        int face = depth - 1;
-        while (!"minecraft:air".equals(court.get(mid, ky + ParkParts.KEEP_DOOR_FLOOR + 1, face))) face--;
-        int z = face + 2;
+        // The door is in the side wing, set back from the main body's face, not in the main body
+        int[] entrance = ParkParts.keepEntrance();
+        int keepFace = 0;
+        for (int z = 0; z < HimejiKeep.depth(); z++) if (court.has(mid, ky, 4 + z)) keepFace = z;
+        assertTrue(entrance[2] < keepFace - 2, "door in the main body's face");
+        int face = 4 + entrance[2], z = face + 2;
+        int doorX = kx + entrance[1] - 1, footX = kx + entrance[3];
+        for (int y = 1; y <= 2; y++) {
+            assertEquals("minecraft:air", court.get(doorX, ky + ParkParts.KEEP_DOOR_FLOOR + y, face), "door");
+        }
+        // The flight rises a block a step from its foot to the landing, under a roof, beside a plastered wall
         int last = -1;
-        for (int x = mid + 1 + ParkParts.KEEP_DOOR_FLOOR; x >= mid + 2; x--) {
+        for (int x = footX; x < kx + entrance[0]; x++) {
             int top = ky;
-            while (court.has(x, top + 1, z)) top++;
+            while (court.has(x, top + 1, z) && !court.get(x, top + 1, z).equals("minecraft:air")) top++;
             assertTrue(court.get(x, top, z).startsWith("minecraft:stone_stairs"), "step at " + x + ": " + court.get(x, top, z));
             if (last >= 0) assertEquals(last + 1, top, "rise at " + x);
             last = top;
-            assertTrue(!court.has(x, top + 1, z) && !court.has(x, top + 2, z), "headroom at " + x);
-        }
-        assertEquals("citybuilder:stone_ashlar", court.get(mid, ky + ParkParts.KEEP_DOOR_FLOOR, z));
-        // The flight is covered: a plastered outer wall beside each step and a roof over it
-        for (int x = mid + 2; x <= mid + 1 + ParkParts.KEEP_DOOR_FLOOR; x++) {
-            int top = ky;
-            while (court.has(x, top + 1, z)) top++;
+            for (int y = 1; y <= 2; y++) assertEquals("minecraft:air", court.get(x, top + y, z), "headroom at " + x);
             assertEquals("citybuilder:plaster_white", court.get(x, top + 1, face + 4), "gallery wall at " + x);
             assertTrue(court.get(x, top + 4, z).startsWith("minecraft:deepslate_tile"), "gallery roof at " + x);
         }
-        // and entered by a turret at its foot, open to the flight, roofed in tiles
-        int turretX = mid + 2 + ParkParts.KEEP_DOOR_FLOOR;
-        assertEquals("minecraft:air", court.get(turretX, ky + 1, z), "turret open to the flight");
+        assertEquals("citybuilder:stone_ashlar", court.get(doorX, ky + ParkParts.KEEP_DOOR_FLOOR, z));
+        // entered by a turret at its foot, open to the flight, roofed
+        assertEquals("minecraft:air", court.get(footX - 1, ky + 1, z), "turret open to the flight");
         boolean roofed = false;
-        for (int y = ky + 9; y <= ky + 16; y++) roofed |= court.has(turretX + ParkParts.ENTRANCE_RADIUS, y, z + 2);
+        for (int y = ky + 9; y <= ky + 16; y++) roofed |= court.has(footX - 1 - ParkParts.ENTRANCE_RADIUS, y, z + 2);
         assertTrue(roofed, "entrance turret roof");
-        for (int y = 1; y <= 2; y++) {
-            assertEquals("minecraft:air", court.get(mid, ky + ParkParts.KEEP_DOOR_FLOOR + y, face), "door");
-        }
     }
 
     @Test

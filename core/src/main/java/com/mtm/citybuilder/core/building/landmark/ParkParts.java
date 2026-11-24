@@ -474,21 +474,51 @@ public final class ParkParts {
     static final int KEEP_BASE = 11;
     /** How far the base's foot spreads out from its face (扇の勾配: steep at the top, flaring at the foot). */
     static final int KEEP_BATTER = 4;
-    /** The keep's first storey's floor over the upper court, where its door opens. */
-    static final int KEEP_DOOR_FLOOR = 12;
+    /** The side wing's floor over the upper court where its door opens: the base's top storey (its 地階). */
+    static final int KEEP_DOOR_FLOOR = 9;
 
     /** The entrance turret's half width (付櫓, at the foot of the keep's flight). */
     static final int ENTRANCE_RADIUS = 3;
 
     /**
-     * The keep's stone base battered and climbed: round its upright masonry a foot of stone that flares out
-     * {@link #KEEP_BATTER} blocks, high by the face and falling away on a concave curve; and up its front, along the
-     * face, a flight of stone steps three wide from the upper court to a landing at the first storey's floor, with a
-     * door cut through the wall there. The flight is not bare: it runs inside a covered gallery (渡櫓: a stone base,
-     * white plaster walls with slit windows, a tiled roof stepping up with it), entered by a small two-storey turret
-     * (付櫓) at its foot whose door faces the court, as the keep of Himeji is entered through its small gates and
-     * turrets. In the court's frame: the keep's corner at (kx, ky, kz), its front to +z, the upper court between x0
-     * and x1 and up to z1.
+     * Where the keep is entered, in the keep model's own frame (front to +z): {first and last column of the door,
+     * the front face's z there, the column of the flight's foot}. Not the main body: the side wing beside it (the
+     * small keeps and galleries the survey joins on to it), the longest stretch of the front that stands back from
+     * the main body's face, its door at the end next to the main body.
+     */
+    static int[] keepEntrance() {
+        Model keep = CastleAsset.KEEP.template();
+        int kw = keep.width();
+        int[] face = new int[kw];
+        java.util.Arrays.fill(face, -1);
+        keep.forEach((x, y, z, state) -> {
+            if (y == 0 && z > face[x]) face[x] = z;
+        });
+        int main = 0;
+        for (int f : face) main = Math.max(main, f);
+        int bestStart = -1, bestLength = 0;
+        for (int x = 0; x < kw; ) {
+            int end = x;
+            while (end + 1 < kw && face[end + 1] == face[x]) end++;
+            if (face[x] >= 0 && face[x] < main - 2 && end - x + 1 > bestLength) {
+                bestStart = x;
+                bestLength = end - x + 1;
+            }
+            x = end + 1;
+        }
+        int runEnd = bestStart + bestLength - 1;
+        return new int[]{runEnd - 2, runEnd, face[runEnd], runEnd - 3 - (KEEP_DOOR_FLOOR - 1)};
+    }
+
+    /**
+     * The keep's stone base battered and entered: round its upright masonry a foot of stone that flares out
+     * {@link #KEEP_BATTER} blocks, high by the face and falling away on a concave curve. It is entered, as Himeji's
+     * is, not through the main body but through the side wing beside it ({@link #keepEntrance}): a small two-storey
+     * turret (付櫓) on the upper court, its door facing the court, opens on to a flight of stone steps three wide that
+     * climbs along the wing's face inside a covered gallery (渡櫓: a stone base, white plaster walls with slit
+     * windows, a tiled roof stepping up with it) to a landing before a door into the wing at the base's top storey.
+     * In the court's frame: the keep's corner at (kx, ky, kz), its front to +z, the upper court between x0 and x1 and
+     * up to z1.
      */
     static void keepBase(Model m, int kx, int ky, int kz, int x0, int x1, int z1) {
         Model keep = CastleAsset.KEEP.template();
@@ -497,28 +527,17 @@ public final class ParkParts {
         keep.forEach((x, y, z, state) -> {
             if (y == 0) foot[x][z] = true;
         });
-        int mid = kx + kw / 2;
-        // The front face along the middle, and the flight's place before it
-        int face = kz;
-        for (int z = kd - 1; z >= 0; z--) {
-            if (foot[kw / 2][z]) {
-                face = kz + z;
-                break;
-            }
-        }
-        int stairZ0 = face + 1, stairZ1 = face + 3;
-        int stairX0 = mid - 1, stairX1 = mid + 1 + KEEP_DOOR_FLOOR;
-        // The gallery round the flight (its outer wall a block out, its west end wall a block past the landing)
-        // and the entrance turret east of its foot
-        int galleryX0 = stairX0 - 1, galleryZ1 = stairZ1 + 1;
-        int turretX0 = stairX1 + 1, turretX1 = turretX0 + 2 * ENTRANCE_RADIUS;
+        int[] entrance = keepEntrance();
+        int doorX0 = kx + entrance[0], doorX1 = kx + entrance[1], face = kz + entrance[2], footX = kx + entrance[3];
+        int stairZ0 = face + 1, stairZ1 = face + 3, galleryZ1 = stairZ1 + 1;
+        int turretX1 = footX - 1, turretX0 = turretX1 - 2 * ENTRANCE_RADIUS;
         int turretZ0 = stairZ0, turretZ1 = turretZ0 + 2 * ENTRANCE_RADIUS;
         String stone = "minecraft:stone_bricks";
         for (int x = x0 + 1; x < x1; x++) {
             for (int z = 1; z < z1; z++) {
                 int lx = x - kx, lz = z - kz;
                 if (lx >= 0 && lx < kw && lz >= 0 && lz < kd && foot[lx][lz]) continue;
-                if (x >= galleryX0 && x <= stairX1 && z >= stairZ0 && z <= galleryZ1 + 1) continue;
+                if (x >= footX && x <= doorX1 + 1 && z >= stairZ0 && z <= galleryZ1 + 1) continue;
                 if (x >= turretX0 - 1 && x <= turretX1 + 1 && z >= turretZ0 && z <= turretZ1 + 1) continue;
                 double d = Double.MAX_VALUE;
                 for (int dx = -KEEP_BATTER; dx <= KEEP_BATTER; dx++) {
@@ -532,45 +551,45 @@ public final class ParkParts {
                 for (int y = 0; y < h; y++) m.set(x, ky + y, z, stone);
             }
         }
-        // The flight: a landing before the door, then a step down each block eastwards to the court
-        for (int x = stairX0; x <= stairX1; x++) {
-            int top = x <= mid + 1 ? KEEP_DOOR_FLOOR : KEEP_DOOR_FLOOR - (x - mid - 1);
-            for (int z = stairZ0; z <= stairZ1; z++) {
-                for (int y = 0; y < top; y++) m.set(x, ky + y, z, stone);
-                m.set(x, ky + top, z, x <= mid + 1 ? "citybuilder:stone_ashlar"
-                        : "minecraft:stone_stairs[facing=west,half=bottom,shape=straight,waterlogged=false]");
-                for (int y = top + 1; y <= top + 3; y++) m.remove(x, ky + y, z);
-            }
-        }
-        // The gallery: its outer wall and west end on a stone base to the step's level, plastered three high with a
-        // slit window every third block, a tiled roof over it a block above the headroom, stepping with the flight
+        // The flight inside its gallery: from its foot a step up each block eastwards to the landing before the
+        // door; the gallery's outer wall a stone base to the step's level, plastered three high with a slit window
+        // every third block, a tiled roof over it stepping up with the flight. Where the main body stands at the
+        // landing's end it closes the gallery; otherwise an end wall does.
         String plaster = "citybuilder:plaster_white", tile = "minecraft:deepslate_tiles";
-        for (int x = galleryX0; x <= stairX1; x++) {
-            int top = x <= mid + 1 ? KEEP_DOOR_FLOOR : KEEP_DOOR_FLOOR - (x - mid - 1);
+        for (int x = footX; x <= doorX1 + 1; x++) {
+            int lx = x - kx;
+            boolean closed = x == doorX1 + 1 && lx < kw && foot[lx][face - kz + 1];
+            if (closed) break;
+            int top = Math.min(KEEP_DOOR_FLOOR, x - footX);
             for (int z = stairZ0; z <= galleryZ1; z++) {
-                boolean outer = z == galleryZ1 || x == galleryX0;
+                boolean outer = z == galleryZ1 || x == doorX1 + 1;
                 if (outer) {
                     for (int y = 0; y <= top; y++) m.set(x, ky + y, z, stone);
                     for (int y = top + 1; y <= top + 3; y++) {
                         m.set(x, ky + y, z, y == top + 2 && z == galleryZ1 && Math.floorMod(x, 3) == 0
                                 ? "minecraft:dark_oak_fence" : plaster);
                     }
+                } else {
+                    for (int y = 0; y < top; y++) m.set(x, ky + y, z, stone);
+                    m.set(x, ky + top, z, x >= doorX0 ? "citybuilder:stone_ashlar"
+                            : "minecraft:stone_stairs[facing=east,half=bottom,shape=straight,waterlogged=false]");
+                    for (int y = top + 1; y <= top + 3; y++) m.set(x, ky + y, z, "minecraft:air");
                 }
                 m.set(x, ky + top + 4, z, tile);
             }
             m.set(x, ky + top + 4, galleryZ1 + 1, "minecraft:deepslate_tile_slab[type=bottom,waterlogged=false]");
         }
-        // The entrance turret: two storeys on the upper court, its door facing the court (+z), open on its west
+        // The entrance turret: two storeys on the upper court, its door facing the court (+z), open on its east
         // side to the flight's foot
         Model turret = new Model();
         com.mtm.citybuilder.core.building.temple.CastleTurret.build(ENTRANCE_RADIUS, 2).forEach((x, y, z, state) ->
                 turret.set(x, y, z, state.equals("minecraft:white_terracotta") ? plaster : state));
         m.place(turret, turretX0, ky - 1, turretZ0, true);
         for (int z = stairZ0; z <= stairZ1; z++) {
-            for (int y = 0; y <= 2; y++) m.set(turretX0, ky + y, z, "minecraft:air");
+            for (int y = 0; y <= 2; y++) m.set(turretX1, ky + y, z, "minecraft:air");
         }
-        // The door: through the wall at the first storey, its sill the floor
-        for (int x = mid - 1; x <= mid + 1; x++) {
+        // The door into the wing: through its base's wall at the top storey, its sill the floor
+        for (int x = doorX0; x <= doorX1; x++) {
             for (int z = face - 1; z <= face; z++) {
                 m.set(x, ky + KEEP_DOOR_FLOOR, z, "minecraft:spruce_planks");
                 for (int y = KEEP_DOOR_FLOOR + 1; y <= KEEP_DOOR_FLOOR + 2; y++) m.set(x, ky + y, z, "minecraft:air");

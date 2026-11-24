@@ -47,8 +47,10 @@ test('castle site overview', async ({}, info) => {
   // upper steps
   let landing=null;
   for (let x=keep.minX; x<=keep.maxX && !landing; x++) for (let z=keep.minZ; z<=keep.maxZ; z++) {
-    const p=await server.columnProfile(x,z,keep.ground+16,keep.ground+18);
-    if (p.blocks.some(b=>b.id==='citybuilder:stone_ashlar' && b.y===keep.ground+17)) { landing=[x,keep.ground+18,z]; break; }
+    const p=await server.columnProfile(x,z,keep.ground+8,keep.ground+20);
+    const top=p.blocks.findLast(b=>b.top!=null && b.y<=keep.ground+18);
+    const ashlar=p.blocks.find(b=>b.id==='citybuilder:stone_ashlar' && b.y>=keep.ground+10);
+    if (ashlar && !p.blocks.some(b=>b.top!=null && (b.y===ashlar.y+1 || b.y===ashlar.y+2))) { landing=[x,ashlar.y+1,z]; break; }
   }
   expect(landing,'keep landing').not.toBeNull();
   const [ux,uy,uz]=keep.upperLanding;
