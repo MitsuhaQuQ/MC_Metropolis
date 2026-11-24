@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 9)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 10)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,9 +33,10 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 9)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 10)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
+        settings.buildings.terracedBaileys = version[0] >= 10;
         settings.plots.followStreetEdges = version[0] >= 9;
         settings.buildings.castleWards = version[0] >= 8;
         settings.buildings.usableFootprints = version[0] >= 8;

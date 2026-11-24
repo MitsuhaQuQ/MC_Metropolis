@@ -983,7 +983,7 @@ public final class FacilityModels {
             reserved.add(new double[]{minX, minZ, maxX, maxZ});
             int dx = DIRS[gateSide][0], dz = DIRS[gateSide][1];
             int endX = gateX + dx * (shortest + 1), endZ = gateZ + dz * (shortest + 1);
-            int endY = parkGround(f, plots, endX, endZ, endX, endZ);
+            int endY = parkGrade(f, plots, endX, endZ);
             Model path = new Model();
             for (int t = 1; t <= shortest; t++) {
                 int level = y + (int) Math.round((double) (endY - y) * t / (shortest + 1));
@@ -996,7 +996,7 @@ public final class FacilityModels {
                 reserved.add(new double[]{path.minX(), path.minZ(), path.maxX(), path.maxZ()});
             }
             if (logic.settings().buildings.castleWards) {
-                connectBaileyGates(f,plots,minX,minZ,maxX,maxZ,gateX+dx*2,gateZ+dz*2,reserved,out);
+                connectBaileyGates(f,plots,minX,minZ,maxX,maxZ,gateX+dx*2,gateZ+dz*2,y,reserved,out);
             }
             return true;
         }
@@ -1004,7 +1004,7 @@ public final class FacilityModels {
     }
 
     private void connectBaileyGates(Facility park, TownPlots plots, int x0,int z0,int x1,int z1,
-                                    int doorX,int doorZ,List<double[]> reserved,List<Placed> out) {
+                                    int doorX,int doorZ,int courtY,List<double[]> reserved,List<Placed> out) {
         var town=plots.settlement();
         var castle=logic.chunks().castle(town);
         if(castle==null)return;
@@ -1031,7 +1031,20 @@ public final class FacilityModels {
                 for(int[] point:route){
                     for(int ix=point[0]-1;ix<=point[0]+1;ix++) for(int iz=point[1]-1;iz<=point[1]+1;iz++){
                         var surface=castle.at(ix+0.5,iz+0.5);
-                        if(surface!=null && !surface.moat())paths.set(ix,surface.ground(),iz,"minecraft:gravel");
+                        if(surface==null || surface.moat()) continue;
+                        // On the bailey's terraces the path follows their grade, not their steps (a walkway is
+                        // filled under and cleared over where it is laid): banked over a lower terrace, cut into a
+                        // higher one
+                        // and near the court's gate it ramps to the court's own floor, which stands on the top
+                        // terrace
+                        double grade=surface.crossing()-0.5;
+                        var door=castle.at(doorX+0.5,doorZ+0.5);
+                        if(door!=null && !door.moat()){
+                            double lift=courtY-(door.crossing()-0.5);
+                            double reach=2*Math.abs(lift)+3;
+                            grade+=lift*Math.max(0,1-Math.hypot(ix-doorX,iz-doorZ)/reach);
+                        }
+                        paths.set(ix,(int)Math.round(grade),iz,"minecraft:gravel");
                     }
                 }
                 for (int i=0; i<route.size(); ) {
@@ -1171,6 +1184,16 @@ public final class FacilityModels {
             h = Math.max((int) Math.floor(l - o), Math.min((int) Math.floor(l + o), h));
         }
         return h;
+    }
+
+    /** The height a path is laid at on a park: on a castle's terraces their grade, not their steps. */
+    private int parkGrade(Facility facility, TownPlots plots, int x, int z) {
+        if (facility.kind() == Facility.Kind.CASTLE_PARK) {
+            var castle = logic.chunks().castle(plots.settlement());
+            var cell = castle == null ? null : castle.at(x + 0.5, z + 0.5);
+            if (cell != null && !cell.moat()) return (int) Math.round(cell.crossing() - 0.5);
+        }
+        return parkGround(facility, plots, x, z, x, z);
     }
 
     private int parkGround(Facility facility, TownPlots plots, int x0, int z0, int x1, int z1) {

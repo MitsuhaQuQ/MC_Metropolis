@@ -12,6 +12,8 @@ public final class BuildingSettings {
     public boolean largeCastleGate = true;
     /** Build the surrounding baileys and moat sections at their planned levels. */
     public boolean castleWards = true;
+    /** The baileys inside the outer moat rise in stone-faced terraces, not one flat lawn each. */
+    public boolean terracedBaileys = true;
     /** Validate the final raster footprint on narrow lots and refit rail-side wedges. */
     public boolean usableFootprints = true;
     /** Place civic and roadside facilities with their entrance frontage on a surveyed street edge. */

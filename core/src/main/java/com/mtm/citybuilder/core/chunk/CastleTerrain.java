@@ -7,24 +7,55 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** The bailey floors and moat sections share one set of heights with gates, bridges and park buildings. */
+/**
+ * The bailey floors and moat sections share one set of heights with gates, bridges and park buildings.
+ *
+ * <p>Terraced (building layout 10): a bailey inside the outer moat is not one flat lawn but rises in terraces
+ * (段々の曲輪) towards its middle, the honmaru towards its centre, each terrace {@link #STEP} over the one below and
+ * faced in stone where it drops; the terraces' edges wander with the ground's lie and a smooth noise, so they are not
+ * rings. A band along each moat stays at the bailey's own level, so its gates, bridges and turrets stand as before. The
+ * grade the paths and approaches follow is the same rise unstepped, so they climb across the terraces as slopes.
+ */
 public final class CastleTerrain {
     public enum Surface { LAWN, MASONRY, BED }
-    /** Block Y of the ground surface, optional water top, and the continuous grade for a crossing. */
-    public record Cell(int ground, Integer water, Surface surface, double crossing) {
+    /**
+     * Block Y of the ground surface, optional water top, the continuous grade for a crossing, and whether the column
+     * is faced in stone (a terrace's edge over lower ground beside it).
+     */
+    public record Cell(int ground, Integer water, Surface surface, double crossing, boolean faced) {
+        public Cell(int ground, Integer water, Surface surface, double crossing) {
+            this(ground, water, surface, crossing, false);
+        }
+
         public boolean moat() { return surface != Surface.LAWN; }
     }
-    private record Ward(Moat moat, int outside, int inside) {}
+
+    /** A terrace's height over the one below. */
+    public static final int STEP = 4;
+    /** Terraces a bailey between two moats rises by, at most, and the innermost (the honmaru) towards its centre. */
+    public static final int STEPS_BAILEY = 3;
+    public static final int STEPS_HONMARU = 2;
+    /** Share of a bailey's depth from each moat kept at the bailey's own level (its gates, bridges, turrets). */
+    public static final double FLAT = 0.22;
+
+    private record Ward(Moat moat, int outside, int inside, int median, double cx, double cz, double radius, long seed) {}
     private record Edge(double distance, double width) {}
     private final List<Ward> wards = new ArrayList<>();
     private final TerrainView terrain;
     private final com.mtm.citybuilder.core.street.WaterField water;
+    private final boolean terraced;
     private double minX = Double.POSITIVE_INFINITY, minZ = minX;
     private double maxX = Double.NEGATIVE_INFINITY, maxZ = maxX;
 
     public CastleTerrain(List<Moat> moats, TerrainView terrain, com.mtm.citybuilder.core.street.WaterField water) {
+        this(moats, terrain, water, false);
+    }
+
+    public CastleTerrain(List<Moat> moats, TerrainView terrain, com.mtm.citybuilder.core.street.WaterField water,
+                         boolean terraced) {
         this.water = water;
         this.terrain = terrain;
+        this.terraced = terraced;
         int previous = 0;
         for (Moat moat : moats) {
             List<double[]> ring = moat.ring();
@@ -43,7 +74,19 @@ public final class CastleTerrain {
             int median = (int) Math.floor(samples[samples.length / 2]);
             int outside = wards.isEmpty() ? median : previous;
             previous = Math.max(outside + 3, Math.min(outside + 8, median + (moat.inner() ? 5 : 3)));
-            wards.add(new Ward(moat, outside, previous));
+            double cx = 0, cz = 0;
+            for (double[] p : ring) {
+                cx += p[0];
+                cz += p[1];
+            }
+            cx /= ring.size();
+            cz /= ring.size();
+            double radius = 0;
+            for (double[] p : ring) radius += Math.hypot(p[0] - cx, p[1] - cz);
+            radius /= ring.size();
+            long seed = com.mtm.citybuilder.core.noise.Hash.of(0xCA57L, (long) Math.floor(ring.get(0)[0]),
+                    (long) Math.floor(ring.get(0)[1]));
+            wards.add(new Ward(moat, outside, previous, median, cx, cz, radius, seed));
         }
     }
 
@@ -111,10 +154,60 @@ public final class CastleTerrain {
         return edge.distance >= edge.width * 0.5;
     }
 
+    /**
+     * The rise of a bailey's floor at a position on it, {terraced, smooth}: whole steps of {@link #STEP}, and the same
+     * rise unstepped (the grade of a path across it). Zero on the outermost bailey and in the band along each moat.
+     */
+    private double[] rise(int w, double d, double half, double x, double z) {
+        if (!terraced || w == 0) return new double[]{0, 0};
+        Ward ward = wards.get(w);
+        double depth = d - half;
+        double share;
+        int steps;
+        double span;
+        if (w + 1 < wards.size()) {
+            // Between two moats: highest in the middle of the band, level again towards the next moat in
+            Edge next = edge(wards.get(w + 1).moat.ring(), x, z);
+            double remaining = Math.max(0, -next.distance - next.width * 0.5);
+            double s = depth / Math.max(1e-6, depth + remaining);
+            share = 1 - Math.abs(2 * s - 1);
+            steps = STEPS_BAILEY;
+            span = 0.5 * (depth + remaining);
+        } else {
+            // The innermost: up towards its centre
+            double toCentre = Math.hypot(x - ward.cx, z - ward.cz);
+            share = Math.min(1, depth / Math.max(1e-6, depth + toCentre));
+            share = Math.min(1, share * 1.6);
+            steps = STEPS_HONMARU;
+            span = (depth + toCentre) / 1.6;
+        }
+        // The terraces' edges wander: with a smooth noise, and up where the ground stands higher than the ring
+        double natural = terrain.smoothHeight(x, z);
+        share += (com.mtm.citybuilder.core.noise.ValueNoise.twoOctaves(ward.seed, x, z, 90) - 0.5) * 0.3
+                + Math.max(-0.2, Math.min(0.3, (natural - ward.median) * 0.04));
+        double v = Math.max(0, Math.min(1, (share - FLAT) / (1 - FLAT)));
+        if (share < FLAT) v = 0;
+        // No more than a narrow bailey has room for: its grade (the paths') at most about one in two
+        double total = Math.min(steps * STEP, 0.5 * (1 - FLAT) * span);
+        int whole = (int) Math.floor(v * total / STEP + 1e-6);
+        return new double[]{whole * STEP, v * total};
+    }
+
+    /** The ground's top at a position, without facing: for the neighbours a terrace's edge is judged by. */
+    private int groundAt(double x, double z) {
+        Cell cell = cell(x, z, false);
+        return cell == null ? Integer.MIN_VALUE : cell.ground();
+    }
+
     public Cell at(double x, double z) {
+        return cell(x, z, terraced);
+    }
+
+    private Cell cell(double x, double z, boolean face) {
         if (!intersects(x, z, x, z) || water.water(x, z)) return null;
         Cell lawn = null;
-        for (Ward ward : wards) {
+        for (int w = 0; w < wards.size(); w++) {
+            Ward ward = wards.get(w);
             Edge edge = edge(ward.moat.ring(), x, z);
             double d = edge.distance, half = edge.width * 0.5;
             if (d < -half - 12) break;
@@ -136,9 +229,37 @@ public final class CastleTerrain {
                 int top = (int) Math.round(ward.outside + (natural - ward.outside) * blend);
                 return new Cell(top, null, Surface.LAWN, crossing + (natural - ward.outside) * blend);
             }
-            if (d < 0) return new Cell(ward.outside, null, Surface.LAWN, crossing);
-            lawn = new Cell(ward.inside, null, Surface.LAWN, crossing);
+            if (d < 0) {
+                // Past the next moat in, the bailey outside it: its own terraces (none along the moat)
+                double[] up = w > 0 ? rise(w - 1, edgeOf(w - 1, x, z), halfOf(w - 1, x, z), x, z) : new double[]{0, 0};
+                return lawnCell(ward.outside + (int) up[0], crossing + up[1], x, z, face);
+            }
+            double[] up = rise(w, d, half, x, z);
+            lawn = lawnCell(ward.inside + (int) up[0], crossing + up[1], x, z, face);
         }
         return lawn;
+    }
+
+    private double edgeOf(int w, double x, double z) {
+        return edge(wards.get(w).moat.ring(), x, z).distance;
+    }
+
+    private double halfOf(int w, double x, double z) {
+        return edge(wards.get(w).moat.ring(), x, z).width * 0.5;
+    }
+
+    /** A bailey's lawn, faced in stone where a neighbour lies two and more lower (a terrace's or a moat's edge). */
+    private Cell lawnCell(int ground, double grade, double x, double z, boolean face) {
+        boolean faced = false;
+        if (face) {
+            for (double[] o : new double[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                int beside = groundAt(x + o[0], z + o[1]);
+                if (beside != Integer.MIN_VALUE && beside <= ground - 2) {
+                    faced = true;
+                    break;
+                }
+            }
+        }
+        return new Cell(ground, null, Surface.LAWN, grade, faced);
     }
 }

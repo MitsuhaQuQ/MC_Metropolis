@@ -37,4 +37,54 @@ class CastleTerrainTest {
             last = next;
         }
     }
+
+    private static Moat ring(double cx, int half, boolean inner, boolean wet) {
+        return new Moat(List.of(new double[]{cx-half,-half,12}, new double[]{cx+half,-half,12},
+                new double[]{cx+half,half,12}, new double[]{cx-half,half,12}), wet, inner);
+    }
+
+    @Test
+    void innerBaileysRiseInFacedTerraces() {
+        // A city's castle on a plain rising gently northwards: rings of half 220, 140 and 55 round (400, 0)
+        List<Moat> moats = List.of(ring(400,220,false,true), ring(400,140,false,false), ring(400,55,true,false));
+        var land = new SyntheticTerrain(0.03, Double.NaN, 0.0, com.mtm.citybuilder.core.terrain.Landform.PLAINS);
+        var flat = new CastleTerrain(moats, land, WaterField.NONE);
+        var terraced = new CastleTerrain(moats, land, WaterField.NONE, true);
+        // The outermost bailey and the band along each moat keep their level
+        assertEquals(flat.at(580,0).ground(), terraced.at(580,0).ground());
+        assertEquals(flat.at(532,0).ground(), terraced.at(532,0).ground());
+        assertEquals(flat.at(463,0).ground(), terraced.at(463,0).ground());
+        // Inside, terraces of whole steps, some of them up, edged in stone where they drop
+        int highest = Integer.MIN_VALUE, faced = 0, lawn = 0;
+        java.util.Set<Integer> levels = new java.util.TreeSet<>();
+        for (int x = 170; x <= 630; x++) {
+            for (int z = -230; z <= 230; z += 5) {
+                var a = terraced.at(x + 0.5, z + 0.5);
+                var b = flat.at(x + 0.5, z + 0.5);
+                if (a == null || a.moat()) continue;
+                lawn++;
+                int up = a.ground() - b.ground();
+                assertTrue(up >= 0 && up % CastleTerrain.STEP == 0, () -> "step at " + a + " over " + b);
+                assertTrue(Math.abs(a.crossing() - b.crossing() - up) <= CastleTerrain.STEP, "grade far from ground");
+                highest = Math.max(highest, up);
+                levels.add(up);
+                if (a.faced()) faced++;
+            }
+        }
+        assertTrue(highest >= 2 * CastleTerrain.STEP, "highest terrace " + highest);
+        assertTrue(levels.size() >= 3, "levels " + levels);
+        assertTrue(faced > 0 && faced < lawn / 3, faced + " faced of " + lawn);
+        // A path's grade across the terraces climbs without steps, inside the outer moat
+        for (int z : new int[]{-100, 0, 100}) {
+            double last = terraced.at(189.5, z + 0.5).crossing();
+            for (int x = 189; x <= 611; x++) {
+                var c = terraced.at(x + 0.5, z + 0.5);
+                if (c == null) continue;
+                final double prev = last;
+                final int at = x;
+                assertTrue(Math.abs(c.crossing() - last) <= 1.0, () -> "grade step at " + at + ": " + prev + " -> " + c);
+                last = c.crossing();
+            }
+        }
+    }
 }

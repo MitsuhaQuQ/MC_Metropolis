@@ -2551,7 +2551,8 @@ public final class ChunkLayer {
                 plan.plazas().stream().filter(square -> square.curbStreet() != null).map(StationPlaza::bounds).toList(),
                 new StreetWidths(logic.settings().streets.continuousCarriageways ? segments : List.of()),
                 logic.settings().buildings.castleWards && !plan.moats().isEmpty()
-                        ? new CastleTerrain(plan.moats(), logic.terrain(), plan.water()) : null);
+                        ? new CastleTerrain(plan.moats(), logic.terrain(), plan.water(),
+                                logic.settings().buildings.terracedBaileys) : null);
         // A street leaving a bridge starts at its deck
         for (int p = 0; p < segments.size(); p++) {
             StreetSegment g = segments.get(p);

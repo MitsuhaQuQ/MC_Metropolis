@@ -657,7 +657,8 @@ public final class CityChunks {
             case MASONRY -> Blocks.STONE_BRICKS.defaultBlockState();
             case BED -> Blocks.GRAVEL.defaultBlockState();
         };
-        BlockState fill = cell.moat() ? Blocks.STONE_BRICKS.defaultBlockState() : Blocks.DIRT.defaultBlockState();
+        // A terrace's edge over lower ground is faced in stone (石垣), its top still the lawn
+        BlockState fill = cell.moat() || cell.faced() ? Blocks.STONE_BRICKS.defaultBlockState() : Blocks.DIRT.defaultBlockState();
         for (int y = Math.max(low, Math.min(old - 1, target - 2)); y < target; y++)
             chunk.setBlockState(pos.set(x, y, z), fill, false);
         chunk.setBlockState(pos.set(x, target, z), face, false);
