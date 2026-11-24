@@ -35,6 +35,9 @@ final class RailCorridors {
         int cx=rx*REGION, cz=rz*REGION;
         double x0=cx*16.0,z0=cz*16.0,x1=(cx+REGION)*16.0,z1=(cz+REGION)*16.0;
         double grid=logic.settings().general.gridSize;
+        // The towns that may reach the region, their streets planned all at once on the common pool (one after
+        // another they took minutes for a city's surroundings); then read in order as before
+        List<Settlement> reaching=new ArrayList<>();
         for (var tier : SettlementTier.values()) {
             if (tier==SettlementTier.VILLAGE) continue;
             double extra=logic.settings().transit.mainLength(tier)+RailChunks.ENTRANCE;
@@ -44,6 +47,15 @@ final class RailCorridors {
                 var extent=logic.extent(town);
                 if (extent.originX()*grid-extra>x1 || (extent.originX()+extent.size())*grid+extra<x0
                         || extent.originZ()*grid-extra>z1 || (extent.originZ()+extent.size())*grid+extra<z0) continue;
+                reaching.add(town);
+            }
+        }
+        reaching.parallelStream().forEach(logic::streetPlan);
+        for (var tier : SettlementTier.values()) {
+            if (tier==SettlementTier.VILLAGE) continue;
+            double extra=logic.settings().transit.mainLength(tier)+RailChunks.ENTRANCE;
+            for (Settlement town : reaching) {
+                if (town.tier()!=tier) continue;
                 var plan=logic.streetPlan(town);
                 Set<Long> touched=new HashSet<>();
                 StationSite main=null;

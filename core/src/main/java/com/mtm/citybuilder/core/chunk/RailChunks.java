@@ -849,12 +849,23 @@ public final class RailChunks {
         if (logic.settings().transit.build == com.mtm.citybuilder.core.CitySettings.Transit.Build.RESERVE) {
             return null;
         }
-        Index made = build(logic.streetPlan(town));
-        synchronized (towns) {
-            towns.putIfAbsent(town.id(), made);
-            return towns.get(town.id());
-        }
+        // Once, the chunk workers asking for it at the same time waiting for the first
+        return building.get(town.id(), () -> {
+            synchronized (towns) {
+                Index known = towns.get(town.id());
+                if (known != null) {
+                    return known;
+                }
+            }
+            Index made = build(logic.streetPlan(town));
+            synchronized (towns) {
+                towns.putIfAbsent(town.id(), made);
+                return towns.get(town.id());
+            }
+        });
     }
+
+    private final com.mtm.citybuilder.core.cache.Once<Index> building = new com.mtm.citybuilder.core.cache.Once<>();
 
     /** The town whose index is being built (its lots know where its streets lie). */
     private final ThreadLocal<com.mtm.citybuilder.core.plot.TownPlots> plotsOf = new ThreadLocal<>();

@@ -68,6 +68,7 @@ public final class FacilityModels {
 
     private final CityLogic logic;
     private final Map<Long, List<Placed>> towns = new HashMap<>();
+    private final com.mtm.citybuilder.core.cache.Once<List<Placed>> once = new com.mtm.citybuilder.core.cache.Once<>();
     private final Map<Long,List<Placed>> spansByChunk = new HashMap<>();
 
     public FacilityModels(CityLogic logic) {
@@ -82,7 +83,19 @@ public final class FacilityModels {
                 return known;
             }
         }
-        List<Placed> placed = place(town);
+        // Once, the chunk workers asking for it at the same time waiting for the first
+        return once.get(town.id(), () -> {
+            synchronized (towns) {
+                List<Placed> known = towns.get(town.id());
+                if (known != null) {
+                    return known;
+                }
+            }
+            return keep(town, place(town));
+        });
+    }
+
+    private List<Placed> keep(Settlement town, List<Placed> placed) {
         synchronized (towns) {
             if (towns.putIfAbsent(town.id(), placed)==null) {
                 for (Placed p : placed) {
@@ -511,7 +524,7 @@ public final class FacilityModels {
     private void park(Facility f, TownFunctions functions, TownPlots plots, Settlement town, List<Placed> out) {
         double half = Math.max(40.0, f.radius() * 1.6 + 20.0);
         long seed = Hash.of(logic.seed() ^ 0x9A4CL, f.id());
-        List<double[]> walk = new ArrayList<>();
+        List<double[]> walk = new Walks();
         for (com.mtm.citybuilder.core.function.Walk w : functions.walks()) {
             if (w.facility() != f.id()) {
                 continue;
@@ -524,14 +537,17 @@ public final class FacilityModels {
         }
         com.mtm.citybuilder.core.chunk.RailChunks rails = logic.chunks().rails();
         var castle = f.kind() == Facility.Kind.CASTLE_PARK ? logic.chunks().castle(town) : null;
-        Ground land = (x, z) -> {
+        // Each position's answers kept: the pieces' searches ask the same grid again and again, five land tests a
+        // position, in a castle park hundreds of thousands of positions (minutes for a city's parks)
+        Ground land = remembered((x, z) -> {
             if (!functions.contains(f, x, z) || rails.near(x, z, 3.0)) return false;
             var cell = castle == null ? null : castle.at(x, z);
             return cell == null || !cell.moat();
-        };
+        });
         List<double[]> reserved = new ArrayList<>();
-        Ground open = (x, z) -> land.test(x, z) && walkDistance(walk, x, z) > 2.0 && !in(reserved, x, z, 2.0)
-                && land.test(x + 3, z) && land.test(x - 3, z) && land.test(x, z + 3) && land.test(x, z - 3);
+        Ground clear = remembered((x, z) -> land.test(x, z) && walkDistance(walk, x, z) > 2.0
+                && land.test(x + 3, z) && land.test(x - 3, z) && land.test(x, z + 3) && land.test(x, z - 3));
+        Ground open = (x, z) -> clear.test(x, z) && !in(reserved, x, z, 2.0);
         Facility.Kind kind = f.kind();
         // The graded pieces, the largest first: a castle's honmaru on its stone walls in the middle
         if (kind == Facility.Kind.CASTLE_PARK) {
@@ -1127,8 +1143,56 @@ public final class FacilityModels {
         return false;
     }
 
+    /** A test's answer at each position kept, for a search that asks the same positions again. */
+    private static Ground remembered(Ground test) {
+        Map<Position, Boolean> known = new HashMap<>();
+        return (x, z) -> known.computeIfAbsent(new Position(x, z), q -> test.test(x, z));
+    }
+
+    private record Position(double x, double z) {
+    }
+
+    /**
+     * A park's paths ({x1, z1, x2, z2, width} each) with a grid of them by where they run, so that how far a position
+     * lies from them looks only at the paths near: exact up to {@link #REACH} from their edges, at least that beyond.
+     */
+    private static final class Walks extends ArrayList<double[]> {
+        static final double REACH = 32.0;
+        private static final double CELL = 16.0;
+        private Map<Long, List<double[]>> grid;
+
+        @Override
+        public boolean add(double[] g) {
+            grid = null;
+            return super.add(g);
+        }
+
+        double distance(double x, double z) {
+            if (grid == null) {
+                grid = new HashMap<>();
+                for (double[] g : this) {
+                    double r = 0.5 * g[4] + REACH;
+                    for (long i = (long) Math.floor((Math.min(g[0], g[2]) - r) / CELL); i <= (long) Math.floor((Math.max(g[0], g[2]) + r) / CELL); i++) {
+                        for (long j = (long) Math.floor((Math.min(g[1], g[3]) - r) / CELL); j <= (long) Math.floor((Math.max(g[1], g[3]) + r) / CELL); j++) {
+                            grid.computeIfAbsent(Hash.mix(i * 0x100000000L + j), k -> new ArrayList<>()).add(g);
+                        }
+                    }
+                }
+            }
+            List<double[]> near = grid.get(Hash.mix((long) Math.floor(x / CELL) * 0x100000000L + (long) Math.floor(z / CELL)));
+            return near == null ? Double.POSITIVE_INFINITY : nearest(near, x, z);
+        }
+    }
+
     /** How far a position lies from the nearest edge of a park's paths ({x1, z1, x2, z2, width} each). */
     private static double walkDistance(List<double[]> walk, double x, double z) {
+        if (walk instanceof Walks w) {
+            return w.distance(x, z);
+        }
+        return nearest(walk, x, z);
+    }
+
+    private static double nearest(List<double[]> walk, double x, double z) {
         double best = Double.POSITIVE_INFINITY;
         for (double[] g : walk) {
             double dx = g[2] - g[0];

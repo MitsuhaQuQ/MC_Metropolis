@@ -16,6 +16,7 @@ public final class PlotLayer {
     private static final int TOWNS = 16;
 
     private final CityLogic logic;
+    private final com.mtm.citybuilder.core.cache.Once<TownPlots> once = new com.mtm.citybuilder.core.cache.Once<>();
     private final Map<Long, TownPlots> towns = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<Long, TownPlots> eldest) {
@@ -44,10 +45,19 @@ public final class PlotLayer {
                 return plots;
             }
         }
-        TownPlots plots = new TownPlots(logic.settings().plots, logic.streetPlan(town), Hash.of(logic.seed(), town.id()));
-        synchronized (towns) {
-            towns.put(town.id(), plots);
-        }
-        return plots;
+        // Once, the chunk workers asking for it at the same time waiting for the first
+        return once.get(town.id(), () -> {
+            synchronized (towns) {
+                TownPlots known = towns.get(town.id());
+                if (known != null) {
+                    return known;
+                }
+            }
+            TownPlots made = new TownPlots(logic.settings().plots, logic.streetPlan(town), Hash.of(logic.seed(), town.id()));
+            synchronized (towns) {
+                towns.put(town.id(), made);
+            }
+            return made;
+        });
     }
 }

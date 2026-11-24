@@ -19,18 +19,21 @@ public final class CitySpawn {
     private CitySpawn() {
     }
 
-    /** Moves a new world's spawn, already set by the game, into the nearest city. */
-    public static void move(ServerLevel level, ServerLevelData data) {
+    /**
+     * Moves a new world's spawn into the nearest city to where it is: whether it was moved (false where there is no
+     * city logic, the setting is off, no city is in reach or the search failed).
+     */
+    public static boolean move(ServerLevel level, ServerLevelData data) {
         try {
             CityLogic logic = CityWorlds.of(level);
             if (logic == null || !logic.settings().general.spawnInCity) {
-                return;
+                return false;
             }
             BlockPos spawn = new BlockPos(data.getXSpawn(), data.getYSpawn(), data.getZSpawn());
             Settlement city = nearestCity(logic, spawn.getX(), spawn.getZ());
             if (city == null) {
                 CityBuilder.LOGGER.info("No city within {} of the spawn: it stays at {}", (int) logic.settings().general.spawnSearch, spawn);
-                return;
+                return false;
             }
             CityExtent extent = logic.extent(city);
             int x = (int) Math.floor(extent.coreX());
@@ -39,9 +42,11 @@ public final class CitySpawn {
             BlockPos moved = new BlockPos(x, y, z);
             data.setSpawn(moved, 0.0f);
             CityBuilder.LOGGER.info("The world's spawn moved into the {} at {} (from {})", city.tier(), moved, spawn);
+            return true;
         } catch (RuntimeException e) {
             // Where the spawn is matters less than the world being made: left where the game put it
             CityBuilder.LOGGER.error("Could not move the spawn into a city", e);
+            return false;
         }
     }
 
@@ -51,7 +56,8 @@ public final class CitySpawn {
         for (double r = Math.min(4000.0, reach); ; r = Math.min(2 * r, reach)) {
             Settlement best = null;
             double bestDistance = Double.POSITIVE_INFINITY;
-            for (Settlement s : logic.settlements(x - r, z - r, x + r, z + r)) {
+            // Only the cities' tiers: the towns and villages of a square tens of kilometres wide would all be planned
+            for (Settlement s : logic.settlements(x - r, z - r, x + r, z + r, SettlementTier.CITY)) {
                 if (s.tier() != SettlementTier.CITY && s.tier() != SettlementTier.METROPOLIS) {
                     continue;
                 }

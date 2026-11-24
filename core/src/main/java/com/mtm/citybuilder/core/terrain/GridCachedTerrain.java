@@ -1,8 +1,6 @@
 package com.mtm.citybuilder.core.terrain;
 
 import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * Keeps the cheap queries the city logic makes again and again, those on the coarse grid's nodes: the smooth height,
@@ -20,7 +18,8 @@ public final class GridCachedTerrain implements TerrainView {
     private final int grid;
     private final int cells;
     private final int regionSize;
-    private final Map<Long, Tile> tiles;
+    /** Read without a lock (the chunk workers queued on an access-ordered map's by the dozen). */
+    private final com.mtm.citybuilder.core.cache.ClockMap<Tile> tiles;
 
     /** The nodes of one region, its near edges only: the far edges belong to the next regions. */
     private static final class Tile {
@@ -43,12 +42,7 @@ public final class GridCachedTerrain implements TerrainView {
         this.grid = grid;
         this.regionSize = regionSize;
         this.cells = regionSize / grid;
-        this.tiles = new LinkedHashMap<>(16, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<Long, Tile> eldest) {
-                return size() > capacity;
-            }
-        };
+        this.tiles = new com.mtm.citybuilder.core.cache.ClockMap<>(capacity);
     }
 
     /** The tile and index of a position on a grid node, or null off the nodes. */
@@ -67,9 +61,7 @@ public final class GridCachedTerrain implements TerrainView {
         long regionZ = Math.floorDiv(nodeZ, cells);
         index[0] = (int) ((nodeX - regionX * cells) * cells + (nodeZ - regionZ * cells));
         long key = (regionX << 32) ^ (regionZ & 0xFFFFFFFFL);
-        synchronized (tiles) {
-            return tiles.computeIfAbsent(key, k -> new Tile(cells));
-        }
+        return tiles.computeIfAbsent(key, k -> new Tile(cells));
     }
 
     @Override

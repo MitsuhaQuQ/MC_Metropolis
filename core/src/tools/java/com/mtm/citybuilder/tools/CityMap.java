@@ -117,6 +117,10 @@ public final class CityMap {
                 spawn(new CityLogic(seed, CitySettings.DEFAULT, counting), centerX, centerZ, counting);
                 return;
             }
+            case "spawncity" -> {
+                spawnCity(logic, centerX, centerZ);
+                return;
+            }
             case "streets", "districts" -> {
                 StreetPlan plan = streetStats(logic, centerX, centerZ);
                 start = System.nanoTime();
@@ -803,6 +807,107 @@ public final class CityMap {
         Runtime runtime = Runtime.getRuntime();
         System.out.printf("spawn heap in use after a collection: %.0f MB (everything cached: MTM_worldgen's and the city logic's)%n",
                 (runtime.totalMemory() - runtime.freeMemory()) / 1048576.0);
+    }
+
+    /**
+     * A new world's first start, timed as the server does it: the spawn moved into the nearest city (looked for as
+     * {@code CitySpawn} does), the city planned ahead of the players ({@code CityPlanner}: streets, functions, public
+     * buildings, the roads, railways and airports round it), then the spawn area's chunks (23 × 23 round the spawn) in
+     * parallel as the chunk workers ask for them: their columns, grades, railways and buildings.
+     */
+    private static void spawnCity(CityLogic logic, double x, double z) {
+        logic.buildings().useFunctions();
+        long all = System.nanoTime();
+        long start = System.nanoTime();
+        Settlement city = null;
+        double reach = logic.settings().general.spawnSearch;
+        for (double r = Math.min(4000.0, reach); ; r = Math.min(2 * r, reach)) {
+            double best = Double.POSITIVE_INFINITY;
+            for (Settlement s : logic.settlements(x - r, z - r, x + r, z + r, SettlementTier.CITY)) {
+                if (s.tier() != SettlementTier.CITY && s.tier() != SettlementTier.METROPOLIS) continue;
+                double d = Math.hypot(s.x() - x, s.z() - z);
+                if (d < best) {
+                    best = d;
+                    city = s;
+                }
+            }
+            if (city != null && best <= r || r >= reach) break;
+        }
+        if (city == null) {
+            System.out.println("no city");
+            return;
+        }
+        CityExtent extent = logic.extent(city);
+        double cx = extent.coreX(), cz = extent.coreZ();
+        System.out.printf("spawncity search: %s at %.0f %.0f in %.1f s%n", city.tier(), cx, cz, (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        logic.terrain().surfaceHeight((int) Math.floor(cx), (int) Math.floor(cz));
+        System.out.printf("spawncity spawn height: %.1f s%n", (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        logic.streetPlan(city);
+        System.out.printf("spawncity streets: %.1f s%n", (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        var functions = logic.functions().town(city);
+        long functionCheck = 0;
+        for (var f : functions.facilities()) {
+            functionCheck = com.mtm.citybuilder.core.noise.Hash.of(functionCheck, f.kind().ordinal(),
+                    Double.doubleToLongBits(f.x()), Double.doubleToLongBits(f.z()));
+        }
+        for (var w : functions.walks()) {
+            for (double[] p : w.points()) {
+                functionCheck = com.mtm.citybuilder.core.noise.Hash.of(functionCheck, Double.doubleToLongBits(p[0]),
+                        Double.doubleToLongBits(p[1]));
+            }
+        }
+        System.out.printf("spawncity functions: %d facilities, checksum %016x, %.1f s%n", functions.facilities().size(),
+                functionCheck, (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        var placed = logic.buildings().facilities().town(city);
+        long check = 0;
+        for (var p : placed) {
+            long[] blocks = {0, 0};
+            p.model().forEach((bx, by, bz, state) -> {
+                blocks[0]++;
+                blocks[1] += com.mtm.citybuilder.core.noise.Hash.of(bx * 31L + by, bz * 17L + state.hashCode());
+            });
+            check = com.mtm.citybuilder.core.noise.Hash.of(check, p.x() * 1_000_003L + p.y() * 1009L + p.z(), blocks[0], blocks[1]);
+        }
+        System.out.printf("spawncity public buildings: %d placed, checksum %016x, %.1f s%n", placed.size(), check,
+                (System.nanoTime() - start) / 1e9);
+        double ahead = 2500.0;
+        start = System.nanoTime();
+        int roads = logic.chunks().prepareRoads(cx - ahead, cz - ahead, cx + ahead, cz + ahead);
+        System.out.printf("spawncity roads: %d in %.1f s%n", roads, (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        int rails = logic.chunks().prepareRails(cx - ahead, cz - ahead, cx + ahead, cz + ahead);
+        System.out.printf("spawncity railways: %d in %.1f s%n", rails, (System.nanoTime() - start) / 1e9);
+        start = System.nanoTime();
+        int airports = logic.airports().airports(cx - ahead, cz - ahead, cx + ahead, cz + ahead).size();
+        System.out.printf("spawncity airports: %d in %.1f s%n", airports, (System.nanoTime() - start) / 1e9);
+        // The chunks, each stage timed over all of them
+        int ox = (int) Math.floor(cx) >> 4, oz = (int) Math.floor(cz) >> 4;
+        String[] names = {"columns", "grades", "rail cells", "rail structures", "buildings"};
+        java.util.concurrent.atomic.AtomicLongArray spent = new java.util.concurrent.atomic.AtomicLongArray(names.length);
+        start = System.nanoTime();
+        java.util.stream.IntStream.range(0, 23 * 23).parallel().forEach(i -> {
+            int chunkX = ox - 11 + i % 23, chunkZ = oz - 11 + i / 23;
+            Runnable[] steps = {
+                    () -> logic.chunks().columns(chunkX, chunkZ),
+                    () -> logic.chunks().grades(chunkX, chunkZ),
+                    () -> logic.chunks().rails().cells(chunkX, chunkZ),
+                    () -> logic.chunks().rails().structures(chunkX, chunkZ),
+                    () -> logic.buildings().columns(chunkX, chunkZ)};
+            for (int k = 0; k < steps.length; k++) {
+                long t = System.nanoTime();
+                steps[k].run();
+                spent.addAndGet(k, System.nanoTime() - t);
+            }
+        });
+        System.out.printf("spawncity chunks 23 x 23: %.1f s wall%n", (System.nanoTime() - start) / 1e9);
+        for (int k = 0; k < names.length; k++) {
+            System.out.printf("    %-16s %.1f s summed over the threads%n", names[k], spent.get(k) / 1e9);
+        }
+        System.out.printf("spawncity total: %.1f s%n", (System.nanoTime() - all) / 1e9);
     }
 
     /**

@@ -1,7 +1,5 @@
 package com.mtm.citybuilder.core.cache;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -18,38 +16,29 @@ public final class RegionCache<T> {
     }
 
     private final Compute<T> compute;
-    private final LinkedHashMap<Long, CompletableFuture<T>> entries;
+    /** Read without a lock (the chunk workers queued on an access-ordered map's by the dozen). */
+    private final ClockMap<CompletableFuture<T>> entries;
 
     public RegionCache(int capacity, Compute<T> compute) {
         this.compute = compute;
-        this.entries = new LinkedHashMap<>(16, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<Long, CompletableFuture<T>> eldest) {
-                return size() > capacity;
-            }
-        };
+        this.entries = new ClockMap<>(capacity);
     }
 
     public T get(int regionX, int regionZ) {
         long key = ((long) regionX << 32) ^ (regionZ & 0xFFFFFFFFL);
-        CompletableFuture<T> future;
+        CompletableFuture<T> future = entries.get(key);
         boolean owner = false;
-        synchronized (entries) {
-            future = entries.get(key);
-            if (future == null) {
-                future = new CompletableFuture<>();
-                entries.put(key, future);
-                owner = true;
-            }
+        if (future == null) {
+            CompletableFuture<T> mine = new CompletableFuture<>();
+            future = entries.computeIfAbsent(key, k -> mine);
+            owner = future == mine;
         }
         if (owner) {
             try {
                 future.complete(compute.compute(regionX, regionZ));
             } catch (Throwable throwable) {
                 // Leave no failed entry behind: the next caller tries again
-                synchronized (entries) {
-                    entries.remove(key, future);
-                }
+                entries.remove(key, future);
                 future.completeExceptionally(throwable);
             }
         }

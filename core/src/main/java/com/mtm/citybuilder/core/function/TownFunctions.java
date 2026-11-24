@@ -238,7 +238,20 @@ public final class TownFunctions {
     }
 
     /** How far a place lies from the nearest arterial, collector or boulevard's edge, within 400. */
+    /**
+     * How far a position lies from the nearest main road (an arterial, collector or boulevard), at most 400; kept by
+     * position, as the area facilities' weights ask it of every block again for each facility placed.
+     */
     private double mainRoadDistance(double x, double z) {
+        return mainRoads.computeIfAbsent(new Spot(x, z), p -> mainRoadDistanceNow(x, z));
+    }
+
+    private final Map<Spot, Double> mainRoads = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private record Spot(double x, double z) {
+    }
+
+    private double mainRoadDistanceNow(double x, double z) {
         double best = 400.0;
         long cx = (long) Math.floor(x / CELL);
         long cz = (long) Math.floor(z / CELL);
@@ -337,10 +350,27 @@ public final class TownFunctions {
      */
     private void placeAreas(Facility.Kind kind, int count, double[] spec, double spacing,
                             java.util.function.ToDoubleFunction<Blocks.Block> suits) {
+        // Each block's distance to the nearest of the kind (capped at the spacing), kept up as they are placed rather
+        // than looked for among all the facilities again for each block and each placed (minutes in a large city)
+        List<Blocks.Block> all = blocks.all();
+        double[] apartOf = new double[all.size()];
+        java.util.Arrays.fill(apartOf, spacing);
+        int seen = 0;
         for (int n = 0; n < count; n++) {
+            for (; seen < facilities.size(); seen++) {
+                Facility f = facilities.get(seen);
+                if (f.kind() != kind) {
+                    continue;
+                }
+                for (int i = 0; i < all.size(); i++) {
+                    Blocks.Block b = all.get(i);
+                    apartOf[i] = Math.min(apartOf[i], Math.hypot(f.x() - b.x(), f.z() - b.z()));
+                }
+            }
             Blocks.Block best = null;
             double bestScore = Double.NEGATIVE_INFINITY;
-            for (Blocks.Block b : blocks.all()) {
+            for (int i = 0; i < all.size(); i++) {
+                Blocks.Block b = all.get(i);
                 if (taken.contains(b.id()) || b.area() < spec[1] * 1e4 || b.area() > spec[2] * 1e4) {
                     continue;
                 }
@@ -348,12 +378,7 @@ public final class TownFunctions {
                 if (suit <= 0) {
                     continue;
                 }
-                double apart = spacing;
-                for (Facility f : facilities) {
-                    if (f.kind() == kind) {
-                        apart = Math.min(apart, Math.hypot(f.x() - b.x(), f.z() - b.z()));
-                    }
-                }
+                double apart = apartOf[i];
                 double score = apart / Math.max(1, spacing) + suit + (b.estate() ? 0.3 : 0)
                         + 0.2 * Hash.unit(Hash.of(seed ^ (kind.ordinal() * 0x9E37L), n, b.id()));
                 if (score > bestScore) {
@@ -1018,6 +1043,26 @@ public final class TownFunctions {
      * gate does), on to its loop: the street is not cut off at the grass.
      */
     private void deadEnds(Facility f, double[] reach, double share, double width) {
+        for (double[] end : deadEnds()) {
+            double ex = end[0], ez = end[1], ux = end[2], uz = end[3], streetWidth = end[4];
+            // Pointing into the park: its land a little on past the end
+            boolean into = false;
+            for (double d = 2; d <= 0.5 * streetWidth + 12 && !into; d += 2) {
+                into = contains(f, ex + ux * d, ez + uz * d);
+            }
+            if (into) {
+                ways(f, new double[]{ex, ez}, reach, share, Math.max(width, Math.min(6.0, 0.5 * streetWidth)));
+            }
+        }
+    }
+
+    /** The town's dead ends (not lanes'), in the order of its segments: {x, z, direction out x, z, street width}. */
+    private List<double[]> deadEnds;
+
+    private List<double[]> deadEnds() {
+        if (deadEnds != null) {
+            return deadEnds;
+        }
         Map<Long, Integer> degree = new HashMap<>();
         for (StreetSegment g : plan.segments()) {
             if (g.streetClass() == StreetClass.PATH) {
@@ -1026,6 +1071,7 @@ public final class TownFunctions {
             degree.merge(endKey(g.x1(), g.z1()), 1, Integer::sum);
             degree.merge(endKey(g.x2(), g.z2()), 1, Integer::sum);
         }
+        List<double[]> out = new ArrayList<>();
         for (StreetSegment g : plan.segments()) {
             if (g.streetClass() == StreetClass.PATH || g.streetClass() == StreetClass.LANE) {
                 continue;
@@ -1042,22 +1088,19 @@ public final class TownFunctions {
                 if (len < 1e-6) {
                     continue;
                 }
-                // Pointing into the park: its land a little on past the end
-                double ux = (ex - ox) / len;
-                double uz = (ez - oz) / len;
-                boolean into = false;
-                for (double d = 2; d <= 0.5 * g.width() + 12 && !into; d += 2) {
-                    into = contains(f, ex + ux * d, ez + uz * d);
-                }
-                if (into) {
-                    ways(f, new double[]{ex, ez}, reach, share, Math.max(width, Math.min(6.0, 0.5 * g.width())));
-                }
+                out.add(new double[]{ex, ez, (ex - ox) / len, (ez - oz) / len, g.width()});
             }
         }
+        deadEnds = out;
+        return out;
     }
 
+    /**
+     * A street end's key, to half a block. Mixed: the packed coordinates' own hash (x xor z) is the same all along a
+     * diagonal, and a town's thousands of ends fell into a few buckets (minutes per park in a large city).
+     */
     private static long endKey(double x, double z) {
-        return (Math.round(x * 2) << 32) ^ (Math.round(z * 2) & 0xFFFFFFFFL);
+        return Hash.mix((Math.round(x * 2) << 32) ^ (Math.round(z * 2) & 0xFFFFFFFFL));
     }
 
     /** Ways straight across a park's loop through its middle: one from its main way in, a second square to it. */
