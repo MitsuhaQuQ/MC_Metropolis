@@ -434,8 +434,26 @@ public final class CityBuildings {
                     }
                     state = chunk.getBlockState(pos.set(baseX + x, --y, baseZ + z));
                 }
+                if (logic.settings().plots.followStreetEdges && (state.is(Blocks.GRASS_BLOCK)
+                        || WILD_GROUND.contains(state.getBlock())) && y < max
+                        && chunk.getBlockState(pos.set(baseX+x,y+1,baseZ+z)).getFluidState().isEmpty()) {
+                    double wx = baseX+x+0.5, wz = baseZ+z+0.5;
+                    var plots = logic.plots().town(sample.owner());
+                    var plot = plots.at(wx,wz);
+                    if (plot != null && plot.hardFrontage() && !plots.onStreet(wx,wz)
+                            && logic.functions().town(sample.owner()).facilityAt(wx,wz) == null) {
+                        chunk.setBlockState(pos.set(baseX+x,y,baseZ+z), Blocks.SMOOTH_STONE.defaultBlockState(), false);
+                        for (int h=y+1; h<=Math.min(y+2,max); h++) {
+                            var plant=chunk.getBlockState(pos.set(baseX+x,h,baseZ+z));
+                            if (!plant.is(net.minecraft.tags.BlockTags.FLOWERS) && !plant.is(Blocks.GRASS)
+                                    && !plant.is(Blocks.TALL_GRASS)) break;
+                            chunk.setBlockState(pos,Blocks.AIR.defaultBlockState(),false);
+                        }
+                        continue;
+                    }
+                }
                 if (WILD_GROUND.contains(state.getBlock())) {
-                    chunk.setBlockState(pos, Blocks.GRASS_BLOCK.defaultBlockState(), false);
+                    chunk.setBlockState(pos.set(baseX+x,y,baseZ+z), Blocks.GRASS_BLOCK.defaultBlockState(), false);
                 }
             }
         }

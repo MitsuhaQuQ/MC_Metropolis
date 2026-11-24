@@ -1198,7 +1198,8 @@ public final class BuildingLayer {
         // storeys, 7 deep for three, 9 for six and more), and walls no higher than four times the narrower side, so a
         // block does not come out a sheet; storeys taken off where the lot is too small for them
         double narrow = Math.min(width, depth);
-        while (storeys > 1 && (depth < minDepth(storeys) || narrow < NARROWEST_UPPER
+        double minimumUpperSide = logic.settings().plots.followStreetEdges ? 6.0 : NARROWEST_UPPER;
+        while (storeys > 1 && (depth < minDepth(storeys) || narrow < minimumUpperSide
                 || ground + (storeys - 1) * upper > 4.0 * narrow)) {
             storeys--;
         }

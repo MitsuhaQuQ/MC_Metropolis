@@ -13,9 +13,11 @@ data rather than guessed.
 > **Early development.** The city logic is planned in full. In the world so far: the streets (paving, road markings,
 > pavements and kerbs, stop lines, street lights, drains and side ditches, bridges, canals, footpaths), graded to
 > their own profiles, the airports, and the town's houses, shops, offices and flats with the mod's own windows,
-> roofing, doors, lanterns and fixtures. Temples, stations and landmarks from the building library come next. An
+> roofing, doors, lanterns and fixtures. Stations and castle complexes also generate in the world. An
 > in-game map of the city plan opens with **K** or `/citymap`. Worlds made with one version may not match the next.
 > Do not use it for worlds you want to keep yet.
+
+Each dimension remembers the building layout it was created with, so an update that changes lot sizes or street edges does not cut across the buildings already there; new worlds get the latest. Where a street narrows, its pavement, roadside grading and lots follow the actual kerb, and busy streets have a level paved strip before any slope or retaining wall. Temples, shrines and other landmarks from the building library are not placed in towns yet.
 
 中文简介见[下文](#中文简介)。日本語の紹介は[こちら](#日本語の紹介)。
 
@@ -110,7 +112,7 @@ The cities are calibrated against statistics measured from:
 - [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors, ODbL): streets of Kyoto,
   Kanazawa, Himeji, Takayama, Tokyo and other towns.
 
-Only the statistics are used; none of either dataset is shipped. The scripts that measure them are in `tools/assets/`.
+The measurement scripts are in `tools/assets/`. The mod also ships voxel models of the Himeji Castle keep, turrets and galleries adapted from PLATEAU. Their sources and adaptations are listed in [ATTRIBUTION](common/src/main/resources/assets/citybuilder/ATTRIBUTION).
 
 ## 中文简介
 
@@ -127,10 +129,10 @@ City Builder 是 [Realistic Landforms（MTM Worldgen）](https://github.com/Mits
   - 机场。
   - 住宅、商店、写字楼和公寓，用本 mod 自己的窗、屋面、门、灯笼和各种小设备。
 
-  寺社、车站和地标要等建筑库接入。按 **K** 或输入 `/citymap` 打开城市规划地图。不同版本生成的世界可能对不上，暂时不要用在想保留的存档里。
+  游戏中也会生成车站和城址建筑；寺社和其他地标还没放进城里。每个维度记住创建时的建筑布局版本，新世界用最新的（目前是 9）。道路收窄时，人行道、路肩整地和临街地块共用实际路缘；密集街区在坡面或挡墙前留出平整前场。已有维度沿用存档中的布局版本，已生成区块保留原地形。按 **K** 或输入 `/citymap` 打开城市规划地图。不同版本生成的世界可能对不上，暂时不要用在想保留的存档里。
 - **依赖**：Minecraft 1.20.1，Fabric 或 Forge，Java 17。地形需要 MTM Worldgen（没装时不生成城市）；MTR 可选，只读取它的车站。
 - **构建、调试图、数据来源和许可证**见上文英文部分。设计文档是中文的：[docs/city-logic-design.md](docs/city-logic-design.md)；工作流程和现状的总说明见 [docs/overview.md](docs/overview.md)。
-- **许可证**：代码采用 MIT；随 mod 发布的每件素材的来源和许可证都记在 ATTRIBUTION 里。PLATEAU 和 OpenStreetMap 的数据只用来做统计，不随 mod 发布。
+- **许可证**：代码采用 MIT；随 mod 发布的每件素材的来源和许可证都记在 ATTRIBUTION 里。路网与地块参考 PLATEAU 和 OpenStreetMap 的统计。随 mod 提供的姬路城天守、橹与渡廊模型由 PLATEAU 数据转换而来。
 
 ## 日本語の紹介
 
@@ -147,7 +149,7 @@ City Builder は [Realistic Landforms（MTM Worldgen）](https://github.com/Mits
   - 空港。
   - 住宅、商店、オフィス、マンション。窓、屋根、扉、提灯、各種設備はこの mod 独自のブロックです。
 
-  寺社、駅、ランドマークは建物ライブラリの組み込み後になります。**K** キーまたは `/citymap` で都市計画の地図を開けます。版が変わると以前に生成したワールドと合わないことがあるので、残したいワールドにはまだ使わないでください。
+  駅や城郭も生成されます（寺社やその他のランドマークはまだ街に置かれません）。各ディメンションは作成時の建物配置のバージョンを記録し、新規ワールドは最新（現在 9）を使います。道幅が変わる場所では、歩道、沿道の整地、敷地の奥行きを同じ道路端に合わせます。既存のディメンションでは保存済みの配置を引き継ぎ、生成済みの地形はそのまま残ります。**K** キーまたは `/citymap` で都市計画の地図を開けます。版が変わると以前に生成したワールドと合わないことがあるので、残したいワールドにはまだ使わないでください。
 - **必要なもの**：Minecraft 1.20.1、Fabric または Forge、Java 17。地形には MTM Worldgen が必要です（入っていないと都市は生成されません）。MTR は任意で、その駅を読み取るだけです。
 - **ビルド、計画図、データの出典とライセンス**は上の英語の部分を見てください。設計書は中国語です：[docs/city-logic-design.md](docs/city-logic-design.md)（仕組みと現状の概要は [docs/overview.md](docs/overview.md)）。
-- **ライセンス**：コードは MIT です。mod に同梱する素材はすべて出典とライセンスを ATTRIBUTION に記録しています。PLATEAU と OpenStreetMap のデータは統計を取るためだけに使い、mod には同梱していません。
+- **ライセンス**：コードは MIT です。mod に同梱する素材はすべて出典とライセンスを ATTRIBUTION に記録しています。道路網と敷地の設計には PLATEAU と OpenStreetMap の統計を使っています。同梱の姫路城の天守・櫓・渡り廊下は PLATEAU のデータから作成しました。

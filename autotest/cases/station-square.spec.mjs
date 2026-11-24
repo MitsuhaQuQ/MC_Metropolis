@@ -7,7 +7,7 @@ import { ROOT, server } from '../lib/server.mjs';
 import { client, clientRunning, waitForClient } from '../lib/client.mjs';
 
 const TOWN = { x: -10232, z: -10272 };
-const SCREENS = join(ROOT, 'build', 'debug', 'station-scale', 'layout-'+(process.env.AUTOTEST_LAYOUT??'8'));
+const SCREENS = join(ROOT, 'build', 'debug', 'station-scale', 'layout-'+(process.env.AUTOTEST_LAYOUT??'9'));
 
 async function settle() {
   let last = -1;
@@ -42,10 +42,10 @@ test('the station square on its own land', async ({}, testInfo) => {
   const sg = await server.station(TOWN.x, TOWN.z);
   expect(Number.isFinite(sg.ground)).toBe(true);
   const ground = sg.ground;
-  const output = join(ROOT, 'build', 'debug', 'station-scale', 'layout-' + (process.env.AUTOTEST_LAYOUT ?? '8'));
+  const output = join(ROOT, 'build', 'debug', 'station-scale', 'layout-' + (process.env.AUTOTEST_LAYOUT ?? '9'));
   mkdirSync(output, { recursive: true });
   writeFileSync(join(output,'plan.json'),JSON.stringify(sg,null,2));
-  if (Number(process.env.AUTOTEST_LAYOUT ?? 8)>=8) {
+  if (Number(process.env.AUTOTEST_LAYOUT ?? 9)>=8) {
     expect(sg.driveStarts.length,'main avenue must meet a verified plaza approach').toBe(2);
     const bus=sg.bays.filter(b=>b.use==='BUS');
     expect(bus.length,'ready-to-use bus stops').toBeGreaterThan(0);
@@ -97,7 +97,7 @@ test('the station square on its own land', async ({}, testInfo) => {
   const approaches = [];
   // The low entrance occupies part of the inner lawn; inspect the exposed shoulders outside its building.
   let shoulder = sg.lowerEntrance?.length ? 24 : 6;
-  if (sg.lowerEntrance?.length && Number(process.env.AUTOTEST_LAYOUT ?? 8)>=8) {
+  if (sg.lowerEntrance?.length && Number(process.env.AUTOTEST_LAYOUT ?? 9)>=8) {
     // The stair and its walls extend on both sides of the doorway. Sample the exposed
     // ground beyond their actual footprint, including where the flight is mirrored.
     shoulder = Math.ceil(Math.max(...sg.lowerEntrance.map(([x,,z])=>Math.abs(-(x-ox)*dz+(z-oz)*dx)))+4);
@@ -117,7 +117,7 @@ test('the station square on its own land', async ({}, testInfo) => {
     approaches.push({ side, steps });
   }
   writeFileSync(join(output, 'approach.json'), JSON.stringify(approaches, null, 2));
-  if (Number(process.env.AUTOTEST_LAYOUT ?? 8) >= 5) {
+  if (Number(process.env.AUTOTEST_LAYOUT ?? 9) >= 5) {
     const route = sg.lowerEntrance;
     expect(route.length, 'this high main station must have a lower entrance').toBeGreaterThan(12);
     const measured = [];
@@ -160,7 +160,7 @@ test('the station square on its own land', async ({}, testInfo) => {
     for (const at of roadClearances) expect(at.clearance, JSON.stringify(at)).toBeGreaterThanOrEqual(4);
     expect(measured.at(-1).feet - measured[0].feet).toBeGreaterThan(4);
   }
-  if (Number(process.env.AUTOTEST_LAYOUT ?? 8) >= 4) {
+  if (Number(process.env.AUTOTEST_LAYOUT ?? 9) >= 4) {
     for (const lane of approaches) {
       for (const [index, step] of lane.steps.entries()) {
         if (index === 0) continue;

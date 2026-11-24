@@ -35,6 +35,7 @@ public final class TownPlots {
 
     private final CitySettings.Plots config;
     private final StreetPlan plan;
+    private final com.mtm.citybuilder.core.chunk.ChunkLayer.StreetWidths widths;
     private final long seed;
     /** The pieces lots front: no bridges or level crossings. */
     private final List<StreetSegment> pieces = new ArrayList<>();
@@ -86,6 +87,7 @@ public final class TownPlots {
     public TownPlots(CitySettings.Plots config, StreetPlan plan, long seed) {
         this.config = config;
         this.plan = plan;
+        widths = new com.mtm.citybuilder.core.chunk.ChunkLayer.StreetWidths(config.followStreetEdges ? plan.segments() : List.of());
         this.seed = seed;
         footpathBounds = new double[plan.promenades().size()][];
         for (int k = 0; k < footpathBounds.length; k++) {
@@ -298,8 +300,7 @@ public final class TownPlots {
         }
     }
 
-    /** The point at a distance along a chain, and the chain's direction there: {x, z, ux, uz}. */
-    public double[] pointAt(int chain, double along) {
+    private int pieceAt(int chain, double along) {
         int[] order = chains.get(chain);
         int lo = 0;
         int hi = order.length - 1;
@@ -311,7 +312,12 @@ public final class TownPlots {
                 hi = mid - 1;
             }
         }
-        int p = order[lo];
+        return order[lo];
+    }
+
+    /** The point at a distance along a chain, and the chain's direction there: {x, z, ux, uz}. */
+    public double[] pointAt(int chain, double along) {
+        int p = pieceAt(chain, along);
         StreetSegment g = pieces.get(p);
         double t = Math.max(0, Math.min(1, (along - offset[p]) / g.length()));
         double ax = reversed[p] ? g.x2() : g.x1();
@@ -375,7 +381,9 @@ public final class TownPlots {
                 int index = 0;
                 while (position < length - 1e-6) {
                     double[] p = pointAt(c, Math.min(length, position + 4.0));
-                    double back = 0.5 * first.width() + 8.0;
+                    double sampleAt = Math.min(length, position + 4.0);
+                    double width = config.followStreetEdges ? widthAlong(c,sampleAt) : first.width();
+                    double back = 0.5 * width + 8.0;
                     District district = plan.districts().at(p[0] - side * p[3] * back, p[1] + side * p[2] * back);
                     if (district == District.NONE || district == District.GROUNDS || district == District.HIGH_SPEED) {
                         // A lot starting at the edge of land without plots: houses
@@ -386,7 +394,11 @@ public final class TownPlots {
                     double frontage = Math.max(config.minFrontage, frontage(range, Hash.unit(hash)) + config.wallAllowance);
                     double lotDepth = range[5] + (range[6] - range[5]) * Hash.unit(Hash.mix(hash));
                     // The last lot takes what is left, if that is short
-                    if (length - (position + frontage) < 0.5 * range[0]) {
+                    double minimum = Math.max(config.minFrontage, range[0] + config.wallAllowance);
+                    if (config.followStreetEdges && length-position >= 2*minimum
+                            && length-position-frontage < minimum) {
+                        frontage = length-position-minimum;
+                    } else if (length - (position + frontage) < (config.followStreetEdges ? minimum : 0.5 * range[0])) {
                         frontage = length - position;
                     }
                     at.add(position);
@@ -704,7 +716,7 @@ public final class TownPlots {
             double dx = g.x2() - g.x1();
             double dz = g.z2() - g.z1();
             double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
-            if (Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z) - 0.5 * g.width() < config.laneAccess) {
+            if (Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z) - 0.5 * widths.at(g, t) < config.laneAccess) {
                 return true;
             }
         }
@@ -857,7 +869,15 @@ public final class TownPlots {
     private Object[] facing(int chain, int side, int index) {
         return lotStreets.computeIfAbsent(Hash.of(0x5713EL, chain, side, index), k -> {
             double[] starts = cuts.get(chain)[side > 0 ? 0 : 1];
-            StreetSegment street = streetAt(chain, 0.5 * (starts[index] + starts[index + 1]));
+            double along = 0.5 * (starts[index] + starts[index + 1]);
+            if (config.followStreetEdges) {
+                int p = pieceAt(chain, along);
+                StreetSegment street = pieces.get(p);
+                double sign = reversed[p] ? -1 : 1;
+                double heading = Math.atan2(sign*(street.z2()-street.z1()),sign*(street.x2()-street.x1()));
+                return new Object[]{street.streetClass(), widthAlong(chain, along), heading};
+            }
+            StreetSegment street = streetAt(chain, along);
             return street == null ? new Object[0] : new Object[]{street.streetClass(), street.width(), headingOf(chain, street)};
         });
     }
@@ -875,6 +895,13 @@ public final class TownPlots {
             }
         }
         return best;
+    }
+
+    private double widthAlong(int chain, double along) {
+        int p = pieceAt(chain, along);
+        StreetSegment street = pieces.get(p);
+        double fraction = (along-offset[p])/street.length();
+        return widths.at(street, reversed[p] ? 1-fraction : fraction);
     }
 
     /** A chain's piece's direction, as the chain runs. */
@@ -950,8 +977,8 @@ public final class TownPlots {
         double along = offset[best] + (reversed[best] ? 1 - bestT : bestT) * g.length();
         double ux = (reversed[best] ? g.x1() - g.x2() : g.x2() - g.x1()) / g.length();
         double uz = (reversed[best] ? g.z1() - g.z2() : g.z2() - g.z1()) / g.length();
-        return new Plot(0L, chain, side, 0, 0.0, 0.0, along, Math.max(0.0, bestDistance - 0.5 * g.width()), 0.0,
-                District.NONE, g.streetClass(), g.width(), Math.atan2(uz, ux), false, false);
+        return new Plot(0L, chain, side, 0, 0.0, 0.0, along, Math.max(0.0, bestDistance - 0.5 * widths.at(g, bestT)), 0.0,
+                District.NONE, g.streetClass(), widths.at(g, bestT), Math.atan2(uz, ux), false, false);
     }
 
     /** Lot {@code index} on the same street and side as a plot, as cut: its frontage, depth and id. */
@@ -1088,7 +1115,7 @@ public final class TownPlots {
             double dz = g.z2() - g.z1();
             double raw = ((x - g.x1()) * dx + (z - g.z1()) * dz) / (dx * dx + dz * dz);
             double t = Math.max(0, Math.min(1, raw));
-            double edge = Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z) - 0.5 * g.width();
+            double edge = Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z) - 0.5 * widths.at(g, t);
             if (edge < 0) {
                 // On a street
                 return null;
@@ -1133,7 +1160,7 @@ public final class TownPlots {
         long id = Hash.of(seed ^ 0x9107L, c, side, lo);
         District lotDistrict = districts.get(c)[side > 0 ? 0 : 1][lo];
         return new Plot(id, c, side, lo, starts[lo], starts[lo + 1], along, bestEdge, maxDepth, lotDistrict, g.streetClass(),
-                g.width(), Math.atan2(uz, ux), bestEdge > maxDepth, false);
+                widths.at(g, bestT), Math.atan2(uz, ux), bestEdge > maxDepth, false);
     }
 
     /**
@@ -1200,7 +1227,7 @@ public final class TownPlots {
             double length2=dx*dx+dz*dz;
             if (g.streetClass()==com.mtm.citybuilder.core.street.StreetClass.PATH) length2=Math.max(1e-9,length2);
             double t = Math.max(0, Math.min(1, ((x - g.x1()) * dx + (z - g.z1()) * dz) / length2));
-            if (Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z) < 0.5 * g.width()) {
+            if (Math.hypot(g.x1() + dx * t - x, g.z1() + dz * t - z) < 0.5 * widths.at(g, t)) {
                 return true;
             }
         }
@@ -1279,7 +1306,9 @@ public final class TownPlots {
         int s = side > 0 ? 0 : 1;
         double[] starts = cuts.get(chain)[s];
         double[] p = pointAt(chain, 0.5 * (starts[index] + starts[index + 1]));
-        double back = 0.5 * chainWidth(chain) + 0.5 * depths.get(chain)[s][index];
+        double along = 0.5 * (starts[index] + starts[index + 1]);
+        double width = config.followStreetEdges ? widthAlong(chain,along) : chainWidth(chain);
+        double back = 0.5 * width + 0.5 * depths.get(chain)[s][index];
         return new double[]{p[0] - p[3] * side * back, p[1] + p[2] * side * back};
     }
 

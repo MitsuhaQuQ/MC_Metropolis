@@ -66,7 +66,7 @@ test('the station driveway leaves the through lanes intact in the photographed b
     }
     profiles.push({name,profile});
   }
-  const dir=join(ROOT,'build','debug','station-scale','layout-8');
+  const dir=join(ROOT,'build','debug','station-scale','layout-'+(process.env.AUTOTEST_LAYOUT??'9'));
   mkdirSync(dir,{recursive:true});
   const laneColumns=columns.size;
   const widths=[];

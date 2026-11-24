@@ -669,7 +669,7 @@ public final class ChunkLayer {
     private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links,
                          Map<Long, List<double[]>> canals, Map<Long, List<StationPlaza>> plazas,
                          Map<Long, List<Stop>> stops, Map<Long, Double> heights, boolean[][] round,
-                         Map<Long, List<double[]>> banks, double[][][] interior, int[] street, List<double[]> curbBounds, Map<Integer,List<Taper>> tapers, CastleTerrain castle) {
+                         Map<Long, List<double[]>> banks, double[][][] interior, int[] street, List<double[]> curbBounds, StreetWidths widths, CastleTerrain castle) {
         /**
          * Whether a column lies on a piece's paving: within half its width of its line and, past an end, only where
          * that end is round (a bend's outside); a square end stops at the end's line.
@@ -773,6 +773,37 @@ public final class ChunkLayer {
         }
         return tapers;
     }
+    /** Local street width shared by street paving, earthworks and parcel frontages. */
+    public static final class StreetWidths {
+        private final Map<StreetSegment,List<Taper>> byStreet = new java.util.IdentityHashMap<>();
+
+        public StreetWidths(List<StreetSegment> streets) {
+            streetTapers(streets).forEach((index, tapers) -> byStreet.put(streets.get(index), tapers));
+        }
+
+        private Taper active(StreetSegment street, double station, double length) {
+            var candidates = byStreet.get(street);
+            if (candidates == null) return null;
+            Taper result = null;
+            double width = street.width();
+            for (Taper taper : candidates) {
+                double local = taper.width(station, length, street.width());
+                if (local < width) {
+                    result = taper;
+                    width = local;
+                }
+            }
+            return result;
+        }
+
+        public double at(StreetSegment street, double fraction) {
+            if (!byStreet.containsKey(street)) return street.width();
+            double length = street.length();
+            double station = Math.max(0, Math.min(1, fraction)) * length;
+            Taper taper = active(street, station, length);
+            return taper == null ? street.width() : taper.width(station, length, street.width());
+        }
+    }
     private static final int INDEXES = 16;
 
     private final CityLogic logic;
@@ -827,7 +858,6 @@ public final class ChunkLayer {
                 StreetSegment g = index.segments.get(p);
                 Surface surface = surface(g);
                 boolean bridge = g.structure() == StreetStructure.BRIDGE;
-                List<Taper> tapers=index.tapers.get(p);
                 double length = Math.max(1e-9, g.length());
                 double ux = (g.x2() - g.x1()) / length;
                 double uz = (g.z2() - g.z1()) / length;
@@ -837,15 +867,9 @@ public final class ChunkLayer {
                         double cx = minX + x + 0.5;
                         double cz = minZ + z + 0.5;
                         double d = distance(g, cx, cz);
-                        double width=g.width();
-                        Taper active=null;
-                        if(tapers!=null) {
-                            double station=Math.max(0,Math.min(length,(cx-g.x1())*ux+(cz-g.z1())*uz));
-                            for(Taper taper:tapers) {
-                                double local=taper.width(station,length,g.width());
-                                if(local<width) {width=local; active=taper;}
-                            }
-                        }
+                        double station = Math.max(0, Math.min(length, (cx-g.x1())*ux+(cz-g.z1())*uz));
+                        Taper active = index.widths.active(g, station, length);
+                        double width = active == null ? g.width() : active.width(station, length, g.width());
                         double half=width/2;
                         if (d > half || !index.covers(p, cx, cz)) {
                             continue;
@@ -1559,7 +1583,6 @@ public final class ChunkLayer {
                         hs[k] = nodeHeight(index, inner[k][1], inner[k][2]);
                     }
                 }
-                double half = 0.5 * Math.max(1.0, g.width());
                 int rank=!logic.settings().streets.continuousCarriageways ? 0 : switch(g.streetClass()) {
                     case BOULEVARD -> 3;
                     case ARTERIAL -> 2;
@@ -1577,6 +1600,8 @@ public final class ChunkLayer {
                         double d = Math.hypot(g.x1() + dx * t - cx, g.z1() + dz * t - cz);
                         int c = x * 16 + z;
                         double at = inner == null ? h1 + (h2 - h1) * t : along(t, h1, h2, inner, hs);
+                        double width = index.widths.at(g, t);
+                        double half = width / 2;
                         boolean covered = index.covers(p, cx, cz);
                         // A lower side street must not cut a trench into a running lane.
                         // Keep the main street's cross section level, then blend into the
@@ -1586,7 +1611,7 @@ public final class ChunkLayer {
                             trunkRank[c]=rank;
                             trunkDistance[c]=d;
                             trunkGrade[c]=at;
-                            trunkFade[c]=approach[c]*Math.min(1,(half+VERGE-d)/(VERGE+walk(g.width())));
+                            trunkFade[c]=approach[c]*Math.min(1,(half+VERGE-d)/(VERGE+walk(width)));
                         }
                         if (d <= half && covered) {
                             double w = 1.0 / ((d + 0.5) * (d + 0.5));
@@ -2524,7 +2549,7 @@ public final class ChunkLayer {
         Index index = new Index(byChunk, segments, deck, links, canals, plazas, stops, heights, round(segments, links), banks,
                 interior(segments, byChunk), streets(links),
                 plan.plazas().stream().filter(square -> square.curbStreet() != null).map(StationPlaza::bounds).toList(),
-                logic.settings().streets.continuousCarriageways ? streetTapers(segments) : Map.of(),
+                new StreetWidths(logic.settings().streets.continuousCarriageways ? segments : List.of()),
                 logic.settings().buildings.castleWards && !plan.moats().isEmpty()
                         ? new CastleTerrain(plan.moats(), logic.terrain(), plan.water()) : null);
         // A street leaving a bridge starts at its deck

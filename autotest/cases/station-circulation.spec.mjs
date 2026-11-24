@@ -3,7 +3,7 @@ import {mkdirSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {ROOT, server} from '../lib/server.mjs';
 
-const out = join(ROOT,'build','debug','station-scale','layout-8');
+const out = join(ROOT,'build','debug','station-scale','layout-'+(process.env.AUTOTEST_LAYOUT??'9'));
 
 function overhead(blocks, floor) {
   const obstacle = blocks.find(b => b.y > floor.y && b.bottom != null);

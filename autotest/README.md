@@ -44,7 +44,7 @@ try { node run.mjs --client buildings-view.spec.mjs station-square.spec.mjs } fi
 ## 样本和复现
 
 - **生成器基线**用种子 `12345`、城下町附近 `(-10232, -10272)`。首次为住宅、商业、普通站、换乘站选样时，记录定位接口返回的实际坐标、设施类型、朝向和地面 Y。已固定的必测样本找不到应报告失败及最近候选；探索其他种子时可记为缺样。
-- **玩家存档回归**用种子 `8689008927313558369`。干道断口中心约 `(3273, -5745)`，堤顶路约 `(3250, -6560)`，钢梁净空点 `(3260, -6538)`。样本包应含地形设置、规划库的一致性副本、建筑尺度版本、模组版本和相关原区块。原区块留作修复前证据；在另一个测试工作副本用相同规划重新生成目标及邻块，再测修复结果。`AUTOTEST_SEED` 只切换种子。设置 `AUTOTEST_REPLAY` 指向含 `level.dat` 和 `citybuilder/` 的只读快照，再用 `AUTOTEST_LAYOUT=8` 运行 `node run.mjs saved-transport.spec.mjs`，会用 SQLite 在线备份 API 将规划复制到独立的 `fabric/run/autotest-replay`；尺度覆盖只写到该副本。原区块不复制，目标区块重新生成。实测结果保存在 `build/debug/transport-replay/columns.json`。
+- **玩家存档回归**用种子 `8689008927313558369`。干道断口中心约 `(3273, -5745)`，堤顶路约 `(3250, -6560)`，钢梁净空点 `(3260, -6538)`。样本包应含地形设置、规划库的一致性副本、建筑尺度版本、模组版本和相关原区块。原区块留作修复前证据；在另一个测试工作副本用相同规划重新生成目标及邻块，再测修复结果。`AUTOTEST_SEED` 只切换种子。设置 `AUTOTEST_REPLAY` 指向含 `level.dat` 和 `citybuilder/` 的只读快照，再用 `AUTOTEST_LAYOUT=8`（复现原存档当时的布局；验证布局 9 的修复时改设 9，见下文"布局 9 的街边与建筑回归"）运行 `node run.mjs saved-transport.spec.mjs`，会用 SQLite 在线备份 API 将规划复制到独立的 `fabric/run/autotest-replay`；尺度覆盖只写到该副本。原区块不复制，目标区块重新生成。实测结果保存在 `build/debug/transport-replay/columns.json`。
 - **尺度升级对照**分别准备旧版和新版布局样本，在相同种子、区域和机位比较。记录建筑尺度版本；重启各自副本后再次生成邻块，检查地块边界接续。旧规划存档会保留旧尺度，不能用它代替新版样本。
 
 ## 街面视觉验收
@@ -59,7 +59,7 @@ try { node run.mjs --client buildings-view.spec.mjs station-square.spec.mjs } fi
 
 ## 改进清单的版本 8 回归
 
-固定 `AUTOTEST_LAYOUT=8`，在 `autotest/` 运行 `node run.mjs --client building-fit.spec.mjs castle-wards.spec.mjs rail-interfaces.spec.mjs rail-boundary.spec.mjs station-square.spec.mjs plaza-roads.spec.mjs station-circulation.spec.mjs rail-boxes.spec.mjs`。只有与故障规划输入配套的 `saved-transport.spec.mjs` 需要另设 `AUTOTEST_REPLAY`。开发服和客户端编译启动期间，应在同一代码版本下完成取样；运行中替换 class 会触发开发加载器热重载，不能充当干净生成的验证。
+这是布局 8 那一轮的回归（现在新世界默认布局 9，不设 `AUTOTEST_LAYOUT` 时按 9 跑）。固定 `AUTOTEST_LAYOUT=8`，在 `autotest/` 运行 `node run.mjs --client building-fit.spec.mjs castle-wards.spec.mjs rail-interfaces.spec.mjs rail-boundary.spec.mjs station-square.spec.mjs plaza-roads.spec.mjs station-circulation.spec.mjs rail-boxes.spec.mjs`。只有与故障规划输入配套的 `saved-transport.spec.mjs` 需要另设 `AUTOTEST_REPLAY`。开发服和客户端编译启动期间，应在同一代码版本下完成取样；运行中替换 class 会触发开发加载器热重载，不能充当干净生成的验证。
 
 | 用例 | 检查对象与证据目录（仓库 `build/debug/` 下） |
 | --- | --- |
@@ -81,3 +81,22 @@ try { node run.mjs --client buildings-view.spec.mjs station-square.spec.mjs } fi
 Codex 完成一轮测试时应分别报出通过、失败、跳过及待视觉评审的场景。服务未启动、目标未加载、客户端未入服等环境失败单列，保留日志后只重跑受影响用例。必测场景必须实际命中；无客户端运行时只报告服务端覆盖。优先跑本次改动关联的用例，全量命令为在 `autotest/` 执行 `node run.mjs --client`。
 
 站前路幅验收还沿两条实际来路分别测量左右路缘，记录多组垂直于中心线的横断面。车行检查沿真实并道方向从宽端进入窄端，并覆盖过路口后继续前进的内侧车道。
+
+## 布局 9 的街边与建筑回归
+
+在 `autotest/` 目录用 PowerShell 运行以下命令。种子 12345 使用默认地形和新世界；复现特定的已有规划时，可用 `AUTOTEST_REPLAY` 指向对应的存档快照。
+
+```powershell
+$env:AUTOTEST_LAYOUT = '9'
+node run.mjs --client urban-frontage.spec.mjs plaza-roads.spec.mjs residential-scale.spec.mjs
+```
+
+| 场景 | 核对内容与输出 |
+| --- | --- |
+| 站前老街 | `urban-frontage` 在原草坎处测五个断面的人行道、相邻地表及地块归属，再检查画面内所有铺装列，相邻两列高差不超过 0.3 格。记录在 `build/debug/urban-frontage/street-edge.json` 和 `frontage-steps.json`；客户端同机位截图为 `frontage.png`。 |
+| 并道与路缘 | `plaza-roads` 沿车道检查铺面、净空及高差，并横向测量路缘。记录在 `build/debug/station-scale/layout-9/through-lanes.json`。 |
+| 住宅与店铺 | `residential-scale` 在固定街景内选取实际建筑，沿整栋占地测首层净高。布局 9 重切了地块，跨版本对照使用同一街景和建筑用途。记录在 `build/debug/residential-scale/layout-9/measurements.json`。 |
+
+本轮住宅与店铺样本首层净高分别为 3 格和 4 格。另一次新旧存档对照检查了 22 列原先高出两格的草地，[同机位截图和结果](../docs/city-logic-design.md#布局-9-的街边地形和地块)见设计文档。
+
+复核玩家种子 `8689008927313558369` 时，保持布局 9，设置 `AUTOTEST_REPLAY` 为该世界的规划快照，再运行 `node run.mjs saved-transport.spec.mjs`。该用例单独检查干道断口、堤脚接入和铁路梁下净空。

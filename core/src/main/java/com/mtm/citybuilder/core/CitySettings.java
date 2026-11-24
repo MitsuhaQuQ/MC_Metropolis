@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 8)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 9)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,9 +33,10 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 8)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 9)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
+        settings.plots.followStreetEdges = version[0] >= 9;
         settings.buildings.castleWards = version[0] >= 8;
         settings.buildings.usableFootprints = version[0] >= 8;
         settings.buildings.streetFacingFacilities = version[0] >= 8;
@@ -1212,6 +1213,7 @@ public final class CitySettings {
      * so they come out right as built: the lots too small to build on join their neighbours, widening them.
      */
     public static final class Plots {
+        public boolean followStreetEdges = true;
         public double[] central = {4.1, 5.6, 9, 17.2, 29.9, 20, 30};
         public double[] stationFront = {4.4, 6, 9.5, 17.5, 30, 20, 30};
         public double[] oldTown = {4, 4.8, 6.6, 10.9, 18.6, 18, 30};

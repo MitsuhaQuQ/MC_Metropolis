@@ -20,9 +20,13 @@ class CitySettingsTest {
             assertEquals(!existingPlans, first.plazas.entranceApproach);
             assertEquals(!existingPlans, first.plazas.lowerEntrance);
             assertEquals(!existingPlans, first.buildings.plateauCastleKeep);
+            assertEquals(!existingPlans, first.plots.followStreetEdges);
             assertEquals(existingPlans ? 0 : 1, first.buildings.retailGroundExtra);
             assertEquals(first.toJson(), CitySettings.forBuildingLayout(store, !existingPlans).toJson());
         }
+        var previousFrontage = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+        previousFrontage.save("layout/building_scale", new byte[]{8});
+        assertFalse(CitySettings.forBuildingLayout(previousFrontage,true).plots.followStreetEdges);
         var firstKeep = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
         firstKeep.save("layout/building_scale", new byte[]{6});
         CitySettings olderKeep = CitySettings.forBuildingLayout(firstKeep, true);

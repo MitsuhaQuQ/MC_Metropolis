@@ -47,6 +47,24 @@ public record Plot(long id, int chain, int side, int index, double start, double
         return end - start;
     }
 
+    /** Open apron of a developed lot, or its designated access strip. */
+    public boolean hardFrontage() {
+        if (interior || use == Use.GARDEN || use == Use.FIELD || use == Use.STATION) return false;
+        if (pole || use == Use.PARKING) return true;
+        if (row != 0) return false;
+        return switch (district) {
+            case CENTRAL, STATION_FRONT -> depth <= 4;
+            case INDUSTRIAL, PORT -> depth <= 6;
+            default -> false;
+        };
+    }
+
+    public boolean developedStreetFront() {
+        return !interior && row == 0 && use != Use.GARDEN && use != Use.FIELD && use != Use.STATION
+                && (district == District.CENTRAL || district == District.STATION_FRONT
+                || district == District.INDUSTRIAL || district == District.PORT);
+    }
+
     /** What a back lot, or a merged parcel, is for. */
     public enum Use {
         /** A house behind the street (a back house, a detached house on a flag lot). */

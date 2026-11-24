@@ -265,7 +265,7 @@ public final class CityChunks {
         return slopeFacing;
     }
 
-    private static void verge(ChunkAccess chunk, double street, double outside, boolean wall, double tx, double tz,
+    private static void verge(ChunkAccess chunk, double street, double outside, boolean wall, boolean frontage, double tx, double tz,
                               int wx, int wz, int x, int z, BlockPos.MutableBlockPos pos, int top) {
         int surface = Math.min(top, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) + 2);
         int ground = surface;
@@ -277,11 +277,33 @@ public final class CityChunks {
             state = chunk.getBlockState(pos.set(wx, --ground, wz));
         }
         int level = (int) Math.floor(street);
+        boolean apron = frontage && outside < 2;
+        if (apron) {
+            // The apron tops out where the pavement beside it does (half a block over the street's level, cut to
+            // eighths), paved in the pavement's own slabs, so no step stands up between them on a falling street
+            int[] cap = surface(street);
+            int y = Math.max(chunk.getMinBuildHeight() + 2, Math.min(top, cap[0]));
+            BlockState slab = CityBlocks.SIDEWALK.get().defaultBlockState();
+            for (int h = ground; h < y - 2; h++) {
+                chunk.setBlockState(pos.set(wx, h, wz), Blocks.DIRT.defaultBlockState(), false);
+            }
+            for (int h = y + 1; h <= surface; h++) {
+                chunk.setBlockState(pos.set(wx, h, wz), Blocks.AIR.defaultBlockState(), false);
+            }
+            for (int k = 1; k <= 2; k++) {
+                chunk.setBlockState(pos.set(wx, y - k, wz), slab, false);
+            }
+            chunk.setBlockState(pos.set(wx, y, wz), slab.setValue(PavingBlock.HEIGHT, cap[1]), false);
+            return;
+        }
+        if (frontage) outside = Math.max(0, outside-2) * ChunkLayer.VERGE / (ChunkLayer.VERGE-2);
         if (wall && Math.abs(ground - level) >= 2) {
             // A concrete retaining wall (擁壁) along the street's edge, straight up or down to the land, which is
             // left as it is beyond it: the wall's block a block out, from the land to the street's level (the street
             // above), or from the street's level up to the land (the street in a cutting)
-            if (outside < 1.0) {
+            // A band a block and a half deep, so a wall running diagonally to the grid (whose columns' distances
+            // from the street step by up to 0.7 a block, more once the frontage stretches them) misses no column
+            if (outside < 1.5) {
                 BlockState concrete = retainingWall();
                 if (ground < level) {
                     for (int y = ground; y <= level; y++) {
@@ -694,7 +716,18 @@ public final class CityChunks {
                     } else if (grades != null && grades.stationLawn()!=null && Double.isFinite(grades.stationLawn()[x*16+z])) {
                         bank(chunk, grades.stationLawn()[x*16+z], ChunkLayer.BANK_SLOPE, baseX+x,baseZ+z,x,z,pos,top);
                     } else if (grades != null && !Double.isNaN(grades.verge()[x * 16 + z])) {
-                        verge(chunk, grades.verge()[x * 16 + z], grades.outside()[x * 16 + z], grades.wall()[x * 16 + z],
+                        int wx = baseX+x, wz = baseZ+z;
+                        var logic = CityWorlds.of(level.getLevel());
+                        var owner = logic != null && logic.settings().plots.followStreetEdges
+                                ? logic.urban(wx+0.5,wz+0.5).owner() : null;
+                        var plot = owner == null ? null : logic.plots().town(owner).at(wx+0.5,wz+0.5);
+                        boolean frontage = owner != null && (plot != null ? plot.developedStreetFront()
+                                : switch (logic.streetPlan(owner).districts().at(wx+0.5,wz+0.5)) {
+                                    case CENTRAL, STATION_FRONT, INDUSTRIAL, PORT -> true;
+                                    default -> false;
+                                })
+                                && logic.functions().town(owner).facilityAt(wx+0.5,wz+0.5) == null;
+                        verge(chunk, grades.verge()[x * 16 + z], grades.outside()[x * 16 + z], grades.wall()[x * 16 + z], frontage,
                                 grades.towardX()[x * 16 + z], grades.towardZ()[x * 16 + z], baseX + x, baseZ + z, x, z, pos, top);
                     }
                     continue;
