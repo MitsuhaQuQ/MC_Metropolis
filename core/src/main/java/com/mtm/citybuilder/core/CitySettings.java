@@ -37,6 +37,7 @@ public final class CitySettings {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
         settings.buildings.terracedBaileys = version[0] >= 10;
+        settings.buildings.batteredKeep = version[0] >= 10;
         settings.plots.followStreetEdges = version[0] >= 9;
         settings.buildings.castleWards = version[0] >= 8;
         settings.buildings.usableFootprints = version[0] >= 8;

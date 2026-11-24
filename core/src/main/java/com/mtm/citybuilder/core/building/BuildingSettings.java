@@ -14,6 +14,8 @@ public final class BuildingSettings {
     public boolean castleWards = true;
     /** The baileys inside the outer moat rise in stone-faced terraces, not one flat lawn each. */
     public boolean terracedBaileys = true;
+    /** The full-size keep's base spreads at its foot (扇の勾配) and a flight of steps climbs to its door. */
+    public boolean batteredKeep = true;
     /** Validate the final raster footprint on narrow lots and refit rail-side wedges. */
     public boolean usableFootprints = true;
     /** Place civic and roadside facilities with their entrance frontage on a surveyed street edge. */

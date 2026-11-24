@@ -74,7 +74,8 @@ final class WalkingCheck {
                     || !state.isFaceSturdy(level,pos,Direction.UP) && !id.endsWith("_stairs") && !id.startsWith("sidewalk")
                     && !id.startsWith("asphalt") && !id.equals("curb_edge"))) continue;
             if(!lot && !hall && !(id.startsWith("asphalt")||id.startsWith("sidewalk")||id.startsWith("tactile")||id.equals("curb_edge")
-                    ||id.equals("gravel")||id.equals("spruce_planks")||id.equals("stone_brick_stairs")||id.equals("dirt_path")
+                    ||id.equals("gravel")||id.equals("spruce_planks")||id.equals("stone_brick_stairs")||id.equals("stone_stairs")
+                    ||id.equals("stone_ashlar")||id.equals("dirt_path")
                     ||id.equals("side_ditch_grate")||id.equals("granite_gray")||id.equals("terminal_tile")
                     ||id.equals("manhole")||id.equals("drain_grate")||id.equals("smooth_stone"))) continue;
             boolean road=id.startsWith("asphalt") || id.equals("manhole") || id.equals("drain_grate");

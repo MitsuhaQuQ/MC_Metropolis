@@ -470,6 +470,75 @@ public final class ParkParts {
         return m;
     }
 
+    /** Height of the keep's stone base (天守台) over the upper court, its top course included. */
+    static final int KEEP_BASE = 11;
+    /** How far the base's foot spreads out from its face (扇の勾配: steep at the top, flaring at the foot). */
+    static final int KEEP_BATTER = 4;
+    /** The keep's first storey's floor over the upper court, where its door opens. */
+    static final int KEEP_DOOR_FLOOR = 12;
+
+    /**
+     * The keep's stone base battered and climbed: round its upright masonry a foot of stone that flares out
+     * {@link #KEEP_BATTER} blocks, high by the face and falling away on a concave curve; and up its front, along the
+     * face, a flight of stone steps three wide from the upper court to a landing at the first storey's floor, with a
+     * door cut through the wall there. In the court's frame: the keep's corner at (kx, ky, kz), its front to +z, the
+     * upper court between x0 and x1 and up to z1.
+     */
+    static void keepBase(Model m, int kx, int ky, int kz, int x0, int x1, int z1) {
+        Model keep = CastleAsset.KEEP.template();
+        int kw = keep.width(), kd = keep.depth();
+        boolean[][] foot = new boolean[kw][kd];
+        keep.forEach((x, y, z, state) -> {
+            if (y == 0) foot[x][z] = true;
+        });
+        int mid = kx + kw / 2;
+        // The front face along the middle, and the flight's place before it
+        int face = kz;
+        for (int z = kd - 1; z >= 0; z--) {
+            if (foot[kw / 2][z]) {
+                face = kz + z;
+                break;
+            }
+        }
+        int stairZ0 = face + 1, stairZ1 = face + 3;
+        int stairX0 = mid - 1, stairX1 = mid + 1 + KEEP_DOOR_FLOOR;
+        String stone = "minecraft:stone_bricks";
+        for (int x = x0 + 1; x < x1; x++) {
+            for (int z = 1; z < z1; z++) {
+                int lx = x - kx, lz = z - kz;
+                if (lx >= 0 && lx < kw && lz >= 0 && lz < kd && foot[lx][lz]) continue;
+                if (x >= stairX0 && x <= stairX1 && z >= stairZ0 && z <= stairZ1) continue;
+                double d = Double.MAX_VALUE;
+                for (int dx = -KEEP_BATTER; dx <= KEEP_BATTER; dx++) {
+                    for (int dz = -KEEP_BATTER; dz <= KEEP_BATTER; dz++) {
+                        int fx = lx + dx, fz = lz + dz;
+                        if (fx >= 0 && fx < kw && fz >= 0 && fz < kd && foot[fx][fz]) d = Math.min(d, Math.hypot(dx, dz));
+                    }
+                }
+                double t = 1 - d / (KEEP_BATTER + 1);
+                int h = t <= 0 ? 0 : (int) Math.round(KEEP_BASE * t * t);
+                for (int y = 0; y < h; y++) m.set(x, ky + y, z, stone);
+            }
+        }
+        // The flight: a landing before the door, then a step down each block eastwards to the court
+        for (int x = stairX0; x <= stairX1; x++) {
+            int top = x <= mid + 1 ? KEEP_DOOR_FLOOR : KEEP_DOOR_FLOOR - (x - mid - 1);
+            for (int z = stairZ0; z <= stairZ1; z++) {
+                for (int y = 0; y < top; y++) m.set(x, ky + y, z, stone);
+                m.set(x, ky + top, z, x <= mid + 1 ? "citybuilder:stone_ashlar"
+                        : "minecraft:stone_stairs[facing=west,half=bottom,shape=straight,waterlogged=false]");
+                for (int y = top + 1; y <= top + 3; y++) m.remove(x, ky + y, z);
+            }
+        }
+        // The door: through the wall at the first storey, its sill the floor
+        for (int x = mid - 1; x <= mid + 1; x++) {
+            for (int z = face - 1; z <= face; z++) {
+                m.set(x, ky + KEEP_DOOR_FLOOR, z, "minecraft:spruce_planks");
+                for (int y = KEEP_DOOR_FLOOR + 1; y <= KEEP_DOOR_FLOOR + 2; y++) m.set(x, ky + y, z, "minecraft:air");
+            }
+        }
+    }
+
     /** A castle court with its gate to the south, built up behind two flights of stone steps. */
     public static Model honmaru(int width, int depth, long seed) {
         return honmaru(width, depth, seed, false);
@@ -484,6 +553,12 @@ public final class ParkParts {
     }
 
     public static Model honmaru(int width, int depth, long seed, boolean keep, boolean himeji, int lowerGateEave) {
+        return honmaru(width, depth, seed, keep, himeji, lowerGateEave, true);
+    }
+
+    /** With {@code battered}, the full-size keep's base spreads at its foot and a flight climbs to its door. */
+    public static Model honmaru(int width, int depth, long seed, boolean keep, boolean himeji, int lowerGateEave,
+                                boolean battered) {
         boolean largeGate = lowerGateEave > 0;
         Model m = new Model();
         int mid = width / 2;
@@ -525,7 +600,9 @@ public final class ParkParts {
         m.place(gate, mid - gate.width() / 2, lowerHeight + 1, upperEnd + 1, true);
 
         if (himeji) {
-            HimejiKeep.place(m, (width - HimejiKeep.width()) / 2, upperHeight + 1, 4);
+            int kx = (width - HimejiKeep.width()) / 2, ky = upperHeight + 1, kz = 4;
+            HimejiKeep.place(m, kx, ky, kz);
+            if (battered) keepBase(m, kx, ky, kz, inset, width - inset - 1, upperEnd);
             return m;
         }
         // A turret at the back of the upper court, with another tier where the town has a keep.

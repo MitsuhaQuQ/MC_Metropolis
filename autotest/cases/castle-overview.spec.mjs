@@ -43,6 +43,18 @@ test('castle site overview', async ({}, info) => {
       section.push({axis,s,x,z,top:top?.top,id:top?.id});
     }
   }
+  // The keep's flight: its landing (ashlar on top, at the first storey's floor) reached on foot from the court's
+  // upper steps
+  let landing=null;
+  for (let x=keep.minX; x<=keep.maxX && !landing; x++) for (let z=keep.minZ; z<=keep.maxZ; z++) {
+    const p=await server.columnProfile(x,z,keep.ground+16,keep.ground+18);
+    if (p.blocks.some(b=>b.id==='citybuilder:stone_ashlar' && b.y===keep.ground+17)) { landing=[x,keep.ground+18,z]; break; }
+  }
+  expect(landing,'keep landing').not.toBeNull();
+  const [ux,uy,uz]=keep.upperLanding;
+  const climb=await server.walkRoute({x:ux,z:uz,y:uy,endX:landing[0],endY:landing[1],endZ:landing[2],margin:40});
+  writeFileSync(join(out,'keep-climb.json'),JSON.stringify({landing,from:keep.upperLanding,found:climb.found,nearest:climb.nearest,steps:climb.path?.length}));
+  expect(climb.found,'court to keep door, nearest '+climb.nearest).toBe(true);
   writeFileSync(join(out,'section.json'),JSON.stringify({keep:{x:cx,z:cz,y:keep.ground},section},null,1));
   if (!clientRunning()) return;
   if(!(await client.state()).inWorld) await client.join();
@@ -58,6 +70,14 @@ test('castle site overview', async ({}, info) => {
     await photograph(out,info,'oblique-'+name,x,y0+45,z,yaw,28);
   }
   await photograph(out,info,'low-sw',cx-120,y0+12,cz-120,-45,4);
+  // The keep's battered base and its flight, from the court before it
+  {
+    const [lx,ly,lz]=landing;
+    const dx=Math.sign(lx-cx)||0, dz=Math.sign(lz-cz)||0;
+    const x=lx+dx*26+dz*14, z=lz+dz*26-dx*14;
+    const yaw=Math.atan2(-(lx-x),(lz-z))*180/Math.PI;
+    await photograph(out,info,'keep-front',x,ly-6,z,yaw,-8);
+  }
   // A terrace's stone wall and its plastered wall, from the lower terrace in front of it
   let wall=null;
   search: for (const [dx,dz] of [[-1,0],[0,-1],[1,0],[0,1]]) {

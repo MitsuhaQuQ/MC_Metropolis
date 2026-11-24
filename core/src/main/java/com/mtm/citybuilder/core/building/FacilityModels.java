@@ -974,7 +974,8 @@ public final class FacilityModels {
             if (himeji && logic.settings().buildings.largeCastleGate) {
                 lowerGateEave = logic.settings().buildings.castleWards ? 9 : 8;
             }
-            Model court = ParkParts.honmaru(width, depth, seed, keep, himeji, lowerGateEave).rotated(gateSide - 2);
+            Model court = ParkParts.honmaru(width, depth, seed, keep, himeji, lowerGateEave,
+                    logic.settings().buildings.batteredKeep).rotated(gateSide - 2);
             int minX = (int) Math.floor(site[1] - court.width() * 0.5);
             int minZ = (int) Math.floor(site[2] - court.depth() * 0.5);
             int maxX = minX + court.width() - 1, maxZ = minZ + court.depth() - 1;

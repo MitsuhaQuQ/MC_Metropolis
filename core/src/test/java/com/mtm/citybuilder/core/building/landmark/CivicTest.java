@@ -34,6 +34,40 @@ class CivicTest {
     }
 
     @Test
+    void keepBaseIsBatteredAndClimbedToADoor() {
+        int width = HimejiKeep.width() + 10, depth = HimejiKeep.depth() + 24;
+        Model court = ParkParts.honmaru(width, depth, 11, true, true);
+        int kx = (width - HimejiKeep.width()) / 2, ky = 5, mid = kx + HimejiKeep.width() / 2;
+        // Beside the keep's west face, the foot spreads out and falls away
+        int faceX = kx;
+        while (!court.has(faceX, ky, depth / 3) && faceX < width) faceX++;
+        int previous = Integer.MAX_VALUE;
+        for (int d = 1; d <= 2; d++) {
+            int h = 0;
+            while (court.has(faceX - d, ky + h, depth / 3)) h++;
+            assertTrue(h > 0 && h < previous, "batter at " + d + ": " + h);
+            previous = h;
+        }
+        // The flight rises a block a step from the court to the landing before the door, which opens on the floor
+        int face = depth - 1;
+        while (!"minecraft:air".equals(court.get(mid, ky + ParkParts.KEEP_DOOR_FLOOR + 1, face))) face--;
+        int z = face + 2;
+        int last = -1;
+        for (int x = mid + 1 + ParkParts.KEEP_DOOR_FLOOR; x >= mid + 2; x--) {
+            int top = ky;
+            while (court.has(x, top + 1, z)) top++;
+            assertTrue(court.get(x, top, z).startsWith("minecraft:stone_stairs"), "step at " + x + ": " + court.get(x, top, z));
+            if (last >= 0) assertEquals(last + 1, top, "rise at " + x);
+            last = top;
+            assertTrue(!court.has(x, top + 1, z) && !court.has(x, top + 2, z), "headroom at " + x);
+        }
+        assertEquals("citybuilder:stone_ashlar", court.get(mid, ky + ParkParts.KEEP_DOOR_FLOOR, z));
+        for (int y = 1; y <= 2; y++) {
+            assertEquals("minecraft:air", court.get(mid, ky + ParkParts.KEEP_DOOR_FLOOR + y, face), "door");
+        }
+    }
+
+    @Test
     void himejiKeepIncludesTheOriginalBaseAndRoof() {
         Model keep = new Model();
         HimejiKeep.place(keep, 0, 0, 0);
