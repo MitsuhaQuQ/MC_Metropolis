@@ -162,7 +162,11 @@ class PlotLayerTest {
                 double nx = -Math.sin(plot.heading()) * plot.side();
                 double nz = Math.cos(plot.heading()) * plot.side();
                 Plot back = plots.at(x + nx * 2.0, z + nz * 2.0);
-                if (back != null && back.chain() == plot.chain() && back.side() == plot.side()) {
+                // (Along a straight street of even width: where it widens or narrows the lots follow its slanting
+                // edge, and round a bend they fan out)
+                if (back != null && back.chain() == plot.chain() && back.side() == plot.side()
+                        && Math.abs(back.streetWidth() - plot.streetWidth()) < 1.0
+                        && Math.abs(Math.IEEEremainder(back.heading() - plot.heading(), 2 * Math.PI)) < 0.05) {
                     assertEquals(plot.index(), back.index(), plot + " / " + back);
                     checked++;
                 }

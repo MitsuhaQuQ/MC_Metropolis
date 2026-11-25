@@ -4698,6 +4698,11 @@ public final class StreetLayer {
                             }
                             // Running its way: within the two pavings; across it, its middle within the wider paving
                             double reach = config.continuousCarriageways || wide.contains(q) ? 0.5 * h.width() - 0.5 : 0.5 * (h.width() + g.width()) - 0.5;
+                            if (config.sideBySide && !wide.contains(q) && h.width() >= g.width()) {
+                                // Side by side, its way: covered wherever the two pavings run together by a block or
+                                // more (the middle line may lie well outside the other's paving)
+                                reach = Math.max(reach, 0.5 * (h.width() + g.width()) - config.sideBySideOverlap);
+                            }
                             if (distanceToSegment(x, z, h) < reach) {
                                 covered++;
                                 if (config.continuousCarriageways) owners.add(q);

@@ -39,6 +39,7 @@ public final class CitySettings {
         settings.streets.teeEnds = version[0] >= 14;
         settings.streets.dryEnds = version[0] >= 14;
         settings.streets.bridgeEnds = version[0] >= 14;
+        settings.streets.sideBySide = version[0] >= 14;
         settings.transit.smoothStations = version[0] >= 14;
         settings.buildings.castleRamps = version[0] >= 13;
         settings.buildings.clearOfStreets = version[0] >= 13;
@@ -886,6 +887,13 @@ public final class CitySettings {
          * pavement's rim across it.
          */
         public boolean bridgeEnds = true;
+        /**
+         * A street running alongside a wider one with {@code sideBySideOverlap} blocks or more of its width under the
+         * wider one's paving is that road laid twice and taken out, as one with its middle line inside it is: two roads
+         * side by side, their pavings run together (often at different heights, one on a levee), are not laid.
+         */
+        public boolean sideBySide = true;
+        public double sideBySideOverlap = 1.0;
         /** A metropolis is a planned capital where this share of its built land is flat, and its hash below the chance. */
         public double joriFlatShare = 0.7;
         public double joriChance = 0.5;

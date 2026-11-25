@@ -1743,6 +1743,23 @@ public final class BuildingLayer {
      * Whether the glass of a window set back from its wall stands in a column of the layer behind the wall, at a
      * height above the building's base (not at a floor's level, where a band stands).
      */
+    /**
+     * Whether a block just behind the walls lies behind a face whose glass is set back at a storey: any of the faces it
+     * is within two blocks of (a corner's is behind two), its window row there a window.
+     */
+    private static boolean behindGlass(Building b, Column c, int storey, int height) {
+        double in = c.v() - b.front();
+        double out = b.back() - c.v();
+        double side = Math.min(c.u(), b.width() - c.u());
+        for (Face f : new Face[]{Face.FRONT, Face.BACK, Face.SIDE}) {
+            double d = f == Face.FRONT ? in : f == Face.BACK ? out : side;
+            if (d >= 1.0 && d < 2.0 && wall(b, c, f, false, storey, 1, height) == Part.WINDOW) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean setBack(Building b, Column c, int dy) {
         if (c == null || dy <= 0 || dy >= b.wallHeight() || terrace(b, c) && dy >= b.floorOf(b.step())) {
             return false;
@@ -2231,6 +2248,11 @@ public final class BuildingLayer {
                     // glass meets the wall round it and the room does not show past its edges
                     Part own = wall(b, c, c.inner(), false, storey, row, height);
                     return own == Part.TRIM || own == Part.ACCENT || own == Part.WALL_ALT ? own : Part.WALL;
+                }
+                if (row == 0 && c.inner() != Face.NONE && recessed(b, storey) && behindGlass(b, c, storey, height)) {
+                    // A corner's inner block, behind a wall other than the one it is counted to (the front's, by the
+                    // side whose glass is set back): its floor's edge faced with the band too
+                    return Part.ACCENT;
                 }
                 Part inside = interior(b, c, storey, row);
                 if (inside != null) {

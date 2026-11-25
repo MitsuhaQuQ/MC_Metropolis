@@ -491,7 +491,10 @@ class BuildingLayerTest {
             for (double z = extent.coreZ() - 2500; z < extent.coreZ() + 2500 && found.size() < 3; z += 8) {
                 Plot plot = plots.at(x, z);
                 Building b = layer.building(plots, plot);
-                if (b != null && BuildingLayer.plant(b) && !BuildingLayer.plantEquipment(b).isEmpty()) {
+                // A power station with room for its stack (a small one may have none)
+                if (b != null && BuildingLayer.plant(b) && !BuildingLayer.plantEquipment(b).isEmpty()
+                        && (b.program() != Program.POWER_PLANT || BuildingLayer.plantEquipment(b).stream()
+                        .anyMatch(e -> e.kind() == BuildingLayer.Equipment.STACK))) {
                     found.putIfAbsent(b.program(), b);
                 }
             }
