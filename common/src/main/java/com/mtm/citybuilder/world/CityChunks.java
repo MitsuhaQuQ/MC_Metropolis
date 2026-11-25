@@ -31,6 +31,8 @@ public final class CityChunks {
     private static final int HEADROOM = 4;
     /** How far above a street {@link #clear} looks for what grew over it. */
     private static final int CLEAR_REACH = 24;
+    /** How far out from an intercity road's edge no bamboo is left standing. */
+    private static final int BAMBOO_CLEAR = 4;
 
 
     private static volatile boolean failed;
@@ -1203,7 +1205,11 @@ public final class CityChunks {
         }
     }
 
-    /** Whatever grew over an intercity road on the ground or a bridge, a bridge's parapets kept; not in a tunnel. */
+    /**
+     * Whatever grew over an intercity road on the ground or a bridge, a bridge's parapets kept; not in a tunnel. And
+     * bamboo off the road's shoulders, {@link #BAMBOO_CLEAR} out from its edge: a stalk there leans its leaves over
+     * the paving (the user, 2026-11-25).
+     */
     private static void clearOverRoads(ChunkAccess chunk, RoadChunks.Cell[] cells,
                                        java.util.List<com.mtm.citybuilder.core.building.FacilityModels.Placed> spans) {
         if (cells == null) {
@@ -1212,9 +1218,20 @@ public final class CityChunks {
         int baseX = chunk.getPos().getMinBlockX();
         int baseZ = chunk.getPos().getMinBlockZ();
         int max = chunk.getMaxBuildHeight() - 1;
+        int min = chunk.getMinBuildHeight();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int c = 0; c < 256; c++) {
             RoadChunks.Cell cell = cells[c];
+            if (cell != null && cell.outside() < BAMBOO_CLEAR && cell.kind() != com.mtm.citybuilder.core.road.RoadKind.TUNNEL) {
+                int x = baseX + c / 16;
+                int z = baseZ + c % 16;
+                for (int y = Math.max(min, cell.level() - BAMBOO_CLEAR - 2); y <= Math.min(max, cell.level() + CLEAR_REACH); y++) {
+                    BlockState state = chunk.getBlockState(pos.set(x, y, z));
+                    if (state.is(Blocks.BAMBOO) || state.is(Blocks.BAMBOO_SAPLING)) {
+                        chunk.setBlockState(pos, Blocks.AIR.defaultBlockState(), false);
+                    }
+                }
+            }
             if (cell == null || !cell.onRoad() || cell.kind() == com.mtm.citybuilder.core.road.RoadKind.TUNNEL) {
                 continue;
             }

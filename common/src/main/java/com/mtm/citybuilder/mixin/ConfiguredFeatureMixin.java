@@ -17,8 +17,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /**
  * Keeps the trees of the biome, its bamboo (a bamboo jungle's, which would stand over the roofs), its huge mushrooms
  * and its forest boulders out of the towns' built land and the
- * airports: none is placed where no tree is allowed; and its lakes (lava's too) and springs out of the towns' land
- * altogether.
+ * airports: none is placed where no tree is allowed; and its bamboo, lakes (lava's too) and springs out of the towns'
+ * land altogether.
  */
 @Mixin(ConfiguredFeature.class)
 abstract class ConfiguredFeatureMixin {
@@ -30,6 +30,11 @@ abstract class ConfiguredFeatureMixin {
         if ((feature instanceof TreeFeature || feature instanceof BlockBlobFeature || feature instanceof AbstractHugeMushroomFeature
                 || feature instanceof net.minecraft.world.level.levelgen.feature.BambooFeature)
                 && !CityChunks.treeAllowed(level, origin)) {
+            cir.setReturnValue(false);
+        }
+        // Bamboo stands far thicker than trees and lifts its stalks over everything: none on a town's land at all
+        // (its edge too, where trees thin out by chance), nor on an airport
+        if (feature instanceof net.minecraft.world.level.levelgen.feature.BambooFeature && CityChunks.inTown(level, origin)) {
             cir.setReturnValue(false);
         }
         // Lava and water lakes and the springs out of a hillside: none in a town, where they would open on a street
