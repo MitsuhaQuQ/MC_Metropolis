@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 15)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 16)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,9 +33,11 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 15)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 16)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
+        settings.roads.landEnds = version[0] >= 16;
+        settings.rail.landEnds = version[0] >= 16;
         settings.transit.pinnedFirst = version[0] >= 15;
         settings.streets.teeEnds = version[0] >= 14;
         settings.streets.dryEnds = version[0] >= 14;
@@ -499,6 +501,11 @@ public final class CitySettings {
      * a pass, switchbacks and a tunnel by what they cost, then given a profile no steeper than {@code maxGrade}.
      */
     public static final class Roads {
+        /**
+         * A line's ends on a lake (a town placed over one) moved to the nearest dry land once the lakes along its way
+         * are known: it ran out over the water to the town's point, and lines meeting there crossed on the lake.
+         */
+        public boolean landEnds = true;
         /** Longest trunk and local road, straight from end to end. */
         public double trunkMaxLength = 24000.0;
         public double localMaxLength = 10000.0;
@@ -582,6 +589,11 @@ public final class CitySettings {
      * profile no steeper than its grade; where the ground stands far above or below it, tunnels and bridges.
      */
     public static final class Rail {
+        /**
+         * A line's ends on a lake (a town placed over one) moved to the nearest dry land once the lakes along its way
+         * are known: it ran out over the water to the town's point, and lines meeting there crossed on the lake.
+         */
+        public boolean landEnds = true;
         /** Longest line, straight from end to end. */
         public double maxLength = 30000.0;
         /** The routing window reaches this far around the two ends, plus {@code windowFactor} of their distance. */

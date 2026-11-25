@@ -204,6 +204,37 @@ public final class RailLayer {
         }
 
         /** Marks rivers and lakes within the corridor around a route's cells, as the full L1 shows them. */
+        /**
+         * The nearest node to a town's point that is dry land with the lakes counted (the full suitability has a value
+         * there), searched out ring by ring to {@code reach} nodes; -1 for none. A town's point may lie on a lake (its
+         * placement does not look at lakes), and a line ended there ran out over the water to it.
+         */
+        int dryEnd(double x, double z, int reach) {
+            int ci = (int) Math.round(x / grid) - originX;
+            int cj = (int) Math.round(z / grid) - originZ;
+            for (int r = 0; r <= reach; r++) {
+                int best = -1;
+                double bestDistance = Double.POSITIVE_INFINITY;
+                for (int i = ci - r; i <= ci + r; i++) {
+                    for (int j = cj - r; j <= cj + r; j++) {
+                        if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) != r || !inside(i, j)
+                                || kind[i * height + j] != LAND || Double.isNaN(below.suitabilityNode(originX + i, originZ + j))) {
+                            continue;
+                        }
+                        double distance = Math.hypot(i - ci, j - cj);
+                        if (distance < bestDistance) {
+                            bestDistance = distance;
+                            best = i * height + j;
+                        }
+                    }
+                }
+                if (best >= 0) {
+                    return best;
+                }
+            }
+            return -1;
+        }
+
         void markWater(List<Integer> cells) {
             int reach = (int) Math.ceil(config.corridor / grid);
             boolean[] seen = new boolean[width * height];
@@ -243,6 +274,14 @@ public final class RailLayer {
             return RailRoute.none(edge);
         }
         window.markWater(cells);
+        if (config.landEnds) {
+            // Ends on a lake moved to its shore
+            int reach = (int) Math.ceil(2000.0 / grid);
+            int dryStart = window.dryEnd(edge.a().x(), edge.a().z(), reach);
+            int dryGoal = window.dryEnd(edge.b().x(), edge.b().z(), reach);
+            start = dryStart >= 0 ? dryStart : start;
+            goal = dryGoal >= 0 ? dryGoal : goal;
+        }
         cells = Alignment.search(window.width, window.height, grid, start, goal, steps, config.turnCost, cost);
         if (cells == null || cells.size() < 2) {
             return RailRoute.none(edge);
