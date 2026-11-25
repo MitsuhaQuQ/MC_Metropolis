@@ -670,7 +670,7 @@ public final class ChunkLayer {
                          Map<Long, List<double[]>> canals, Map<Long, List<StationPlaza>> plazas,
                          Map<Long, List<Stop>> stops, Map<Long, Double> heights, boolean[][] round,
                          Map<Long, List<double[]>> banks, double[][][] interior, int[] street, List<double[]> curbBounds, StreetWidths widths, CastleTerrain castle,
-                         double[][] tees) {
+                         double[][] tees, DryEnds dry) {
         /**
          * Whether a column lies on a piece's paving: within half its width of its line and, past an end, only where
          * that end is round (a bend's outside); a square end stops at the end's line.
@@ -681,6 +681,13 @@ public final class ChunkLayer {
             double dz = g.z2() - g.z1();
             double length2 = Math.max(1e-9, dx * dx + dz * dz);
             double t = ((x - g.x1()) * dx + (z - g.z1()) * dz) / length2;
+            if (dry != null) {
+                // A dead end cut back off the water stops square at its cut
+                double[] range = dry.range(p);
+                if (range[0] > 0 && t < range[0] || range[1] < 1 && t > range[1] || range[0] >= range[1]) {
+                    return false;
+                }
+            }
             if (t >= 0 && t <= 1 || t < 0 && round[p][0] || t > 1 && round[p][1]) {
                 // A T's stem stops at the centre line of the street it meets
                 double[] tee = tees == null ? null : tees[2 * p + (t > 0.5 ? 1 : 0)];
@@ -2015,6 +2022,134 @@ public final class ChunkLayer {
         return out;
     }
 
+    /**
+     * The streets without the stubs a wide street's end can be left with ({@link CitySettings.Streets#dryEnds}): a
+     * piece shorter than half its width, one end joined to the street's other pieces and the other loose. Its square end,
+     * as wide as the street and turned with its own short line, stood out sideways past the street's edges.
+     */
+    static List<StreetSegment> withoutStubs(List<StreetSegment> segments) {
+        Map<Long, Integer> count = new HashMap<>();
+        for (StreetSegment g : segments) {
+            count.merge(point(g.x1(), g.z1()), 1, Integer::sum);
+            count.merge(point(g.x2(), g.z2()), 1, Integer::sum);
+        }
+        List<StreetSegment> kept = new ArrayList<>(segments.size());
+        for (StreetSegment g : segments) {
+            int a = count.get(point(g.x1(), g.z1()));
+            int b = count.get(point(g.x2(), g.z2()));
+            boolean stub = g.structure() != StreetStructure.BRIDGE && g.streetClass() != StreetClass.PATH
+                    && g.length() < 0.5 * g.width() && (a == 1) != (b == 1);
+            if (!stub) {
+                kept.add(g);
+            }
+        }
+        return kept;
+    }
+
+    /**
+     * Which ends of each piece are dead ends ({@link DryEnds}): no other piece ends there and it lies on no other
+     * street's paving. Footpaths, steps and bridges have none.
+     */
+    static boolean[][] deadEnds(List<StreetSegment> segments, Map<Long, List<Integer>> byChunk) {
+        Map<Long, Integer> count = new HashMap<>();
+        for (StreetSegment g : segments) {
+            count.merge(point(g.x1(), g.z1()), 1, Integer::sum);
+            count.merge(point(g.x2(), g.z2()), 1, Integer::sum);
+        }
+        boolean[][] dead = new boolean[segments.size()][2];
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            if (g.structure() == StreetStructure.BRIDGE || g.structure() == StreetStructure.STAIRS
+                    || g.streetClass() == StreetClass.PATH) {
+                continue;
+            }
+            for (int e = 0; e < 2; e++) {
+                double ex = e == 0 ? g.x1() : g.x2();
+                double ez = e == 0 ? g.z1() : g.z2();
+                if (count.get(point(ex, ez)) > 1) {
+                    continue;
+                }
+                boolean on = false;
+                List<Integer> near = byChunk.get(key(Math.floorDiv((int) Math.floor(ex), 16), Math.floorDiv((int) Math.floor(ez), 16)));
+                for (int q : near == null ? List.<Integer>of() : near) {
+                    StreetSegment o = segments.get(q);
+                    if (q == p || o.streetClass() == StreetClass.PATH) {
+                        continue;
+                    }
+                    on |= distance(o, ex, ez) <= 0.5 * o.width() + 0.5;
+                }
+                dead[p][e] = !on;
+            }
+        }
+        return dead;
+    }
+
+    /**
+     * Dead ends cut back off the water ({@link CitySettings.Streets#dryEnds}): the planning knows lakes and rivers on a
+     * coarse grid, so a street may run on a little way into a lake whose flat shore lies barely above its water. Each
+     * dead end is cut back to the first point, from its loose end in, where its middle and both edges are on dry land
+     * as generated; a piece wholly in the water is not laid at all. Worked out the first time a piece is paved (the
+     * detailed terrain there is wanted for the chunk anyway), the same whichever chunk asks first.
+     */
+    static final class DryEnds {
+        private static final double[] WHOLE = {0.0, 1.0};
+        private final List<StreetSegment> segments;
+        private final boolean[][] dead;
+        private final com.mtm.citybuilder.core.terrain.TerrainView terrain;
+        private final Map<Integer, double[]> ranges = new java.util.concurrent.ConcurrentHashMap<>();
+
+        DryEnds(List<StreetSegment> segments, boolean[][] dead, com.mtm.citybuilder.core.terrain.TerrainView terrain) {
+            this.segments = segments;
+            this.dead = dead;
+            this.terrain = terrain;
+        }
+
+        /** The stretch of a piece laid, {from, to} as fractions of it from its first end. */
+        double[] range(int p) {
+            if (!dead[p][0] && !dead[p][1]) {
+                return WHOLE;
+            }
+            return ranges.computeIfAbsent(p, this::measure);
+        }
+
+        private double[] measure(int p) {
+            StreetSegment g = segments.get(p);
+            double length = g.length();
+            if (length < 1e-6) {
+                return WHOLE;
+            }
+            double from = dead[p][0] ? dry(g, 0, length) / length : 0.0;
+            double to = dead[p][1] ? 1.0 - dry(g, 1, length) / length : 1.0;
+            return new double[]{from, to};
+        }
+
+        /** How far in from an end, a block at a time, the piece first stands on dry land across its width. */
+        private double dry(StreetSegment g, int e, double length) {
+            double ux = (g.x2() - g.x1()) / length;
+            double uz = (g.z2() - g.z1()) / length;
+            double ex = e == 0 ? g.x1() : g.x2();
+            double ez = e == 0 ? g.z1() : g.z2();
+            double sx = e == 0 ? ux : -ux;
+            double sz = e == 0 ? uz : -uz;
+            double half = 0.5 * g.width() + 0.5;
+            for (double s = 0.0; s < length; s += 1.0) {
+                double x = ex + sx * s;
+                double z = ez + sz * s;
+                if (!wet(x, z) && !wet(x - uz * half, z + ux * half) && !wet(x + uz * half, z - ux * half)) {
+                    return s;
+                }
+            }
+            return length;
+        }
+
+        private boolean wet(double x, double z) {
+            double ground = terrain.surfaceHeight((int) Math.floor(x), (int) Math.floor(z));
+            double water = terrain.waterLevel(x, z);
+            // Any water over the ground makes a water block: a lake's flat shore may lie a fraction of a block under it
+            return !Double.isNaN(water) && water > ground || ground < terrain.seaLevel();
+        }
+    }
+
     /** Whether a piece takes part in T junctions ({@link #tees}): not steps or a footpath. */
     private static boolean teed(StreetSegment g) {
         return g.structure() != StreetStructure.STAIRS && g.streetClass() != StreetClass.PATH;
@@ -2511,6 +2646,9 @@ public final class ChunkLayer {
             }
             segments.add(g);
         }
+        if (logic.settings().streets.dryEnds) {
+            segments = withoutStubs(segments);
+        }
         for (com.mtm.citybuilder.core.function.Walk walk : functions.walks()) {
             for (int k = 1; k < walk.points().size(); k++) {
                 double[] a = walk.points().get(k - 1);
@@ -2665,13 +2803,19 @@ public final class ChunkLayer {
             }
         }
         Map<Long, Double> heights = new java.util.concurrent.ConcurrentHashMap<>();
-        Index index = new Index(byChunk, segments, deck, links, canals, plazas, stops, heights, round(segments, links), banks,
+        boolean[][] round = round(segments, links);
+        if (logic.settings().streets.bridgeEnds) {
+            squareBridgeEnds(segments, round);
+        }
+        Index index = new Index(byChunk, segments, deck, links, canals, plazas, stops, heights, round, banks,
                 interior(segments, byChunk), streets(links),
                 plan.plazas().stream().filter(square -> square.curbStreet() != null).map(StationPlaza::bounds).toList(),
                 new StreetWidths(logic.settings().streets.continuousCarriageways ? segments : List.of()),
                 logic.settings().buildings.castleWards && !plan.moats().isEmpty()
                         ? castle(plan, segments) : null,
-                logic.settings().streets.teeEnds ? tees(segments, byChunk) : null);
+                logic.settings().streets.teeEnds ? tees(segments, byChunk) : null,
+                logic.settings().streets.dryEnds
+                        ? new DryEnds(segments, deadEnds(segments, byChunk), logic.terrain()) : null);
         // A street leaving a bridge starts at its deck
         for (int p = 0; p < segments.size(); p++) {
             StreetSegment g = segments.get(p);
@@ -2774,6 +2918,36 @@ public final class ChunkLayer {
             }
         }
         return round;
+    }
+
+    /**
+     * Square ends where a bridge piece and a piece on the ground meet ({@link CitySettings.Streets#bridgeEnds}): the
+     * round outside of a slight bend there was laid as the deck, as wide as the street, over the ground road's paving.
+     */
+    static void squareBridgeEnds(List<StreetSegment> segments, boolean[][] round) {
+        Map<Long, List<int[]>> ends = new HashMap<>();
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            ends.computeIfAbsent(point(g.x1(), g.z1()), k -> new ArrayList<>()).add(new int[]{p, 0});
+            ends.computeIfAbsent(point(g.x2(), g.z2()), k -> new ArrayList<>()).add(new int[]{p, 1});
+        }
+        for (List<int[]> at : ends.values()) {
+            boolean bridge = false;
+            boolean ground = false;
+            for (int[] e : at) {
+                StreetSegment g = segments.get(e[0]);
+                if (g.structure() == StreetStructure.BRIDGE) {
+                    bridge = true;
+                } else if (g.streetClass() != StreetClass.PATH) {
+                    ground = true;
+                }
+            }
+            if (bridge && ground) {
+                for (int[] e : at) {
+                    round[e[0]][e[1]] = false;
+                }
+            }
+        }
     }
 
     /** How far past an end running on into its street's next piece its paving reaches. */

@@ -47,7 +47,7 @@ public record RailPalette(String concrete, String concreteSlab, String steel, St
 
     /** Grey concrete and grey-painted steel: JR's viaducts in central Tokyo and Kyoto. */
     public static final RailPalette CONCRETE = new RailPalette(m("light_gray_concrete"), m("smooth_stone_slab"),
-            c("steel_girder_gray"), m("gravel"), m("gray_concrete"), m("polished_andesite"),
+            c("steel_girder_gray"), c("ballast"), m("gray_concrete"), m("polished_andesite"),
             m("polished_andesite_stairs"), m("iron_bars"), m("smooth_stone"), m("yellow_concrete"),
             m("white_concrete"), m("smooth_stone_slab"), m("light_gray_stained_glass"), m("sea_lantern"),
             c("steel_girder_gray"), m("white_concrete"), c("concrete_parapet"), c("bridge_railing"),
@@ -56,7 +56,7 @@ public record RailPalette(String concrete, String concreteSlab, String steel, St
 
     /** Weathered concrete and green-painted steel: older lines and footbridges (歩道橋 are often green or blue). */
     public static final RailPalette WEATHERED = new RailPalette(m("stone"), m("stone_slab"), c("steel_girder_green"),
-            m("gravel"), m("gray_concrete"), m("andesite"), m("andesite_stairs"), m("iron_bars"), m("stone"),
+            c("ballast"), m("gray_concrete"), m("andesite"), m("andesite_stairs"), m("iron_bars"), m("stone"),
             m("yellow_terracotta"), m("smooth_stone"), m("stone_slab"), m("glass"), m("sea_lantern"),
             c("steel_girder_green"), m("white_terracotta"), c("concrete_parapet"), c("bridge_railing"),
             c("sound_barrier"), c("sound_barrier_clear"), c("bridge_bearing"), c("expansion_joint"),
@@ -64,7 +64,7 @@ public record RailPalette(String concrete, String concreteSlab, String steel, St
 
     /** Pale stone and blue steel: newer lines, footbridges painted blue. */
     public static final RailPalette BLUE = new RailPalette(m("white_concrete"), m("smooth_stone_slab"),
-            c("steel_girder_blue"), m("gravel"), m("gray_concrete"), m("polished_diorite"),
+            c("steel_girder_blue"), c("ballast"), m("gray_concrete"), m("polished_diorite"),
             m("polished_diorite_stairs"), m("iron_bars"), m("smooth_stone"), m("yellow_concrete"),
             m("white_concrete"), m("smooth_stone_slab"), m("light_blue_stained_glass"), m("sea_lantern"),
             c("steel_girder_blue"), m("white_concrete"), c("concrete_parapet"), c("bridge_railing"),

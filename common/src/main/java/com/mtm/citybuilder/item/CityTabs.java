@@ -19,7 +19,7 @@ import java.util.function.Predicate;
  */
 public final class CityTabs {
     private static final String[] ROADS = {"asphalt", "sidewalk", "curb", "manhole", "drain_grate", "tactile",
-            "road_", "concrete_parapet", "_layer", "_slope", "bridge_", "sound_barrier", "steel_girder", "expansion_joint", "deck_drain",
+            "road_", "ballast", "concrete_parapet", "_layer", "_slope", "bridge_", "sound_barrier", "steel_girder", "expansion_joint", "deck_drain",
             "catenary_", "curve_marker", "paving", "marking", "street_light", "side_ditch"};
     private static final String[] BUILDINGS = {"window_", "curtain_", "thin_", "roof_", "adjuster", "door", "lantern",
             "andon", "chochin", "ac_unit", "vending", "water_heater", "postbox", "downpipe", "solar_panel",

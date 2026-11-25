@@ -60,7 +60,7 @@ public final class CityRails {
         int min = chunk.getMinBuildHeight();
         BlockState air = Blocks.AIR.defaultBlockState();
         BlockState deck = Blocks.LIGHT_GRAY_CONCRETE.defaultBlockState();
-        BlockState ballast = Blocks.GRAVEL.defaultBlockState();
+        BlockState ballast = com.mtm.citybuilder.block.CityBlocks.BALLAST.get().defaultBlockState();
         BlockState shoulder = own("concrete_exposed", Blocks.SMOOTH_STONE);
         BlockState pier = own("concrete_exposed", Blocks.SMOOTH_STONE);
         BlockState platform = own("sidewalk", Blocks.SMOOTH_STONE);

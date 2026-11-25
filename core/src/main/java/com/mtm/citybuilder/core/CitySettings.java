@@ -37,6 +37,8 @@ public final class CitySettings {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
         settings.streets.teeEnds = version[0] >= 14;
+        settings.streets.dryEnds = version[0] >= 14;
+        settings.streets.bridgeEnds = version[0] >= 14;
         settings.buildings.castleRamps = version[0] >= 13;
         settings.buildings.clearOfStreets = version[0] >= 13;
         settings.buildings.facilityAtStreetLevel = version[0] >= 12;
@@ -866,6 +868,17 @@ public final class CitySettings {
          * end no longer pokes a corner out past the far side of the street it meets.
          */
         public boolean teeEnds = true;
+        /**
+         * No dead end runs into a lake or the sea: a stub left at a wide street's end (shorter than half its width) is
+         * dropped, and a dead end is cut back to dry land as generated (the planning sees water on a coarse grid).
+         */
+        public boolean dryEnds = true;
+        /**
+         * A bridge's end where its street runs on over the ground stays square: at a slight bend there the bend's round
+         * outside, as wide as the street and laid as the deck, reached past the end over the ground road and drew its
+         * pavement's rim across it.
+         */
+        public boolean bridgeEnds = true;
         /** A metropolis is a planned capital where this share of its built land is flat, and its hash below the chance. */
         public double joriFlatShare = 0.7;
         public double joriChance = 0.5;

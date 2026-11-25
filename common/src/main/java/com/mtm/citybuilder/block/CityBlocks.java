@@ -94,6 +94,12 @@ public final class CityBlocks {
     /** A drop hanger with its string of insulators, holding the wires over a track. */
     public static Supplier<Block> CATENARY_HANGER;
 
+    /**
+     * A track bed's ballast: gravel to look at, but a plain block that does not fall when a neighbour changes (gravel
+     * laid on a viaduct's deck or over a cutting dropped through it).
+     */
+    public static Supplier<Block> BALLAST;
+
     /** A curve marker (曲線標) beside a track, telling where an MTR node goes and how it is set. */
     public static Supplier<Block> CURVE_MARKER;
     public static Supplier<BlockEntityType<CurveMarkerBlockEntity>> CURVE_MARKER_ENTITY;
@@ -108,6 +114,7 @@ public final class CityBlocks {
         BuildingBlocks.register();
         GroundBlocks.register();
         ASPHALT = platform.registerBlock("asphalt", () -> new PavingBlock(properties()));
+        BALLAST = platform.registerBlock("ballast", () -> new net.minecraft.world.level.block.Block(BlockBehaviour.Properties.copy(Blocks.GRAVEL)));
         ASPHALT_LINE_WHITE = platform.registerBlock("asphalt_line_white", () -> new MarkingBlock(properties()));
         ASPHALT_LINE_YELLOW = platform.registerBlock("asphalt_line_yellow", () -> new MarkingBlock(properties()));
         ASPHALT_WHITE = platform.registerBlock("asphalt_white", () -> new PavingBlock(properties()));

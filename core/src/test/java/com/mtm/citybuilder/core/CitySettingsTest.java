@@ -31,6 +31,8 @@ class CitySettingsTest {
             assertEquals(!existingPlans, first.buildings.castleRamps);
             assertEquals(!existingPlans, first.buildings.clearOfStreets);
             assertEquals(!existingPlans, first.streets.teeEnds);
+            assertEquals(!existingPlans, first.streets.dryEnds);
+            assertEquals(!existingPlans, first.streets.bridgeEnds);
             assertEquals(existingPlans ? 0.0 : 40.0, first.plots.parcelFrontage);
             assertEquals(existingPlans ? 0 : 1, first.buildings.retailGroundExtra);
             assertEquals(first.toJson(), CitySettings.forBuildingLayout(store, !existingPlans).toJson());
@@ -57,6 +59,8 @@ class CitySettingsTest {
         var squareTees = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
         squareTees.save("layout/building_scale", new byte[]{13});
         assertFalse(CitySettings.forBuildingLayout(squareTees,true).streets.teeEnds);
+        assertFalse(CitySettings.forBuildingLayout(squareTees,true).streets.dryEnds);
+        assertFalse(CitySettings.forBuildingLayout(squareTees,true).streets.bridgeEnds);
         assertTrue(CitySettings.forBuildingLayout(squareTees,true).buildings.clearOfStreets);
         assertTrue(CitySettings.forBuildingLayout(steppedWays,true).buildings.turretsOnGround);
         assertTrue(CitySettings.forBuildingLayout(sparseDowntown,true).buildings.batteredKeep);

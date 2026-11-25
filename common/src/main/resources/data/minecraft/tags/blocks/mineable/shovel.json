@@ -6,6 +6,7 @@
     "citybuilder:grass_slope",
     "citybuilder:dirt_slope",
     "citybuilder:snow_slope",
-    "citybuilder:snow_layer"
+    "citybuilder:snow_layer",
+    "citybuilder:ballast"
   ]
 }
