@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 17)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 18)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,11 +33,12 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 17)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 18)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
         settings.extent.ruggedFade = version[0] >= 17;
         settings.streets.finalSnap = version[0] >= 17;
+        settings.streets.dryPaths = version[0] >= 18;
         settings.roads.landEnds = version[0] >= 16;
         settings.rail.landEnds = version[0] >= 16;
         settings.transit.pinnedFirst = version[0] >= 15;
@@ -924,6 +925,12 @@ public final class CitySettings {
         public boolean sideBySide = true;
         /** Streets ending just short of another joined to it once more after the last steps that change the streets. */
         public boolean finalSnap = true;
+        /**
+         * A footpath (a promenade, its steps, a park's walk) is not laid where the generated water stands over the
+         * ground and no embankment's cross-section reaches: the planning's water grid puts a lake's shore a few blocks
+         * off, and such a path was laid as a strip of stone up to the water's surface out in the lake.
+         */
+        public boolean dryPaths = true;
         public double sideBySideOverlap = 1.0;
         /** A metropolis is a planned capital where this share of its built land is flat, and its hash below the chance. */
         public double joriFlatShare = 0.7;

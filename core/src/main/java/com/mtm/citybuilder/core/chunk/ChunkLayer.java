@@ -989,6 +989,17 @@ public final class ChunkLayer {
                 }
             }
         }
+        // A footpath out in the water as generated, off any embankment: not laid (layout 18)
+        if (logic.settings().streets.dryPaths) {
+            for (int c = 0; c < 256; c++) {
+                Column column = columns[c];
+                if (column.surface == Surface.PATH && !column.bridge
+                        && wetFootpath(chunkX, chunkZ, minX + c / 16 + 0.5, minZ + c % 16 + 0.5)) {
+                    columns[c] = Column.EMPTY;
+                    footpath[c] = false;
+                }
+            }
+        }
         // A footpath under a bridge's deck: laid on the ground beneath it
         for (int c = 0; c < 256; c++) {
             Column column = columns[c];
@@ -2512,6 +2523,44 @@ public final class ChunkLayer {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a footpath's column stands in the water as generated ({@link CitySettings.Streets#dryPaths}): water over
+     * the ground there, and no embankment's cross-section (its terrace, its revetment) under it.
+     */
+    private boolean wetFootpath(int chunkX, int chunkZ, double x, double z) {
+        com.mtm.citybuilder.core.terrain.TerrainView terrain = logic.terrain();
+        double water = terrain.waterLevel(x, z);
+        double ground = terrain.surfaceHeight((int) Math.floor(x), (int) Math.floor(z));
+        if (!(!Double.isNaN(water) && water > ground || ground < terrain.seaLevel())) {
+            return false;
+        }
+        CitySettings.Streets config = logic.settings().streets;
+        for (Settlement town : towns(chunkX * 16.0, chunkZ * 16.0)) {
+            List<double[]> near = index(town).banks.get(key(chunkX, chunkZ));
+            if (near == null) {
+                continue;
+            }
+            double[] best = null;
+            double bestD = Double.POSITIVE_INFINITY;
+            double bestT = 0;
+            for (double[] b : near) {
+                double dx = b[2] - b[0];
+                double dz = b[3] - b[1];
+                double t = Math.max(0, Math.min(1, ((x - b[0]) * dx + (z - b[1]) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+                double d = Math.hypot(b[0] + dx * t - x, b[1] + dz * t - z);
+                if (d < bestD) {
+                    bestD = d;
+                    best = b;
+                    bestT = t;
+                }
+            }
+            if (best != null && bankProfile(best, bestT, x, z, config) != null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** The crest of an embankment whose centre line runs within {@code reach} of a position, or NaN. */
