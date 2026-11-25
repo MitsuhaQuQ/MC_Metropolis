@@ -39,6 +39,7 @@ public final class CitySettings {
         settings.streets.teeEnds = version[0] >= 14;
         settings.streets.dryEnds = version[0] >= 14;
         settings.streets.bridgeEnds = version[0] >= 14;
+        settings.transit.smoothStations = version[0] >= 14;
         settings.buildings.castleRamps = version[0] >= 13;
         settings.buildings.clearOfStreets = version[0] >= 13;
         settings.buildings.facilityAtStreetLevel = version[0] >= 12;
@@ -728,6 +729,12 @@ public final class CitySettings {
         /** Least curve radius of a town's lines, the search's turn cost, the widest curve fitted. */
         public double minRadius = 160.0;
         public double turnCost = 800.0;
+        /**
+         * A town line's station is moved onto the road beside it only where the curves leading onto its platform and
+         * back are no tighter than {@code minRadius}; else its platform stays on the line's own course. The two halves of
+         * a line routed in to its middle are joined by an arc even where one ends on a doubled point.
+         */
+        public boolean smoothStations = true;
         public double maxRadius = 1200.0;
         /** Stations about this far apart along a line. */
         public double stationSpacing = 1000.0;

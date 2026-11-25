@@ -3034,7 +3034,8 @@ public final class StreetLayer {
                 if (leg != null) {
                     List<double[]> out = new ArrayList<>(leg.line());
                     java.util.Collections.reverse(out);
-                    route = route.isEmpty() ? out : joinWithArc(route, out, transit.minRadius);
+                    route = route.isEmpty() ? out : joinWithArc(transit.smoothStations ? distinct(route) : route,
+                            transit.smoothStations ? distinct(out) : out, transit.minRadius);
                 }
             }
             if (route.size() < 2) {
@@ -3231,6 +3232,26 @@ public final class StreetLayer {
             int in = indexAt(run, run[k] - half - before);
             int out = indexAt(run, run[k] + half + after);
             in = Math.max(in, resume);
+            if (transit.smoothStations && tightJoin(raw, k, n, in, out, a, aDirection, b, bDirection, transit.minRadius)) {
+                // The curves onto the road's platform and back would be too tight: the platform on the line's own course
+                List<double[]> own = new ArrayList<>();
+                for (int q = indexAt(run, run[k] - half); q <= Math.min(n - 1, indexAt(run, run[k] + half)); q++) {
+                    own.add(new double[]{raw.get(q)[0], raw.get(q)[1]});
+                }
+                if (own.size() >= 2) {
+                    platforms.set(s, own);
+                    double[] t = tangent(raw, k);
+                    st[1] = raw.get(k)[0];
+                    st[2] = raw.get(k)[1];
+                    st[3] = t[0];
+                    st[4] = t[1];
+                    for (int q = resume; q < Math.min(n, out + 1); q++) {
+                        shaped.add(new double[]{raw.get(q)[0], raw.get(q)[1]});
+                    }
+                    resume = Math.min(n, out + 1);
+                    continue;
+                }
+            }
             for (int q = resume; q <= in && k > 0; q++) {
                 shaped.add(new double[]{raw.get(q)[0], raw.get(q)[1]});
             }
@@ -3448,6 +3469,61 @@ public final class StreetLayer {
         return k;
     }
 
+    /**
+     * Whether the curves a station's platform along a road would be joined to its line by (from the line at {@code in}
+     * onto the platform's first end, from its last end back onto the line at {@code out}) bend tighter than a radius,
+     * the bend measured by the circle through each point and those either side, the line's and platform's own points
+     * at the joins included.
+     */
+    private static boolean tightJoin(List<double[]> raw, int k, int n, int in, int out, double[] a, double[] aDirection,
+                                     double[] b, double[] bDirection, double radius) {
+        if (k > 0 && in < n) {
+            List<double[]> curve = new ArrayList<>();
+            if (in > 0) {
+                curve.add(raw.get(in - 1));
+            }
+            curve.add(raw.get(in));
+            curve.addAll(bezier(raw.get(in), tangent(raw, in), a, aDirection));
+            curve.add(a);
+            curve.add(new double[]{a[0] + 8.0 * aDirection[0], a[1] + 8.0 * aDirection[1]});
+            if (tighter(curve, radius)) {
+                return true;
+            }
+        }
+        if (k < n - 1 && out < n) {
+            List<double[]> curve = new ArrayList<>();
+            curve.add(new double[]{b[0] - 8.0 * bDirection[0], b[1] - 8.0 * bDirection[1]});
+            curve.add(b);
+            curve.addAll(bezier(b, bDirection, raw.get(out), tangent(raw, out)));
+            curve.add(raw.get(out));
+            if (out + 1 < n) {
+                curve.add(raw.get(out + 1));
+            }
+            return tighter(curve, radius);
+        }
+        return false;
+    }
+
+    /** Whether a line bends tighter than a radius anywhere: the circle through each point and its neighbours. */
+    private static boolean tighter(List<double[]> line, double radius) {
+        for (int i = 1; i + 1 < line.size(); i++) {
+            double[] p = line.get(i - 1);
+            double[] q = line.get(i);
+            double[] r = line.get(i + 1);
+            double pq = Math.hypot(q[0] - p[0], q[1] - p[1]);
+            double qr = Math.hypot(r[0] - q[0], r[1] - q[1]);
+            double rp = Math.hypot(p[0] - r[0], p[1] - r[1]);
+            if (pq < 0.5 || qr < 0.5) {
+                continue;
+            }
+            double cross = Math.abs((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+            if (cross > 1e-9 && pq * qr * rp / (2.0 * cross) < radius) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Points every 8 blocks along a cubic curve from p leaving along u to q arriving along v, both ends excluded. */
     private static List<double[]> bezier(double[] p, double[] u, double[] q, double[] v) {
         double length = Math.hypot(q[0] - p[0], q[1] - p[1]);
@@ -3521,6 +3597,21 @@ public final class StreetLayer {
         }
         joined.addAll(tail);
         return joined;
+    }
+
+    /**
+     * A line without points repeated one after another ({@link CitySettings.Transit#smoothStations}): a routed half
+     * ending on a doubled point gave {@link #joinWithArc} no direction there, and the halves met at a bare corner.
+     */
+    private static List<double[]> distinct(List<double[]> line) {
+        List<double[]> out = new ArrayList<>(line.size());
+        for (double[] p : line) {
+            double[] last = out.isEmpty() ? null : out.get(out.size() - 1);
+            if (last == null || Math.hypot(p[0] - last[0], p[1] - last[1]) > 1e-6) {
+                out.add(p);
+            }
+        }
+        return out;
     }
 
     /** A line with a length cut off its end. */
@@ -6330,7 +6421,19 @@ public final class StreetLayer {
                 q[1] = route.z(k);
                 line.add(q);
             }
-            line.addAll(stretch.line());
+            if (logic.settings().transit.smoothStations && line.size() >= 2 && stretch.line().size() >= 2) {
+                // The approach starts from the search grid's node by the corridor, a little off it and turned: the two
+                // joined by an arc, not met at a corner
+                List<double[]> in = distinct(line);
+                in.add(stretch.line().get(0));
+                List<double[]> joined = joinWithArc(distinct(in), distinct(stretch.line()), minRadius);
+                line = new ArrayList<>();
+                for (double[] q : joined) {
+                    line.add(q.length < width ? java.util.Arrays.copyOf(q, width) : q);
+                }
+            } else {
+                line.addAll(stretch.line());
+            }
             railways.add(new CityRailway(route.edge(), edge, line));
         }
     }

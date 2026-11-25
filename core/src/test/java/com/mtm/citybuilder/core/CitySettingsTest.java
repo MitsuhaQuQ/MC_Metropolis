@@ -33,6 +33,7 @@ class CitySettingsTest {
             assertEquals(!existingPlans, first.streets.teeEnds);
             assertEquals(!existingPlans, first.streets.dryEnds);
             assertEquals(!existingPlans, first.streets.bridgeEnds);
+            assertEquals(!existingPlans, first.transit.smoothStations);
             assertEquals(existingPlans ? 0.0 : 40.0, first.plots.parcelFrontage);
             assertEquals(existingPlans ? 0 : 1, first.buildings.retailGroundExtra);
             assertEquals(first.toJson(), CitySettings.forBuildingLayout(store, !existingPlans).toJson());
@@ -61,6 +62,7 @@ class CitySettingsTest {
         assertFalse(CitySettings.forBuildingLayout(squareTees,true).streets.teeEnds);
         assertFalse(CitySettings.forBuildingLayout(squareTees,true).streets.dryEnds);
         assertFalse(CitySettings.forBuildingLayout(squareTees,true).streets.bridgeEnds);
+        assertFalse(CitySettings.forBuildingLayout(squareTees,true).transit.smoothStations);
         assertTrue(CitySettings.forBuildingLayout(squareTees,true).buildings.clearOfStreets);
         assertTrue(CitySettings.forBuildingLayout(steppedWays,true).buildings.turretsOnGround);
         assertTrue(CitySettings.forBuildingLayout(sparseDowntown,true).buildings.batteredKeep);
