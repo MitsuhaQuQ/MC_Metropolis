@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 21)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 22)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,7 +33,7 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 21)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 22)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
         settings.extent.ruggedFade = version[0] >= 17;
@@ -47,6 +47,8 @@ public final class CitySettings {
         settings.streets.dryStreets = version[0] >= 21;
         settings.transit.waterGround = version[0] >= 21;
         settings.transit.stationPercentile = version[0] >= 21 ? 0.6 : 1.0;
+        settings.transit.fittedLines = version[0] >= 22;
+        settings.transit.flatMainStation = version[0] >= 22;
         settings.roads.landEnds = version[0] >= 16;
         settings.rail.landEnds = version[0] >= 16;
         settings.transit.pinnedFirst = version[0] >= 15;
@@ -806,6 +808,18 @@ public final class CitySettings {
          * held its lines up for a kilometre; 0.6 from layout 21.
          */
         public double stationPercentile = 0.6;
+        /**
+         * A town line's levels fitted to the ground for what they cost, down into cuttings and tunnels as well as up
+         * (layout 22, {@code RailChunks.fitLevels}); the main station at the middle of its lines' levels, they ramped to
+         * it either way. Before, lines were only raised to keep the grade, and the main station took the highest.
+         */
+        public boolean fittedLines = true;
+        /**
+         * The main station's site scored for how far the ground rises across its platforms and how far it stands from
+         * the lines' height where they enter the town, the fallback too (layout 22): before, a site up a slope rising
+         * 60 blocks along its platforms was taken when no site passed the grade check.
+         */
+        public boolean flatMainStation = true;
         public double maxRadius = 1200.0;
         /** Stations about this far apart along a line. */
         public double stationSpacing = 1000.0;

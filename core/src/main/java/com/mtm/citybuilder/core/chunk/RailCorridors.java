@@ -69,7 +69,8 @@ final class RailCorridors {
                 double throat=RailStructures.throatLength(
                         com.mtm.citybuilder.core.building.rail.CrossSection.mainStation(tier,true).half());
                 for (var railway:plan.railways()) {
-                    line(touched,cx,cz,main==null?railway.line():RailChunks.intoStation(railway.line(),main,throat));
+                    line(touched,cx,cz,main==null?railway.line():RailChunks.intoStation(railway.line(),main,throat,
+                            logic.settings().transit.fittedLines?logic.settings().transit.minRadius:0.0));
                 }
                 for (long cell:touched) owners.computeIfAbsent(cell,k->new ArrayList<>()).add(town);
             }

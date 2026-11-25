@@ -48,6 +48,8 @@ class CitySettingsTest {
             assertEquals(!existingPlans, first.transit.waterGround);
             assertEquals(existingPlans ? 6.0 : 10.0, first.extent.roughFrom);
             assertEquals(existingPlans ? 1.0 : 0.6, first.transit.stationPercentile);
+            assertEquals(!existingPlans, first.transit.fittedLines);
+            assertEquals(!existingPlans, first.transit.flatMainStation);
             assertEquals(!existingPlans, first.transit.smoothStations);
             assertEquals(existingPlans ? 0.0 : 40.0, first.plots.parcelFrontage);
             assertEquals(existingPlans ? 0 : 1, first.buildings.retailGroundExtra);
@@ -114,6 +116,11 @@ class CitySettingsTest {
         assertEquals(6.0, at20.extent.roughFrom);
         assertEquals(1.0, at20.transit.stationPercentile);
         assertTrue(at20.transit.riverStations);
+        var raisedLines = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+        raisedLines.save("layout/building_scale", new byte[]{21});
+        assertFalse(CitySettings.forBuildingLayout(raisedLines,true).transit.fittedLines);
+        assertFalse(CitySettings.forBuildingLayout(raisedLines,true).transit.flatMainStation);
+        assertTrue(CitySettings.forBuildingLayout(raisedLines,true).transit.waterGround);
         assertFalse(CitySettings.forBuildingLayout(squareTees,true).transit.smoothStations);
         assertTrue(CitySettings.forBuildingLayout(squareTees,true).buildings.clearOfStreets);
         assertTrue(CitySettings.forBuildingLayout(steppedWays,true).buildings.turretsOnGround);

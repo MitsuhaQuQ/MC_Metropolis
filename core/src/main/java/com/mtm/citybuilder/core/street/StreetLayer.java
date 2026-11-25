@@ -6331,6 +6331,13 @@ public final class StreetLayer {
         double bestScore = Double.NEGATIVE_INFINITY;
         double[] fallback = null;
         double fallbackScore = Double.NEGATIVE_INFINITY;
+        // Layout 22: the platforms' footprint flat, and near the height the lines come in at
+        boolean flat = logic.settings().transit.flatMainStation;
+        int footprint = Math.max(1, (int) Math.round(STATION_FOOTPRINT / grid));
+        double entryHeight = 0.0;
+        for (double[] entry : entries) {
+            entryHeight += logic.terrain().smoothHeight(entry[1], entry[2]) / entries.size();
+        }
         for (int i = 1; i < window.size - 1; i++) {
             for (int j = 1; j < window.size - 1; j++) {
                 District district = base.node(i, j);
@@ -6350,6 +6357,23 @@ public final class StreetLayer {
                 }
                 double edge = Math.abs(window.intensity[k] - config.oldTownIntensity);
                 double score = -edge / config.stationBand + 0.6 * toward / entries.size() - 0.6 * distance / 1000.0;
+                double rise = 0.0;
+                if (flat) {
+                    double lowest = Double.POSITIVE_INFINITY;
+                    double highest = Double.NEGATIVE_INFINITY;
+                    for (int a = Math.max(0, i - footprint); a <= Math.min(window.size - 1, i + footprint); a++) {
+                        for (int b = Math.max(0, j - footprint); b <= Math.min(window.size - 1, j + footprint); b++) {
+                            int q = a * window.size + b;
+                            if (!window.water[q]) {
+                                lowest = Math.min(lowest, window.height[q]);
+                                highest = Math.max(highest, window.height[q]);
+                            }
+                        }
+                    }
+                    rise = Double.isInfinite(lowest) ? 0.0 : highest - lowest;
+                    // (Only past what a site on gentle ground has anyway, so such a site stays where it was)
+                    score -= Math.max(0.0, rise - 12.0) / 20.0 + Math.max(0.0, Math.abs(window.height[k] - entryHeight) - 20.0) / 40.0;
+                }
                 if (distance > farthest) {
                     score -= 10.0;
                 }
@@ -6365,7 +6389,7 @@ public final class StreetLayer {
                     }
                 }
                 if (edge > config.stationBand || steepest > config.stationGrade || distance < config.stationDistance
-                        || distance > farthest) {
+                        || distance > farthest || flat && rise > STATION_RISE) {
                     continue;
                 }
                 if (score > bestScore) {
@@ -7086,6 +7110,11 @@ public final class StreetLayer {
         }
         return new Districts(window.originX, window.originZ, size, grid, kinds);
     }
+
+    /** How far each way the ground under a main station's site is looked at for how much it rises (layout 22). */
+    private static final double STATION_FOOTPRINT = 120.0;
+    /** How much the ground may rise across that footprint for a site to be taken outright (layout 22). */
+    private static final double STATION_RISE = 30.0;
 
     private static final int[][] NEIGHBOURS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 

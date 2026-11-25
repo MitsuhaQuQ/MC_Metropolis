@@ -971,7 +971,8 @@ public final class RailChunks {
             // Double through a town even on a single-track branch: its stations' two platform tracks and the
             // passing loops a town's stretch needs (the viaduct as wide as the station it reaches)
             int firstRun = runsOf.get().size();
-            stretch(main == null ? railway.line() : intoStation(railway.line(), main, throatLength), DOUBLE, pieces, subways, flats);
+            stretch(main == null ? railway.line() : intoStation(railway.line(), main, throatLength,
+                    logic.settings().transit.fittedLines ? logic.settings().transit.minRadius : 0.0), DOUBLE, pieces, subways, flats);
             if (logic.settings().transit.passengerSpace && runsOf.get().size() > firstRun) {
                 var corridor=logic.railRoute(railway.edge());
                 int sample=railway.entry();
@@ -986,7 +987,7 @@ public final class RailChunks {
             }
         }
         if (main != null) {
-            mainLevel(pieces, runsOf.get(), firstRailway, main, throatLength);
+            mainLevel(pieces, runsOf.get(), firstRailway, main, throatLength, logic.settings().transit.fittedLines);
         }
         if (logic.settings().transit.pinnedFirst && !entries.isEmpty()) {
             // A line held to its corridor's height where it enters the town is kept there: it is separated first and
@@ -1010,7 +1011,8 @@ public final class RailChunks {
         } else {
             separate(pieces, runsOf.get(), firstRailway, main, logic.settings().transit.passengerSpace);
         }
-        if (main!=null && logic.settings().transit.passengerSpace) mainLevel(pieces,runsOf.get(),firstRailway,main,throatLength);
+        if (main!=null && logic.settings().transit.passengerSpace) mainLevel(pieces,runsOf.get(),firstRailway,main,throatLength,
+                logic.settings().transit.fittedLines);
         for (EntryGrade entry : entries.values()) entry.connect(pieces);
         List<int[]> runs = new ArrayList<>(runsOf.get());
         runsOf.get().clear();
@@ -1259,6 +1261,15 @@ public final class RailChunks {
      * and on along the axis to the station's middle. Each point keeps the way (mode) of the line's last point.
      */
     static List<double[]> intoStation(List<double[]> line, StationSite main, double throatLength) {
+        return intoStation(line, main, throatLength, 0.0);
+    }
+
+    /**
+     * As {@link #intoStation(List, StationSite, double)}; with a {@code minRadius} (layout 22) the curve is a cubic
+     * one leaving the line along its own way (the quadratic one turned off it at once, up to 40 degrees at a point)
+     * and no tighter than that radius, begun further back along the line until it is.
+     */
+    static List<double[]> intoStation(List<double[]> line, StationSite main, double throatLength, double minRadius) {
         int n = line.size();
         if (n < 2) {
             return line;
@@ -1291,6 +1302,51 @@ public final class RailChunks {
         double qx = ex + ux * side * 0.5 * span;
         double qz = ez + uz * side * 0.5 * span;
         double mode = last.length > 2 ? last[2] : TransitMode.ELEVATED.ordinal();
+        if (minRadius > 0) {
+            // Back along the line until a cubic from there, along the line and into the axis, is wide enough; into
+            // the platforms' nearer end first, else the other; else the widest found
+            double[] best = null;
+            int bestJ = -1;
+            double bestSide = side;
+            search:
+            for (double s : new double[]{side, -side}) {
+                double sx = main.x() + ux * half * s;
+                double sz = main.z() + uz * half * s;
+                for (int j = k; j >= 1; j--) {
+                    double[] at = line.get(j);
+                    double[] before = line.get(j - 1);
+                    double tl = Math.hypot(at[0] - before[0], at[1] - before[1]);
+                    if (tl < 1e-6) {
+                        continue;
+                    }
+                    double[] curve = cubicInto(at, (at[0] - before[0]) / tl, (at[1] - before[1]) / tl, sx, sz, ux * s, uz * s);
+                    if (best == null || curve[8] > best[8]) {
+                        best = curve;
+                        bestJ = j;
+                        bestSide = s;
+                    }
+                    if (curve[8] >= minRadius) {
+                        break search;
+                    }
+                }
+            }
+            if (best != null) {
+                double[] at = line.get(bestJ);
+                List<double[]> out = new ArrayList<>(line.subList(0, bestJ + 1));
+                double length = Math.hypot(best[6] - at[0], best[7] - at[1]);
+                int steps = Math.max(2, (int) Math.ceil(length / 8.0));
+                for (int i = 1; i <= steps; i++) {
+                    double[] p = bezier(best, (double) i / steps);
+                    out.add(new double[]{p[0], p[1], mode});
+                }
+                int along = Math.max(1, (int) Math.ceil(half / 12.0));
+                for (int i = 1; i <= along; i++) {
+                    double t = half * (1.0 - (double) i / along);
+                    out.add(new double[]{main.x() + ux * t * bestSide, main.z() + uz * t * bestSide, mode});
+                }
+                return out;
+            }
+        }
         List<double[]> out = new ArrayList<>(line.subList(0, k + 1));
         int steps = Math.max(2, (int) Math.ceil(span / 12.0));
         for (int i = 1; i <= steps; i++) {
@@ -1306,6 +1362,39 @@ public final class RailChunks {
             out.add(new double[]{main.x() + ux * t * side, main.z() + uz * t * side, mode});
         }
         return out;
+    }
+
+    /**
+     * A cubic Bezier from {@code (x0, z0)} leaving along {@code (tx, tz)} to the platforms' end {@code (ex, ez)},
+     * arriving along the axis towards the station's middle ({@code -(ax, az)}): {x0, z0, x1, z1, x2, z2, x3, z3, the
+     * tightest radius on it}.
+     */
+    private static double[] cubicInto(double[] at, double tx, double tz, double ex, double ez, double ax, double az) {
+        double span = Math.hypot(ex - at[0], ez - at[1]);
+        double l = span / 3.0;
+        double[] c = {at[0], at[1], at[0] + tx * l, at[1] + tz * l, ex + ax * l, ez + az * l, ex, ez, 0};
+        double tightest = Double.POSITIVE_INFINITY;
+        for (int i = 0; i <= 48; i++) {
+            double t = i / 48.0;
+            double u = 1 - t;
+            double dx = 3 * u * u * (c[2] - c[0]) + 6 * u * t * (c[4] - c[2]) + 3 * t * t * (c[6] - c[4]);
+            double dz = 3 * u * u * (c[3] - c[1]) + 6 * u * t * (c[5] - c[3]) + 3 * t * t * (c[7] - c[5]);
+            double ddx = 6 * u * (c[4] - 2 * c[2] + c[0]) + 6 * t * (c[6] - 2 * c[4] + c[2]);
+            double ddz = 6 * u * (c[5] - 2 * c[3] + c[1]) + 6 * t * (c[7] - 2 * c[5] + c[3]);
+            double cross = Math.abs(dx * ddz - dz * ddx);
+            double speed = Math.hypot(dx, dz);
+            if (cross > 1e-12) {
+                tightest = Math.min(tightest, speed * speed * speed / cross);
+            }
+        }
+        c[8] = tightest;
+        return c;
+    }
+
+    private static double[] bezier(double[] c, double t) {
+        double u = 1 - t;
+        double a = u * u * u, b = 3 * u * u * t, d = 3 * u * t * t, e = t * t * t;
+        return new double[]{a * c[0] + b * c[2] + d * c[4] + e * c[6], a * c[1] + b * c[3] + d * c[5] + e * c[7]};
     }
 
     /**
@@ -1375,7 +1464,8 @@ public final class RailChunks {
      * its own side, and met the other with a step at the station's middle): the highest of theirs, each line's ramp
      * to it raised no steeper than 1 in {@link #GRADE_RUN}.
      */
-    private static void mainLevel(List<double[]> pieces, List<int[]> runs, int firstRailway, StationSite main, double throatLength) {
+    private static void mainLevel(List<double[]> pieces, List<int[]> runs, int firstRailway, StationSite main, double throatLength,
+                                  boolean middle) {
         double ux = Math.cos(main.heading());
         double uz = Math.sin(main.heading());
         double reachAlong = 0.5 * main.length() + throatLength + 4.0;
@@ -1386,6 +1476,7 @@ public final class RailChunks {
             return Math.abs(dx * ux + dz * uz) <= reachAlong && Math.abs(-dx * uz + dz * ux) <= reachAcross;
         };
         double top = Double.NEGATIVE_INFINITY;
+        List<Double> found = new ArrayList<>();
         for (int r = firstRailway; r < runs.size(); r++) {
             for (int i = runs.get(r)[0]; i < runs.get(r)[1]; i++) {
                 double[] g = pieces.get(i);
@@ -1394,14 +1485,21 @@ public final class RailChunks {
                 }
                 if (in.test(g[0], g[1])) {
                     top = Math.max(top, g[4]);
+                    found.add(g[4]);
                 }
                 if (in.test(g[2], g[3])) {
                     top = Math.max(top, g[5]);
+                    found.add(g[5]);
                 }
             }
         }
         if (Double.isInfinite(top)) {
             return;
+        }
+        if (middle) {
+            // The middle of the lines' levels there, not the highest (one off a mountain held them all up; layout 22)
+            java.util.Collections.sort(found);
+            top = found.get(found.size() / 2);
         }
         for (int r = firstRailway; r < runs.size(); r++) {
             int from = runs.get(r)[0];
@@ -1411,6 +1509,7 @@ public final class RailChunks {
             }
             double[] level = new double[m + 1];
             double[] along = new double[m + 1];
+            boolean[] pinned = new boolean[m + 1];
             boolean touched = false;
             for (int i = 0; i < m; i++) {
                 double[] g = pieces.get(from + i);
@@ -1418,9 +1517,13 @@ public final class RailChunks {
                     level[i] = g[4];
                     level[i + 1] = g[5];
                 } else {
-                    level[i] = in.test(g[0], g[1]) ? Math.max(g[4], top) : g[4];
-                    level[i + 1] = in.test(g[2], g[3]) ? Math.max(g[5], top) : g[5];
+                    level[i] = in.test(g[0], g[1]) ? (middle ? top : Math.max(g[4], top)) : g[4];
+                    level[i + 1] = in.test(g[2], g[3]) ? (middle ? top : Math.max(g[5], top)) : g[5];
                     touched |= in.test(g[0], g[1]) || in.test(g[2], g[3]);
+                    if (middle) {
+                        pinned[i] |= in.test(g[0], g[1]);
+                        pinned[i + 1] |= in.test(g[2], g[3]);
+                    }
                 }
                 along[i] = g[7];
                 along[i + 1] = g[7] + Math.hypot(g[2] - g[0], g[3] - g[1]);
@@ -1428,19 +1531,37 @@ public final class RailChunks {
             if (!touched) {
                 continue;
             }
-            for (int k = 1; k <= m; k++) {
-                level[k] = Math.max(level[k], level[k - 1] - (along[k] - along[k - 1]) / GRADE_RUN);
-            }
-            for (int k = m - 1; k >= 0; k--) {
-                level[k] = Math.max(level[k], level[k + 1] - (along[k + 1] - along[k]) / GRADE_RUN);
+            if (middle) {
+                // Out from the station both ways, up or down to it, no steeper than the grade
+                for (int k = 1; k <= m; k++) {
+                    if (!pinned[k]) {
+                        double d = (along[k] - along[k - 1]) / GRADE_RUN;
+                        level[k] = Math.max(level[k - 1] - d, Math.min(level[k - 1] + d, level[k]));
+                    }
+                }
+                for (int k = m - 1; k >= 0; k--) {
+                    if (!pinned[k]) {
+                        double d = (along[k + 1] - along[k]) / GRADE_RUN;
+                        level[k] = Math.max(level[k + 1] - d, Math.min(level[k + 1] + d, level[k]));
+                    }
+                }
+            } else {
+                for (int k = 1; k <= m; k++) {
+                    level[k] = Math.max(level[k], level[k - 1] - (along[k] - along[k - 1]) / GRADE_RUN);
+                }
+                for (int k = m - 1; k >= 0; k--) {
+                    level[k] = Math.max(level[k], level[k + 1] - (along[k + 1] - along[k]) / GRADE_RUN);
+                }
             }
             for (int i = 0; i < m; i++) {
                 double[] g = pieces.get(from + i);
                 g[4] = level[i];
                 g[5] = level[i + 1];
-                // Raised out of the ground: no longer a box or a cutting
+                // Raised out of the ground: no longer a box or a cutting; brought down into it: one
                 if (g[10] > 0.5 && Math.min(g[4] - g[8], g[5] - g[9]) > -3.0) {
                     g[10] = 0;
+                } else if (middle && g[10] < 0.5 && g[4] < g[8] - 3.0 && g[5] < g[9] - 3.0) {
+                    g[10] = 1;
                 }
             }
         }
@@ -1777,6 +1898,8 @@ public final class RailChunks {
         }
         // A station level along its platforms (and a little past them): the highest of the line's levels there
         boolean[] flat = new boolean[n];
+        // The points a station's level was set at (its platforms and a point past each end): kept by the fit below
+        boolean[] fixed = new boolean[n];
         double[] deepLevel = new double[n];
         java.util.Arrays.fill(deepLevel, Double.POSITIVE_INFINITY);
         for (int k = 0; k < n; k++) {
@@ -1832,6 +1955,7 @@ public final class RailChunks {
             int to = Math.min(n, end + 1);
             for (int j = from; j < to; j++) {
                 level[j] = deep ? bottom : top;
+                fixed[j] = true;
                 deepLevel[j] = deep ? bottom : Double.POSITIVE_INFINITY;
             }
             k = end;
@@ -1847,11 +1971,26 @@ public final class RailChunks {
                 level[k] = Math.min(level[k], level[k + 1] + (along[k + 1] - along[k]) / GRADE_RUN);
             }
         }
-        for (int k = 1; k < n; k++) {
-            level[k] = Math.max(level[k], level[k - 1] - (along[k] - along[k - 1]) / GRADE_RUN);
+        boolean anyUnder = false;
+        for (int k = 0; k < n; k++) {
+            anyUnder |= modes[k] == TransitMode.UNDERGROUND.ordinal();
         }
-        for (int k = n - 2; k >= 0; k--) {
-            level[k] = Math.max(level[k], level[k + 1] - (along[k + 1] - along[k]) / GRADE_RUN);
+        if (logic.settings().transit.fittedLines && !anyUnder && n >= 2) {
+            // Fitted to the ground for what it costs, down into cuttings and tunnels as well as up (layout 22)
+            double[] water = new double[n];
+            for (int k = 0; k < n; k++) {
+                double[] p = points.get(k);
+                water[k] = logic.terrain().waterLevel(p[0], p[1]);
+            }
+            double[] fitted = fitLevels(level, ground, water, modes, fixed, along);
+            System.arraycopy(fitted, 0, level, 0, n);
+        } else {
+            for (int k = 1; k < n; k++) {
+                level[k] = Math.max(level[k], level[k - 1] - (along[k] - along[k - 1]) / GRADE_RUN);
+            }
+            for (int k = n - 2; k >= 0; k--) {
+                level[k] = Math.max(level[k], level[k + 1] - (along[k + 1] - along[k]) / GRADE_RUN);
+            }
         }
         // A subway's station keeps its depth though a portal's ramp would lift it (a portal within 660 of it): the
         // line down to it no steeper than 1 in GRADE_RUN, the ramp to the portal starting from it
@@ -1881,6 +2020,104 @@ public final class RailChunks {
                     under ? 1 : 0, flat[k - 1] ? 1 : 0, flat[k] ? 1 : 0});
         }
         runs.add(new int[]{pieces.size() - (n - 1), pieces.size()});
+    }
+
+    /** The resolution of {@link #fitLevels}, in blocks. */
+    private static final double FIT_CELL = 0.25;
+    /** What a block of a town line in a tunnel (more than {@link #COVER} under the ground) costs, along it. */
+    static final double TUNNEL_COST = 20.0;
+    /** How far under the ground a line's bed is in a tunnel or a box rather than a cutting. */
+    private static final double COVER = 3.0;
+
+    /**
+     * A town line's levels no steeper than 1 in {@link #GRADE_RUN}, as near each point's level by its way ({@code
+     * target}: the ground, a viaduct's clearance over it) as they can be for what they cost a block along: over the
+     * target its height (a taller viaduct, an embankment); under it, for a line at grade its depth (a cutting), for one
+     * that should be elevated three times the clearance it loses over the streets; more than {@link #COVER} under the
+     * ground a tunnel, {@link #TUNNEL_COST} however deep (and for an elevated line its lost clearance besides); under
+     * water not at all. The points a station fixed keep their levels. Exact over levels {@link #FIT_CELL} apart (a
+     * dynamic program, as {@code rail.Alignment.fitProfile}): before (layout 22), lines were only raised to keep the
+     * grade, and one coming down off a mountain held a town's line 100 blocks or more over it for kilometres.
+     */
+    static double[] fitLevels(double[] target, double[] ground, double[] water, int[] modes, boolean[] fixed, double[] along) {
+        int n = target.length;
+        double low = Double.POSITIVE_INFINITY;
+        double high = Double.NEGATIVE_INFINITY;
+        for (int k = 0; k < n; k++) {
+            low = Math.min(low, Math.min(target[k], ground[k]));
+            high = Math.max(high, target[k]);
+        }
+        low -= TUNNEL_COST + COVER + 4.0;
+        high += 4.0;
+        int levels = (int) Math.ceil((high - low) / FIT_CELL) + 1;
+        double[] cost = new double[levels];
+        double[] next = new double[levels];
+        int[] deque = new int[levels];
+        short[] back = new short[n * levels];
+        for (int h = 0; h < levels; h++) {
+            cost[h] = levelCost(low + h * FIT_CELL, 0, target, ground, water, modes, fixed, 1.0);
+        }
+        for (int i = 1; i < n; i++) {
+            double step = Math.max(0.0, along[i] - along[i - 1]);
+            int w = (int) Math.min(Short.MAX_VALUE, Math.floor(step / GRADE_RUN / FIT_CELL + 1e-9));
+            int head = 0;
+            int tail = 0;
+            int added = 0;
+            for (int h = 0; h < levels; h++) {
+                int top = Math.min(levels - 1, h + w);
+                while (added <= top) {
+                    while (tail > head && cost[deque[tail - 1]] >= cost[added]) {
+                        tail--;
+                    }
+                    deque[tail++] = added++;
+                }
+                while (deque[head] < h - w) {
+                    head++;
+                }
+                int best = deque[head];
+                next[h] = cost[best] + levelCost(low + h * FIT_CELL, i, target, ground, water, modes, fixed, Math.max(1.0, step));
+                back[i * levels + h] = (short) (best - h);
+            }
+            double[] t = cost;
+            cost = next;
+            next = t;
+        }
+        int at = 0;
+        for (int h = 1; h < levels; h++) {
+            if (cost[h] < cost[at]) {
+                at = h;
+            }
+        }
+        double[] out = new double[n];
+        for (int i = n - 1; i >= 0; i--) {
+            out[i] = fixed[i] ? target[i] : low + at * FIT_CELL;
+            if (i > 0) {
+                at += back[i * levels + at];
+            }
+        }
+        return out;
+    }
+
+    /** What a town line costs at a height at one of its points, over the distance {@code run} it stands for. */
+    private static double levelCost(double h, int k, double[] target, double[] ground, double[] water, int[] modes,
+                                    boolean[] fixed, double run) {
+        if (fixed[k]) {
+            // A station's level, to within a cell
+            return Math.abs(h - target[k]) <= 0.5 * FIT_CELL + 1e-9 ? 0.0 : 1e7;
+        }
+        if (!Double.isNaN(water[k]) && water[k] > ground[k] - 0.5 && h < water[k] + 1.0) {
+            return 1e6;
+        }
+        boolean raised = modes[k] == TransitMode.ELEVATED.ordinal() || modes[k] == TransitMode.STACKED.ordinal();
+        double c;
+        if (h >= target[k]) {
+            c = h - target[k];
+        } else if (h >= ground[k] - COVER) {
+            c = raised ? 3.0 * (target[k] - h) : target[k] - h;
+        } else {
+            c = TUNNEL_COST + (raised ? 3.0 * (target[k] - ground[k]) : 0.0);
+        }
+        return c * run;
     }
 
     private static void bucket(Map<Long, List<Integer>> map, int p, double x1, double z1, double x2, double z2, double reach) {
