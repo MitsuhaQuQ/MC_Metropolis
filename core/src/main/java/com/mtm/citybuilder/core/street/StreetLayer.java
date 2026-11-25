@@ -6334,10 +6334,13 @@ public final class StreetLayer {
         // Layout 22: the platforms' footprint flat, and near the height the lines come in at
         boolean flat = logic.settings().transit.flatMainStation;
         int footprint = Math.max(1, (int) Math.round(STATION_FOOTPRINT / grid));
-        double entryHeight = 0.0;
-        for (double[] entry : entries) {
-            entryHeight += logic.terrain().smoothHeight(entry[1], entry[2]) / entries.size();
+        // (The median: one line off a mountain does not pull it up, as the station's level does not follow it)
+        double[] entryHeights = new double[entries.size()];
+        for (int e = 0; e < entries.size(); e++) {
+            entryHeights[e] = logic.terrain().smoothHeight(entries.get(e)[1], entries.get(e)[2]);
         }
+        java.util.Arrays.sort(entryHeights);
+        double entryHeight = entryHeights[entryHeights.length / 2];
         for (int i = 1; i < window.size - 1; i++) {
             for (int j = 1; j < window.size - 1; j++) {
                 District district = base.node(i, j);

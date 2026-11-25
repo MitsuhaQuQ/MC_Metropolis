@@ -49,6 +49,41 @@ class FitLevelsTest {
         }
     }
 
+    /**
+     * Points two blocks apart (a finely sampled curve): each step alone allows less than a cell of grade, yet the line
+     * still comes down from 60 over the ground to a station on it, no steeper than the grade overall.
+     */
+    @Test
+    void closelySampledPointsStillChangeLevel() {
+        int n = 1200;
+        double[] ground = new double[n];
+        double[] target = new double[n];
+        double[] water = new double[n];
+        double[] along = new double[n];
+        int[] modes = new int[n];
+        boolean[] fixed = new boolean[n];
+        for (int k = 0; k < n; k++) {
+            along[k] = 2.0 * k;
+            ground[k] = 100.0;
+            modes[k] = TransitMode.GROUND.ordinal();
+            target[k] = 100.0;
+            water[k] = Double.NaN;
+        }
+        fixed[0] = true;
+        target[0] = 160.0;
+        fixed[n - 1] = true;
+        target[n - 1] = 100.0;
+        double[] h = RailChunks.fitLevels(target, ground, water, modes, fixed, along);
+        assertEquals(160.0, h[0], 1e-9);
+        assertEquals(100.0, h[n - 1], 1e-9);
+        // Down to the ground within 60 * 30 = 1800 blocks plus a little, not held up the whole way
+        assertTrue(h[1000] < 101.0, "still " + h[1000] + " at 2000 blocks along");
+        for (int k = 1; k < n; k++) {
+            int fk = k;
+            assertTrue(h[k - 1] - h[k] <= 2.0 / RailChunks.GRADE_RUN + 1e-6, () -> "too steep at " + fk);
+        }
+    }
+
     /** The curve into the main station leaves the line along its own way and is no tighter than the radius asked. */
     @Test
     void theWayIntoTheMainStationIsSmooth() {

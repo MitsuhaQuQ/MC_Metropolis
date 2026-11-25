@@ -987,7 +987,7 @@ public final class RailChunks {
             }
         }
         if (main != null) {
-            mainLevel(pieces, runsOf.get(), firstRailway, main, throatLength, logic.settings().transit.fittedLines);
+            mainLevel(pieces, runsOf.get(), firstRailway, main, throatLength, logic.settings().transit.fittedLines, overWater());
         }
         if (logic.settings().transit.pinnedFirst && !entries.isEmpty()) {
             // A line held to its corridor's height where it enters the town is kept there: it is separated first and
@@ -1012,7 +1012,7 @@ public final class RailChunks {
             separate(pieces, runsOf.get(), firstRailway, main, logic.settings().transit.passengerSpace);
         }
         if (main!=null && logic.settings().transit.passengerSpace) mainLevel(pieces,runsOf.get(),firstRailway,main,throatLength,
-                logic.settings().transit.fittedLines);
+                logic.settings().transit.fittedLines, overWater());
         for (EntryGrade entry : entries.values()) entry.connect(pieces);
         List<int[]> runs = new ArrayList<>(runsOf.get());
         runsOf.get().clear();
@@ -1466,6 +1466,15 @@ public final class RailChunks {
      */
     private static void mainLevel(List<double[]> pieces, List<int[]> runs, int firstRailway, StationSite main, double throatLength,
                                   boolean middle) {
+        mainLevel(pieces, runs, firstRailway, main, throatLength, middle, null);
+    }
+
+    /**
+     * As above; {@code floor}, where given, the lowest a line's bed may be brought at a point (a block over water there,
+     * else no limit): the ramp down to the station's middle level kept out of a lake or river on the way.
+     */
+    private static void mainLevel(List<double[]> pieces, List<int[]> runs, int firstRailway, StationSite main, double throatLength,
+                                  boolean middle, java.util.function.ToDoubleBiFunction<Double, Double> floor) {
         double ux = Math.cos(main.heading());
         double uz = Math.sin(main.heading());
         double reachAlong = 0.5 * main.length() + throatLength + 4.0;
@@ -1532,17 +1541,27 @@ public final class RailChunks {
                 continue;
             }
             if (middle) {
+                // The lowest each point may be brought: over water, a block above it
+                double[] lowest = new double[m + 1];
+                java.util.Arrays.fill(lowest, Double.NEGATIVE_INFINITY);
+                if (floor != null) {
+                    for (int i = 0; i < m; i++) {
+                        double[] g = pieces.get(from + i);
+                        lowest[i] = Math.max(lowest[i], floor.applyAsDouble(g[0], g[1]));
+                        lowest[i + 1] = Math.max(lowest[i + 1], floor.applyAsDouble(g[2], g[3]));
+                    }
+                }
                 // Out from the station both ways, up or down to it, no steeper than the grade
                 for (int k = 1; k <= m; k++) {
                     if (!pinned[k]) {
                         double d = (along[k] - along[k - 1]) / GRADE_RUN;
-                        level[k] = Math.max(level[k - 1] - d, Math.min(level[k - 1] + d, level[k]));
+                        level[k] = Math.max(lowest[k], Math.max(level[k - 1] - d, Math.min(level[k - 1] + d, level[k])));
                     }
                 }
                 for (int k = m - 1; k >= 0; k--) {
                     if (!pinned[k]) {
                         double d = (along[k + 1] - along[k]) / GRADE_RUN;
-                        level[k] = Math.max(level[k + 1] - d, Math.min(level[k + 1] + d, level[k]));
+                        level[k] = Math.max(lowest[k], Math.max(level[k + 1] - d, Math.min(level[k + 1] + d, level[k])));
                     }
                 }
             } else {
@@ -2022,8 +2041,22 @@ public final class RailChunks {
         runs.add(new int[]{pieces.size() - (n - 1), pieces.size()});
     }
 
+    /** A block over the water's surface where water stands over the ground, else no limit (layout 22's fitted lines). */
+    private java.util.function.ToDoubleBiFunction<Double, Double> overWater() {
+        if (!logic.settings().transit.fittedLines) {
+            return null;
+        }
+        return (x, z) -> {
+            double water = logic.terrain().waterLevel(x, z);
+            return !Double.isNaN(water) && water > logic.terrain().surfaceHeight((int) Math.floor(x), (int) Math.floor(z))
+                    ? water + 1.0 : Double.NEGATIVE_INFINITY;
+        };
+    }
+
     /** The resolution of {@link #fitLevels}, in blocks. */
     private static final double FIT_CELL = 0.25;
+    /** The shortest step {@link #fitLevels} fits over: one along which the grade allows a whole cell, with room. */
+    private static final double MIN_FIT_STEP = 2.0 * FIT_CELL * GRADE_RUN;
     /** What a block of a town line in a tunnel (more than {@link #COVER} under the ground) costs, along it. */
     static final double TUNNEL_COST = 20.0;
     /** How far under the ground a line's bed is in a tunnel or a box rather than a cutting. */
@@ -2040,6 +2073,44 @@ public final class RailChunks {
      * grade, and one coming down off a mountain held a town's line 100 blocks or more over it for kilometres.
      */
     static double[] fitLevels(double[] target, double[] ground, double[] water, int[] modes, boolean[] fixed, double[] along) {
+        // Points closer than a cell's worth of grade to the last kept one could not change level at all from it: fitted
+        // over the points kept (the ends and every station point always), the others along the straight between
+        int total = target.length;
+        int[] kept = new int[total];
+        int count = 0;
+        for (int k = 0; k < total; k++) {
+            if (k == 0 || k == total - 1 || fixed[k] || along[k] - along[kept[count - 1]] >= MIN_FIT_STEP) {
+                kept[count++] = k;
+            }
+        }
+        if (count < total) {
+            double[] t = new double[count], g = new double[count], w = new double[count], a = new double[count];
+            int[] m = new int[count];
+            boolean[] f = new boolean[count];
+            for (int i = 0; i < count; i++) {
+                int k = kept[i];
+                t[i] = target[k];
+                g[i] = ground[k];
+                w[i] = water[k];
+                a[i] = along[k];
+                m[i] = modes[k];
+                f[i] = fixed[k];
+            }
+            double[] fit = fitLevels(t, g, w, m, f, a);
+            double[] out = new double[total];
+            for (int i = 0; i < count; i++) {
+                out[kept[i]] = fit[i];
+                if (i > 0) {
+                    int k0 = kept[i - 1];
+                    int k1 = kept[i];
+                    double span = Math.max(1e-9, along[k1] - along[k0]);
+                    for (int k = k0 + 1; k < k1; k++) {
+                        out[k] = fit[i - 1] + (fit[i] - fit[i - 1]) * (along[k] - along[k0]) / span;
+                    }
+                }
+            }
+            return out;
+        }
         int n = target.length;
         double low = Double.POSITIVE_INFINITY;
         double high = Double.NEGATIVE_INFINITY;
