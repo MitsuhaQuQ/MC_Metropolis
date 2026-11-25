@@ -669,7 +669,8 @@ public final class ChunkLayer {
     private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links,
                          Map<Long, List<double[]>> canals, Map<Long, List<StationPlaza>> plazas,
                          Map<Long, List<Stop>> stops, Map<Long, Double> heights, boolean[][] round,
-                         Map<Long, List<double[]>> banks, double[][][] interior, int[] street, List<double[]> curbBounds, StreetWidths widths, CastleTerrain castle) {
+                         Map<Long, List<double[]>> banks, double[][][] interior, int[] street, List<double[]> curbBounds, StreetWidths widths, CastleTerrain castle,
+                         double[][] tees) {
         /**
          * Whether a column lies on a piece's paving: within half its width of its line and, past an end, only where
          * that end is round (a bend's outside); a square end stops at the end's line.
@@ -681,7 +682,9 @@ public final class ChunkLayer {
             double length2 = Math.max(1e-9, dx * dx + dz * dz);
             double t = ((x - g.x1()) * dx + (z - g.z1()) * dz) / length2;
             if (t >= 0 && t <= 1 || t < 0 && round[p][0] || t > 1 && round[p][1]) {
-                return true;
+                // A T's stem stops at the centre line of the street it meets
+                double[] tee = tees == null ? null : tees[2 * p + (t > 0.5 ? 1 : 0)];
+                return tee == null || (x - tee[0]) * tee[2] + (z - tee[1]) * tee[3] <= 0;
             }
             boolean[] on = reachOn.get(g);
             double past = (t < 0 ? -t : t - 1) * Math.sqrt(length2);
@@ -1909,6 +1912,114 @@ public final class ChunkLayer {
         return out;
     }
 
+    /**
+     * Where each piece's end stops on another street's side (a T): {x, z, nx, nz}, a point on that street's centre line
+     * and its normal pointing away from the piece, by {@code 2 * piece + end}; null for an end that does not (a dead
+     * end, a street running on across the junction, a bend, a fork without a straight-through street). The end is on
+     * the other street's line or within its paving between its ends, or at a junction of pieces where two of the others
+     * run on through (within 30 degrees of straight) and none carries this one on across. Footpaths and steps neither
+     * have nor make them.
+     */
+    static double[][] tees(List<StreetSegment> segments, Map<Long, List<Integer>> byChunk) {
+        double[][] out = new double[2 * segments.size()][];
+        Map<Long, List<double[]>> ends = new HashMap<>();
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            if (!teed(g)) {
+                continue;
+            }
+            double leaving = Math.atan2(g.z2() - g.z1(), g.x2() - g.x1());
+            ends.computeIfAbsent(point(g.x1(), g.z1()), k -> new ArrayList<>()).add(new double[]{p, 0, leaving});
+            ends.computeIfAbsent(point(g.x2(), g.z2()), k -> new ArrayList<>()).add(new double[]{p, 1, leaving + Math.PI});
+        }
+        double straight = Math.cos(Math.toRadians(150));
+        double onward = Math.cos(Math.toRadians(30));
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            if (!teed(g) || g.length() < 1e-6) {
+                continue;
+            }
+            for (int e = 0; e < 2; e++) {
+                double ex = e == 0 ? g.x1() : g.x2();
+                double ez = e == 0 ? g.z1() : g.z2();
+                // The way out of the piece through this end
+                double ox = (e == 0 ? -1 : 1) * (g.x2() - g.x1()) / g.length();
+                double oz = (e == 0 ? -1 : 1) * (g.z2() - g.z1()) / g.length();
+                List<double[]> at = ends.getOrDefault(point(ex, ez), List.of());
+                boolean across = false;
+                double[] through = null;
+                for (double[] a : at) {
+                    if ((int) a[0] == p) {
+                        continue;
+                    }
+                    // A piece leaving straight on: the street runs on across, no T
+                    across |= Math.cos(a[2]) * ox + Math.sin(a[2]) * oz > onward;
+                    for (double[] b : at) {
+                        if ((int) b[0] == p || b == a) {
+                            continue;
+                        }
+                        if (Math.cos(a[2]) * Math.cos(b[2]) + Math.sin(a[2]) * Math.sin(b[2]) < straight) {
+                            through = new double[]{Math.cos(a[2]) - Math.cos(b[2]), Math.sin(a[2]) - Math.sin(b[2])};
+                        }
+                    }
+                }
+                if (across) {
+                    continue;
+                }
+                double[] line = null;
+                if (through != null) {
+                    line = new double[]{ex, ez, through[0], through[1]};
+                } else {
+                    // On another street's side between its ends
+                    List<Integer> near = byChunk.get(key(Math.floorDiv((int) Math.floor(ex), 16), Math.floorDiv((int) Math.floor(ez), 16)));
+                    for (int q : near == null ? List.<Integer>of() : near) {
+                        StreetSegment o = segments.get(q);
+                        if (q == p || !teed(o)) {
+                            continue;
+                        }
+                        double dx = o.x2() - o.x1();
+                        double dz = o.z2() - o.z1();
+                        double length2 = dx * dx + dz * dz;
+                        double t = ((ex - o.x1()) * dx + (ez - o.z1()) * dz) / Math.max(1e-9, length2);
+                        double margin = 1.0 / Math.max(1.0, Math.sqrt(length2));
+                        if (t <= margin || t >= 1 - margin) {
+                            continue;
+                        }
+                        double fx = o.x1() + dx * t;
+                        double fz = o.z1() + dz * t;
+                        if (Math.hypot(fx - ex, fz - ez) > Math.max(0.75, 0.5 * o.width())) {
+                            continue;
+                        }
+                        line = new double[]{fx, fz, dx, dz};
+                        break;
+                    }
+                }
+                if (line == null) {
+                    continue;
+                }
+                double n = Math.hypot(line[2], line[3]);
+                double nx = -line[3] / n;
+                double nz = line[2] / n;
+                double side = nx * ox + nz * oz;
+                // A street meeting another nearly along it is no T to cut
+                if (Math.abs(side) < 0.25) {
+                    continue;
+                }
+                if (side < 0) {
+                    nx = -nx;
+                    nz = -nz;
+                }
+                out[2 * p + e] = new double[]{line[0], line[1], nx, nz};
+            }
+        }
+        return out;
+    }
+
+    /** Whether a piece takes part in T junctions ({@link #tees}): not steps or a footpath. */
+    private static boolean teed(StreetSegment g) {
+        return g.structure() != StreetStructure.STAIRS && g.streetClass() != StreetClass.PATH;
+    }
+
     /** Whether a piece takes part in the streets' levels and ramps: not a bridge, steps or a footpath. */
     private static boolean ramped(StreetSegment g) {
         return g.structure() != StreetStructure.BRIDGE && g.structure() != StreetStructure.STAIRS
@@ -2559,7 +2670,8 @@ public final class ChunkLayer {
                 plan.plazas().stream().filter(square -> square.curbStreet() != null).map(StationPlaza::bounds).toList(),
                 new StreetWidths(logic.settings().streets.continuousCarriageways ? segments : List.of()),
                 logic.settings().buildings.castleWards && !plan.moats().isEmpty()
-                        ? castle(plan, segments) : null);
+                        ? castle(plan, segments) : null,
+                logic.settings().streets.teeEnds ? tees(segments, byChunk) : null);
         // A street leaving a bridge starts at its deck
         for (int p = 0; p < segments.size(); p++) {
             StreetSegment g = segments.get(p);

@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 13)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 14)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,9 +33,10 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 13)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 14)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
+        settings.streets.teeEnds = version[0] >= 14;
         settings.buildings.castleRamps = version[0] >= 13;
         settings.buildings.clearOfStreets = version[0] >= 13;
         settings.buildings.facilityAtStreetLevel = version[0] >= 12;
@@ -860,6 +861,11 @@ public final class CitySettings {
     public static final class Streets {
         /** Preserve the travelled centreline when removing overlaps and the crest under bank roads. */
         public boolean continuousCarriageways = true;
+        /**
+         * A street ending on another's side (a T, above all a skewed one) stops at that street's centre line: its square
+         * end no longer pokes a corner out past the far side of the street it meets.
+         */
+        public boolean teeEnds = true;
         /** A metropolis is a planned capital where this share of its built land is flat, and its hash below the chance. */
         public double joriFlatShare = 0.7;
         public double joriChance = 0.5;
