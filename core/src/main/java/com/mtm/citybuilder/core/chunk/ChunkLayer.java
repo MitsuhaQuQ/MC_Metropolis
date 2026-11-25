@@ -2381,6 +2381,14 @@ public final class ChunkLayer {
         return index;
     }
 
+    /** A town's castle grounds; in layout 13 with its streets and paths climbing through the terraces at their grade. */
+    private CastleTerrain castle(StreetPlan plan, List<StreetSegment> segments) {
+        CastleTerrain castle = new CastleTerrain(plan.moats(), logic.terrain(), plan.water(),
+                logic.settings().buildings.terracedBaileys);
+        return logic.settings().buildings.castleRamps && logic.settings().buildings.terracedBaileys
+                ? castle.withWays(segments) : castle;
+    }
+
     private Index build(StreetPlan plan) {
         // The streets, but not the lanes a facility's grounds take in; the paths inside the grounds as footpaths
         com.mtm.citybuilder.core.function.TownFunctions functions = logic.functions().town(plan.settlement());
@@ -2551,8 +2559,7 @@ public final class ChunkLayer {
                 plan.plazas().stream().filter(square -> square.curbStreet() != null).map(StationPlaza::bounds).toList(),
                 new StreetWidths(logic.settings().streets.continuousCarriageways ? segments : List.of()),
                 logic.settings().buildings.castleWards && !plan.moats().isEmpty()
-                        ? new CastleTerrain(plan.moats(), logic.terrain(), plan.water(),
-                                logic.settings().buildings.terracedBaileys) : null);
+                        ? castle(plan, segments) : null);
         // A street leaving a bridge starts at its deck
         for (int p = 0; p < segments.size(); p++) {
             StreetSegment g = segments.get(p);

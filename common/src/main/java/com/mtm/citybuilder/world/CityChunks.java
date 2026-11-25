@@ -753,7 +753,11 @@ public final class CityChunks {
                     planned = around(grades.level(), x, z);
                 }
                 if (castle != null && column.surface() == ChunkLayer.Surface.PATH && !castle.moat()) {
-                    planned = castle.ground() + 0.5;
+                    // Layout 13: at the path's even grade through the terraces, as the streets; before, a terrace's
+                    // whole steps
+                    var logic = CityWorlds.of(level.getLevel());
+                    planned = logic != null && logic.settings().buildings.castleRamps
+                            ? castle.crossing() : castle.ground() + 0.5;
                 }
                 // A footpath on an embankment (the riverside promenade on its terrace) at the embankment's level
                 if (grades != null && column.surface() == ChunkLayer.Surface.PATH && !Double.isNaN(grades.bank()[x * 16 + z])) {

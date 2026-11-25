@@ -5,6 +5,8 @@ import com.mtm.citybuilder.core.terrain.TerrainView;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 
 /**
@@ -45,6 +47,13 @@ public final class CastleTerrain {
     private final TerrainView terrain;
     private final com.mtm.citybuilder.core.street.WaterField water;
     private final boolean terraced;
+    /**
+     * The streets and paths over the baileys ({x1, z1, x2, z2, half width}) by 32-block cells (layout 13): along them,
+     * out to {@link #WAY_MARGIN} past their edges, the ground follows their even grade rather than the terraces.
+     */
+    private Map<Long, List<double[]>> ways;
+    /** How far past a way's edge the ground keeps to its grade: its verge, before the cut's wall or the fill's face. */
+    public static final double WAY_MARGIN = 1.5;
     private double minX = Double.POSITIVE_INFINITY, minZ = minX;
     private double maxX = Double.NEGATIVE_INFINITY, maxZ = maxX;
 
@@ -89,6 +98,42 @@ public final class CastleTerrain {
                     (long) Math.floor(ring.get(0)[1]));
             wards.add(new Ward(moat, outside, previous, median, cx, cz, radius, seed));
         }
+    }
+
+    /**
+     * The streets and paths over the castle, whose ground then follows their even grade through the terraces (a sloped
+     * way between stone walls) instead of stepping: a street or path reaching a terrace's edge goes on up it.
+     */
+    public CastleTerrain withWays(List<com.mtm.citybuilder.core.street.StreetSegment> segments) {
+        Map<Long, List<double[]>> cells = new HashMap<>();
+        for (var g : segments) {
+            double half = 0.5 * Math.max(1.0, g.width());
+            double reach = half + WAY_MARGIN + 1;
+            if (!intersects(Math.min(g.x1(), g.x2()) - reach, Math.min(g.z1(), g.z2()) - reach,
+                    Math.max(g.x1(), g.x2()) + reach, Math.max(g.z1(), g.z2()) + reach)) continue;
+            double[] w = {g.x1(), g.z1(), g.x2(), g.z2(), half};
+            for (int i = (int) Math.floor((Math.min(g.x1(), g.x2()) - reach) / 32); i <= (int) Math.floor((Math.max(g.x1(), g.x2()) + reach) / 32); i++) {
+                for (int j = (int) Math.floor((Math.min(g.z1(), g.z2()) - reach) / 32); j <= (int) Math.floor((Math.max(g.z1(), g.z2()) + reach) / 32); j++) {
+                    cells.computeIfAbsent(com.mtm.citybuilder.core.noise.Hash.mix(((long) i << 32) ^ (j & 0xFFFFFFFFL)),
+                            k -> new ArrayList<>()).add(w);
+                }
+            }
+        }
+        ways = cells;
+        return this;
+    }
+
+    /** Whether a position lies on a street or path over the castle, or within {@link #WAY_MARGIN} of its edge. */
+    private boolean onWay(double x, double z) {
+        if (ways == null) return false;
+        long key = com.mtm.citybuilder.core.noise.Hash.mix(((long) Math.floor(x / 32) << 32) ^ ((long) Math.floor(z / 32) & 0xFFFFFFFFL));
+        for (double[] w : ways.getOrDefault(key, List.of())) {
+            double dx = w[2] - w[0], dz = w[3] - w[1];
+            double l2 = dx * dx + dz * dz;
+            double t = l2 < 1e-9 ? 0 : Math.max(0, Math.min(1, ((x - w[0]) * dx + (z - w[1]) * dz) / l2));
+            if (Math.hypot(w[0] + dx * t - x, w[1] + dz * t - z) <= w[4] + WAY_MARGIN) return true;
+        }
+        return false;
     }
 
     public boolean intersects(double x0, double z0, double x1, double z1) {
@@ -232,12 +277,17 @@ public final class CastleTerrain {
             if (d < 0) {
                 // Past the next moat in, the bailey outside it: its own terraces (none along the moat)
                 double[] up = w > 0 ? rise(w - 1, edgeOf(w - 1, x, z), halfOf(w - 1, x, z), x, z) : new double[]{0, 0};
-                return lawnCell(ward.outside + (int) up[0], crossing + up[1], x, z, face);
+                return lawnCell(ward.outside + step(up, x, z), crossing + up[1], x, z, face);
             }
             double[] up = rise(w, d, half, x, z);
-            lawn = lawnCell(ward.inside + (int) up[0], crossing + up[1], x, z, face);
+            lawn = lawnCell(ward.inside + step(up, x, z), crossing + up[1], x, z, face);
         }
         return lawn;
+    }
+
+    /** A terrace's rise at a position ({@link #rise}): whole steps, or on a way the even grade's whole blocks. */
+    private int step(double[] up, double x, double z) {
+        return onWay(x, z) ? (int) Math.floor(up[1] + 1e-6) : (int) up[0];
     }
 
     private double edgeOf(int w, double x, double z) {

@@ -25,6 +25,18 @@ public final class BuildingSettings {
      * on the back lot, not out by the street over the lot in front (where it found no room and the lot stood empty).
      */
     public boolean fillDowntown = true;
+    /**
+     * In a castle's terraced baileys the streets and paths climb at their own even grade through the terraces, the
+     * ground along them cut down or built up to it (a sloped way between stone walls), so a street or path reaching a
+     * terrace's edge goes on up it instead of ending at the foot of its wall.
+     */
+    public boolean castleRamps = true;
+    /**
+     * No street or lane runs through a building: a lot along a wide street may reach round a lane that leaves it (the
+     * wider street's land wins), and a building placed across the lane was cut in two by it. Such a building is moved to
+     * the stretch of frontage beside the lane, or the lot left open.
+     */
+    public boolean clearOfStreets = true;
     /** A castle's turrets and galleries in its baileys stand on the ground, not on their surveyed stone bases. */
     public boolean turretsOnGround = true;
     /** A public building facing its street stands with its forecourt level with the pavement, not a block over it. */

@@ -28,6 +28,8 @@ class CitySettingsTest {
             assertEquals(!existingPlans, first.transit.mezzanineExits);
             assertEquals(!existingPlans, first.transit.portalOverRails);
             assertEquals(!existingPlans, first.buildings.turretsOnGround);
+            assertEquals(!existingPlans, first.buildings.castleRamps);
+            assertEquals(!existingPlans, first.buildings.clearOfStreets);
             assertEquals(existingPlans ? 0.0 : 40.0, first.plots.parcelFrontage);
             assertEquals(existingPlans ? 0 : 1, first.buildings.retailGroundExtra);
             assertEquals(first.toJson(), CitySettings.forBuildingLayout(store, !existingPlans).toJson());
@@ -47,6 +49,11 @@ class CitySettingsTest {
         assertFalse(CitySettings.forBuildingLayout(raisedFacilities,true).buildings.facilityAtStreetLevel);
         assertFalse(CitySettings.forBuildingLayout(raisedFacilities,true).transit.mezzanineExits);
         assertTrue(CitySettings.forBuildingLayout(raisedFacilities,true).buildings.fillDowntown);
+        var steppedWays = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+        steppedWays.save("layout/building_scale", new byte[]{12});
+        assertFalse(CitySettings.forBuildingLayout(steppedWays,true).buildings.castleRamps);
+        assertFalse(CitySettings.forBuildingLayout(steppedWays,true).buildings.clearOfStreets);
+        assertTrue(CitySettings.forBuildingLayout(steppedWays,true).buildings.turretsOnGround);
         assertTrue(CitySettings.forBuildingLayout(sparseDowntown,true).buildings.batteredKeep);
         var firstKeep = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
         firstKeep.save("layout/building_scale", new byte[]{6});

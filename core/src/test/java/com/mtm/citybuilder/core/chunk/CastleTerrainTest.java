@@ -81,6 +81,37 @@ class CastleTerrainTest {
         assertTrue(walls > 0 && walls <= faced, walls + " walls of " + faced + " faced");
         // Along the outermost bailey (no terraces) no column carries a wall
         for (int x = 192; x <= 250; x++) assertFalse(terraced.at(x + 0.5, -200.5).wall(), "wall at " + x);
+        // Layout 13: a street across the terraces has its ground cut or built up to its grade, a block at a time,
+        // with no wall across it; beside it, past its margin, the terraces as they were
+        var street = new StreetSegment(189, 40, 611, 40, StreetClass.STREET, Era.TOWN, 8, StreetStructure.GROUND);
+        var ramped = new CastleTerrain(moats, land, WaterField.NONE, true).withWays(List.of(street));
+        int lastGround = Integer.MIN_VALUE, cut = 0;
+        for (int x = 189; x <= 611; x++) {
+            for (double z : new double[]{40.5, 43.5}) {
+                var c = ramped.at(x + 0.5, z);
+                if (c == null || c.moat()) continue;
+                final int at = x;
+                assertFalse(c.wall(), () -> "a wall across the street at " + at);
+                // The street's ground rises with its grade, to within a block, over what the land had without terraces
+                var base = flat.at(x + 0.5, z);
+                double lift = c.ground() - base.ground(), climb = c.crossing() - base.crossing();
+                assertTrue(lift >= 0 && Math.abs(lift - climb) < 1 + 1e-6,
+                        () -> "ground off the grade at " + at + ": " + c + " over " + base);
+            }
+            var c = ramped.at(x + 0.5, 40.5);
+            if (c == null || c.moat()) {
+                lastGround = Integer.MIN_VALUE;
+                continue;
+            }
+            if (lastGround != Integer.MIN_VALUE) {
+                final int at = x, prev = lastGround;
+                assertTrue(Math.abs(c.ground() - lastGround) <= 1, () -> "step along the street at " + at + ": " + prev + " -> " + c);
+            }
+            lastGround = c.ground();
+            if (c.ground() != terraced.at(x + 0.5, 40.5).ground()) cut++;
+        }
+        assertTrue(cut > 0, "the street never left the terraces");
+        assertEquals(terraced.at(400.5, 60.5).ground(), ramped.at(400.5, 60.5).ground());
         // A path's grade across the terraces climbs without steps, inside the outer moat
         for (int z : new int[]{-100, 0, 100}) {
             double last = terraced.at(189.5, z + 0.5).crossing();

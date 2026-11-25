@@ -428,6 +428,8 @@ public final class BuildingLayer {
         Plot fitted = facilities == null ? plot : clearOfRails(plots, plot);
         Building building = fitted == null ? null : make(plots, fitted);
         boolean unusable = logic.settings().buildings.usableFootprints && building != null && !hasRoom(plots, building);
+        boolean split = config.clearOfStreets && building != null && !unusable && crossesStreet(plots, building);
+        if (split) unusable = true;
         boolean fill = fillsDowntown(plot);
         boolean refit = logic.settings().buildings.usableFootprints && plot.row() == 0 && (fitted != plot || unusable || fill);
         if (unusable) building = null;
@@ -436,7 +438,7 @@ public final class BuildingLayer {
         if (refit && building == null) {
             for (Plot candidate : frontageCandidates(plots, plot)) {
                 Building trial = make(plots, candidate);
-                if (trial == null || !hasRoom(plots, trial)) continue;
+                if (trial == null || !hasRoom(plots, trial) || config.clearOfStreets && crossesStreet(plots, trial)) continue;
                 building = checkSite(plots, candidate, trial);
                 if (building != null) { relocated=true; break; }
             }
@@ -467,6 +469,9 @@ public final class BuildingLayer {
         }
         if (logic.settings().buildings.usableFootprints && !hasRoom(plots, made)) {
             return "no room";
+        }
+        if (config.clearOfStreets && crossesStreet(plots, made)) {
+            return "street through";
         }
         String why = checkReason(plots, fitted, made);
         if ("facility".equals(why)) {
@@ -599,9 +604,15 @@ public final class BuildingLayer {
             candidates.add(new Plot(plot.id(),plot.chain(),plot.side(),plot.index(),start,end,plot.along(),plot.depth(),
                     clear[i],plot.district(),plot.street(),plot.streetWidth(),plot.heading(),false,false,0,plot.use(),false));
         }
-        candidates.sort(java.util.Comparator.comparingDouble((Plot p)->p.frontage()*p.maxDepth()).reversed());
+        // Largest first; in layout 13 the frontage counts for more than depth past a deep building's (a street's
+        // dead end behind the lot cuts the building shallower rather than leaving half its frontage open)
+        double deep = config.clearOfStreets ? FRONTAGE_FIRST_DEPTH : Double.POSITIVE_INFINITY;
+        candidates.sort(java.util.Comparator.comparingDouble((Plot p)->p.frontage()*Math.min(p.maxDepth(), deep)).reversed());
         return candidates;
     }
+
+    /** Past this depth a refitted building's frontage is worth more than its depth ({@link #frontageCandidates}). */
+    private static final double FRONTAGE_FIRST_DEPTH = 16.0;
 
     /** How deep a lot cut back by a railway must still run, along a stretch of its frontage, to be built on. */
     private static final double RAIL_LOT_DEPTH = 7.0;
@@ -746,6 +757,64 @@ public final class BuildingLayer {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a street or lane runs through a building's body ({@link BuildingSettings#clearOfStreets}): two or more
+     * points of its footprint, a block or more back from its front, sampled every block, on a street's paving with
+     * the building's body off the street on both sides of it (across or along). A street merely grazing a side, the
+     * back or, on a curve, the front is no split: the columns on it are left out and the building stands whole.
+     */
+    private static boolean crossesStreet(TownPlots plots, Building b) {
+        double w = b.width();
+        double back = b.hasWing() ? Math.max(b.back(), b.wingBack()) : b.back();
+        int hits = 0;
+        for (double u = 0.5; u < w; u += 1.0) {
+            for (double v = Math.max(b.front(), 0.0) + 1.5; v < back; v += 1.0) {
+                if (!b.covers(u, v) || !onStreet(plots, b, u, v)) {
+                    continue;
+                }
+                boolean across = body(plots, b, u - SPLIT_REACH, v) && body(plots, b, u + SPLIT_REACH, v);
+                boolean along = body(plots, b, u, v - SPLIT_REACH) && body(plots, b, u, v + SPLIT_REACH);
+                if ((across || along) && ++hits >= 2) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a street lies between a point of a building's lot and the middle of its body
+     * ({@link BuildingSettings#clearOfStreets}): a corner of the lot left beyond a lane crossing it, neither built on
+     * nor fenced in as its yard.
+     */
+    private static boolean cutOff(TownPlots plots, Building b, double x, double z) {
+        double back = b.hasWing() ? Math.max(b.back(), b.wingBack()) : b.back();
+        double middle = 0.5 * (Math.max(b.front(), 0.0) + back);
+        double cx = b.ox() + b.nx() * middle;
+        double cz = b.oz() + b.nz() * middle;
+        double length = Math.hypot(cx - x, cz - z);
+        int n = (int) Math.ceil(length / 0.5);
+        for (int i = 1; i < n; i++) {
+            if (plots.onStreet(x + (cx - x) * i / n, z + (cz - z) * i / n)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** How far to either side of a street point a building's body must go on for the street to split it. */
+    private static final double SPLIT_REACH = 4.0;
+
+    private static boolean onStreet(TownPlots plots, Building b, double u, double v) {
+        double s = u - 0.5 * b.width();
+        return plots.onStreet(b.ox() + b.tx() * s + b.nx() * v, b.oz() + b.tz() * s + b.nz() * v);
+    }
+
+    /** Whether a point in a building's own frame is in its body and off any street. */
+    private static boolean body(TownPlots plots, Building b, double u, double v) {
+        return u > 0 && u < b.width() && v > Math.max(b.front(), 0.0) && b.covers(u, v) && !onStreet(plots, b, u, v);
     }
 
     /** Whether any of a building's footprint lies in the open land along a footpath, sampled every block or so. */
@@ -1493,7 +1562,7 @@ public final class BuildingLayer {
                 Plot plot = town.at(x, z);
                 plots[i * 18 + k] = plot;
                 Building b = building(town, plot);
-                if (b == null || plot.id() != b.id()) {
+                if (b == null || plot.id() != b.id() || config.clearOfStreets && cutOff(town, b, x, z)) {
                     continue;
                 }
                 lots[i * 18 + k] = b;
