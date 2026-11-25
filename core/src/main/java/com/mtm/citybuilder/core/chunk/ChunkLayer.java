@@ -1682,7 +1682,8 @@ public final class ChunkLayer {
                     if (best == null) {
                         continue;
                     }
-                    double[] profile = bankProfile(best, bestT, cx, cz, config);
+                    double[] profile = bankProfile(best, bestT, cx, cz, config,
+                            config.bankCorners && joinedAt(near, best, bestT));
                     if (profile != null && (Double.isNaN(bank[c]) || profile[0] > bank[c])) {
                         bank[c] = profile[0];
                         bankKind[c] = (int) profile[1];
@@ -1802,12 +1803,24 @@ public final class ChunkLayer {
      * the town.
      */
     static double[] bankProfile(double[] b, double t, double x, double z, CitySettings.Streets config) {
+        return bankProfile(b, t, x, z, config, false);
+    }
+
+    /**
+     * As {@link #bankProfile(double[], double, double, double, CitySettings.Streets)}; {@code joined}: the nearest point
+     * is an end of the piece where another piece of an embankment goes on (a corner). There the section turns round the
+     * corner, measured out from it ({@link CitySettings.Streets#bankCorners}): before, the wedge outside a corner lay
+     * past both pieces' ends, was neither's, and the water came in between their revetments.
+     */
+    static double[] bankProfile(double[] b, double t, double x, double z, CitySettings.Streets config, boolean joined) {
         double px = b[0] + (b[2] - b[0]) * t;
         double pz = b[1] + (b[3] - b[1]) * t;
         double s = (x - px) * b[6] + (z - pz) * b[7];
         // Past the piece's ends only within a little of its line (the outside of a bend), not beyond
         double off = Math.hypot(x - px, z - pz);
-        if (off > Math.abs(s) + 2.0) {
+        if (joined && (t <= 0.0 || t >= 1.0)) {
+            s = (s < 0 ? -1.0 : 1.0) * off;
+        } else if (off > Math.abs(s) + 2.0) {
             return null;
         }
         double crest = b[4] + (b[5] - b[4]) * t;
@@ -2556,11 +2569,29 @@ public final class ChunkLayer {
                     bestT = t;
                 }
             }
-            if (best != null && bankProfile(best, bestT, x, z, config) != null) {
+            if (best != null && bankProfile(best, bestT, x, z, config, config.bankCorners && joinedAt(near, best, bestT)) != null) {
                 return false;
             }
         }
         return true;
+    }
+
+    /** How far apart an embankment's two ends may stop for it to be closed into a ring ({@code bankCorners}). */
+    static final double BANK_RING_GAP = 24.0;
+
+    /** Whether a bank piece's end nearest at {@code t} (0 or 1) is where another piece starts or ends. */
+    static boolean joinedAt(List<double[]> near, double[] b, double t) {
+        if (t > 0.0 && t < 1.0) {
+            return false;
+        }
+        double ex = t <= 0.0 ? b[0] : b[2];
+        double ez = t <= 0.0 ? b[1] : b[3];
+        for (double[] o : near) {
+            if (o != b && (Math.hypot(o[0] - ex, o[1] - ez) < 1.5 || Math.hypot(o[2] - ex, o[3] - ez) < 1.5)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The crest of an embankment whose centre line runs within {@code reach} of a position, or NaN. */
@@ -2827,11 +2858,26 @@ public final class ChunkLayer {
         double offset = logic.settings().streets.bankOffset;
         for (com.mtm.citybuilder.core.street.Embankment e : plan.embankments()) {
             double reach = Math.max(offset, e.land()) + 2.0;
-            for (int k = 1; k < e.points().size(); k++) {
+            int count = e.points().size();
+            // A ring round a shore whose two ends stop short of each other: closed (layout 20; the gap between them
+            // was a break in the revetment the water came in through)
+            double[] head = e.points().get(0);
+            double[] tail = e.points().get(count - 1);
+            boolean ring = logic.settings().streets.bankCorners && count >= 4
+                    && Math.hypot(head[0] - tail[0], head[1] - tail[1]) <= BANK_RING_GAP;
+            for (int k = 1; k < (ring ? count + 1 : count); k++) {
                 double[] a = e.points().get(k - 1);
-                double[] b = e.points().get(k);
+                double[] b = e.points().get(k % count);
                 double nx = a[3] + b[3];
                 double nz = a[4] + b[4];
+                if (k == count) {
+                    // The closing piece: square to its own line, to the land side as its ends' normals
+                    double dx = b[0] - a[0];
+                    double dz = b[1] - a[1];
+                    double side = -dz * nx + dx * nz >= 0 ? 1.0 : -1.0;
+                    nx = -dz * side;
+                    nz = dx * side;
+                }
                 double n = Math.hypot(nx, nz);
                 if (n < 1e-9) {
                     continue;
@@ -2842,7 +2888,7 @@ public final class ChunkLayer {
                     piece[14] = logic.settings().streets.leveeSlope * Math.max(0,a[2]-a[5]);
                     piece[15] = logic.settings().streets.leveeSlope * Math.max(0,b[2]-b[5]);
                     piece[8] = e.footRoad().get(k-1)[2];
-                    piece[9] = e.footRoad().get(k)[2];
+                    piece[9] = e.footRoad().get(k % count)[2];
                 }
                 for (int cx = Math.floorDiv((int) Math.floor(Math.min(a[0], b[0]) - reach), 16); cx <= Math.floorDiv((int) Math.floor(Math.max(a[0], b[0]) + reach), 16); cx++) {
                     for (int cz = Math.floorDiv((int) Math.floor(Math.min(a[1], b[1]) - reach), 16); cz <= Math.floorDiv((int) Math.floor(Math.max(a[1], b[1]) + reach), 16); cz++) {

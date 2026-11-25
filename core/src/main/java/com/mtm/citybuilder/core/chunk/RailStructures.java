@@ -72,6 +72,10 @@ final class RailStructures {
 
         /** The world columns the station's model takes: {minX, minZ, maxX, maxZ}. */
         int[] bounds;
+        /** Whether water lies under its platforms ({@code transit.riverStations}): a bridge station. */
+        boolean river;
+        /** Where its platforms reach dry land at each end, {x, z} (none for an end out in the water). */
+        List<double[]> banks = List.of();
         private Line path;
 
         Line path() {
@@ -436,6 +440,12 @@ final class RailStructures {
     }
 
     /** The terrain's top block under a world column. */
+    /** Whether the water stands over the ground at a point. */
+    static boolean wet(CityLogic logic, double x, double z) {
+        double water = logic.terrain().waterLevel(x, z);
+        return !Double.isNaN(water) && water > logic.terrain().surfaceHeight((int) Math.floor(x), (int) Math.floor(z));
+    }
+
     private static int terrain(CityLogic logic, double x, double z) {
         return (int) Math.floor(logic.terrain().surfaceHeight((int) Math.floor(x), (int) Math.floor(z)));
     }
@@ -572,6 +582,9 @@ final class RailStructures {
                     overStreet = plots.onStreet(q[0], q[1]);
                 }
             }
+            // Over a river: the concourse hung under the deck over the water too, not on the river's bed
+            boolean overWater = st.river && logic.settings().transit.riverStations;
+            overStreet |= overWater;
             st.mezzanine = overStreet;
             Ground real = (x, z) -> {
                 double[] q = curve.place(x + 0.5, z + 0.5);
@@ -619,7 +632,7 @@ final class RailStructures {
                         for (int k = 1; k <= runs[e] + 1 && !onRoad; k++) {
                             for (int z = -2; z <= 2 && !onRoad; z++) {
                                 double[] q = curve.place(end + dir * k + 0.5, z + 0.5);
-                                onRoad = streets.paved(q[0], q[1]);
+                                onRoad = streets.paved(q[0], q[1]) || overWater && wet(logic, q[0], q[1]);
                             }
                         }
                         if (onRoad) {
@@ -631,7 +644,7 @@ final class RailStructures {
                         if (ends[0] || ends[1]) {
                             es = trial;
                             st.mezzanineExits = true;
-                        } else {
+                        } else if (!overWater) {
                             // Both ends over the road (the line along a street's middle): out of the sides instead,
                             // a footbridge over the street to beyond its paving and stairs down beside it
                             int[] reach = new int[2], dir = new int[2];

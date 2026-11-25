@@ -17,8 +17,8 @@ const baseline = process.env.AUTOTEST_BASELINE;
 if (replay && baseline) throw new Error('Select either a saved-chunk baseline or a plan replay');
 const WORLD = baseline ? 'autotest-baseline' : replay ? 'autotest-replay' : 'autotest';
 const layout = process.env.AUTOTEST_LAYOUT;
-if (layout !== undefined && !['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19'].includes(layout)) {
-  throw new Error('AUTOTEST_LAYOUT must be 1 to 19');
+if (layout !== undefined && !['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].includes(layout)) {
+  throw new Error('AUTOTEST_LAYOUT must be 1 to 20');
 }
 const ENDPOINT = join(RUN, 'testkit', 'endpoint-server.json');
 const LOG = join(RUN, 'logs', 'latest.log');

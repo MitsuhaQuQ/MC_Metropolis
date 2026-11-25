@@ -41,6 +41,8 @@ class CitySettingsTest {
             assertEquals(!existingPlans, first.streets.finalSnap);
             assertEquals(!existingPlans, first.streets.dryPaths);
             assertEquals(!existingPlans, first.rail.fitProfile);
+            assertEquals(!existingPlans, first.streets.bankCorners);
+            assertEquals(!existingPlans, first.transit.riverStations);
             assertEquals(!existingPlans, first.transit.smoothStations);
             assertEquals(existingPlans ? 0.0 : 40.0, first.plots.parcelFrontage);
             assertEquals(existingPlans ? 0 : 1, first.buildings.retailGroundExtra);
@@ -93,6 +95,11 @@ class CitySettingsTest {
         midpointRails.save("layout/building_scale", new byte[]{18});
         assertFalse(CitySettings.forBuildingLayout(midpointRails,true).rail.fitProfile);
         assertTrue(CitySettings.forBuildingLayout(midpointRails,true).streets.dryPaths);
+        var openCorners = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+        openCorners.save("layout/building_scale", new byte[]{19});
+        assertFalse(CitySettings.forBuildingLayout(openCorners,true).streets.bankCorners);
+        assertFalse(CitySettings.forBuildingLayout(openCorners,true).transit.riverStations);
+        assertTrue(CitySettings.forBuildingLayout(openCorners,true).rail.fitProfile);
         assertFalse(CitySettings.forBuildingLayout(squareTees,true).transit.smoothStations);
         assertTrue(CitySettings.forBuildingLayout(squareTees,true).buildings.clearOfStreets);
         assertTrue(CitySettings.forBuildingLayout(steppedWays,true).buildings.turretsOnGround);

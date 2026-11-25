@@ -32,6 +32,10 @@ import java.util.Set;
 public final class RailChunks {
     /** An elevated deck's top over the ground under it, in blocks; a stacked one's over that. */
     public static final double CLEARANCE = 9.0;
+    /** How far over the water a station with water under its platforms stands ({@code transit.riverStations}). */
+    static final double RIVER_DECK = 9.0;
+    /** How far back from the water's edge onto the bank a bridge station's stairs come down. */
+    static final double BANK_BACK = 6.0;
     public static final double STACKED = 8.0;
     /**
      * Rail over rail where one line crosses over another: the lower line's trains, its catenary and the upper deck's
@@ -369,9 +373,12 @@ public final class RailChunks {
         }
     }
 
-    /** A town's above-ground stations as built: their middle, whether built whole, elevated, a mezzanine and with its own stairs. */
+    /**
+     * A town's above-ground stations as built: their middle, whether built whole, elevated, a mezzanine and with its own
+     * stairs; whether water lies under its platforms and on how many banks stairs come up to them.
+     */
     public record StationSummary(double x, double z, double level, boolean main, boolean built, boolean elevated,
-                                 boolean mezzanine, boolean mezzanineExits) {}
+                                 boolean mezzanine, boolean mezzanineExits, boolean river, int banks) {}
 
     public List<StationSummary> stations(Settlement town) {
         Index index = index(town);
@@ -380,7 +387,7 @@ public final class RailChunks {
         for (var st : index.structures.stations) {
             double[] mid = st.line.get(st.line.size() / 2);
             out.add(new StationSummary(mid[0], mid[1], st.level, st.main, st.built, st.elevated, st.mezzanine,
-                    st.mezzanineExits));
+                    st.mezzanineExits, st.river, st.banks.size()));
         }
         return out;
     }
@@ -1042,6 +1049,9 @@ public final class RailChunks {
             }
             RailStructures.Station station = new RailStructures.Station(aboveLines.get(k), stationLevel(pieces, mid),
                     isMain, side, houseLength, houseDepth);
+            if (logic.settings().transit.riverStations) {
+                riverBanks(station);
+            }
             station.firstApproachPiece = (int) mid[4];
             station.endApproachPiece = (int) mid[5];
             station.square = isMain ? square : null;
@@ -1080,7 +1090,12 @@ public final class RailChunks {
             }
             // A stair down beside the line from each side platform's middle to the street: where the station is not
             // built whole, or its concourse is a mezzanine over a street with no stairs of its own down to the ground
-            if (!st.built || st.mezzanine && !st.mezzanineExits) {
+            if (st.river && !st.banks.isEmpty() && (!st.built || st.mezzanine && !st.mezzanineExits)) {
+                // A bridge station: up from the ground on each bank at its platforms' dry ends, not down into the water
+                for (double[] bank : st.banks) {
+                    stairs(entrances, bank[0], bank[1], mid[2], half + 2.5, -1, half, 0, st.level);
+                }
+            } else if (!st.built || st.mezzanine && !st.mezzanineExits) {
                 boolean lowDoor = st.square != null && structures.lowerEntries.containsKey(
                         key((int) Math.floor(st.square.x()), (int) Math.floor(st.square.z())));
                 stairs(entrances, mid[0], mid[1], mid[2], half + 2.5, -1, half, lowDoor ? st.side : 0, st.level);
@@ -1300,6 +1315,48 @@ public final class RailChunks {
     private static boolean interchange(StreetPlan plan, double[] at) {
         return plan.sites().stream().anyMatch(s -> s.kind() == StationSite.Kind.TOWN_LINE && s.plaza() > 0
                 && Math.hypot(s.x() - at[0], s.z() - at[1]) < 2);
+    }
+
+    /**
+     * Whether water lies under a station's platforms, and where they reach dry land at each end: from each end inwards,
+     * {@link #BANK_BACK} short of the first water (none for an end itself out in the water).
+     */
+    private void riverBanks(RailStructures.Station station) {
+        List<double[]> pts = new ArrayList<>();
+        List<double[]> line = station.line;
+        for (int i = 1; i < line.size(); i++) {
+            double[] a = line.get(i - 1);
+            double[] b = line.get(i);
+            double length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+            for (double s = 0; s < length; s += 2.0) {
+                pts.add(new double[]{a[0] + (b[0] - a[0]) * s / length, a[1] + (b[1] - a[1]) * s / length});
+            }
+        }
+        pts.add(line.get(line.size() - 1));
+        int n = pts.size();
+        boolean[] wet = new boolean[n];
+        boolean any = false;
+        for (int i = 0; i < n; i++) {
+            wet[i] = RailStructures.wet(logic, pts.get(i)[0], pts.get(i)[1]);
+            any |= wet[i];
+        }
+        if (!any) {
+            return;
+        }
+        station.river = true;
+        List<double[]> banks = new ArrayList<>();
+        int back = (int) Math.round(BANK_BACK / 2.0);
+        if (!wet[0]) {
+            int first = 0;
+            while (first < n && !wet[first]) first++;
+            banks.add(pts.get(Math.max(0, first - 1 - back)));
+        }
+        if (!wet[n - 1]) {
+            int last = n - 1;
+            while (last >= 0 && !wet[last]) last--;
+            banks.add(pts.get(Math.min(n - 1, last + 1 + back)));
+        }
+        station.banks = banks;
     }
 
     private static void stairs(List<double[]> out, double x, double z, double h, double off, int rising, double half, int gallerySide, double bed) {
@@ -1746,6 +1803,16 @@ public final class RailChunks {
             for (int j = k; j < end; j++) {
                 deep &= modes[j] == TransitMode.UNDERGROUND.ordinal();
                 bottom = Math.min(bottom, level[j]);
+            }
+            if (!deep && logic.settings().transit.riverStations) {
+                // Water under the platforms: a bridge station clear over it (its ground there was the river's bed)
+                for (int j = k; j < end; j++) {
+                    double[] p = points.get(j);
+                    double water = logic.terrain().waterLevel(p[0], p[1]);
+                    if (!Double.isNaN(water) && water > ground[j]) {
+                        top = Math.max(top, Math.floor(water) + RIVER_DECK);
+                    }
+                }
             }
             int from = Math.max(0, k - 1);
             int to = Math.min(n, end + 1);

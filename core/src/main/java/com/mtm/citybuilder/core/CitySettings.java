@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 19)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 20)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,13 +33,15 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 19)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 20)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
         settings.extent.ruggedFade = version[0] >= 17;
         settings.streets.finalSnap = version[0] >= 17;
         settings.streets.dryPaths = version[0] >= 18;
         settings.rail.fitProfile = version[0] >= 19;
+        settings.streets.bankCorners = version[0] >= 20;
+        settings.transit.riverStations = version[0] >= 20;
         settings.roads.landEnds = version[0] >= 16;
         settings.rail.landEnds = version[0] >= 16;
         settings.transit.pinnedFirst = version[0] >= 15;
@@ -775,6 +777,13 @@ public final class CitySettings {
          * pulled back to the corridor's height afterwards and crossed another viaduct on its level.
          */
         public boolean pinnedFirst = true;
+        /**
+         * A station with water under its platforms (a river it crosses, a lake's edge) a bridge station: its level at
+         * least {@code RailChunks.RIVER_DECK} over the water, its concourse hung under the deck over the water, its
+         * stairs down only where they land dry, else stairs up from the ground on each bank at its platforms' dry ends.
+         * Before, a station over water was levelled from the river's bed and stood in it.
+         */
+        public boolean riverStations = true;
         public double maxRadius = 1200.0;
         /** Stations about this far apart along a line. */
         public double stationSpacing = 1000.0;
@@ -940,6 +949,8 @@ public final class CitySettings {
          * off, and such a path was laid as a strip of stone up to the water's surface out in the lake.
          */
         public boolean dryPaths = true;
+        /** An embankment's cross-section turned round its corners, measured out from the corner (layout 20). */
+        public boolean bankCorners = true;
         public double sideBySideOverlap = 1.0;
         /** A metropolis is a planned capital where this share of its built land is flat, and its hash below the chance. */
         public double joriFlatShare = 0.7;
