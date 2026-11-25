@@ -1,19 +1,78 @@
 {
-  "variants": {
-    "facing=north": {
-      "model": "citybuilder:block/sound_barrier"
+  "multipart": [
+    {
+      "when": {
+        "facing": "north"
+      },
+      "apply": {
+        "model": "citybuilder:block/sound_barrier"
+      }
     },
-    "facing=east": {
-      "model": "citybuilder:block/sound_barrier",
-      "y": 90
+    {
+      "when": {
+        "facing": "east"
+      },
+      "apply": {
+        "model": "citybuilder:block/sound_barrier",
+        "y": 90
+      }
     },
-    "facing=south": {
-      "model": "citybuilder:block/sound_barrier",
-      "y": 180
+    {
+      "when": {
+        "facing": "south"
+      },
+      "apply": {
+        "model": "citybuilder:block/sound_barrier",
+        "y": 180
+      }
     },
-    "facing=west": {
-      "model": "citybuilder:block/sound_barrier",
-      "y": 270
+    {
+      "when": {
+        "facing": "west"
+      },
+      "apply": {
+        "model": "citybuilder:block/sound_barrier",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "north",
+        "outer": "true"
+      },
+      "apply": {
+        "model": "citybuilder:block/sound_barrier",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "outer": "true"
+      },
+      "apply": {
+        "model": "citybuilder:block/sound_barrier",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "outer": "true"
+      },
+      "apply": {
+        "model": "citybuilder:block/sound_barrier",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "outer": "true"
+      },
+      "apply": {
+        "model": "citybuilder:block/sound_barrier"
+      }
     }
-  }
+  ]
 }

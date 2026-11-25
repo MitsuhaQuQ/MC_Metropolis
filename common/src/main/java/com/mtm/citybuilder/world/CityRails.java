@@ -271,15 +271,134 @@ public final class CityRails {
         int baseX = chunk.getPos().getMinBlockX();
         int baseZ = chunk.getPos().getMinBlockZ();
         int min = chunk.getMinBuildHeight();
+        // Railings, panes and fences linked to their neighbours in the structures (across the chunk's edges too): set
+        // straight into the chunk they would otherwise stand each alone, a row of separate posts and panels
+        java.util.Map<Long, BlockState> around = null;
+        for (RailChunks.Structure s : structures) {
+            for (int i = 0; i < s.packed().length && around == null; i++) {
+                if (linking(CityBuildings.parsed(s.state(i)))) {
+                    around = new java.util.HashMap<>();
+                }
+            }
+        }
+        if (around != null) {
+            CityLogic logic = CityWorlds.of(level.getLevel());
+            int cx = chunk.getPos().x;
+            int cz = chunk.getPos().z;
+            for (int[] d : new int[][]{{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                for (RailChunks.Structure s : d[0] == 0 && d[1] == 0 ? structures
+                        : logic.chunks().rails().structures(cx + d[0], cz + d[1])) {
+                    int bx = (cx + d[0]) * 16;
+                    int bz = (cz + d[1]) * 16;
+                    for (int i = 0; i < s.packed().length; i++) {
+                        around.put(BlockPos.asLong(bx + s.x(i), s.y(i), bz + s.z(i)), CityBuildings.parsed(s.state(i)));
+                    }
+                }
+            }
+        }
         for (RailChunks.Structure s : structures) {
             for (int i = 0; i < s.packed().length; i++) {
                 int y = s.y(i);
                 if (y < min || y > top) {
                     continue;
                 }
-                chunk.setBlockState(pos.set(baseX + s.x(i), y, baseZ + s.z(i)), CityBuildings.parsed(s.state(i)), false);
+                BlockState state = CityBuildings.parsed(s.state(i));
+                if (around != null && linking(state)) {
+                    java.util.Map<Long, BlockState> blocks = around;
+                    int x0 = baseX + s.x(i);
+                    int y0 = y;
+                    int z0 = baseZ + s.z(i);
+                    state = linked(state, (dx, dy, dz) -> blocks.get(BlockPos.asLong(x0 + dx, y0 + dy, z0 + dz)));
+                }
+                chunk.setBlockState(pos.set(baseX + s.x(i), y, baseZ + s.z(i)), state, false);
             }
         }
+    }
+
+    /** Whether a block joins its neighbours by its sides (panes, iron bars, fences, walls, a deck's edge pieces). */
+    static boolean linking(BlockState state) {
+        Block b = state.getBlock();
+        return b instanceof net.minecraft.world.level.block.CrossCollisionBlock || b instanceof net.minecraft.world.level.block.WallBlock
+                || b instanceof com.mtm.citybuilder.block.CornerEdgeBlock;
+    }
+
+    /**
+     * A deck's edge piece where the edge steps out on the diagonal: the next piece of the edge stands a block further
+     * out to one side, and this piece is the one stepped out, so it closes its side towards the piece behind it (else
+     * the panels stand apart, a gap at every step).
+     */
+    private static BlockState cornered(BlockState state, Beside beside) {
+        var out = state.getValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING);
+        for (var side : new net.minecraft.core.Direction[]{out.getClockWise(), out.getCounterClockWise()}) {
+            // The piece behind: a block to this side and a block in from the edge, on the same edge (a block up or down
+            // where the deck climbs)
+            boolean behind = false;
+            for (int dy = -1; dy <= 1 && !behind; dy++) {
+                behind = sameEdge(beside.at(side.getStepX() - out.getStepX(), dy, side.getStepZ() - out.getStepZ()), out);
+            }
+            BlockState next = beside.at(side.getStepX(), 0, side.getStepZ());
+            if (behind && !sameEdge(next, out)) {
+                return side == out.getClockWise()
+                        ? state.setValue(com.mtm.citybuilder.block.CornerEdgeBlock.OUTER, true)
+                        : state.setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, side)
+                                .setValue(com.mtm.citybuilder.block.CornerEdgeBlock.OUTER, true);
+            }
+        }
+        return state;
+    }
+
+    private static boolean sameEdge(BlockState n, net.minecraft.core.Direction out) {
+        return n != null && n.getBlock() instanceof com.mtm.citybuilder.block.EdgeBlock
+                && n.getValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING) == out;
+    }
+
+    /** What stands at (dx, dy, dz) from the block being placed, among its own structure's; null for nothing. */
+    interface Beside {
+        BlockState at(int dx, int dy, int dz);
+    }
+
+    /** A pane, bar, fence or wall joined on each side to what stands beside it. */
+    static BlockState linked(BlockState state, Beside beside) {
+        Block b = state.getBlock();
+        if (b instanceof com.mtm.citybuilder.block.CornerEdgeBlock) {
+            return cornered(state, beside);
+        }
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockState n = beside.at(d.getStepX(), 0, d.getStepZ());
+            boolean join = n != null && joins(state, n);
+            if (b instanceof net.minecraft.world.level.block.CrossCollisionBlock) {
+                state = state.setValue(switch (d) {
+                    case NORTH -> BlockStateProperties.NORTH;
+                    case SOUTH -> BlockStateProperties.SOUTH;
+                    case EAST -> BlockStateProperties.EAST;
+                    default -> BlockStateProperties.WEST;
+                }, join);
+            } else {
+                var side = switch (d) {
+                    case NORTH -> net.minecraft.world.level.block.WallBlock.NORTH_WALL;
+                    case SOUTH -> net.minecraft.world.level.block.WallBlock.SOUTH_WALL;
+                    case EAST -> net.minecraft.world.level.block.WallBlock.EAST_WALL;
+                    default -> net.minecraft.world.level.block.WallBlock.WEST_WALL;
+                };
+                state = state.setValue(side, join ? net.minecraft.world.level.block.state.properties.WallSide.LOW
+                        : net.minecraft.world.level.block.state.properties.WallSide.NONE);
+            }
+        }
+        return state;
+    }
+
+    /** Whether a pane, bar, fence or wall reaches over to a neighbour: one of its kind, or a full solid block. */
+    private static boolean joins(BlockState self, BlockState n) {
+        Block a = self.getBlock();
+        Block b = n.getBlock();
+        if (a instanceof net.minecraft.world.level.block.FenceBlock) {
+            if (b instanceof net.minecraft.world.level.block.FenceBlock || b instanceof net.minecraft.world.level.block.FenceGateBlock) {
+                return true;
+            }
+        } else if (b instanceof net.minecraft.world.level.block.IronBarsBlock || b instanceof net.minecraft.world.level.block.WallBlock) {
+            return true;
+        }
+        return !n.isAir() && Block.isShapeFullBlock(n.getCollisionShape(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, BlockPos.ZERO));
     }
 
     /**

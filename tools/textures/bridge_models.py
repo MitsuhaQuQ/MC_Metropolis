@@ -84,12 +84,26 @@ def model(elements, side, top, bottom=None, render=None):
     return m
 
 
-def edge(name, side, top, x0, x1, depth, render=None):
+CLOCKWISE = {'north': 'east', 'east': 'south', 'south': 'west', 'west': 'north'}
+
+
+def edge(name, side, top, x0, x1, depth, render=None, corners=False):
+    """An edge piece; with corners (CornerEdgeBlock) outer=true also stands it against the side clockwise of facing."""
     write(os.path.join(MODELS, name + '.json'),
           model([box((x0, 0, 0), (x1, 16, depth), side, top)], side, top, render=render))
-    write(os.path.join(BLOCKSTATES, name + '.json'), {'variants': {
-        'facing=%s' % f: dict({'model': 'citybuilder:block/' + name}, **({'y': y} if y else {}))
-        for f, y in FACING_Y.items()}})
+    if not corners:
+        write(os.path.join(BLOCKSTATES, name + '.json'), {'variants': {
+            'facing=%s' % f: dict({'model': 'citybuilder:block/' + name}, **({'y': y} if y else {}))
+            for f, y in FACING_Y.items()}})
+        return
+    parts = []
+    for f, y in FACING_Y.items():
+        parts.append({'when': {'facing': f}, 'apply': dict({'model': 'citybuilder:block/' + name}, **({'y': y} if y else {}))})
+    for f in FACING_Y:
+        y = FACING_Y[CLOCKWISE[f]]
+        parts.append({'when': {'facing': f, 'outer': 'true'},
+                      'apply': dict({'model': 'citybuilder:block/' + name}, **({'y': y} if y else {}))})
+    write(os.path.join(BLOCKSTATES, name + '.json'), {'multipart': parts})
 
 
 def single(name, elements, side, top, render=None):
@@ -148,10 +162,10 @@ def marker():
 
 
 def main():
-    edge('concrete_parapet', 'concrete_parapet', 'concrete_parapet_top', 0, 16, 5)
-    edge('bridge_railing', 'bridge_railing', 'bridge_railing_top', 0, 16, 2, 'cutout')
-    edge('sound_barrier', 'sound_barrier', 'sound_barrier', 0, 16, 2)
-    edge('sound_barrier_clear', 'sound_barrier_clear', 'sound_barrier_clear', 0, 16, 1, 'translucent')
+    edge('concrete_parapet', 'concrete_parapet', 'concrete_parapet_top', 0, 16, 5, corners=True)
+    edge('bridge_railing', 'bridge_railing', 'bridge_railing_top', 0, 16, 2, 'cutout', corners=True)
+    edge('sound_barrier', 'sound_barrier', 'sound_barrier', 0, 16, 2, corners=True)
+    edge('sound_barrier_clear', 'sound_barrier_clear', 'sound_barrier_clear', 0, 16, 1, 'translucent', corners=True)
     edge('drain_pipe', 'drain_pipe', 'drain_pipe', 6, 10, 4)
     for colour in ('gray', 'green', 'blue'):
         name = 'steel_girder_' + colour

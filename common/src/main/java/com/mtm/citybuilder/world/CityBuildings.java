@@ -261,7 +261,15 @@ public final class CityBuildings {
                             return;
                         }
                     }
-                    chunk.setBlockState(pos.set(wx, wy, wz), parsed(s), false);
+                    BlockState state = parsed(s);
+                    if (CityRails.linking(state)) {
+                        // Its fences and railings joined to their neighbours in the model, not each standing alone
+                        state = CityRails.linked(state, (dx, dy, dz) -> {
+                            String n = p.model().get(mx + dx, my + dy, mz + dz);
+                            return n == null ? null : parsed(n);
+                        });
+                    }
+                    chunk.setBlockState(pos.set(wx, wy, wz), state, false);
                 }
             });
         }

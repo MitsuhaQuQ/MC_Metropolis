@@ -148,13 +148,13 @@ public final class CityBlocks {
                     () -> new SeatBlock(copy(Blocks.WHITE_CONCRETE).strength(1.0F).noOcclusion())));
         }
         CONCRETE_PARAPET = platform.registerBlock("concrete_parapet",
-                () -> new EdgeBlock(thin(Blocks.LIGHT_GRAY_CONCRETE), 0, 16, 16, 5));
+                () -> new CornerEdgeBlock(thin(Blocks.LIGHT_GRAY_CONCRETE), 0, 16, 16, 5));
         BRIDGE_RAILING = platform.registerBlock("bridge_railing",
-                () -> new EdgeBlock(thin(Blocks.IRON_BARS), 0, 16, 16, 2));
+                () -> new CornerEdgeBlock(thin(Blocks.IRON_BARS), 0, 16, 16, 2));
         SOUND_BARRIER = platform.registerBlock("sound_barrier",
-                () -> new EdgeBlock(thin(Blocks.IRON_BLOCK), 0, 16, 16, 2));
+                () -> new CornerEdgeBlock(thin(Blocks.IRON_BLOCK), 0, 16, 16, 2));
         SOUND_BARRIER_CLEAR = platform.registerBlock("sound_barrier_clear",
-                () -> new EdgeBlock(thin(Blocks.GLASS), 0, 16, 16, 1));
+                () -> new CornerEdgeBlock(thin(Blocks.GLASS), 0, 16, 16, 1));
         STEEL_GIRDER_GRAY = platform.registerBlock("steel_girder_gray",
                 () -> new Block(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)));
         STEEL_GIRDER_GREEN = platform.registerBlock("steel_girder_green",

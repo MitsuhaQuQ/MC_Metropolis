@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 14)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 15)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,9 +33,10 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 14)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 15)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
+        settings.transit.pinnedFirst = version[0] >= 15;
         settings.streets.teeEnds = version[0] >= 14;
         settings.streets.dryEnds = version[0] >= 14;
         settings.streets.bridgeEnds = version[0] >= 14;
@@ -736,6 +737,12 @@ public final class CitySettings {
          * a line routed in to its middle are joined by an arc even where one ends on a doubled point.
          */
         public boolean smoothStations = true;
+        /**
+         * An intercity line held to its corridor's height where it enters a town is separated from the town's other
+         * lines first and kept at that height, the others going over or under it: separated the other way, it was
+         * pulled back to the corridor's height afterwards and crossed another viaduct on its level.
+         */
+        public boolean pinnedFirst = true;
         public double maxRadius = 1200.0;
         /** Stations about this far apart along a line. */
         public double stationSpacing = 1000.0;

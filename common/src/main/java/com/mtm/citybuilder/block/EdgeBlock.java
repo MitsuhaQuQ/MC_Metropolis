@@ -21,7 +21,7 @@ import java.util.Map;
  * looks towards, so standing on a deck and facing out puts it on the edge.
  */
 public class EdgeBlock extends HorizontalDirectionalBlock {
-    private final Map<Direction, VoxelShape> shapes = new EnumMap<>(Direction.class);
+    protected final Map<Direction, VoxelShape> shapes = new EnumMap<>(Direction.class);
 
     /** The box against the north side, in sixteenths: x0..x1 across, height, depth from the side. */
     public EdgeBlock(Properties properties, double x0, double x1, double height, double depth) {

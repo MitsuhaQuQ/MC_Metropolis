@@ -981,7 +981,28 @@ public final class RailChunks {
         if (main != null) {
             mainLevel(pieces, runsOf.get(), firstRailway, main, throatLength);
         }
-        separate(pieces, runsOf.get(), firstRailway, main, logic.settings().transit.passengerSpace);
+        if (logic.settings().transit.pinnedFirst && !entries.isEmpty()) {
+            // A line held to its corridor's height where it enters the town is kept there: it is separated first and
+            // the others go over or under it (else it was moved off another line, then pulled back level with it)
+            List<int[]> all = runsOf.get();
+            List<int[]> ordered = new ArrayList<>();
+            List<Boolean> rail = new ArrayList<>();
+            for (int pass = 0; pass < 2; pass++) {
+                for (int r = 0; r < all.size(); r++) {
+                    if (entries.containsKey(all.get(r)[0]) == (pass == 0)) {
+                        ordered.add(all.get(r));
+                        rail.add(r >= firstRailway);
+                    }
+                }
+            }
+            boolean[] railway = new boolean[rail.size()];
+            for (int r = 0; r < railway.length; r++) {
+                railway[r] = rail.get(r);
+            }
+            separate(pieces, ordered, railway, main, logic.settings().transit.passengerSpace);
+        } else {
+            separate(pieces, runsOf.get(), firstRailway, main, logic.settings().transit.passengerSpace);
+        }
         if (main!=null && logic.settings().transit.passengerSpace) mainLevel(pieces,runsOf.get(),firstRailway,main,throatLength);
         for (EntryGrade entry : entries.values()) entry.connect(pieces);
         List<int[]> runs = new ArrayList<>(runsOf.get());
@@ -1375,6 +1396,15 @@ public final class RailChunks {
      * whole and kept level.
      */
     static void separate(List<double[]> pieces, List<int[]> runs, int firstRailway, StationSite main, boolean volumes) {
+        boolean[] railway = new boolean[runs.size()];
+        for (int r = firstRailway; r < runs.size(); r++) {
+            railway[r] = true;
+        }
+        separate(pieces, runs, railway, main, volumes);
+    }
+
+    /** As above, the runs in the order they are fixed, each marked whether it is an intercity line's. */
+    static void separate(List<double[]> pieces, List<int[]> runs, boolean[] railway, StationSite main, boolean volumes) {
         for (int r = 1; r < runs.size(); r++) {
             int from = runs.get(r)[0];
             int to = runs.get(r)[1];
@@ -1408,12 +1438,12 @@ public final class RailChunks {
                     for (int j = runs.get(q)[0]; j < runs.get(q)[1]; j++) {
                         double[] h = pieces.get(j);
                         boolean buried = volumes && (g[10] > 0.5 || h[10] > 0.5);
-                        double[] tu = volumes ? contact(g, h, boxHalf(g,r>=firstRailway?main:null) + boxHalf(h,q>=firstRailway?main:null)) : cross(g, h);
+                        double[] tu = volumes ? contact(g, h, boxHalf(g,railway[r]?main:null) + boxHalf(h,railway[q]?main:null)) : cross(g, h);
                         if (tu == null) {
                             continue;
                         }
                         // Intercity lines meeting on their way into the main station: a junction, not a crossing
-                        if (main != null && r >= firstRailway && q >= firstRailway) {
+                        if (main != null && railway[r] && railway[q]) {
                             double cx = g[0] + (g[2] - g[0]) * tu[0];
                             double cz = g[1] + (g[3] - g[1]) * tu[0];
                             if (!buried && Math.hypot(cx - main.x(), cz - main.z()) < 2.0 * main.length() + 40.0
