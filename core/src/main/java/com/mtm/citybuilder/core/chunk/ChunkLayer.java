@@ -2686,6 +2686,12 @@ public final class ChunkLayer {
         int chunkZ = Math.floorDiv((int) Math.floor(z), 16);
         for (Settlement town : towns(chunkX * 16.0, chunkZ * 16.0)) {
             Index index = index(town);
+            // A long crossing to a small island the town left out: nobody lays it
+            for (StreetSegment g : logic.streetPlan(town).omitted()) {
+                if (distance(g, x, z) <= Math.max(1.5, g.width() - 0.5)) {
+                    return true;
+                }
+            }
             List<Integer> pieces = index.byChunk.get(key(chunkX, chunkZ));
             if (pieces == null) {
                 continue;

@@ -10,14 +10,17 @@ import java.util.List;
  * for every other town), the land kept for its stations and stops, and the reserved high-speed lines through it, routed round the old
  * town, the irrigation canals through its old town, and its large estates no street enters ({x, z, radius}: the
  * land for its temples, schools and parks), the footpaths along its water, the water itself as the street layer saw
- * it, and the squares in front of its stations.
+ * it, and the squares in front of its stations, and the old road's pieces left out as long crossings to small islands
+ * (which the intercity layer leaves too).
  */
 public record StreetPlan(Settlement settlement, Formation formation, List<Anchor> anchors, List<StreetSegment> segments,
                          List<Moat> moats, Districts districts, List<CityRailway> railways, List<Embankment> embankments,
                          List<UrbanLine> urbanLines, double[] capital, List<StationSite> sites,
                          List<List<double[]>> highSpeed, List<Canal> canals, List<double[]> estates,
-                         List<Promenade> promenades, WaterField water, List<StationPlaza> plazas) {
+                         List<Promenade> promenades, WaterField water, List<StationPlaza> plazas,
+                         List<StreetSegment> omitted) {
     public StreetPlan {
+        omitted = List.copyOf(omitted);
         promenades = List.copyOf(promenades);
         plazas = List.copyOf(plazas);
         canals = List.copyOf(canals);

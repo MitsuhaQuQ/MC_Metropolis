@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 22)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 23)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,7 +33,7 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 22)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 23)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
         settings.extent.ruggedFade = version[0] >= 17;
@@ -49,6 +49,7 @@ public final class CitySettings {
         settings.transit.stationPercentile = version[0] >= 21 ? 0.6 : 1.0;
         settings.transit.fittedLines = version[0] >= 22;
         settings.transit.flatMainStation = version[0] >= 22;
+        settings.streets.islandBridges = version[0] >= 23;
         settings.roads.landEnds = version[0] >= 16;
         settings.rail.landEnds = version[0] >= 16;
         settings.transit.pinnedFirst = version[0] >= 15;
@@ -990,6 +991,14 @@ public final class CitySettings {
          * planning's 16-block water grid ran a loop of streets out over a lake, laid as stone up to the water's surface.
          */
         public boolean dryStreets = true;
+        /**
+         * A run of bridge pieces {@code islandSpan} blocks long or more to a small island (land the water closes in
+         * within {@code islandArea} square blocks) is not laid, nor the intercity road over it (layout 23, the user:
+         * a road over a long stretch of water to a small island was a deck 100 blocks over the lake).
+         */
+        public boolean islandBridges = true;
+        public double islandSpan = 200.0;
+        public double islandArea = 400_000.0;
         /** An embankment's cross-section turned round its corners, measured out from the corner (layout 20). */
         public boolean bankCorners = true;
         public double sideBySideOverlap = 1.0;

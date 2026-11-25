@@ -1571,6 +1571,10 @@ public final class StreetLayer {
         unoverlap(window, canals, segments, mouths);
         clearEstates(window, segments);
         snapEnds(segments);
+        List<StreetSegment> omitted = new ArrayList<>();
+        if (config.islandBridges) {
+            dropIslandBridges(window, segments, omitted);
+        }
         dropLooseBridges(segments);
         if (config.continuousCarriageways) LeveeAccess.fit(terrain,config,embankments,urban,railways,segments);
         List<Promenade> promenades = formation == Formation.VILLAGE ? List.of()
@@ -1589,8 +1593,122 @@ public final class StreetLayer {
         return new StreetPlan(settlement, formation, anchors, segments, moats, districts, railways, embankments, urban,
                 window.capital == null ? null : window.capital.clone(), sites, highSpeed, canals, window.estates,
                 promenades, new WaterField((double) window.originX * grid, (double) window.originZ * grid, FINE,
-                window.fineSize, window.edge.clone()), plazas);
+                window.fineSize, window.edge.clone()), plazas, omitted);
     }
+
+    /**
+     * Long crossings to small islands left out (layout 23, the user: a road over a long stretch of water to a small
+     * island is not laid): a run of bridge pieces (joined end to end) {@code islandSpan} long or more, one of whose
+     * banks is land the water closes in within {@code islandArea}, goes. Old-road pieces taken out are kept in
+     * {@code omitted}: the intercity layer does not lay them either.
+     */
+    private void dropIslandBridges(Window window, List<StreetSegment> segments, List<StreetSegment> omitted) {
+        Map<Long, List<Integer>> ends = new HashMap<>();
+        for (int p = 0; p < segments.size(); p++) {
+            StreetSegment g = segments.get(p);
+            if (g.structure() == StreetStructure.BRIDGE) {
+                ends.computeIfAbsent(bridgeEnd(g.x1(), g.z1()), k -> new ArrayList<>()).add(p);
+                ends.computeIfAbsent(bridgeEnd(g.x2(), g.z2()), k -> new ArrayList<>()).add(p);
+            }
+        }
+        boolean[] seen = new boolean[segments.size()];
+        java.util.Set<Integer> drop = new java.util.TreeSet<>(java.util.Comparator.reverseOrder());
+        Map<Long, Boolean> islands = new HashMap<>();
+        for (int start = 0; start < segments.size(); start++) {
+            if (seen[start] || segments.get(start).structure() != StreetStructure.BRIDGE) {
+                continue;
+            }
+            List<Integer> run = new ArrayList<>();
+            java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>(List.of(start));
+            seen[start] = true;
+            double span = 0.0;
+            while (!queue.isEmpty()) {
+                int p = queue.poll();
+                run.add(p);
+                StreetSegment g = segments.get(p);
+                span += g.length();
+                for (long end : new long[]{bridgeEnd(g.x1(), g.z1()), bridgeEnd(g.x2(), g.z2())}) {
+                    for (int q : ends.get(end)) {
+                        if (!seen[q]) {
+                            seen[q] = true;
+                            queue.add(q);
+                        }
+                    }
+                }
+            }
+            if (span < config.islandSpan) {
+                continue;
+            }
+            boolean island = false;
+            for (int p : run) {
+                StreetSegment g = segments.get(p);
+                for (double[] e : new double[][]{{g.x1(), g.z1()}, {g.x2(), g.z2()}}) {
+                    if (ends.get(bridgeEnd(e[0], e[1])).stream().filter(run::contains).count() == 1) {
+                        island |= islands.computeIfAbsent(bridgeEnd(e[0], e[1]), k -> smallIsland(window, e[0], e[1]));
+                    }
+                }
+            }
+            if (island) {
+                drop.addAll(run);
+            }
+        }
+        for (int p : drop) {
+            StreetSegment g = segments.remove(p);
+            if (g.streetClass() == StreetClass.OLD_ROAD) {
+                omitted.add(g);
+            }
+        }
+    }
+
+    /**
+     * Whether a bridge's bank is on a small island: the land reached from it (on the street layer's water, in
+     * {@link #ISLAND_CELL} cells) closes before {@code islandArea}; the bank itself may lie a little out on the water.
+     */
+    private boolean smallIsland(Window window, double x, double z) {
+        double cell = ISLAND_CELL;
+        double[] from = null;
+        for (double r = 0; r <= 2 * cell && from == null; r += 4) {
+            for (int a = 0; a < 16 && from == null; a++) {
+                double px = x + r * Math.cos(a * Math.PI / 8), pz = z + r * Math.sin(a * Math.PI / 8);
+                if (window.inside(px, pz) && !window.water(px, pz)) {
+                    from = new double[]{px, pz};
+                }
+                if (r == 0) {
+                    break;
+                }
+            }
+        }
+        if (from == null) {
+            return false;
+        }
+        int limit = (int) Math.ceil(config.islandArea / (cell * cell));
+        java.util.Set<Long> reached = new java.util.HashSet<>();
+        java.util.ArrayDeque<int[]> queue = new java.util.ArrayDeque<>();
+        queue.add(new int[]{0, 0});
+        reached.add(0L);
+        while (!queue.isEmpty()) {
+            int[] c = queue.poll();
+            for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                int i = c[0] + d[0], j = c[1] + d[1];
+                double px = from[0] + i * cell, pz = from[1] + j * cell;
+                if (!window.inside(px, pz)) {
+                    // Out to the window's edge: no island this small
+                    return false;
+                }
+                if (window.water(px, pz) || !reached.add(((long) i << 32) ^ (j & 0xffffffffL))) {
+                    continue;
+                }
+                if (reached.size() > limit) {
+                    return false;
+                }
+                queue.add(new int[]{i, j});
+            }
+        }
+        return true;
+    }
+
+    /** The cell size of {@link #smallIsland}'s flood, in blocks. */
+    private static final double ISLAND_CELL = 8.0;
 
     /**
      * The footpaths, laid last so no street ends on one: a promenade on the bank of every river, lake and sea front
