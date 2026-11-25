@@ -1578,6 +1578,11 @@ public final class StreetLayer {
         List<StationPlaza> plazas = plazas(fronts, railways, urban, segments, window);
         // Endpoint snapping, toe roads and square approaches may introduce new canal crossings.
         if (config.continuousCarriageways && !canals.isEmpty()) culverts(canals, segments);
+        if (config.finalSnap) {
+            // The steps after the first snapping (loose bridges dropped, levee access, squares cut back) can leave a
+            // street ending just short of another again
+            snapEnds(segments);
+        }
         List<StationSite> sites = formation == Formation.VILLAGE ? List.of()
                 : sites(settlement, window, anchors, railways, urban, segments, fronts, plazas);
         List<List<double[]>> highSpeed = highSpeedCorridor(settlement, window, districts, anchors);

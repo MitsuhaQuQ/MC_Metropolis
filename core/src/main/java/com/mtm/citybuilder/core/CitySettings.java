@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 16)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 17)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,9 +33,11 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 16)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 17)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
+        settings.extent.ruggedFade = version[0] >= 17;
+        settings.streets.finalSnap = version[0] >= 17;
         settings.roads.landEnds = version[0] >= 16;
         settings.rail.landEnds = version[0] >= 16;
         settings.transit.pinnedFirst = version[0] >= 15;
@@ -480,6 +482,14 @@ public final class CitySettings {
          */
         public double flatGrade = 0.12;
         public double steepGrade = 0.6;
+        /**
+         * Where the ground as generated lies this far off the smooth height the plans are laid on (on average over a
+         * node), urban intensity starts fading, and at {@code roughTo} it is gone: an eroded mountainside's ground
+         * lies tens of blocks under it, and streets graded to the smooth height stood on walls over it.
+         */
+        public boolean ruggedFade = true;
+        public double roughFrom = 6.0;
+        public double roughTo = 18.0;
     }
 
     /** L3.5: the use of land outside the built-up areas. */
@@ -912,6 +922,8 @@ public final class CitySettings {
          * side by side, their pavings run together (often at different heights, one on a levee), are not laid.
          */
         public boolean sideBySide = true;
+        /** Streets ending just short of another joined to it once more after the last steps that change the streets. */
+        public boolean finalSnap = true;
         public double sideBySideOverlap = 1.0;
         /** A metropolis is a planned capital where this share of its built land is flat, and its hash below the chance. */
         public double joriFlatShare = 0.7;

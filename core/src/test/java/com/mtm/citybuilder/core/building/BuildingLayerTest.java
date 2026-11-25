@@ -418,8 +418,10 @@ class BuildingLayerTest {
             Set<Integer> reached = new HashSet<>();
             int ox = (int) Math.floor(b.ox());
             int oz = (int) Math.floor(b.oz());
-            for (int x = ox - 40; x < ox + 40; x++) {
-                for (int z = oz - 40; z < oz + 40; z++) {
+            // (Round the whole building: one may stand well back in its lot)
+            int reach = (int) Math.ceil(Math.max(b.back(), 0.0) + b.width()) + 4;
+            for (int x = ox - reach; x < ox + reach; x++) {
+                for (int z = oz - reach; z < oz + reach; z++) {
                     if (inWell(b, b.local(x + 0.5, z + 0.5), bay) && standIn(b, x, z, 1)) {
                         queue.add(new int[]{x, z, 1});
                     }

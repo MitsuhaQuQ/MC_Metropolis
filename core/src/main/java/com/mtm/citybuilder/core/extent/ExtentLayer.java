@@ -236,6 +236,8 @@ public final class ExtentLayer {
         }
 
         float[] floor = basinFloor(kind, height, size);
+        float[] rough = new float[size * size];
+        java.util.Arrays.fill(rough, Float.NaN);
         float[] intensity = new float[size * size];
         int built = 0;
         if (stop > 0.0) {
@@ -253,6 +255,23 @@ public final class ExtentLayer {
                     double grade = grade(kind, height, size, i, j);
                     double gradeFade = clamp(1.0 - (grade - config.flatGrade) / (config.steepGrade - config.flatGrade));
                     float value = (float) (fall * riseFade * gradeFade);
+                    if (value > 0f && config.ruggedFade) {
+                        // Ground cut far below the smooth height the plans are laid on (eroded mountainsides): the
+                        // streets would stand on walls over it, so the town stays off it. The mean of the node's and
+                        // its four neighbours', so a lone rough spot in a town (a knoll, a cutting) leaves no hole
+                        double off = rugged(rough, size, originX, originZ, i, j);
+                        int counted = 1;
+                        for (int[] step : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                            int ni = i + step[0];
+                            int nj = j + step[1];
+                            if (ni >= 0 && nj >= 0 && ni < size && nj < size && kind[ni * size + nj] == LAND) {
+                                off += rugged(rough, size, originX, originZ, ni, nj);
+                                counted++;
+                            }
+                        }
+                        off /= counted;
+                        value *= (float) clamp(1.0 - (off - config.roughFrom) / (config.roughTo - config.roughFrom));
+                    }
                     if (value > 0f) {
                         intensity[k] = value;
                         built++;
@@ -328,6 +347,36 @@ public final class ExtentLayer {
     }
 
     /** The lowest land within {@code floorRadius} of each node, as separable minimum filters along rows and columns. */
+    /**
+     * How far, on average, a node's ground as generated lies off its smooth height (five points over it), the points by
+     * a river left out; kept in {@code rough}.
+     */
+    private double rugged(float[] rough, int size, int originX, int originZ, int i, int j) {
+        int k = i * size + j;
+        if (!Float.isNaN(rough[k])) {
+            return rough[k];
+        }
+        double x = (double) (originX + i) * grid;
+        double z = (double) (originZ + j) * grid;
+        double off = 0.0;
+        int counted = 0;
+        for (double[] d : new double[][]{{0, 0}, {-0.3, 0}, {0.3, 0}, {0, -0.3}, {0, 0.3}}) {
+            double px = x + d[0] * grid;
+            double pz = z + d[1] * grid;
+            com.mtm.citybuilder.core.terrain.RiverSample river = terrain.nearestRiver(px, pz);
+            if (river != null && river.bankDistance() < RIVER_MARGIN) {
+                continue;
+            }
+            off += Math.abs(terrain.surfaceHeight((int) Math.floor(px), (int) Math.floor(pz)) - terrain.smoothHeight(px, pz));
+            counted++;
+        }
+        rough[k] = (float) (counted == 0 ? 0.0 : off / counted);
+        return rough[k];
+    }
+
+    /** How near a river a point's ground is left out of how rugged the land is: the river's channel and banks. */
+    private static final double RIVER_MARGIN = 40.0;
+
     private float[] basinFloor(byte[] kind, float[] height, int size) {
         int reach = (int) Math.round(settings.extent.floorRadius / grid);
         float[] rows = new float[size * size];
