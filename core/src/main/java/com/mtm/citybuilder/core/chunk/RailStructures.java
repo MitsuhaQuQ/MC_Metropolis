@@ -126,9 +126,47 @@ final class RailStructures {
         }
 
         Built done() {
-            building.forEach((k, v) -> blocks.put(k, v.stream().mapToLong(Long::longValue).toArray()));
+            building.forEach((k, v) -> {
+                unhung(v);
+                blocks.put(k, v.stream().mapToLong(Long::longValue).toArray());
+            });
             building.clear();
             return this;
+        }
+
+        /**
+         * A deck's edge pieces (parapet, railing, sound barrier) left over air another structure cleared under them (a
+         * station's throat taking the narrower viaduct's edge away, its upper panel left hanging): taken away too,
+         * each over air going, and so those on it, bottom up. Added last, so they win.
+         */
+        private void unhung(List<Long> chunk) {
+            Map<Long, Integer> last = new HashMap<>();
+            for (long e : chunk) {
+                last.put(e & 0xFFFFFFL, (int) (e >>> 24));
+            }
+            Integer air = stateIndex.get("minecraft:air");
+            if (air == null) {
+                return;
+            }
+            List<Long> spots = new ArrayList<>();
+            for (Map.Entry<Long, Integer> e : last.entrySet()) {
+                if (edgePiece(states.get(e.getValue()))) {
+                    spots.add(e.getKey());
+                }
+            }
+            spots.sort(Long::compare);
+            for (long at : spots) {
+                long below = at - (1L << 8);
+                if (Integer.valueOf(air).equals(last.get(below)) && edgePiece(states.get(last.get(at)))) {
+                    last.put(at, air);
+                    chunk.add(((long) air << 24) | at);
+                }
+            }
+        }
+
+        private static boolean edgePiece(String state) {
+            return state.startsWith("citybuilder:concrete_parapet") || state.startsWith("citybuilder:sound_barrier")
+                    || state.startsWith("citybuilder:bridge_railing");
         }
 
         boolean takenWithin(int x, int z, int reach) {
