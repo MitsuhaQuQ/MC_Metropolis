@@ -682,6 +682,10 @@ public final class ChunkLayer {
             double length2 = Math.max(1e-9, dx * dx + dz * dz);
             double t = ((x - g.x1()) * dx + (z - g.z1()) * dz) / length2;
             if (dry != null) {
+                // A piece out over the water as generated: not laid at all (layout 21)
+                if (dry.submerged(p)) {
+                    return false;
+                }
                 // A dead end cut back off the water stops square at its cut
                 double[] range = dry.range(p);
                 if (range[0] > 0 && t < range[0] || range[1] < 1 && t > range[1] || range[0] >= range[1]) {
@@ -2121,12 +2125,58 @@ public final class ChunkLayer {
         private final boolean[][] dead;
         private final com.mtm.citybuilder.core.terrain.TerrainView terrain;
         private final Map<Integer, double[]> ranges = new java.util.concurrent.ConcurrentHashMap<>();
+        private final Map<Integer, Boolean> submerged = new java.util.concurrent.ConcurrentHashMap<>();
+        /** Whether pieces mostly over the water are left out ({@link CitySettings.Streets#dryStreets}). */
+        private final boolean wetPieces;
 
         DryEnds(List<StreetSegment> segments, boolean[][] dead, com.mtm.citybuilder.core.terrain.TerrainView terrain) {
+            this(segments, dead, terrain, false);
+        }
+
+        DryEnds(List<StreetSegment> segments, boolean[][] dead, com.mtm.citybuilder.core.terrain.TerrainView terrain,
+                boolean wetPieces) {
             this.segments = segments;
             this.dead = dead;
             this.terrain = terrain;
+            this.wetPieces = wetPieces;
         }
+
+        /**
+         * Whether a piece lies mostly over the water as generated ({@link CitySettings.Streets#dryStreets}): {@link
+         * #SUBMERGED} or more of its middle line, every two blocks. Not a bridge or a footpath (their own rules); over a
+         * culvert, whose stream runs under it all along, only where the water reaches past both its edges too.
+         */
+        boolean submerged(int p) {
+            if (!wetPieces) {
+                return false;
+            }
+            StreetSegment g = segments.get(p);
+            if (g.structure() == StreetStructure.BRIDGE || g.streetClass() == StreetClass.PATH) {
+                return false;
+            }
+            // Over a culvert the stream is under the street all along: only open water reaching past both its edges
+            boolean culvert = g.structure() == StreetStructure.CULVERT;
+            return submerged.computeIfAbsent(p, q -> {
+                double length = g.length();
+                int n = Math.max(1, (int) Math.ceil(length / 2.0));
+                double ux = (g.x2() - g.x1()) / Math.max(1e-9, length);
+                double uz = (g.z2() - g.z1()) / Math.max(1e-9, length);
+                double side = 0.5 * g.width() + 6.0;
+                int wet = 0;
+                for (int k = 0; k <= n; k++) {
+                    double t = (double) k / n;
+                    double x = g.x1() + (g.x2() - g.x1()) * t;
+                    double z = g.z1() + (g.z2() - g.z1()) * t;
+                    if (wet(x, z) && (!culvert || wet(x - uz * side, z + ux * side) && wet(x + uz * side, z - ux * side))) {
+                        wet++;
+                    }
+                }
+                return wet >= SUBMERGED * (n + 1);
+            });
+        }
+
+        /** The share of a piece's middle line over the water at which it is not laid. */
+        static final double SUBMERGED = 0.6;
 
         /** The stretch of a piece laid, {from, to} as fractions of it from its first end. */
         double[] range(int p) {
@@ -2910,7 +2960,8 @@ public final class ChunkLayer {
                         ? castle(plan, segments) : null,
                 logic.settings().streets.teeEnds ? tees(segments, byChunk) : null,
                 logic.settings().streets.dryEnds
-                        ? new DryEnds(segments, deadEnds(segments, byChunk), logic.terrain()) : null);
+                        ? new DryEnds(segments, deadEnds(segments, byChunk), logic.terrain(),
+                        logic.settings().streets.dryStreets) : null);
         // A street leaving a bridge starts at its deck
         for (int p = 0; p < segments.size(); p++) {
             StreetSegment g = segments.get(p);

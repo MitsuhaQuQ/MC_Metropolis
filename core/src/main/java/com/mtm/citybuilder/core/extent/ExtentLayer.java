@@ -364,10 +364,16 @@ public final class ExtentLayer {
             double px = x + d[0] * grid;
             double pz = z + d[1] * grid;
             com.mtm.citybuilder.core.terrain.RiverSample river = terrain.nearestRiver(px, pz);
+            double gap = terrain.surfaceHeight((int) Math.floor(px), (int) Math.floor(pz)) - terrain.smoothHeight(px, pz);
             if (river != null && river.bankDistance() < RIVER_MARGIN) {
-                continue;
+                // By a river its channel lies under the smooth height as a matter of course; ground standing over it
+                // (a hill on the bank) is as rugged there as anywhere (layout 21; before, the whole margin was skipped)
+                if (!settings.extent.riverHills) {
+                    continue;
+                }
+                gap = Math.max(0.0, gap);
             }
-            off += Math.abs(terrain.surfaceHeight((int) Math.floor(px), (int) Math.floor(pz)) - terrain.smoothHeight(px, pz));
+            off += Math.abs(gap);
             counted++;
         }
         rough[k] = (float) (counted == 0 ? 0.0 : off / counted);

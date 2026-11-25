@@ -43,6 +43,11 @@ class CitySettingsTest {
             assertEquals(!existingPlans, first.rail.fitProfile);
             assertEquals(!existingPlans, first.streets.bankCorners);
             assertEquals(!existingPlans, first.transit.riverStations);
+            assertEquals(!existingPlans, first.extent.riverHills);
+            assertEquals(!existingPlans, first.streets.dryStreets);
+            assertEquals(!existingPlans, first.transit.waterGround);
+            assertEquals(existingPlans ? 6.0 : 10.0, first.extent.roughFrom);
+            assertEquals(existingPlans ? 1.0 : 0.6, first.transit.stationPercentile);
             assertEquals(!existingPlans, first.transit.smoothStations);
             assertEquals(existingPlans ? 0.0 : 40.0, first.plots.parcelFrontage);
             assertEquals(existingPlans ? 0 : 1, first.buildings.retailGroundExtra);
@@ -100,6 +105,15 @@ class CitySettingsTest {
         assertFalse(CitySettings.forBuildingLayout(openCorners,true).streets.bankCorners);
         assertFalse(CitySettings.forBuildingLayout(openCorners,true).transit.riverStations);
         assertTrue(CitySettings.forBuildingLayout(openCorners,true).rail.fitProfile);
+        var lakeBedRails = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+        lakeBedRails.save("layout/building_scale", new byte[]{20});
+        var at20 = CitySettings.forBuildingLayout(lakeBedRails,true);
+        assertFalse(at20.transit.waterGround);
+        assertFalse(at20.streets.dryStreets);
+        assertFalse(at20.extent.riverHills);
+        assertEquals(6.0, at20.extent.roughFrom);
+        assertEquals(1.0, at20.transit.stationPercentile);
+        assertTrue(at20.transit.riverStations);
         assertFalse(CitySettings.forBuildingLayout(squareTees,true).transit.smoothStations);
         assertTrue(CitySettings.forBuildingLayout(squareTees,true).buildings.clearOfStreets);
         assertTrue(CitySettings.forBuildingLayout(steppedWays,true).buildings.turretsOnGround);

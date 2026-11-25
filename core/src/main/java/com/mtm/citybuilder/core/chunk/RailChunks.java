@@ -1760,6 +1760,13 @@ public final class RailChunks {
             double[] p = points.get(k);
             ground[k] = logic.terrain().surfaceHeight((int) Math.floor(p[0]), (int) Math.floor(p[1]));
             int mode = modes[k];
+            if (logic.settings().transit.waterGround && mode != TransitMode.UNDERGROUND.ordinal()) {
+                // Over water from its surface, not the bed (layout 21)
+                double water = logic.terrain().waterLevel(p[0], p[1]);
+                if (!Double.isNaN(water) && water > ground[k]) {
+                    ground[k] = water;
+                }
+            }
             double over = mode == TransitMode.ELEVATED.ordinal() ? CLEARANCE
                     : mode == TransitMode.STACKED.ordinal() ? CLEARANCE + STACKED
                     : mode == TransitMode.UNDERGROUND.ordinal() ? -(logic.settings().transit.passengerSpace ? 19.0 : DEPTH) : 0.0;
@@ -1796,6 +1803,13 @@ public final class RailChunks {
             while (end < n && flat[end]) {
                 top = Math.max(top, level[end]);
                 end++;
+            }
+            double share = logic.settings().transit.stationPercentile;
+            if (share < 1.0 && end - k >= 2) {
+                // Not the highest of its levels (a hilltop under its platforms): that far up the sorted run (layout 21)
+                double[] sorted = java.util.Arrays.copyOfRange(level, k, end);
+                java.util.Arrays.sort(sorted);
+                top = sorted[(int) Math.min(sorted.length - 1, Math.floor(share * (sorted.length - 1) + 0.5))];
             }
             // A subway's station at its lowest (full cover over all of it), one above the ground at its highest
             boolean deep = true;

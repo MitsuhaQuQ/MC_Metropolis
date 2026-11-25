@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 20)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 21)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,7 +33,7 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 20)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 21)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
         settings.extent.ruggedFade = version[0] >= 17;
@@ -42,6 +42,11 @@ public final class CitySettings {
         settings.rail.fitProfile = version[0] >= 19;
         settings.streets.bankCorners = version[0] >= 20;
         settings.transit.riverStations = version[0] >= 20;
+        settings.extent.riverHills = version[0] >= 21;
+        settings.extent.roughFrom = version[0] >= 21 ? 10.0 : 6.0;
+        settings.streets.dryStreets = version[0] >= 21;
+        settings.transit.waterGround = version[0] >= 21;
+        settings.transit.stationPercentile = version[0] >= 21 ? 0.6 : 1.0;
         settings.roads.landEnds = version[0] >= 16;
         settings.rail.landEnds = version[0] >= 16;
         settings.transit.pinnedFirst = version[0] >= 15;
@@ -492,7 +497,13 @@ public final class CitySettings {
          * lies tens of blocks under it, and streets graded to the smooth height stood on walls over it.
          */
         public boolean ruggedFade = true;
-        public double roughFrom = 6.0;
+        /** Layout 21: 10 (6 before, which left thin unbuilt strips across gently rough land and cut arterials short). */
+        public double roughFrom = 10.0;
+        /**
+         * Ground standing over the smooth height within a river's margin counted as rugged too (layout 21): before, the
+         * margin was skipped whole, and a hill on a river's bank was cut down 20 blocks to the plan's smooth level.
+         */
+        public boolean riverHills = true;
         public double roughTo = 18.0;
     }
 
@@ -784,6 +795,17 @@ public final class CitySettings {
          * Before, a station over water was levelled from the river's bed and stood in it.
          */
         public boolean riverStations = true;
+        /**
+         * A town line's levels over water measured from the water's surface, not the bed (layout 21): an elevated
+         * stretch across a lake stood "9 over the ground" 19 blocks under its surface.
+         */
+        public boolean waterGround = true;
+        /**
+         * Which of the levels along a station's platforms it is laid at, as a share up their sorted run: 1 the highest
+         * (before layout 21), which on platforms over a hilltop put the station 50 or more over the ground round it and
+         * held its lines up for a kilometre; 0.6 from layout 21.
+         */
+        public double stationPercentile = 0.6;
         public double maxRadius = 1200.0;
         /** Stations about this far apart along a line. */
         public double stationSpacing = 1000.0;
@@ -949,6 +971,11 @@ public final class CitySettings {
          * off, and such a path was laid as a strip of stone up to the water's surface out in the lake.
          */
         public boolean dryPaths = true;
+        /**
+         * A street piece (not a bridge or a footpath) mostly over the water as generated is not laid (layout 21): the
+         * planning's 16-block water grid ran a loop of streets out over a lake, laid as stone up to the water's surface.
+         */
+        public boolean dryStreets = true;
         /** An embankment's cross-section turned round its corners, measured out from the corner (layout 20). */
         public boolean bankCorners = true;
         public double sideBySideOverlap = 1.0;
