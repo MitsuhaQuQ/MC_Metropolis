@@ -17,6 +17,10 @@ const baseline = process.env.AUTOTEST_BASELINE;
 if (replay && baseline) throw new Error('Select either a saved-chunk baseline or a plan replay');
 const WORLD = baseline ? 'autotest-baseline' : replay ? 'autotest-replay' : 'autotest';
 const layout = process.env.AUTOTEST_LAYOUT;
+// How far the test client sees, in chunks (the server's view distance with it): 16 for the views over a town; the
+// game's 8 hid everything past 128 blocks in fog
+const VIEW = Number(process.env.AUTOTEST_VIEW ?? 16);
+if (!Number.isInteger(VIEW) || VIEW < 2 || VIEW > 32) throw new Error('AUTOTEST_VIEW must be 2 to 32');
 if (layout !== undefined && !['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].includes(layout)) {
   throw new Error('AUTOTEST_LAYOUT must be 1 to 20');
 }
@@ -48,7 +52,7 @@ async function properties() {
   writeFileSync(join(RUN, 'server.properties'), [
     'level-type=mtm_worldgen\\:realistic', `level-seed=${process.env.AUTOTEST_SEED ?? '12345'}`, `level-name=${WORLD}`, 'online-mode=false',
     'enable-rcon=false', 'enable-query=false', 'server-ip=127.0.0.1', 'server-port=25566', 'spawn-protection=0',
-    `view-distance=${WITH_CLIENT ? 8 : 4}`, 'simulation-distance=4', ''].join('\n'));
+    `view-distance=${WITH_CLIENT ? VIEW : 4}`, 'simulation-distance=4', ''].join('\n'));
   rmSync(target, { recursive: true, force: true });
   if (source) {
     if (baseline) {
@@ -154,6 +158,17 @@ function archiveEvidence(directory, destination) {
     }
   }
 }
+/** The test client's render distance set in its options.txt (kept otherwise as it is, or made). */
+function clientOptions() {
+  const file = join(ROOT, 'fabric', 'run-client', 'options.txt');
+  const lines = existsSync(file) ? readFileSync(file, 'utf8').split(/\r?\n/).filter(l => l !== '') : [];
+  const set = { renderDistance: String(VIEW) };
+  for (const [key, value] of Object.entries(set)) {
+    const at = lines.findIndex(l => l.startsWith(`${key}:`));
+    if (at >= 0) lines[at] = `${key}:${value}`; else lines.push(`${key}:${value}`);
+  }
+  writeFileSync(file, lines.join('\n') + '\n');
+}
 const serverLog = join(RUN, 'autotest-server.log');
 const clientLog = join(ROOT, 'fabric', 'run-client', 'autotest-client.log');
 let serverProcess = null;
@@ -166,6 +181,7 @@ try {
   await waitFor(() => existsSync(ENDPOINT), 600, 'server', serverLog);
   manifest.seed = (await server.worldInfo()).seed;
   if (WITH_CLIENT) {
+    clientOptions();
     clientProcess = gradle(':fabric:runClient', clientLog, 'client');
     await waitFor(() => existsSync(CLIENT_ENDPOINT), 600, 'client', clientLog);
   }
