@@ -473,7 +473,24 @@ public final class CityChunks {
                 chunk.setBlockState(pos.set(wx, y - k, wz), under, false);
             }
         }
+        if (kind == ChunkLayer.BANK_TERRACE) {
+            // Under the terrace the land in stone: where the river runs lower than the plan put it (cut deep into the
+            // ground as generated), the face down to its water is a revetment, not a wall of bare earth
+            for (int down = y - 2; down >= Math.max(chunk.getMinBuildHeight() + 1, y - TERRACE_FACING); down--) {
+                BlockState below = chunk.getBlockState(pos.set(wx, down, wz));
+                if (!below.blocksMotion()) {
+                    break;
+                }
+                if (below.is(net.minecraft.tags.BlockTags.DIRT) || below.is(net.minecraft.tags.BlockTags.BASE_STONE_OVERWORLD)
+                        || below.is(Blocks.GRAVEL) || below.is(Blocks.SAND) || below.is(Blocks.CLAY)) {
+                    chunk.setBlockState(pos, Blocks.STONE_BRICKS.defaultBlockState(), false);
+                }
+            }
+        }
     }
+
+    /** How deep under an embankment's terrace the land is faced in stone (see {@link #bank}). */
+    private static final int TERRACE_FACING = 24;
 
     /** The mean of the levels within two columns of one in its chunk (x-major, NaN where none), or NaN. */
     private static double around(double[] levels, int x, int z) {

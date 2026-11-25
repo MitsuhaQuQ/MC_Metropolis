@@ -50,6 +50,7 @@ public final class CitySettings {
         settings.transit.fittedLines = version[0] >= 22;
         settings.transit.flatMainStation = version[0] >= 22;
         settings.streets.islandBridges = version[0] >= 23;
+        settings.streets.castleSite = version[0] >= 23;
         settings.transit.stationDecks = version[0] >= 23;
         settings.roads.landEnds = version[0] >= 16;
         settings.rail.landEnds = version[0] >= 16;
@@ -1083,6 +1084,12 @@ public final class CitySettings {
         public double approachWidth = 8.0;
         /** Where a castle or a temple is looked for around the centre: the highest land within. */
         public double castleReach = 1000.0;
+        /**
+         * A castle's grounds kept off water and rough ground (layout 23): its site the highest within reach whose
+         * grounds hold no water and rise no more than {@code castleRelief}, before the highest built land at all.
+         */
+        public boolean castleSite = true;
+        public double castleRelief = 30.0;
         public double templeReach = 1500.0;
         /** Above this urban intensity, streets belong to the old town; below, to the modern town. */
         public double oldTownIntensity = 0.55;

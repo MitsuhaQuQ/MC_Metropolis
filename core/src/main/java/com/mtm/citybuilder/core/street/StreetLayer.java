@@ -7676,7 +7676,9 @@ public final class StreetLayer {
             }
         }
         switch (formation) {
-            case CASTLE_TOWN -> anchors.add(highest(Anchor.Kind.CASTLE, extent, window, config.castleReach));
+            case CASTLE_TOWN -> anchors.add(config.castleSite
+                    ? castleSite(extent, window, config.castleReach, grounds(settlement.tier()))
+                    : highest(Anchor.Kind.CASTLE, extent, window, config.castleReach));
             case TEMPLE_TOWN -> anchors.add(highest(Anchor.Kind.TEMPLE, extent, window, config.templeReach));
             case JORI -> {
                 // The palace at the north of the grid, on built land: Kyoto's daidairi
@@ -7693,6 +7695,91 @@ public final class StreetLayer {
         }
         return anchors;
     }
+
+    /**
+     * A castle's site (layout 23, the user: a castle's terraced grounds were laid over a river, its banks left as walls
+     * of earth twenty blocks high, and cut forty blocks into a hill): the highest built land within reach of the
+     * centre whose grounds ({@code radius} round it) hold no water, rise no more than {@code castleRelief} on the
+     * planning's smooth heights, and then, tried highest first, none and no more than that on the ground as
+     * generated; where none does, of those tried the one with the least water and relief.
+     */
+    private Anchor castleSite(CityExtent extent, Window window, double reach, double radius) {
+        List<double[]> sites = new ArrayList<>();
+        double[] least = null;
+        for (double dx = -reach; dx <= reach; dx += grid) {
+            for (double dz = -reach; dz <= reach; dz += grid) {
+                double x = extent.coreX() + dx;
+                double z = extent.coreZ() + dz;
+                if (dx * dx + dz * dz > reach * reach || !window.built(x, z)) {
+                    continue;
+                }
+                int wet = 0;
+                double low = Double.POSITIVE_INFINITY, high = Double.NEGATIVE_INFINITY;
+                for (double ox = -radius; ox <= radius; ox += grid) {
+                    for (double oz = -radius; oz <= radius; oz += grid) {
+                        if (ox * ox + oz * oz > radius * radius) {
+                            continue;
+                        }
+                        if (!window.inside(x + ox, z + oz) || window.water(x + ox, z + oz)) {
+                            wet++;
+                            continue;
+                        }
+                        double h = window.height(x + ox, z + oz);
+                        low = Math.min(low, h);
+                        high = Math.max(high, h);
+                    }
+                }
+                double relief = Double.isInfinite(low) ? 0.0 : high - low;
+                double penalty = 100.0 * wet + relief;
+                if (least == null || penalty < least[0]) {
+                    least = new double[]{penalty, x, z};
+                }
+                if (wet == 0 && relief <= config.castleRelief) {
+                    sites.add(new double[]{window.height(x, z), x, z});
+                }
+            }
+        }
+        sites.sort((a, b) -> Double.compare(b[0], a[0]));
+        // On the ground as generated (the smooth heights hide a river's cut and a hill's knolls): the first of the
+        // highest dry and even enough, else the one of them with the least water and relief
+        double step = radius / 4.0;
+        double[] fewest = null;
+        for (int k = 0; k < Math.min(CASTLE_TRIES, sites.size()); k++) {
+            double x = sites.get(k)[1], z = sites.get(k)[2];
+            double low = Double.POSITIVE_INFINITY, high = Double.NEGATIVE_INFINITY;
+            int wet = 0;
+            for (double ox = -radius; ox <= radius; ox += step) {
+                for (double oz = -radius; oz <= radius; oz += step) {
+                    if (ox * ox + oz * oz > radius * radius) {
+                        continue;
+                    }
+                    int px = (int) Math.floor(x + ox), pz = (int) Math.floor(z + oz);
+                    double h = terrain.surfaceHeight(px, pz);
+                    double water = terrain.waterLevel(px + 0.5, pz + 0.5);
+                    if (!Double.isNaN(water) && water > h) {
+                        wet++;
+                    }
+                    low = Math.min(low, h);
+                    high = Math.max(high, h);
+                }
+            }
+            if (wet == 0 && high - low <= config.castleRelief) {
+                return new Anchor(Anchor.Kind.CASTLE, x, z);
+            }
+            double penalty = 10.0 * wet + (high - low);
+            if (fewest == null || penalty < fewest[0]) {
+                fewest = new double[]{penalty, x, z};
+            }
+        }
+        if (fewest != null) {
+            return new Anchor(Anchor.Kind.CASTLE, fewest[1], fewest[2]);
+        }
+        return least == null ? new Anchor(Anchor.Kind.CASTLE, extent.coreX(), extent.coreZ())
+                : new Anchor(Anchor.Kind.CASTLE, least[1], least[2]);
+    }
+
+    /** How many of the best castle sites are checked on the generated ground. */
+    private static final int CASTLE_TRIES = 24;
 
     /** The highest built land within reach of the centre. */
     private Anchor highest(Anchor.Kind kind, CityExtent extent, Window window, double reach) {

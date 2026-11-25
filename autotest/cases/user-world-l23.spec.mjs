@@ -18,6 +18,8 @@ const SPOTS = [
   { name: 'island', x: 6520, y: 239, z: -4880 },
   { name: 'long-bridge', x: 6271, y: 179, z: -5234 },
   { name: 'road-viaducts', x: 6735, y: 186, z: -4584 },
+  // Layout 23's castle site, off the river and the hill the castle stood on before
+  { name: 'castle', x: 5976, y: 330, z: -4008 },
 ];
 
 async function settle() {
