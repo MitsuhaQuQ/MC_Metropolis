@@ -40,6 +40,7 @@ class CitySettingsTest {
             assertEquals(!existingPlans, first.extent.ruggedFade);
             assertEquals(!existingPlans, first.streets.finalSnap);
             assertEquals(!existingPlans, first.streets.dryPaths);
+            assertEquals(!existingPlans, first.rail.fitProfile);
             assertEquals(!existingPlans, first.transit.smoothStations);
             assertEquals(existingPlans ? 0.0 : 40.0, first.plots.parcelFrontage);
             assertEquals(existingPlans ? 0 : 1, first.buildings.retailGroundExtra);
@@ -88,6 +89,10 @@ class CitySettingsTest {
         wetPaths.save("layout/building_scale", new byte[]{17});
         assertFalse(CitySettings.forBuildingLayout(wetPaths,true).streets.dryPaths);
         assertTrue(CitySettings.forBuildingLayout(wetPaths,true).streets.finalSnap);
+        var midpointRails = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+        midpointRails.save("layout/building_scale", new byte[]{18});
+        assertFalse(CitySettings.forBuildingLayout(midpointRails,true).rail.fitProfile);
+        assertTrue(CitySettings.forBuildingLayout(midpointRails,true).streets.dryPaths);
         assertFalse(CitySettings.forBuildingLayout(squareTees,true).transit.smoothStations);
         assertTrue(CitySettings.forBuildingLayout(squareTees,true).buildings.clearOfStreets);
         assertTrue(CitySettings.forBuildingLayout(steppedWays,true).buildings.turretsOnGround);

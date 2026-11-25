@@ -256,4 +256,97 @@ public final class Alignment {
         }
         return heights;
     }
+
+    /**
+     * Heights of a line no steeper than {@code grade} that keep as near the ground as they can for what they cost: a
+     * viaduct or an embankment its height, a cutting its depth up to {@code tunnelCost}, beyond which it is a tunnel
+     * of that cost however deep; under a lake (a sample with {@code water} set, its ground the water's surface) not at
+     * all, under a river ({@code river}) twice a tunnel's cost (a river falling down its valley faster than the grade
+     * would otherwise hold the line up over the whole valley). Found exactly over heights a fraction of the grade's step apart. Unlike {@link #profile}, a range of high
+     * hills far off along the line does not hold its heights up over the plain between: the line tunnels through it.
+     */
+    static double[] fitProfile(double[] xs, double[] zs, double[] ground, boolean[] water, boolean[] river, double grade,
+                               double tunnelCost) {
+        int n = ground.length;
+        if (n < 2) {
+            return ground.clone();
+        }
+        double[] dist = new double[n];
+        double longest = 0.0;
+        for (int i = 1; i < n; i++) {
+            dist[i] = Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]);
+            longest = Math.max(longest, dist[i]);
+        }
+        // Two cells to a full step at the longest spacing
+        double cell = Math.max(0.05, 0.5 * grade * longest);
+        double low = Double.POSITIVE_INFINITY;
+        double high = Double.NEGATIVE_INFINITY;
+        for (double g : ground) {
+            low = Math.min(low, g);
+            high = Math.max(high, g);
+        }
+        // Never worth being lower than the lowest ground by more than a tunnel's cost, nor over the highest ground
+        low -= tunnelCost + 2.0;
+        high += 2.0;
+        int levels = (int) Math.ceil((high - low) / cell) + 1;
+        byte[] back = new byte[n * levels];
+        double[] cost = new double[levels];
+        double[] next = new double[levels];
+        int[] deque = new int[levels];
+        for (int h = 0; h < levels; h++) {
+            cost[h] = sampleCost(low + h * cell, ground[0], water[0], river[0], tunnelCost);
+        }
+        for (int i = 1; i < n; i++) {
+            int w = Math.min(127, (int) Math.floor(grade * dist[i] / cell + 1e-9));
+            // The cheapest of cost[h - w .. h + w] for each h: a sliding minimum
+            int head = 0;
+            int tail = 0;
+            int added = 0;
+            for (int h = 0; h < levels; h++) {
+                int top = Math.min(levels - 1, h + w);
+                while (added <= top) {
+                    while (tail > head && cost[deque[tail - 1]] >= cost[added]) {
+                        tail--;
+                    }
+                    deque[tail++] = added++;
+                }
+                while (deque[head] < h - w) {
+                    head++;
+                }
+                int best = deque[head];
+                next[h] = cost[best] + sampleCost(low + h * cell, ground[i], water[i], river[i], tunnelCost) * dist[i];
+                back[i * levels + h] = (byte) (best - h);
+            }
+            double[] t = cost;
+            cost = next;
+            next = t;
+        }
+        int at = 0;
+        for (int h = 1; h < levels; h++) {
+            if (cost[h] < cost[at]) {
+                at = h;
+            }
+        }
+        double[] heights = new double[n];
+        for (int i = n - 1; i >= 0; i--) {
+            heights[i] = low + at * cell;
+            if (i > 0) {
+                at += back[i * levels + at];
+            }
+        }
+        return heights;
+    }
+
+    /** What a line costs a block along at a height over a sample's ground ({@link #fitProfile}). */
+    private static double sampleCost(double height, double ground, boolean water, boolean river, double tunnelCost) {
+        double above = height - ground;
+        if (water) {
+            // Over a lake with a little room under the deck; under it far too dear
+            return above >= 1.0 ? above : 1000.0 + (1.0 - above);
+        }
+        if (river) {
+            return above >= 1.0 ? above : 2.0 * tunnelCost;
+        }
+        return above >= 0.0 ? above : Math.min(-above, tunnelCost);
+    }
 }

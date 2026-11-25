@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 18)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 19)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,12 +33,13 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 18)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 19)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
         settings.extent.ruggedFade = version[0] >= 17;
         settings.streets.finalSnap = version[0] >= 17;
         settings.streets.dryPaths = version[0] >= 18;
+        settings.rail.fitProfile = version[0] >= 19;
         settings.roads.landEnds = version[0] >= 16;
         settings.rail.landEnds = version[0] >= 16;
         settings.transit.pinnedFirst = version[0] >= 15;
@@ -605,6 +606,14 @@ public final class CitySettings {
          * are known: it ran out over the water to the town's point, and lines meeting there crossed on the lake.
          */
         public boolean landEnds = true;
+        /**
+         * A line's heights fitted to the ground for what its structures cost (a viaduct its height, a cutting its depth,
+         * a tunnel {@code tunnelCost} however deep): before, the midpoint between the grade-limited lines under and over
+         * the ground, which a range of mountains held 100 blocks or more over a plain ten kilometres either side of it.
+         */
+        public boolean fitProfile = true;
+        /** What a block of tunnel costs against a block of viaduct height or cutting depth ({@code fitProfile}). */
+        public double tunnelCost = 20.0;
         /** Longest line, straight from end to end. */
         public double maxLength = 30000.0;
         /** The routing window reaches this far around the two ends, plus {@code windowFactor} of their distance. */

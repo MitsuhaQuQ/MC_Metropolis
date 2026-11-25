@@ -340,6 +340,8 @@ public final class RailLayer {
         double[] zs = new double[n];
         double[] ground = new double[n];
         boolean[] water = new boolean[n];
+        boolean[] lakes = new boolean[n];
+        boolean[] rivers = new boolean[n];
         for (int i = 0; i < n; i++) {
             xs[i] = samples.get(i)[0];
             zs[i] = samples.get(i)[1];
@@ -348,9 +350,13 @@ public final class RailLayer {
             RiverSample river = terrain.nearestRiver(xs[i], zs[i]);
             boolean inLake = !Double.isNaN(lake) && lake > smooth;
             water[i] = inLake || (river != null && river.inWater());
+            lakes[i] = inLake;
+            rivers[i] = water[i] && !inLake;
             ground[i] = inLake ? lake : smooth;
         }
-        double[] heights = Alignment.profile(xs, zs, ground, grade(railClass));
+        double[] heights = config.fitProfile
+                ? Alignment.fitProfile(xs, zs, ground, lakes, rivers, grade(railClass), config.tunnelCost)
+                : Alignment.profile(xs, zs, ground, grade(railClass));
         float[] railOut = new float[n];
         float[] groundOut = new float[n];
         RailKind[] kinds = new RailKind[n];
