@@ -162,7 +162,8 @@ function archiveEvidence(directory, destination) {
 function clientOptions() {
   const file = join(ROOT, 'fabric', 'run-client', 'options.txt');
   const lines = existsSync(file) ? readFileSync(file, 'utf8').split(/\r?\n/).filter(l => l !== '') : [];
-  const set = { renderDistance: String(VIEW) };
+  // (No clouds: from over the towns the views look down through them)
+  const set = { renderDistance: String(VIEW), renderClouds: '"false"' };
   for (const [key, value] of Object.entries(set)) {
     const at = lines.findIndex(l => l.startsWith(`${key}:`));
     if (at >= 0) lines[at] = `${key}:${value}`; else lines.push(`${key}:${value}`);
