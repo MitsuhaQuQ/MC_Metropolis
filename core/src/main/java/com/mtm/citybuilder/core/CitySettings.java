@@ -50,6 +50,7 @@ public final class CitySettings {
         settings.transit.fittedLines = version[0] >= 22;
         settings.transit.flatMainStation = version[0] >= 22;
         settings.streets.islandBridges = version[0] >= 23;
+        settings.transit.stationDecks = version[0] >= 23;
         settings.roads.landEnds = version[0] >= 16;
         settings.rail.landEnds = version[0] >= 16;
         settings.transit.pinnedFirst = version[0] >= 15;
@@ -821,6 +822,12 @@ public final class CitySettings {
          * 60 blocks along its platforms was taken when no site passed the grade check.
          */
         public boolean flatMainStation = true;
+        /**
+         * A ground station's formation more than {@code GroundStation.DECK_FILL} over the ground (out over water) laid
+         * as a slab on columns, not solid concrete down to the lake's bed (layout 23: layout 22's flat-ground siting
+         * takes a lake's surface for flat ground and put a main station half out over a lake as a block of concrete).
+         */
+        public boolean stationDecks = true;
         public double maxRadius = 1200.0;
         /** Stations about this far apart along a line. */
         public double stationSpacing = 1000.0;

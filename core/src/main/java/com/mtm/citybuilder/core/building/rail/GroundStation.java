@@ -46,6 +46,8 @@ public final class GroundStation {
     private final int bridgeFloor;
     private final RailPalette p;
     private final Ground ground;
+    /** Whether deep fill (over water, a hollow) is a deck on bents instead ({@link #withDecks}). */
+    private boolean decks;
     /** z ranges people stand on beside the tracks, with tracks on their low and/or high side: the platforms, and a
      * walkway along the building beside the line when the section ends in a track. Stairs to the bridge on each. */
     private final List<CrossSection.Platform> areas = new ArrayList<>();
@@ -59,6 +61,21 @@ public final class GroundStation {
      * @param canopyLength canopy along the platforms, 0 for half the platform
      * @param bridgeFloor  the footbridge's floor over the datum (people a block higher); 8 clears the wires
      */
+    /** Deeper fill than this under the datum is laid as a deck on bents by {@link #withDecks}. */
+    public static final int DECK_FILL = 4;
+    /** The bents' spacing along the line under a deck. */
+    public static final int BENT_SPACING = 12;
+
+    /**
+     * Where the ground lies more than {@link #DECK_FILL} under the datum (a station reaching out over water), the
+     * formation and the building's base as a two-block slab on columns every {@link #BENT_SPACING} instead of solid
+     * concrete down to it.
+     */
+    public GroundStation withDecks() {
+        decks = true;
+        return this;
+    }
+
     public GroundStation(CrossSection section, int platformLength, House house, int houseWidth, int houseDepth,
                          int storeys, int canopyLength, int approach, int bridgeFloor, RailPalette p, Ground ground) {
         this.section = section;
@@ -222,7 +239,12 @@ public final class GroundStation {
         // The formation, built up where the terrain lies below the datum
         for (int x = 0; x <= len; x++) {
             for (int z = zLo; z <= zHi; z++) {
-                for (int y = ground.at(x, z); y < 0; y++) {
+                int foot = ground.at(x, z);
+                if (decks && foot < -DECK_FILL && !(x % BENT_SPACING == 0 && ((z - zLo) % 4 == 0 || z == zHi))) {
+                    // Over deep fill a slab, carried on the bents
+                    foot = -2;
+                }
+                for (int y = foot; y < 0; y++) {
                     m.set(x, y, z, p.concrete());
                 }
             }
@@ -345,7 +367,11 @@ public final class GroundStation {
         int top = 1 + first + (storeys-1) * STOREY;
         for (int x = hx0; x <= hx1; x++) {
             for (int z = hz0; z <= hz1; z++) {
-                for (int y = ground.at(x, z); y <= 0; y++) {
+                int foot = ground.at(x, z);
+                if (decks && foot < -DECK_FILL && !((x == hx0 || x == hx1 || x % BENT_SPACING == 0) && (z == hz0 || z == hz1))) {
+                    foot = -2;
+                }
+                for (int y = foot; y <= 0; y++) {
                     m.set(x, y, z, p.concrete());
                 }
                 m.set(x, 1, z, p.walk());

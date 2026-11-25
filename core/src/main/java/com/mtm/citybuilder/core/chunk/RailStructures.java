@@ -718,6 +718,9 @@ final class RailStructures {
             };
             GroundStation gs = new GroundStation(section, platform, house, houseWidth, houseDepth, storeys, 0, APPROACH,
                     GroundStation.BRIDGE_FLOOR, p, ground);
+            if (logic.settings().transit.stationDecks) {
+                gs.withDecks();
+            }
             if(logic.settings().transit.passengerSpace) {
                 straightFlights=gs.flights();
                 stairDatum=bed;

@@ -829,6 +829,36 @@ class RailStructureTest {
         }
     }
 
+    /** A ground station out over water (the ground 18 under its datum) stands on a slab and columns, not a block. */
+    @Test
+    void aStationOverWaterStandsOnBents() {
+        Ground deep = (x, z) -> x < 60 ? -18 : -1;
+        GroundStation solid = new GroundStation(new CrossSection("PTTP", 5), 120, GroundStation.House.OVER, 6, 14, 1, 0,
+                4, 9, P, deep);
+        GroundStation decked = new GroundStation(new CrossSection("PTTP", 5), 120, GroundStation.House.OVER, 6, 14, 1, 0,
+                4, 9, P, deep).withDecks();
+        int[] counts = new int[2];
+        Model[] models = {solid.build(), decked.build()};
+        for (int k = 0; k < 2; k++) {
+            int kk = k;
+            models[k].forEach((x, y, z, state) -> {
+                if (y == -10 && x < 60) {
+                    counts[kk]++;
+                }
+            });
+        }
+        assertTrue(counts[0] > 200, "solid fill " + counts[0]);
+        assertTrue(counts[1] > 0 && counts[1] * 8 < counts[0], "columns only " + counts[1] + " of " + counts[0]);
+        // Where the ground lies near the datum the formation is solid either way
+        int[] near = new int[1];
+        models[1].forEach((x, y, z, state) -> {
+            if (y == -1 && x > 70 && x < 100) {
+                near[0]++;
+            }
+        });
+        assertTrue(near[0] > 0);
+    }
+
     @Test
     void stationBuildingsStandOnlyOnWideCurves() {
         GroundStation st = new GroundStation(new CrossSection("PTTP", 5), 120, GroundStation.House.OVER, 6, 14, 1, 0,
