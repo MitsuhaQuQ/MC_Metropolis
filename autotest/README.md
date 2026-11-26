@@ -59,7 +59,7 @@ try { node run.mjs --client buildings-view.spec.mjs station-square.spec.mjs } fi
 
 ## 改进清单的版本 8 回归
 
-这是布局 8 那一轮的回归（现在新世界默认布局 23，不设 `AUTOTEST_LAYOUT` 时按 23 跑）。固定 `AUTOTEST_LAYOUT=8`，在 `autotest/` 运行 `node run.mjs --client building-fit.spec.mjs castle-wards.spec.mjs rail-interfaces.spec.mjs rail-boundary.spec.mjs station-square.spec.mjs plaza-roads.spec.mjs station-circulation.spec.mjs rail-boxes.spec.mjs`。只有与故障规划输入配套的 `saved-transport.spec.mjs` 需要另设 `AUTOTEST_REPLAY`。开发服和客户端编译启动期间，应在同一代码版本下完成取样；运行中替换 class 会触发开发加载器热重载，不能充当干净生成的验证。
+这是布局 8 那一轮的回归（现在新世界默认布局 24，不设 `AUTOTEST_LAYOUT` 时按 24 跑）。固定 `AUTOTEST_LAYOUT=8`，在 `autotest/` 运行 `node run.mjs --client building-fit.spec.mjs castle-wards.spec.mjs rail-interfaces.spec.mjs rail-boundary.spec.mjs station-square.spec.mjs plaza-roads.spec.mjs station-circulation.spec.mjs rail-boxes.spec.mjs`。只有与故障规划输入配套的 `saved-transport.spec.mjs` 需要另设 `AUTOTEST_REPLAY`。开发服和客户端编译启动期间，应在同一代码版本下完成取样；运行中替换 class 会触发开发加载器热重载，不能充当干净生成的验证。
 
 | 用例 | 检查对象与证据目录（仓库 `build/debug/` 下） |
 | --- | --- |
@@ -101,7 +101,7 @@ node run.mjs --client urban-frontage.spec.mjs plaza-roads.spec.mjs residential-s
 
 复核玩家种子 `8689008927313558369` 时，保持布局 9，设置 `AUTOTEST_REPLAY` 为该世界的规划快照，再运行 `node run.mjs saved-transport.spec.mjs`。该用例单独检查干道断口、堤脚接入和铁路梁下净空。
 
-## 用户新世界的复现（布局 12–23）
+## 用户新世界的复现（布局 12–24）
 
 用户试玩新版本时报告的问题，按用户世界的种子在开发服上重新生成同一处再截图对照。用例都在 `cases/user-world-*.spec.mjs`，文件头写着种子和运行方式：
 
@@ -110,7 +110,7 @@ node run.mjs --client urban-frontage.spec.mjs plaza-roads.spec.mjs residential-s
 | `user-world-fixes` | 0.0.6，种子 1568509124983131767 | 布局 12：夹层站厅的出入口、与街齐平的公共建筑、城址的橹 |
 | `user-world-009` | 0.0.9，种子 8936058095230555848 | 布局 15：斜向高架的隔音墙、两座高架同层相交 |
 | `user-world-lake` | 0.0.10，种子 -3822740797505900337 | 布局 16–22：湖城的城际路线、山坡消退、湖边步道、护岸转角、跨河车站、主站 |
-| `user-world-l23` | 0.0.12，同上 | 布局 23：通往小岛的长桥、湖上车站的柱、城址、河的护岸和平桥；每处一张俯视、一张从南往北的斜视 |
+| `user-world-l23` | 0.0.12，同上 | 布局 23、24（`AUTOTEST_LAYOUT=24` 截图文件名带 `-v24`）：通往小岛的长桥、湖上车站的柱、城址、河的护岸和平桥；每处一张俯视、一张从南往北的斜视 |
 
 - **地形设置要和用户的一致**：用户世界的 MTM_worldgen 设置不是默认值（例如 `maxSurfaceHeight` 750），先把 `level.dat` 里 `WorldGenSettings/dimensions/minecraft:overworld/generator/biome_source/settings` 的 JSON 写进 `fabric/run/config/mtm_worldgen.json`（默认文件备份为 `mtm_worldgen.json.bak-default`，跑种子 12345 的用例前换回来）。
 - **运行**：`$env:AUTOTEST_SEED='-3822740797505900337'; node run.mjs --client cases/user-world-l23.spec.mjs`，约 6 分钟；截图在 `test-results/screens/l23-*-v23.png`，世界留在 `fabric/run/autotest`，可用 `mca` 脚本逐列读方块。对照旧布局时另设 `AUTOTEST_LAYOUT`。

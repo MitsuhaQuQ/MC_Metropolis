@@ -21,8 +21,8 @@ const layout = process.env.AUTOTEST_LAYOUT;
 // game's 8 hid everything past 128 blocks in fog
 const VIEW = Number(process.env.AUTOTEST_VIEW ?? 16);
 if (!Number.isInteger(VIEW) || VIEW < 2 || VIEW > 32) throw new Error('AUTOTEST_VIEW must be 2 to 32');
-if (layout !== undefined && !['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23'].includes(layout)) {
-  throw new Error('AUTOTEST_LAYOUT must be 1 to 23');
+if (layout !== undefined && !['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24'].includes(layout)) {
+  throw new Error('AUTOTEST_LAYOUT must be 1 to 24');
 }
 const ENDPOINT = join(RUN, 'testkit', 'endpoint-server.json');
 const LOG = join(RUN, 'logs', 'latest.log');

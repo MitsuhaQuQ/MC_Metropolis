@@ -17,7 +17,7 @@ data rather than guessed.
 > in-game map of the city plan opens with **K** or `/citymap`. Worlds made with one version may not match the next.
 > Do not use it for worlds you want to keep yet.
 
-Each dimension remembers the building layout it was created with, so an update that changes lot sizes or street edges does not cut across the buildings already there; new worlds get the latest (currently 23: street bridges run level with the roads on both banks, river embankments follow the actual water, castles keep off rivers and steep ground, no long bridges out to small islands, and railway profiles are fitted by building cost). Where a street narrows, its pavement, roadside grading and lots follow the actual kerb, and busy streets have a level paved strip before any slope or retaining wall. Temples, shrines and other landmarks from the building library are not placed in towns yet.
+Each dimension remembers the building layout it was created with, so an update that changes lot sizes or street edges does not cut across the buildings already there; new worlds get the latest (currently 24: intercity roads and railways never bridge long stretches of lake (the sea was never crossed; rivers are still bridged), riverside roads keep low beside the river, street bridges run level with the roads on both banks, river embankments follow the actual water, castles keep off rivers and steep ground, no long bridges out to small islands, and railway profiles are fitted by building cost). Where a street narrows, its pavement, roadside grading and lots follow the actual kerb, and busy streets have a level paved strip before any slope or retaining wall. Temples, shrines and other landmarks from the building library are not placed in towns yet.
 
 中文简介见[下文](#中文简介)。日本語の紹介は[こちら](#日本語の紹介)。
 
@@ -129,7 +129,7 @@ City Builder 是 [Realistic Landforms（MTM Worldgen）](https://github.com/Mits
   - 机场。
   - 住宅、商店、写字楼和公寓，用本 mod 自己的窗、屋面、门、灯笼和各种小设备。
 
-  游戏中也会生成车站和城址建筑；寺社和其他地标还没放进城里。每个维度记住创建时的建筑布局版本，新世界用最新的（目前是 23：街桥与两岸齐平，河的护岸按实际水面，城址避开河和陡坡，不铺通往小岛的长桥，铁路的纵断面按造价拟合）。道路收窄时，人行道、路肩整地和临街地块共用实际路缘；密集街区在坡面或挡墙前留出平整前场。已有维度沿用存档中的布局版本，已生成区块保留原地形。按 **K** 或输入 `/citymap` 打开城市规划地图。不同版本生成的世界可能对不上，暂时不要用在想保留的存档里。
+  游戏中也会生成车站和城址建筑；寺社和其他地标还没放进城里。每个维度记住创建时的建筑布局版本，新世界用最新的（目前是 24：街桥与两岸齐平，堤顶道路贴着河、护岸不再陡，城际道路和铁路不跨长水面，河的护岸按实际水面，城址避开河和陡坡，不铺通往小岛的长桥，铁路的纵断面按造价拟合）。道路收窄时，人行道、路肩整地和临街地块共用实际路缘；密集街区在坡面或挡墙前留出平整前场。已有维度沿用存档中的布局版本，已生成区块保留原地形。按 **K** 或输入 `/citymap` 打开城市规划地图。不同版本生成的世界可能对不上，暂时不要用在想保留的存档里。
 - **依赖**：Minecraft 1.20.1，Fabric 或 Forge，Java 17。地形需要 MTM Worldgen（没装时不生成城市）；MTR 可选，只读取它的车站。
 - **构建、调试图、数据来源和许可证**见上文英文部分。设计文档是中文的：[docs/city-logic-design.md](docs/city-logic-design.md)；工作流程和现状的总说明见 [docs/overview.md](docs/overview.md)。
 - **许可证**：代码采用 MIT；随 mod 发布的每件素材的来源和许可证都记在 ATTRIBUTION 里。路网与地块参考 PLATEAU 和 OpenStreetMap 的统计。随 mod 提供的姬路城天守、橹与渡廊模型由 PLATEAU 数据转换而来。
@@ -149,7 +149,7 @@ City Builder は [Realistic Landforms（MTM Worldgen）](https://github.com/Mits
   - 空港。
   - 住宅、商店、オフィス、マンション。窓、屋根、扉、提灯、各種設備はこの mod 独自のブロックです。
 
-  駅や城郭も生成されます（寺社やその他のランドマークはまだ街に置かれません）。各ディメンションは作成時の建物配置のバージョンを記録し、新規ワールドは最新（現在 23。橋は両岸の道路と同じ高さでつながり、川の護岸は実際の水面に合わせ、城は川や急斜面を避け、小島への長い橋は架けず、鉄道の縦断は工費で決めます）を使います。道幅が変わる場所では、歩道、沿道の整地、敷地の奥行きを同じ道路端に合わせます。既存のディメンションでは保存済みの配置を引き継ぎ、生成済みの地形はそのまま残ります。**K** キーまたは `/citymap` で都市計画の地図を開けます。版が変わると以前に生成したワールドと合わないことがあるので、残したいワールドにはまだ使わないでください。
+  駅や城郭も生成されます（寺社やその他のランドマークはまだ街に置かれません）。各ディメンションは作成時の建物配置のバージョンを記録し、新規ワールドは最新（現在 24。都市間の道路と鉄道は長い水面に橋を架けず、川沿いの堤防道路は低く保ちます。橋は両岸の道路と同じ高さでつながり、川の護岸は実際の水面に合わせ、城は川や急斜面を避け、小島への長い橋は架けず、鉄道の縦断は工費で決めます）を使います。道幅が変わる場所では、歩道、沿道の整地、敷地の奥行きを同じ道路端に合わせます。既存のディメンションでは保存済みの配置を引き継ぎ、生成済みの地形はそのまま残ります。**K** キーまたは `/citymap` で都市計画の地図を開けます。版が変わると以前に生成したワールドと合わないことがあるので、残したいワールドにはまだ使わないでください。
 - **必要なもの**：Minecraft 1.20.1、Fabric または Forge、Java 17。地形には MTM Worldgen が必要です（入っていないと都市は生成されません）。MTR は任意で、その駅を読み取るだけです。
 - **ビルド、計画図、データの出典とライセンス**は上の英語の部分を見てください。設計書は中国語です：[docs/city-logic-design.md](docs/city-logic-design.md)（仕組みと現状の概要は [docs/overview.md](docs/overview.md)）。
 - **ライセンス**：コードは MIT です。mod に同梱する素材はすべて出典とライセンスを ATTRIBUTION に記録しています。道路網と敷地の設計には PLATEAU と OpenStreetMap の統計を使っています。同梱の姫路城の天守・櫓・渡り廊下は PLATEAU のデータから作成しました。

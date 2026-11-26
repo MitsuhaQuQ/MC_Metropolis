@@ -54,6 +54,10 @@ class CitySettingsTest {
             assertEquals(!existingPlans, first.streets.castleSite);
             assertEquals(!existingPlans, first.streets.generatedBanks);
             assertEquals(!existingPlans, first.streets.flatBridges);
+            assertEquals(!existingPlans, first.streets.gentleBanks);
+            assertEquals(!existingPlans, first.plazas.bayRunOn);
+            assertEquals(!existingPlans, first.roads.waterDetour);
+            assertEquals(!existingPlans, first.rail.waterDetour);
             assertEquals(!existingPlans, first.transit.stationDecks);
             assertEquals(!existingPlans, first.transit.smoothStations);
             assertEquals(existingPlans ? 0.0 : 40.0, first.plots.parcelFrontage);
@@ -133,6 +137,13 @@ class CitySettingsTest {
         assertFalse(CitySettings.forBuildingLayout(islandDecks,true).streets.generatedBanks);
         assertFalse(CitySettings.forBuildingLayout(islandDecks,true).streets.flatBridges);
         assertFalse(CitySettings.forBuildingLayout(islandDecks,true).transit.stationDecks);
+        var steepBanks = new com.mtm.citybuilder.core.plan.MemoryPlanStore();
+        steepBanks.save("layout/building_scale", new byte[]{23});
+        assertFalse(CitySettings.forBuildingLayout(steepBanks,true).streets.gentleBanks);
+        assertFalse(CitySettings.forBuildingLayout(steepBanks,true).plazas.bayRunOn);
+        assertFalse(CitySettings.forBuildingLayout(steepBanks,true).roads.waterDetour);
+        assertFalse(CitySettings.forBuildingLayout(steepBanks,true).rail.waterDetour);
+        assertTrue(CitySettings.forBuildingLayout(steepBanks,true).streets.flatBridges);
         assertTrue(CitySettings.forBuildingLayout(islandDecks,true).transit.flatMainStation);
         assertFalse(CitySettings.forBuildingLayout(squareTees,true).transit.smoothStations);
         assertTrue(CitySettings.forBuildingLayout(squareTees,true).buildings.clearOfStreets);

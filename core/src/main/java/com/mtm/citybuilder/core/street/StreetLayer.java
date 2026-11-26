@@ -4143,6 +4143,14 @@ public final class StreetLayer {
         level = Math.min(level, ground);
         double crest = Math.max(ground, level + config.leveeHeight);
         double behind = Math.max(Math.min(crest, town), crest - 2.0 * config.leveeHeight);
+        if (config.gentleBanks) {
+            // Layout 24: the crest kept a levee over the water, the town over it reached by a slope rising inland,
+            // up to the ground as generated there (at most two levees' height, the land beyond left as it is)
+            crest = Math.min(crest, level + config.leveeHeight);
+            double above = config.generatedBanks
+                    ? terrain.surfaceHeight((int) Math.floor(x + nx * out), (int) Math.floor(z + nz * out)) : town;
+            behind = Math.min(Math.max(crest, above), crest + 2.0 * config.leveeHeight);
+        }
         return new double[]{x, z, crest, nx, nz, behind, level};
     }
 
@@ -4557,7 +4565,9 @@ public final class StreetLayer {
                 for (double[] p : run) {
                     double[] point = crest(window, p[0], p[1], bankWidth);
                     crest.add(point);
-                    rise = Math.max(rise, point[Embankment.CREST] - point[Embankment.GROUND]);
+                    rise = Math.max(rise, config.gentleBanks
+                            ? Math.abs(point[Embankment.CREST] - point[Embankment.GROUND])
+                            : point[Embankment.CREST] - point[Embankment.GROUND]);
                 }
                 double land = 0.5 * bankWidth + (rise >= 1.0 ? config.leveeSlope * rise + config.leveeRoad : 1.0);
                 embankments.add(new Embankment(crest, bankWidth, land));

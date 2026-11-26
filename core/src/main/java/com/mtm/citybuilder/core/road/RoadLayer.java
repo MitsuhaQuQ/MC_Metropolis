@@ -166,6 +166,8 @@ public final class RoadLayer {
         final int width;
         final int height;
         final byte[] kind;
+        /** Water cells on a lake (layout 24). */
+        final boolean[] lake;
         final float[] suit;
         final float[] ground;
         /** How far each node lies from the nearest river's water, in the corridor; infinite elsewhere. */
@@ -180,6 +182,7 @@ public final class RoadLayer {
             width = (int) Math.ceil((Math.max(edge.a().x(), edge.b().x()) + margin) / grid) - originX + 1;
             height = (int) Math.ceil((Math.max(edge.a().z(), edge.b().z()) + margin) / grid) - originZ + 1;
             kind = new byte[width * height];
+            lake = new boolean[width * height];
             suit = new float[width * height];
             ground = new float[width * height];
             riverEdge = new float[width * height];
@@ -342,6 +345,9 @@ public final class RoadLayer {
                         seen[k] = true;
                         if (Double.isNaN(below.suitabilityNode(originX + i, originZ + j))) {
                             kind[k] = WATER;
+                            // Layout 24: a lake's water (not a river's) is gone round, a long stretch of it not crossed
+                            lake[k] = config.waterDetour
+                                    && !Double.isNaN(terrain.lakeLevel((double) (originX + i) * grid, (double) (originZ + j) * grid));
                         }
                         // Rivers narrower than the grid run between its nodes: how far off this one's is
                         RiverSample river = terrain.nearestRiver((double) (originX + i) * grid, (double) (originZ + j) * grid);
@@ -356,6 +362,22 @@ public final class RoadLayer {
 
     /** A found path: its nodes from start to goal and how each was reached. */
     private record Path(List<Integer> nodes, List<Byte> steps) {
+    }
+
+
+    /** The longest stretch of consecutive lake samples, measured along the line (layout 24's {@code maxWaterRun}). */
+    static double longestWater(double[] xs, double[] zs, boolean[] water) {
+        double longest = 0.0;
+        double run = 0.0;
+        for (int i = 1; i < water.length; i++) {
+            if (water[i] && water[i - 1]) {
+                run += Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]);
+                longest = Math.max(longest, run);
+            } else {
+                run = 0.0;
+            }
+        }
+        return longest;
     }
 
     private RoadRoute compute(RoadEdge edge) {
@@ -427,7 +449,7 @@ public final class RoadLayer {
                 double next;
                 byte kind = STEP;
                 if (w.kind[m] == WATER || w.kind[k] == WATER) {
-                    next = length * (1.0 + (w.kind[m] == WATER ? config.bridgeCost : 0.0));
+                    next = length * (1.0 + (w.kind[m] == WATER ? (w.lake[m] ? config.detourBridgeCost : config.bridgeCost) : 0.0));
                 } else {
                     double poor = 1.0 + config.unsuitCost * (1.0 - w.suit[m]);
                     // A river narrower than the grid between the nodes: what of the step runs over it is bridge
@@ -680,6 +702,7 @@ public final class RoadLayer {
         }
         // Water: lakes are crossed at their level, rivers and lakes on bridges
         boolean[] water = new boolean[n];
+        boolean[] onLake = new boolean[n];
         boolean lakes = false;
         for (int i = 0; i < n; i++) {
             double lake = terrain.lakeLevel(xs[i], zs[i]);
@@ -689,7 +712,12 @@ public final class RoadLayer {
             if (inLake) {
                 ground[i] = lake;
                 lakes = true;
+                onLake[i] = true;
             }
+        }
+        if (config.waterDetour && longestWater(xs, zs, onLake) > config.maxWaterRun) {
+            // Layout 24: no road over long water, rather none
+            return RoadRoute.none(edge);
         }
         if (lakes) {
             height = heights(xs, zs, ground, grade);

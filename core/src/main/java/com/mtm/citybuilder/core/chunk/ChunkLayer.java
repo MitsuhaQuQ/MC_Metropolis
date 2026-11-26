@@ -1854,6 +1854,11 @@ public final class ChunkLayer {
             return new double[]{crest, BANK_CREST};
         }
         double rise = crest - ground;
+        if (config.gentleBanks && rise <= -1.0) {
+            // Layout 24: the town standing over the crest, a grass slope rising to it inland, no road at its foot
+            double up = config.leveeSlope * -rise;
+            return s <= half + up ? new double[]{crest + (s - half) / up * -rise, BANK_SLOPE} : null;
+        }
         if (rise < 1.0) {
             return null;
         }
@@ -1873,8 +1878,9 @@ public final class ChunkLayer {
      */
     private double nodeHeight(Index index, double x, double z) {
         return index.heights.computeIfAbsent(point(x, z), k -> {
-            // On an embankment's bank road: its crest
-            double crest = crest(index, x, z, 1.5);
+            // On an embankment's bank road: its crest (layout 24: anywhere on its paving, so a side street ending at
+            // its edge does not lift it to the ground behind the bank, the whole embankment raised with it)
+            double crest = logic.settings().streets.gentleBanks ? crestOnRoad(index, x, z) : crest(index, x, z, 1.5);
             if (!Double.isNaN(crest)) {
                 return crest;
             }
@@ -2341,9 +2347,19 @@ public final class ChunkLayer {
         java.util.PriorityQueue<double[]> crestApproaches = new java.util.PriorityQueue<>(open.comparator());
         Map<Long, Double> best = new HashMap<>();
         List<Long> crestNodes = new ArrayList<>();
+        // Layout 24: the junctions on a bank road's paving, which follows its crest along the water
+        boolean gentle = logic.settings().streets.gentleBanks;
+        Set<Long> onBank = new java.util.HashSet<>();
         for (Map.Entry<Long, double[]> n : nodes.entrySet()) {
             double[] at = n.getValue();
             double seed = crest(index, at[0], at[1], 1.5);
+            if (gentle) {
+                // Layout 24: any junction on the bank road's paving at the crest there, ramps starting from it
+                seed = crestOnRoad(index, at[0], at[1]);
+                if (!Double.isNaN(seed)) {
+                    onBank.add(n.getKey());
+                }
+            }
             Double preset = index.heights.get(n.getKey());
             if (Double.isNaN(seed) && preset == null) {
                 // Neither on a crest nor a bridge's end: its ground (precise terrain, dear) only if a ramp reaches it
@@ -2385,6 +2401,12 @@ public final class ChunkLayer {
             index.heights.merge(node, top[0], Math::max);
             for (double[] link : links.getOrDefault(node, List.of())) {
                 long next = (long) link[0];
+                if (onBank.contains(next)) {
+                    // Layout 24: no ramp carried along a bank road, which keeps to its crest (before, a lift from high
+                    // ground upstream came down it at 1 in leveeRamp, more gently than the river fell, and stood the
+                    // road and its embankment ten blocks over the levee)
+                    continue;
+                }
                 double[] at = nodes.get(next);
                 Double preset = index.heights.get(next);
                 double ground = preset != null ? preset : groundHeight(at[0], at[1]);
@@ -2442,7 +2464,8 @@ public final class ChunkLayer {
                 long next=(long)edge[0];
                 double height=here[0]-edge[1]/ramp;
                 var at=nodes.get(next);
-                if(!lifted.contains(next) && height>groundHeight(at[0],at[1])) {
+                // Layout 24: not along a bank road, which keeps to its own crest
+                if(!lifted.contains(next) && !onBank.contains(next) && height>groundHeight(at[0],at[1])) {
                     liftedCrests.add(new double[]{height,next});
                 }
             }
@@ -2456,6 +2479,8 @@ public final class ChunkLayer {
             for (double[] edge : links.getOrDefault(node, List.of())) {
                 long next = (long)edge[0];
                 if (graded.contains(next)) continue;
+                // Layout 24: a bank road keeps to its crest, not graded down from the junctions above it
+                if (onBank.contains(next)) continue;
                 double[] at = nodes.get(next);
                 double target = here[0] - edge[1] / ramp;
                 if (target > groundHeight(at[0], at[1])) crestApproaches.add(new double[]{target, next});
@@ -2649,6 +2674,26 @@ public final class ChunkLayer {
             }
         }
         return false;
+    }
+
+    /** The crest of the embankment whose bank road's paving (its half width, at least 1.5) holds a position, or NaN. */
+    private static double crestOnRoad(Index index, double x, double z) {
+        List<double[]> near = index.banks.get(key(Math.floorDiv((int) Math.floor(x), 16), Math.floorDiv((int) Math.floor(z), 16)));
+        double best = Double.POSITIVE_INFINITY;
+        double crest = Double.NaN;
+        if (near != null) {
+            for (double[] b : near) {
+                double dx = b[2] - b[0];
+                double dz = b[3] - b[1];
+                double t = Math.max(0, Math.min(1, ((x - b[0]) * dx + (z - b[1]) * dz) / Math.max(1e-9, dx * dx + dz * dz)));
+                double d = Math.hypot(b[0] + dx * t - x, b[1] + dz * t - z);
+                if (d <= Math.max(1.5, 0.5 * b[12]) && d < best) {
+                    best = d;
+                    crest = b[4] + (b[5] - b[4]) * t;
+                }
+            }
+        }
+        return crest;
     }
 
     /** The crest of an embankment whose centre line runs within {@code reach} of a position, or NaN. */

@@ -150,6 +150,8 @@ public final class RailLayer {
         final int width;
         final int height;
         final byte[] kind;
+        /** Water cells on a lake (layout 24). */
+        final boolean[] lake;
         final float[] suit;
         final float[] ground;
 
@@ -160,6 +162,7 @@ public final class RailLayer {
             width = (int) Math.ceil((Math.max(edge.a().x(), edge.b().x()) + margin) / grid) - originX + 1;
             height = (int) Math.ceil((Math.max(edge.a().z(), edge.b().z()) + margin) / grid) - originZ + 1;
             kind = new byte[width * height];
+            lake = new boolean[width * height];
             suit = new float[width * height];
             ground = new float[width * height];
             IntStream.range(0, width).parallel().forEach(i -> {
@@ -253,11 +256,29 @@ public final class RailLayer {
                         seen[k] = true;
                         if (Double.isNaN(below.suitabilityNode(originX + i, originZ + j))) {
                             kind[k] = WATER;
+                            // Layout 24: a lake's water (not a river's) is gone round, a long stretch of it not crossed
+                            lake[k] = config.waterDetour
+                                    && !Double.isNaN(terrain.lakeLevel((double) (originX + i) * grid, (double) (originZ + j) * grid));
                         }
                     }
                 }
             }
         }
+    }
+
+    /** The longest stretch of consecutive lake samples, measured along the line (layout 24's {@code maxWaterRun}). */
+    static double longestWater(double[] xs, double[] zs, boolean[] water) {
+        double longest = 0.0;
+        double run = 0.0;
+        for (int i = 1; i < water.length; i++) {
+            if (water[i] && water[i - 1]) {
+                run += Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]);
+                longest = Math.max(longest, run);
+            } else {
+                run = 0.0;
+            }
+        }
+        return longest;
     }
 
     private RailRoute compute(RailEdge edge) {
@@ -303,7 +324,7 @@ public final class RailLayer {
                 return Double.POSITIVE_INFINITY;
             }
             if (w.kind[k] == WATER) {
-                total += partLength * (1.0 + config.bridgeCost);
+                total += partLength * (1.0 + (w.lake[k] ? config.detourBridgeCost : config.bridgeCost));
             } else {
                 total += partLength * (1.0 + config.unsuitCost * (1.0 - w.suit[k]));
                 if (w.kind[previous] == LAND) {
@@ -353,6 +374,10 @@ public final class RailLayer {
             lakes[i] = inLake;
             rivers[i] = water[i] && !inLake;
             ground[i] = inLake ? lake : smooth;
+        }
+        if (config.waterDetour && longestWater(xs, zs, lakes) > config.maxWaterRun) {
+            // Layout 24: no line over long water, rather none
+            return RailRoute.none(edge);
         }
         double[] heights = config.fitProfile
                 ? Alignment.fitProfile(xs, zs, ground, lakes, rivers, grade(railClass), config.tunnelCost)

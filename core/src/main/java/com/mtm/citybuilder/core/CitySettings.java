@@ -21,7 +21,7 @@ public final class CitySettings {
         String key = "layout/building_scale";
         byte[] version = store.load(key);
         if (version == null) {
-            version = new byte[]{(byte) (existingPlans ? 1 : 23)};
+            version = new byte[]{(byte) (existingPlans ? 1 : 24)};
             store.save(key, version);
         }
         CitySettings settings = new CitySettings();
@@ -33,7 +33,7 @@ public final class CitySettings {
             settings.transit.mainWidth = 40.0;
             settings.transit.townLineWidth = 14.0;
             settings.transit.siteWidth = 20.0;
-        } else if (version.length != 1 || (version[0] < 2 || version[0] > 23)) {
+        } else if (version.length != 1 || (version[0] < 2 || version[0] > 24)) {
             throw new IllegalStateException("Unsupported saved building layout version");
         }
         settings.extent.ruggedFade = version[0] >= 17;
@@ -53,6 +53,10 @@ public final class CitySettings {
         settings.streets.castleSite = version[0] >= 23;
         settings.streets.generatedBanks = version[0] >= 23;
         settings.streets.flatBridges = version[0] >= 23;
+        settings.streets.gentleBanks = version[0] >= 24;
+        settings.plazas.bayRunOn = version[0] >= 24;
+        settings.roads.waterDetour = version[0] >= 24;
+        settings.rail.waterDetour = version[0] >= 24;
         settings.transit.stationDecks = version[0] >= 23;
         settings.roads.landEnds = version[0] >= 16;
         settings.rail.landEnds = version[0] >= 16;
@@ -561,6 +565,16 @@ public final class CitySettings {
         public double tunnelMaxLength = 3000.0;
         /** Extra cost per block over water: bridges. */
         public double bridgeCost = 4.0;
+        /**
+         * Long water not bridged (layout 24, the user: across the sea or other long water, rather no link or a way
+         * round than a bridge straight over it): each block over a lake costs {@code detourBridgeCost} times a block
+         * on land (a river's still {@code bridgeCost}: a wide river is bridged, as Japan's are), so the route goes round
+         * where it can; a route still crossing more than {@code maxWaterRun} blocks of a lake in one stretch is not
+         * built at all. The sea was never crossed.
+         */
+        public boolean waterDetour = true;
+        public double detourBridgeCost = 12.0;
+        public double maxWaterRun = 400.0;
         /** Around the first route, rivers and lakes are looked up within this distance and the road routed again. */
         public double corridor = 1500.0;
         /** Spacing of the profile's samples along a road. */
@@ -660,6 +674,16 @@ public final class CitySettings {
         public double climbCost = 20.0;
         /** Extra cost per block over water. */
         public double bridgeCost = 3.0;
+        /**
+         * Long water not bridged (layout 24, the user: across the sea or other long water, rather no link or a way
+         * round than a bridge straight over it): each block over a lake costs {@code detourBridgeCost} times a block
+         * on land (a river's still {@code bridgeCost}: a wide river is bridged, as Japan's are), so the route goes round
+         * where it can; a route still crossing more than {@code maxWaterRun} blocks of a lake in one stretch is not
+         * built at all. The sea was never crossed.
+         */
+        public boolean waterDetour = true;
+        public double detourBridgeCost = 12.0;
+        public double maxWaterRun = 400.0;
         /**
          * Cost of each change of heading, in blocks: without it the search zigzags between neighbouring headings to
          * run between them, and the line gets a curve every few hundred blocks.
@@ -1103,6 +1127,14 @@ public final class CitySettings {
          * on), the deck sloping between them no steeper than 1 in 6, so the streets either side need no ramp.
          */
         public boolean flatBridges = true;
+        /**
+         * Embankments under a town standing high over its water kept low (layout 24, the user: the revetment by the
+         * park was still very steep): the crest no higher than the water plus {@code leveeHeight}, so the revetment
+         * keeps its section (four blocks up over the room between the promenade and the bank road); the town above is
+         * reached inland by a grass slope rising 1 in {@code leveeSlope}, at most two levees' height. Before, the crest
+         * stood at the bank's own ground, 14 over a river cut into the town, and the revetment climbed it over 7 blocks.
+         */
+        public boolean gentleBanks = true;
         public double castleRelief = 30.0;
         public double templeReach = 1500.0;
         /** Above this urban intensity, streets belong to the old town; below, to the modern town. */
@@ -1543,6 +1575,11 @@ public final class CitySettings {
     public static final class Plazas {
         /** Lay straight stopping kerbs first and join them to verified street approaches. */
         public boolean frontageLayout = true;
+        /**
+         * A kerbside bay's street runs on past each end of it (layout 24): before, only the bay and its tapers had to
+         * lie along the street, so one could stand at a street's end, its exit leading off the road.
+         */
+        public boolean bayRunOn = true;
         /** Grade the central pedestrian approach across the reserved station forecourt site. */
         public boolean entranceApproach = true;
         /** Connect high station concourses to a lower plaza when the approach can clear the street. */

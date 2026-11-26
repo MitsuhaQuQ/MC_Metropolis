@@ -415,7 +415,7 @@ public record StationPlaza(Template template, double x, double z, double heading
             links.add(new Link(u-half*site.du,v-half*site.dv,u+half*site.du,v+half*site.dv,6,1,0));
             links.add(new Link(u+half*site.du,v+half*site.dv,site.u+(half+taper)*site.du+inner*nu,
                     site.v+(half+taper)*site.dv+inner*nv,4,0,0));
-            if (!clearBay(site,roads,dry,links,half+taper)) continue;
+            if (!clearBay(site,roads,dry,links,half+taper+(config.bayRunOn?BAY_RUN_ON:0))) continue;
             List<Berth> stops=new ArrayList<>();
             double s=1;
             stops.add(new Berth(Use.BUS,-2,s,s+config.berth,true)); s+=config.berth+1;
@@ -450,6 +450,9 @@ public record StationPlaza(Template template, double x, double z, double heading
         }
         return null;
     }
+
+    /** How far the street runs on past each end of a kerbside bay at least (layout 24). */
+    private static final double BAY_RUN_ON = 6.0;
 
     private boolean clearBay(BaySite site,List<StreetSegment> roads,Free dry,List<Link> links,double reach) {
         double tx=(site.road.x2()-site.road.x1())/site.road.length(),tz=(site.road.z2()-site.road.z1())/site.road.length();
