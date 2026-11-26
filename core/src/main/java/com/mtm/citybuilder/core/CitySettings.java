@@ -51,6 +51,8 @@ public final class CitySettings {
         settings.transit.flatMainStation = version[0] >= 22;
         settings.streets.islandBridges = version[0] >= 23;
         settings.streets.castleSite = version[0] >= 23;
+        settings.streets.generatedBanks = version[0] >= 23;
+        settings.streets.flatBridges = version[0] >= 23;
         settings.transit.stationDecks = version[0] >= 23;
         settings.roads.landEnds = version[0] >= 16;
         settings.rail.landEnds = version[0] >= 16;
@@ -1089,6 +1091,18 @@ public final class CitySettings {
          * grounds hold no water and rise no more than {@code castleRelief}, before the highest built land at all.
          */
         public boolean castleSite = true;
+        /**
+         * A river's embankment at its water and bank as generated, and a street bridge's banks at the ground as
+         * generated (layout 23): planned on the valley's smooth ground, a river cut 28 blocks into it had its crest
+         * roads, terraces and bridges that much over it, the bridges' ends stepping down to the streets.
+         */
+        public boolean generatedBanks = true;
+        /**
+         * Street bridges laid level with their banks (layout 23, the user: with this many bridges both sides level with
+         * them is enough, no rise and ramps): no {@code bridgeRise}, each end at its bank's ground (or the crest it lands
+         * on), the deck sloping between them no steeper than 1 in 6, so the streets either side need no ramp.
+         */
+        public boolean flatBridges = true;
         public double castleRelief = 30.0;
         public double templeReach = 1500.0;
         /** Above this urban intensity, streets belong to the old town; below, to the modern town. */

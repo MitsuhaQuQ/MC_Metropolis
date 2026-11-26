@@ -788,6 +788,16 @@ public final class CityChunks {
                 int eighths = 8;
                 if (column.bridge()) {
                     y = (int) column.deck();
+                    if (column.deck() != Math.floor(column.deck())) {
+                        // Layout 23: a deck sloping between its banks, topped in eighths as a street rising on a ramp
+                        int[] laid = surface(column.deck() + 0.5);
+                        if (laid[1] < 8 && cut(block, laid[1]) != null) {
+                            y = laid[0];
+                            eighths = laid[1];
+                        } else {
+                            y = laid[1] >= 4 ? laid[0] : laid[0] - 1;
+                        }
+                    }
                 } else {
                     // The ground: down from the top past air and plants to the first solid block, the heightmaps not
                     // being trusted here; where water lies on top, its surface, the water under the street filled

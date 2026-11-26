@@ -52,6 +52,8 @@ class CitySettingsTest {
             assertEquals(!existingPlans, first.transit.flatMainStation);
             assertEquals(!existingPlans, first.streets.islandBridges);
             assertEquals(!existingPlans, first.streets.castleSite);
+            assertEquals(!existingPlans, first.streets.generatedBanks);
+            assertEquals(!existingPlans, first.streets.flatBridges);
             assertEquals(!existingPlans, first.transit.stationDecks);
             assertEquals(!existingPlans, first.transit.smoothStations);
             assertEquals(existingPlans ? 0.0 : 40.0, first.plots.parcelFrontage);
@@ -128,6 +130,8 @@ class CitySettingsTest {
         islandDecks.save("layout/building_scale", new byte[]{22});
         assertFalse(CitySettings.forBuildingLayout(islandDecks,true).streets.islandBridges);
         assertFalse(CitySettings.forBuildingLayout(islandDecks,true).streets.castleSite);
+        assertFalse(CitySettings.forBuildingLayout(islandDecks,true).streets.generatedBanks);
+        assertFalse(CitySettings.forBuildingLayout(islandDecks,true).streets.flatBridges);
         assertFalse(CitySettings.forBuildingLayout(islandDecks,true).transit.stationDecks);
         assertTrue(CitySettings.forBuildingLayout(islandDecks,true).transit.flatMainStation);
         assertFalse(CitySettings.forBuildingLayout(squareTees,true).transit.smoothStations);

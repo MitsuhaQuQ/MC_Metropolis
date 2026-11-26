@@ -666,7 +666,8 @@ public final class ChunkLayer {
      * A town's street pieces bucketed by chunk, its bridges' deck heights by piece, and for each piece the pieces that
      * continue it: of its class, sharing an end, within 30 degrees of its line.
      */
-    private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck, int[][] links,
+    private record Index(Map<Long, List<Integer>> byChunk, List<StreetSegment> segments, double[] deck,
+                         double[][] deckEnds, int[][] links,
                          Map<Long, List<double[]>> canals, Map<Long, List<StationPlaza>> plazas,
                          Map<Long, List<Stop>> stops, Map<Long, Double> heights, boolean[][] round,
                          Map<Long, List<double[]>> banks, double[][][] interior, int[] street, List<double[]> curbBounds, StreetWidths widths, CastleTerrain castle,
@@ -930,7 +931,13 @@ public final class ChunkLayer {
                                 across = (across < 0 ? -1.0 : 1.0) * d;
                             }
                             double along = cx * ux + cz * uz;
-                            double deck = bridge ? Math.max(index.deck[p], old.bridge ? old.deck : Double.NEGATIVE_INFINITY) : Double.NaN;
+                            double laid = index.deck[p];
+                            if (bridge && index.deckEnds[p] != null) {
+                                // Layout 23: sloping from one bank's level to the other's
+                                double[] ends = index.deckEnds[p];
+                                laid = ends[0] + (ends[1] - ends[0]) * Math.max(0.0, Math.min(1.0, t / Math.max(1e-9, length)));
+                            }
+                            double deck = bridge ? Math.max(laid, old.bridge ? old.deck : Double.NEGATIVE_INFINITY) : Double.NaN;
                             Column road = new Column(surface, bridge, deck, across, heading, along, width);
                             columns[c] = active==null ? road : road.withStop(active.paint(road,g.width()));
                         }
@@ -2664,6 +2671,93 @@ public final class ChunkLayer {
         return crest;
     }
 
+    /**
+     * A bridge laid level with its banks (layout 23, the user: the many bridges need not rise and ramp down to their
+     * streets, level with the streets either side is enough): a run of pieces end to end with two banks runs straight
+     * from the one's level to the other's, each the ground there as generated (or the embankment's crest it lands on),
+     * no steeper than {@link #BRIDGE_GRADE} (the lower bank's end raised to keep it so), and clear of the water under
+     * each piece by {@link #BRIDGE_CLEARANCE}; {@code deckEnds} the levels at each piece's two ends (the block the deck is
+     * laid at, continuous), {@code deck} the higher. A run with more than two banks keeps its level deck.
+     */
+    private void levelBridge(List<StreetSegment> segments, List<Integer> run, Map<Long, List<Integer>> ends, double[] deck,
+                             double[][] deckEnds, StreetPlan plan) {
+        List<double[]> banks = new ArrayList<>();
+        for (int p : run) {
+            StreetSegment g = segments.get(p);
+            for (double[] e : new double[][]{{g.x1(), g.z1()}, {g.x2(), g.z2()}}) {
+                if (ends.getOrDefault(point(e[0], e[1]), List.of()).stream().filter(run::contains).count() == 1) {
+                    banks.add(e);
+                }
+            }
+        }
+        if (banks.size() != 2) {
+            return;
+        }
+        // Along the run from the first bank: each piece's ends' distances
+        Map<Long, Double> along = new HashMap<>();
+        along.put(point(banks.get(0)[0], banks.get(0)[1]), 0.0);
+        java.util.ArrayDeque<Long> queue = new java.util.ArrayDeque<>(List.of(point(banks.get(0)[0], banks.get(0)[1])));
+        while (!queue.isEmpty()) {
+            long at = queue.poll();
+            for (int p : ends.getOrDefault(at, List.of())) {
+                if (!run.contains(p)) {
+                    continue;
+                }
+                StreetSegment g = segments.get(p);
+                long a = point(g.x1(), g.z1()), b = point(g.x2(), g.z2());
+                long other = a == at ? b : a;
+                if (!along.containsKey(other)) {
+                    along.put(other, along.get(at) + g.length());
+                    queue.add(other);
+                }
+            }
+        }
+        Double total = along.get(point(banks.get(1)[0], banks.get(1)[1]));
+        if (total == null || total <= 0.0) {
+            return;
+        }
+        double reach = logic.settings().streets.bankOffset + 8.0;
+        double[] level = new double[2];
+        for (int k = 0; k < 2; k++) {
+            double[] e = banks.get(k);
+            double ground = logic.terrain().surfaceHeight((int) Math.floor(e[0]), (int) Math.floor(e[1]));
+            level[k] = Math.max(Math.floor(ground) + 1.0, crestNear(plan, e[0], e[1], reach));
+        }
+        // No steeper than the grade: the lower end raised
+        double most = total * BRIDGE_GRADE;
+        if (level[0] < level[1] - most) {
+            level[0] = level[1] - most;
+        } else if (level[1] < level[0] - most) {
+            level[1] = level[0] - most;
+        }
+        // Clear of the water under every piece: the whole line raised by the most it falls short
+        double lift = 0.0;
+        for (int p : run) {
+            StreetSegment g = segments.get(p);
+            Double a = along.get(point(g.x1(), g.z1())), b = along.get(point(g.x2(), g.z2()));
+            if (a == null || b == null) {
+                return;
+            }
+            double mid = level[0] + (level[1] - level[0]) * (0.5 * (a + b)) / total;
+            double water = logic.terrain().waterLevel(0.5 * (g.x1() + g.x2()), 0.5 * (g.z1() + g.z2()));
+            if (!Double.isNaN(water)) {
+                lift = Math.max(lift, water + BRIDGE_CLEARANCE - mid);
+            }
+        }
+        for (int p : run) {
+            StreetSegment g = segments.get(p);
+            double a = level[0] + (level[1] - level[0]) * along.get(point(g.x1(), g.z1())) / total + lift;
+            double b = level[0] + (level[1] - level[0]) * along.get(point(g.x2(), g.z2())) / total + lift;
+            deckEnds[p] = new double[]{a, b};
+            deck[p] = Math.max(a, b);
+        }
+    }
+
+    /** The steepest a bridge laid level with its banks runs (1 in 6, a town street's steepest). */
+    private static final double BRIDGE_GRADE = 1.0 / 6.0;
+    /** How far a bridge's deck stands over the water at the least (its block over the surface, with a beam's room). */
+    private static final double BRIDGE_CLEARANCE = 2.0;
+
     /** The highest crest of a plan's embankments whose centre line points lie within {@code reach}, or -infinity. */
     private static double crestNear(StreetPlan plan, double x, double z, double reach) {
         double best = Double.NEGATIVE_INFINITY;
@@ -2810,6 +2904,7 @@ public final class ChunkLayer {
         // Bridges: runs of bridge pieces joined end to end, each level at its higher bank plus a block
         double[] deck = new double[segments.size()];
         java.util.Arrays.fill(deck, Double.NaN);
+        double[][] deckEnds = new double[segments.size()][];
         Map<Long, List<Integer>> ends = new HashMap<>();
         for (int p = 0; p < segments.size(); p++) {
             StreetSegment g = segments.get(p);
@@ -2847,7 +2942,11 @@ public final class ChunkLayer {
                 for (double[] e : new double[][]{{g.x1(), g.z1()}, {g.x2(), g.z2()}}) {
                     long count = ends.getOrDefault(point(e[0], e[1]), List.of()).stream().filter(run::contains).count();
                     if (count == 1) {
-                        bank = Math.max(bank, logic.terrain().smoothHeight(e[0], e[1]));
+                        // Layout 23: the bank's ground as generated (the smooth ground stood far over a river cut
+                        // deep into its valley)
+                        bank = Math.max(bank, logic.settings().streets.generatedBanks
+                                ? logic.terrain().surfaceHeight((int) Math.floor(e[0]), (int) Math.floor(e[1]))
+                                : logic.terrain().smoothHeight(e[0], e[1]));
                         // Over an embankment's crest, which the bridge lands on
                         bank = Math.max(bank, crestNear(plan, e[0], e[1], logic.settings().streets.bankOffset + 8.0));
                     }
@@ -2867,6 +2966,9 @@ public final class ChunkLayer {
             double level = Math.max(bank, logic.terrain().seaLevel()) + 1.0 + rise;
             for (int p : run) {
                 deck[p] = Math.floor(level);
+            }
+            if (cfg.flatBridges) {
+                levelBridge(segments, run, ends, deck, deckEnds, plan);
             }
         }
         int[][] links = links(segments);
@@ -2958,7 +3060,7 @@ public final class ChunkLayer {
         if (logic.settings().streets.bridgeEnds) {
             squareBridgeEnds(segments, round);
         }
-        Index index = new Index(byChunk, segments, deck, links, canals, plazas, stops, heights, round, banks,
+        Index index = new Index(byChunk, segments, deck, deckEnds, links, canals, plazas, stops, heights, round, banks,
                 interior(segments, byChunk), streets(links),
                 plan.plazas().stream().filter(square -> square.curbStreet() != null).map(StationPlaza::bounds).toList(),
                 new StreetWidths(logic.settings().streets.continuousCarriageways ? segments : List.of()),
@@ -2974,6 +3076,12 @@ public final class ChunkLayer {
             if (g.structure() == StreetStructure.BRIDGE && !Double.isNaN(deck[p])) {
                 // At the deck's top: a street's paving tops out half a block over its level (the chunk layer lays
                 // it so), the deck's at the top of its block
+                if (deckEnds[p] != null) {
+                    // Layout 23: each end at its own bank's level, the streets there level with it
+                    heights.merge(point(g.x1(), g.z1()), deckEnds[p][0] + 0.5, Math::max);
+                    heights.merge(point(g.x2(), g.z2()), deckEnds[p][1] + 0.5, Math::max);
+                    continue;
+                }
                 double end = Math.floor(deck[p]) + 0.5;
                 heights.merge(point(g.x1(), g.z1()), end, Math::max);
                 heights.merge(point(g.x2(), g.z2()), end, Math::max);

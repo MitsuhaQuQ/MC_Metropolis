@@ -4127,6 +4127,16 @@ public final class StreetLayer {
         double lake = terrain.lakeLevel(qx, qz);
         double level = !Double.isNaN(lake) ? lake
                 : terrain.landform(qx, qz) == Landform.OCEAN ? terrain.seaLevel() : terrain.smoothHeight(qx, qz);
+        if (config.generatedBanks && Double.isNaN(lake) && terrain.landform(qx, qz) != Landform.OCEAN) {
+            // Layout 23: a river at its water as generated and its bank at the ground as generated (a few points
+            // along each bank, so the fine terrain's cost stays small): the valley's smooth ground stood 28 blocks
+            // over a river cut deep into it, and the whole embankment and the bridges on it with it
+            double water = terrain.waterLevel(qx, qz);
+            if (!Double.isNaN(water)) {
+                level = water;
+                ground = Math.min(ground, terrain.surfaceHeight((int) Math.floor(x), (int) Math.floor(z)));
+            }
+        }
         // The water at a bank lies no higher than the bank's ground (the point sampled across it may fall on another
         // water, a lake up in the hills); the back slope falls at most two levees' height, the ground beyond left
         // as it is (a bank above a drop would otherwise reach hundreds of blocks inland, and keep the lots off)
